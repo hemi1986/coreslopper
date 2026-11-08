@@ -4,6 +4,14 @@ The shared language of the workflow, its projects, and its artifacts. Definition
 
 ## Language
 
+**Workspace**:
+A self-contained directory created by `npx coreslopper init` that holds the workflow runtime, configuration, credentials, and one or more projects. It is the unit a user opens in Claude Code.
+_Avoid_: repo, checkout
+
+**Runtime Snapshot**:
+The versioned copy of the workflow files that `npx coreslopper init` writes into a workspace. It is not a git clone and is updated by re-running init.
+_Avoid_: install, template
+
 **Brief**:
 The one-page statement of topic, source, audience, length, formats, and style that anchors every later creative decision.
 _Avoid_: concept, pitch

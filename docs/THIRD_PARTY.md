@@ -51,6 +51,17 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+## Onboarding and build dependencies
+
+The published `coreslopper` package uses these MIT-licensed libraries in addition to the runtime dependencies:
+
+| Package | License | Use |
+|---|---|---|
+| `@clack/prompts` | MIT | Interactive onboarding prompts |
+| `tsup` | MIT | Bundling the npx entry point with esbuild |
+
+`commander`, `yaml`, and `zod` are also MIT-licensed and are declared in the root `package.json`.
+
 ## Remotion
 
 - **Package:** `remotion`, `@remotion/three`, and related `@remotion/*` packages

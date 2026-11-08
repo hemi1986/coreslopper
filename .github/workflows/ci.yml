@@ -69,6 +69,16 @@ jobs:
           npm run cli -- render projects/demo --still 130 --still-scale 0.25
           test -s projects/demo/renders/still-130.png
 
+      - name: Build npm package and npx bundle
+        run: npm run build
+
+      - name: Package smoke test
+        run: |
+          npm pack
+          npx -y -p ./coreslopper-0.1.0.tgz coreslopper init "$RUNNER_TEMP/coreslopper-npx" --yes --no-install --no-git --skip-project
+          npx -y -p ./coreslopper-0.1.0.tgz coreslopper doctor "$RUNNER_TEMP/coreslopper-npx"
+          test -f "$RUNNER_TEMP/coreslopper-npx/packages/cli/src/init.ts"
+
       - name: Upload demo artifacts
         uses: actions/upload-artifact@v4
         with:

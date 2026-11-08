@@ -13,5 +13,6 @@ Short records of decisions that are hard to reverse, surprising without context,
 | [0007](0007-remotion-deterministic-renderer.md) | Remotion is the renderer; determinism is enforced. |
 | [0008](0008-local-audio-analysis.md) | Local Demucs + WhisperX + librosa; lyrics text wins. |
 | [0009](0009-mit-open-source.md) | MIT open source with explicit third-party notices. |
+| [0010](0010-npx-onboarding.md) | npx onboarding with a versioned runtime snapshot. |
 
 Status values: `Accepted`, `Deprecated`, `Superseded by ADR-NNNN`.

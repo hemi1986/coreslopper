@@ -22,6 +22,8 @@ export interface NewProjectOptions {
   imageProvider?: 'fal' | 'mock';
   videoProvider?: 'fal' | 'mock';
   songProvider?: 'suno' | 'import' | 'mock';
+  /** Workspace root. Defaults to the repository root discovered from cwd. */
+  root?: string;
 }
 
 function titleFromSlug(slug: string): string {
@@ -63,7 +65,7 @@ export async function createProject(options: NewProjectOptions): Promise<string>
     throw new ConfigError('A project budget is required. Pass --budget <USD>.');
   }
 
-  const root = repoRoot();
+  const root = options.root ?? repoRoot();
   const defaults = await loadDefaults(root);
   if (options.budget < defaults.budget.minimum_usd) {
     throw new ConfigError(

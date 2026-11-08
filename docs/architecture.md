@@ -160,6 +160,15 @@ Formats are separate compositions (`16x9`, `9x16`, `1x1`, `4x5`) with safe-area-
 
 The core skills and scripts are tool-agnostic. The commands, agents, hooks, and MCP config are the Claude Code layer.
 
+## Distribution and onboarding
+
+The root package is publishable as `coreslopper`. `npm run build` produces two artifacts:
+
+- `runtime/` — a snapshot of the tracked workflow, excluding generated media and local credentials;
+- `dist/cli.js` — a bundled npx entry point with `init`, `doctor`, `new`, `status`, and `validate`.
+
+`npx coreslopper init` copies `runtime/` into a private workspace, checks the local toolchain, optionally installs uv/Python/ffmpeg/Claude Code, writes `FAL_KEY` to `.env`, and configures the Suno MCP server in `.mcp.json`. The npx package deliberately does not depend on Remotion; the workspace's `npm install` provides rendering and audio-analysis dependencies. The workspace is a snapshot, not a clone, so updates use `init --force` rather than `git pull`. See [onboarding.md](onboarding.md) and [ADR 0010](adr/0010-npx-onboarding.md).
+
 ## Security and licensing
 
 - No secrets in the repository. `.env.example` documents the variables; `.env` is gitignored.

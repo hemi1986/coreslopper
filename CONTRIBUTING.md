@@ -68,6 +68,20 @@ Do not hand-edit `schema/*.json`; regenerate it.
 
 CI runs without API keys and uses the mock provider. GPU tests are opt-in.
 
+## Publishing the npx package
+
+The root package is published as `coreslopper`. The `prepack` hook builds `runtime/` and `dist/cli.js`, so the tarball always contains the current workflow.
+
+```bash
+npm login
+npm run typecheck
+npm test
+npm run pack:check     # builds and inspects the tarball
+npm publish            # add --provenance in CI
+```
+
+The GitHub Actions `publish` workflow runs the same checks on a manual dispatch or a published release. It expects an `NPM_TOKEN` secret with publish access to the `coreslopper` package. Never put a token in `.env`, a workflow file, or a commit.
+
 ## Commits and pull requests
 
 - Keep commits focused.

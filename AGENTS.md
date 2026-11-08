@@ -14,6 +14,18 @@ An open-source, Claude Code-native workflow for producing music videos from a br
 
 ## Quickstart
 
+Create a workspace with the published onboarding CLI:
+
+```bash
+npx coreslopper@latest init my-video
+cd my-video
+claude
+```
+
+The wizard checks and optionally installs Node-adjacent tools, validates an optional fal.ai key, configures the Suno MCP server, and creates the first project. In Claude Code, run `/mcp` once and then `/video-next my-video`. Use `--yes` for a non-interactive run and see `docs/onboarding.md` for all flags.
+
+Work in this repository instead:
+
 ```bash
 npm install
 npm run demo:audio
@@ -49,12 +61,15 @@ packages/
   core/            Zod schemas, state, timing resolver, hash, cost, project loader
   providers/       generateImage/editImage/imageToVideo, fal.ai + mock, cache/manifest runner
   cli/             validate, status, new, render, contact-sheet, stage-*, estimate, doctor
+                   npx entry, onboarding, tool checks, workspace init
   remotion/        MusicVideo composition, motion components, effects, 3D
 schema/            Generated JSON Schema for cross-language validation
-scripts/           Audio analysis (Python/uv), fixture generators
+scripts/           Audio analysis (Python/uv), fixture generators, runtime build
 templates/project/ Project template used by /new-video
 brand/example/     Neutral synthwave/cyberpunk brand kit with OFL fonts
 projects/          Video projects (media gitignored)
+runtime/           Generated npm runtime snapshot (gitignored)
+dist/              Generated npx bundle (gitignored)
 ```
 
 ## Pipeline
@@ -113,9 +128,18 @@ npm run schema
 | `npm run cli -- stage-start/-done/-fail/-skip/-reset` | Update `state.json` from the orchestrator. |
 | `npm run cli -- estimate --role <role> --units <n>` | Check a generation cost against the budget. |
 | `npm run cli -- validate-file <file>` | Validate one changed artifact (used by the hook). |
-| `npm run cli -- doctor` | Check Node, ffmpeg, fonts, Remotion, and keys. |
+| `npm run cli -- doctor` | Check workspace, tools, fonts, Remotion, and keys. |
+| `npx coreslopper init [dir]` | Create a workspace, install tools, configure fal.ai and Suno. |
+| `npx coreslopper doctor` | Check a workspace from outside it. |
+| `npx coreslopper new <slug> --budget <usd>` | Create a project inside a workspace. |
+| `npm run build` | Build `runtime/` and the npx bundle in `dist/`. |
+| `npm run pack:check` | Build and inspect the npm tarball. |
 
 In Claude Code: `/new-video`, `/video-next`, `/video-status`.
+
+## Distribution
+
+The root package is published as `coreslopper`. `npm run build` copies the tracked workflow into `runtime/` and bundles `packages/cli/src/npx.ts` into `dist/cli.js`; `prepack` runs the same build. The npm package ships the onboarding CLI (init, doctor, new, status, validate) plus the runtime snapshot, not the Remotion dependency tree. `npx coreslopper init` copies `runtime/` into a private workspace, then the workspace's own `npm install` provides rendering and audio-analysis dependencies. Never publish generated media or `.env`.
 
 ## Skills
 

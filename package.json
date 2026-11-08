@@ -1,10 +1,38 @@
 {
   "name": "coreslopper",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
   "type": "module",
   "description": "An open-source, Claude Code-native workflow for producing music videos from brief to render.",
   "license": "MIT",
+  "bin": {
+    "coreslopper": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "runtime",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hemi1986/coreslopper.git"
+  },
+  "homepage": "https://github.com/hemi1986/coreslopper#readme",
+  "bugs": {
+    "url": "https://github.com/hemi1986/coreslopper/issues"
+  },
+  "keywords": [
+    "music-video",
+    "remotion",
+    "suno",
+    "fal-ai",
+    "claude-code",
+    "ai-video"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=22"
   },
@@ -13,6 +41,12 @@
   ],
   "scripts": {
     "cli": "tsx packages/cli/src/index.ts",
+    "build:runtime": "node scripts/build-runtime.mjs",
+    "build:cli": "tsup",
+    "build": "npm run build:runtime && npm run build:cli",
+    "pack:check": "npm run build && npm pack --dry-run",
+    "prepack": "npm run build",
+    "prepublishOnly": "npm test && npm run typecheck",
     "schema": "tsx scripts/generate-schema.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -29,6 +63,7 @@
     "python:sync": "cd scripts/audio-analysis && uv sync"
   },
   "dependencies": {
+    "@clack/prompts": "^1.8.1",
     "commander": "^14.0.2",
     "yaml": "^2.8.1",
     "zod": "^4.6.7"
@@ -49,6 +84,7 @@
     "react-dom": "^19.2.0",
     "remotion": "4.0.541",
     "three": "^0.181.0",
+    "tsup": "^9.0.0",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"

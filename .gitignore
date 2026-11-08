@@ -8,6 +8,8 @@ dist/
 build/
 coverage/
 .remotion/
+runtime/
+*.tgz
 
 # Secrets and local config
 .env

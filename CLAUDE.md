@@ -10,6 +10,10 @@
 
 `/video-next` dispatches one `stage-runner` subagent per stage. Do not inline a whole stage into the main context.
 
+## Workspace setup
+
+Create a workspace with `npx coreslopper init <dir>` (or `npx coreslopper@latest init`). The onboarding CLI checks tools, writes `FAL_KEY` to `.env`, and configures the Suno MCP server. The workspace is a private runtime snapshot, so run day-to-day commands with its local `npm run cli -- ...`; `npx coreslopper doctor` works from anywhere. See `docs/onboarding.md`.
+
 ## Agents
 
 - `stage-runner` — executes exactly one stage in a fresh context and returns a compact summary.

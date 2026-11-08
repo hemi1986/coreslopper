@@ -1,0 +1,146 @@
+# Onboarding with npx
+
+`npx coreslopper init` creates a self-contained workspace and configures the tools and credentials the pipeline needs. It is the fastest path from a clean machine to a first project.
+
+## Requirements
+
+- Node.js 22 or newer (needed to run `npx` and the TypeScript pipeline).
+- npm (ships with Node).
+- Optional but recommended: `uv`, Python 3.12+, `ffmpeg`, `git`, and Claude Code. The wizard checks all of them and offers to install what it can.
+
+## Interactive
+
+```bash
+npx coreslopper@latest init my-video
+```
+
+The wizard:
+
+1. Picks a target directory and refuses to overwrite a non-empty directory unless you confirm or pass `--force`.
+2. Checks Node, npm, git, uv, Python, ffmpeg, and Claude Code.
+3. Offers to install uv, Python 3.12 (via uv), ffmpeg, and Claude Code.
+4. Asks how the song is made:
+   - `import` — bring your own `audio/song.wav`, no Suno account needed;
+   - `suno` — generate with Suno through the MCP server.
+5. Asks how visuals are generated:
+   - `mock` — motion graphics and dry runs, no API key;
+   - `fal` — AI keyframes and image-to-video, needs `FAL_KEY`.
+6. Validates a fal.ai key against `https://api.fal.ai/v1/models` and writes it to `.env` with mode `0600`.
+7. Writes `.mcp.json` with the Suno server at `https://api.suno.com/mcp`.
+8. Creates the first project and runs `npm install` plus `uv sync --group dev`.
+
+At the end, open Claude Code in the workspace, run `/mcp` once to authenticate Suno, and start the pipeline with `/video-next <slug>`.
+
+## Non-interactive
+
+Use `--yes` in scripts, CI, or when you already know the answers:
+
+```bash
+npx coreslopper@latest init my-video \
+  --yes \
+  --song suno \
+  --visual fal \
+  --budget 50 \
+  --project my-video
+```
+
+`--yes` uses `import` and `mock` by default. Pass `--fal-key` or set `FAL_KEY` in the environment for fal.ai. Prefer the environment variable or the interactive prompt; a key passed on the command line can end up in your shell history.
+
+Add `--install-tools` to let the non-interactive run install missing uv, Python, ffmpeg, and Claude Code.
+
+## Flags
+
+| Flag | Default | Purpose |
+|---|---|---|
+| `[dir]` | `.` | Target workspace directory. |
+| `-y, --yes` | off | Skip prompts and use defaults. |
+| `--force` | off | Merge into a non-empty directory. |
+| `--no-install` | install | Skip `npm install` and `uv sync`. |
+| `--no-git` | git init | Do not initialize a git repository. |
+| `--install-tools` | off | Install missing uv, Python, ffmpeg, and Claude Code in non-interactive mode. |
+| `--no-tool-install` | off | Do not offer to install system tools in interactive mode. |
+| `--song <suno\|import>` | `import` | Song source for the first project. |
+| `--visual <mock\|fal>` | `mock` | Image and video provider for the first project. |
+| `--budget <usd>` | `50` | First project budget. Minimum $5. |
+| `--project <slug>` | target folder name | First project slug. |
+| `--title <title>` | derived from slug | First project title. |
+| `--fal-key <key>` | `FAL_KEY` | fal.ai API key. |
+| `--no-suno` | configure | Do not add the Suno MCP server. |
+| `--skip-project` | off | Create the workspace without a first project. |
+
+Run `npx coreslopper init --help` for the current list.
+
+## What gets created
+
+```text
+my-video/
+  .claude/                 skills, commands, agents, hooks
+  .env                     local secrets (gitignored, mode 0600)
+  .mcp.json                Suno MCP server
+  coreslopper.workspace.json
+  GETTING_STARTED.md
+  config/                  defaults and model roles
+  docs/                    workflow documentation
+  packages/                core, CLI, providers, Remotion composition
+  projects/
+    demo/                  the license-safe motion demo
+    my-video/              your first project
+  scripts/                 audio analysis and fixtures
+  templates/project/       template for new projects
+  package.json
+```
+
+The workspace is private and self-contained. It is not a git clone; `npx coreslopper init` copies a versioned runtime snapshot into the folder. That makes onboarding deterministic and independent of GitHub availability.
+
+## Day-to-day commands
+
+Inside the workspace, use the local CLI:
+
+```bash
+npm run cli -- doctor
+npm run demo
+npm run cli -- new another-video --budget 50
+npm run cli -- status another-video
+npm run cli -- validate another-video
+npm run cli -- render another-video --format 16x9
+```
+
+`npx coreslopper` also works inside a workspace for `doctor`, `new`, `status`, and `validate`:
+
+```bash
+npx coreslopper doctor
+npx coreslopper status my-video
+```
+
+Rendering and asset generation use the workspace's own dependencies, so run them through `npm run cli -- ...`.
+
+For real lyric alignment and stem separation, add the optional WhisperX and Demucs extras:
+
+```bash
+cd scripts/audio-analysis
+uv sync --extra asr --extra stems
+```
+
+The base install is enough for the motion-only demo and for projects that import a song with existing timing.
+
+## Updating a workspace
+
+The workspace is a snapshot. To pick up a newer workflow version, commit your projects first, then merge the runtime in place:
+
+```bash
+npx coreslopper@latest init . --force --skip-project --no-install
+npm install
+npm run python:sync
+```
+
+This replaces the workflow files (skills, commands, config, packages, scripts, docs) but leaves your project artifacts under `projects/<your-slug>/` and your `.env` untouched. It merges files; workflow files removed upstream are not deleted from the workspace.
+
+## Troubleshooting
+
+- **`uv: command not found` after installation** — open a new shell or add `~/.local/bin` to `PATH`.
+- **ffmpeg missing** — on Linux x64, run `./scripts/install-ffmpeg.sh` in the workspace; otherwise install it with your package manager. It is optional for the motion-only demo.
+- **Suno does not authenticate** — open Claude Code in the workspace and run `/mcp`; complete the OAuth flow in the browser. Suno is optional when you import a song.
+- **`FAL_KEY` rejected** — create a key on the `API` preset at <https://fal.ai/dashboard/keys> and update `.env`.
+- **`npm install` failed** — run it again in the workspace. The rest of the onboarding output is still valid.
+- **`uv sync` failed** — run `npm run python:sync` inside the workspace. Audio analysis needs it; the motion-only demo does not.
+- **A paid generation is refused** — check the project budget and the batch cap with `npm run cli -- status <slug>`.

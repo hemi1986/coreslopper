@@ -1,8 +1,5 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { execFileSync } from 'node:child_process';
 import {
   ValidationError,
   effectiveBatchCap,
@@ -10,7 +7,6 @@ import {
   formatUsd,
   loadModelsConfig,
   loadProject,
-  nextStage,
   recordSpend,
   remainingBudget,
   saveState,
@@ -19,7 +15,6 @@ import {
   setStageRunning,
   setStageSkipped,
   resetStage,
-  stageTable,
 } from '@coreslopper/core';
 import { validateProject } from './validate.js';
 import { validateChangedFile } from './validate-file.js';
@@ -29,16 +24,17 @@ import { createProject } from './new-project.js';
 import { generateBatch } from './generate.js';
 import { runQa } from './qa.js';
 import { importFootage, normalizeAudio, extractFrame } from './media.js';
+import { runDoctor } from './doctor.js';
+import { runInitCommand, validateChoice, type InitCommandOptions } from './init-command.js';
+import { printStatus } from './status.js';
 import { formatSeconds, parseCsv, projectDirFromArg, run } from './utils.js';
+import { findWorkspaceRoot, loadWorkspaceEnv, ownVersion } from './workspace.js';
 import type { FormatId } from '../../remotion/src/types.js';
 
-const packageVersion = (() => {
-  try {
-    return (JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8')) as { version?: string }).version ?? '0.1.0';
-  } catch {
-    return '0.1.0';
-  }
-})();
+const workspaceRoot = findWorkspaceRoot();
+if (workspaceRoot) loadWorkspaceEnv(workspaceRoot);
+
+const packageVersion = ownVersion();
 
 const program = new Command();
 program
@@ -71,18 +67,7 @@ program
   .description('Show project stage state and budget.')
   .action((project: string | undefined) =>
     run(async () => {
-      const projectDir = projectDirFromArg(project);
-      const loaded = await loadProject(projectDir);
-      const state = loaded.state;
-      console.log(`${loaded.config.title} (${loaded.config.slug})`);
-      console.log(`Stage: ${state.stage} · Overall: ${state.status}`);
-      console.log(stageTable(state).join('\n'));
-      console.log(
-        `Budget: ${formatUsd(state.budget.spentUsd)} spent / ${formatUsd(state.budget.totalUsd)} total · ${formatUsd(remainingBudget(state))} remaining · batch cap ${formatUsd(effectiveBatchCap(loaded.config, state))}`,
-      );
-      const next = nextStage(state);
-      console.log(`Next: ${next ? `${next.id} (${next.skills.join(', ')})` : 'done'}`);
-      if (!existsSync(loaded.paths.state)) console.log('Note: state.json does not exist yet; showing the initial state.');
+      await printStatus(projectDirFromArg(project));
     }),
   );
 
@@ -142,6 +127,31 @@ program
           requireAudio: options.requireAudio,
         });
       }),
+  );
+
+program
+  .command('init [dir]')
+  .description('Create a new workspace from the bundled runtime.')
+  .option('-y, --yes', 'Use defaults and skip prompts')
+  .option('--force', 'Merge into a non-empty directory')
+  .option('--no-install', 'Skip npm install and uv sync')
+  .option('--no-git', 'Do not initialize a git repository')
+  .option('--install-tools', 'Install missing uv, Python, ffmpeg, and Claude Code')
+  .option('--no-tool-install', 'Do not offer to install system tools')
+  .option('--song <provider>', 'suno | import', 'import')
+  .option('--visual <provider>', 'mock | fal', 'mock')
+  .option('--budget <usd>', 'First project budget in USD', (value) => Number(value))
+  .option('--project <slug>', 'First project slug')
+  .option('--title <title>', 'First project title')
+  .option('--fal-key <key>', 'fal.ai API key (prefer FAL_KEY in the environment)')
+  .option('--no-suno', 'Do not configure the Suno MCP server')
+  .option('--skip-project', 'Create the workspace without a first project')
+  .action((dir: string | undefined, options: InitCommandOptions) =>
+    run(async () => {
+      if (options.song) options.song = validateChoice(options.song, ['suno', 'import'] as const, 'song provider');
+      if (options.visual) options.visual = validateChoice(options.visual, ['mock', 'fal'] as const, 'visual provider');
+      await runInitCommand(dir, options);
+    }),
   );
 
 program
@@ -358,54 +368,12 @@ program
 program
   .command('doctor')
   .description('Check local prerequisites.')
-  .action(() =>
+  .option('--json', 'Print machine-readable JSON')
+  .action((options: { json?: boolean }) =>
     run(async () => {
-      const root = process.cwd();
-      const checks: Array<{ name: string; ok: boolean; detail: string; optional?: boolean }> = [];
-      const major = Number(process.versions.node.split('.')[0]);
-      checks.push({ name: 'Node >= 22', ok: major >= 22, detail: process.versions.node });
-      const localFfmpeg = join(root, '.tools', 'ffmpeg', 'ffmpeg');
-      if (existsSync(localFfmpeg)) {
-        checks.push({ name: 'ffmpeg', ok: true, detail: localFfmpeg });
-      } else {
-        try {
-          execFileSync('which', ['ffmpeg'], { stdio: 'ignore' });
-          checks.push({ name: 'ffmpeg', ok: true, detail: 'found on PATH' });
-        } catch {
-          checks.push({
-            name: 'ffmpeg',
-            ok: false,
-            detail: 'missing (run ./scripts/install-ffmpeg.sh or install with your package manager)',
-          });
-        }
-      }
-      checks.push({
-        name: 'Example fonts',
-        ok: existsSync(join(root, 'brand/example/fonts/SpaceGrotesk.ttf')),
-        detail: 'brand/example/fonts',
-      });
-      checks.push({
-        name: 'Remotion entry',
-        ok: existsSync(join(root, 'packages/remotion/src/index.ts')),
-        detail: 'packages/remotion/src/index.ts',
-      });
-      checks.push({
-        name: 'FAL_KEY',
-        ok: Boolean(process.env.FAL_KEY),
-        detail: process.env.FAL_KEY ? 'set' : 'not set (mock works without it)',
-        optional: true,
-      });
-      checks.push({
-        name: 'Suno MCP',
-        ok: existsSync(join(root, '.mcp.json')),
-        detail: '.mcp.json',
-        optional: true,
-      });
-      for (const check of checks) {
-        const mark = check.ok ? '✔' : check.optional ? '○' : '✖';
-        console.log(`${mark} ${check.name}: ${check.detail}`);
-      }
-      if (checks.some((check) => !check.ok && !check.optional)) process.exitCode = 1;
+      const root = workspaceRoot ?? process.cwd();
+      const result = await runDoctor(root, { json: options.json });
+      if (!result.ok) process.exitCode = 1;
     }),
   );
 

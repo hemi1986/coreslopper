@@ -38,10 +38,44 @@ Read [the plan](docs/PLAN.md) for the full rationale, [the ADRs](docs/adr/) for 
 - Optional: a CUDA GPU for WhisperX/Demucs. CPU works but is slower.
 - Optional: a Suno account for song generation and a `FAL_KEY` for AI image/video generation.
 
-## Quickstart
+## Install with npx
+
+Create a self-contained workspace without cloning the repository:
 
 ```bash
-git clone <your-fork> coreslopper
+npx coreslopper@latest init my-video
+```
+
+The onboarding wizard:
+
+- checks Node 22+, npm, git, uv, Python 3.12, ffmpeg, and Claude Code;
+- offers to install uv, Python 3.12, ffmpeg, and Claude Code;
+- asks how the song is made (Suno or import) and how visuals are generated (mock or fal.ai);
+- validates an optional `FAL_KEY` and writes it to `.env` (gitignored);
+- configures the Suno MCP server in `.mcp.json`;
+- creates the first project and runs `npm install` plus `uv sync`.
+
+Fully non-interactive:
+
+```bash
+npx coreslopper@latest init my-video --yes --song suno --visual mock --budget 50
+```
+
+Set `FAL_KEY` in the environment (or pass `--fal-key`) when you choose `--visual fal`.
+
+Then open Claude Code in the workspace:
+
+```bash
+cd my-video
+claude
+```
+
+Run `/mcp` once to authenticate Suno, then `/video-next my-video`. The generated workspace contains the full workflow runtime, so every `npm run cli -- ...` command in this README works inside it. Running `npx coreslopper` without arguments inside a workspace prints the available commands. See [docs/onboarding.md](docs/onboarding.md) for all flags and troubleshooting.
+
+## Work in this repository
+
+```bash
+git clone https://github.com/hemi1986/coreslopper.git
 cd coreslopper
 ./scripts/setup.sh        # or: npm install && (cd scripts/audio-analysis && uv sync --group dev)
 
@@ -74,7 +108,7 @@ npm run cli -- doctor
 npm run cli -- new my-video --budget 50
 ```
 
-Budget is mandatory. The command creates `projects/my-video/` from `templates/project/` and initializes `state.json`. Then open Claude Code in the repository and run:
+Budget is mandatory. The command creates `projects/my-video/` from `templates/project/` and initializes `state.json`. In an npx workspace, `npx coreslopper new my-video --budget 50` does the same. Then open Claude Code in the workspace and run:
 
 ```text
 /video-next my-video
@@ -223,6 +257,7 @@ Derivatives are separate compositions with safe-area-aware layouts, not naive cr
 ## Documentation
 
 - [docs/PLAN.md](docs/PLAN.md) — agreed architecture and delivery plan.
+- [docs/onboarding.md](docs/onboarding.md) — npx setup, flags, and troubleshooting.
 - [docs/architecture.md](docs/architecture.md) — data flow, state, cache, providers, rendering.
 - [docs/pipeline.md](docs/pipeline.md) — stage-by-stage runbook.
 - [docs/glossary.md](docs/glossary.md) — ubiquitous language.

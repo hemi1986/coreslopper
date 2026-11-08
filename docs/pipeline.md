@@ -2,6 +2,18 @@
 
 This page is the stage-by-stage operating manual. The project is autonomous by default; these are the commands a human or an agent runs when a stage needs attention.
 
+## Before the pipeline
+
+Create a workspace and a first project with the onboarding CLI:
+
+```bash
+npx coreslopper init my-video
+cd my-video
+npm run cli -- doctor
+```
+
+The wizard installs dependencies, stores an optional `FAL_KEY` in `.env`, and configures the Suno MCP server. Open Claude Code in the workspace, run `/mcp` once to authenticate Suno, and then run `/video-next my-video`. See [onboarding.md](onboarding.md) for flags and troubleshooting. If you work in a clone of this repository, skip this section and use `npm run cli -- new <slug> --budget <usd>`.
+
 ## Stage IDs
 
 `brief`, `treatment`, `lyrics`, `song`, `audio-analysis`, `style-character`, `storyboard`, `assets`, `assembly`, `qa-export`.
