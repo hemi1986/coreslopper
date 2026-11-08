@@ -11,7 +11,8 @@ The central renderer for coreslopper. It receives a serializable `VideoProps` ob
 - `src/components/Backdrops.tsx` contains the grid, particles, title card, lyric card, and glitch backdrop.
 - `src/components/NeonTorus.tsx` is the `@remotion/three` 3D layer.
 - `src/components/Grain.tsx` adds deterministic film grain.
-- `src/lib/timing.ts` contains pure beat, energy, and lyric-line helpers.
+- `src/hooks/useTiming.ts` exposes `useBeat`, `useDownbeat`, `useEnergy`, `useOnset`, `useSection`, and `useWordTiming`.
+- `src/lib/timing.ts` contains pure beat, energy, onset, and lyric-line helpers.
 
 ## Determinism rules
 
@@ -25,9 +26,10 @@ The central renderer for coreslopper. It receives a serializable `VideoProps` ob
 
 1. Create the component in `src/components/`.
 2. Register its name in the `MotionLayer` switch in `ShotRenderer.tsx`.
-3. Set `motion.component` in `storyboard.yaml`.
-4. Render a still at a representative frame and check 16:9, 9:16, and 1:1.
-5. Run `npm run typecheck` and `npm test`.
+3. Add the name to `MOTION_COMPONENTS` in `packages/core/src/timing.ts` so storyboard validation accepts it.
+4. Set `motion.component` in `storyboard.yaml`.
+5. Render a still at a representative frame and check 16:9, 9:16, and 1:1.
+6. Run `npm run typecheck` and `npm test`.
 
 ## Rendering
 

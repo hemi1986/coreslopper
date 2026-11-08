@@ -22,8 +22,8 @@ license: MIT
 ## Process
 
 1. Read the lyrics and style prompt. Confirm the section tags and the target duration.
-2. If `providers.song` is `suno` and the MCP server is available, generate **two variants** with the same lyrics and style. Do not invent MCP tool names; use the tools the server exposes and follow their schema.
-3. Score the variants on structure, energy, lyric fit, and style fit. Pick the best and record the scores and reasoning in `song.json`. If the project config pins a variant, respect it.
+2. If `providers.song` is `suno` and the MCP server is available, generate `song.variants` variants (default 2; 1–4) with the same lyrics and style. Do not invent MCP tool names; use the tools the server exposes and follow their schema.
+3. Score the variants on structure, energy, lyric fit, and style fit. Pick the best and record the scores and reasoning in `song.json`. If `song.pinned_variant` is set, respect it.
 4. If Suno is unavailable or the user prefers an import, copy the source file to `audio/song.wav` (48 kHz WAV preferred), record source, artist, license, duration, and BPM in `song.json`.
 5. Collect stems when the plan provides them. Store vocals at `audio/stems/vocals.wav` and any other stems beside it. If no stems exist, the audio-analysis stage will use Demucs.
 6. Never commit the audio or stems. They are gitignored. Record the license and provenance.

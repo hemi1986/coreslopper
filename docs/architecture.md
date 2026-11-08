@@ -31,7 +31,7 @@ flowchart TD
 - project budget: total, spent, reserved;
 - a global `stage` and `status`.
 
-`/video-next` uses `npm run cli -- status` to find the next stage and `stage-start`, `stage-done`, `stage-fail`, and `stage-skip` to persist transitions. A stage is skipped when its inputs are unchanged and its outputs exist.
+`/video-next` uses `npm run cli -- status` to find the next stage and `stage-start`, `stage-done`, `stage-fail`, and `stage-skip` to persist transitions. Done and skipped stages are not repeated; use `stage-reset` to re-run one after changing an input. Input hashes are recorded when the stage provides them.
 
 ## Data plane
 

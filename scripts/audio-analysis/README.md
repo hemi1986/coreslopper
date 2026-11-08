@@ -14,8 +14,7 @@ It never writes `timing.overrides.json`; that file is user-owned and is merged b
 ```bash
 cd scripts/audio-analysis
 uv sync                 # core: librosa, numpy, soundfile, jsonschema
-uv sync --extra asr     # WhisperX word alignment
-uv sync --extra stems   # Demucs vocal separation
+uv sync --extra asr --extra stems   # WhisperX + Demucs
 ```
 
 `ffmpeg` is required by librosa for some compressed formats. Use WAV for the pipeline. On the RTX 5070 Ti, install a PyTorch build with CUDA 12.8+ support; the extras are not pinned to a specific CUDA wheel.

@@ -224,8 +224,11 @@ def align_lines(
         boundary = sections[index]["start"]
         nearest = min((line["start"] for line in lines), key=lambda value: abs(value - boundary), default=None)
         if nearest is not None and abs(nearest - boundary) <= 1.0:
-            sections[index]["start"] = nearest
-            sections[index - 1]["end"] = nearest
+            previous_start = sections[index - 1]["start"]
+            next_end = sections[index]["end"]
+            if previous_start < nearest < next_end:
+                sections[index]["start"] = nearest
+                sections[index - 1]["end"] = nearest
     return lines, unmatched
 
 

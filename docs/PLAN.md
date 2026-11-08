@@ -225,6 +225,9 @@ providers:
   image: fal
   video: fal
   song: suno
+song:
+  variants: 2          # 1-4; the skill scores each variant and selects one
+  # pinned_variant: "variant-2"
 brand: example
 models: {}                # per-project overrides for config/models.yaml
 ```

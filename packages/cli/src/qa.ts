@@ -27,11 +27,15 @@ interface Check {
 }
 
 function checkAssets(project: Awaited<ReturnType<typeof loadProject>>, assetsDone: boolean): Check {
-  if (!assetsDone) {
-    return { name: 'Assets', result: 'N/A', evidence: 'assets stage is not done; no generated assets to check' };
+  const shots = project.storyboard?.shots ?? [];
+  const hasAssets = shots.some(
+    (shot) => Boolean(shot.asset) || Boolean(shot.layers?.some((layer) => layer.asset)),
+  );
+  if (!assetsDone && !hasAssets) {
+    return { name: 'Assets', result: 'N/A', evidence: 'no generated assets to check' };
   }
   const missing: string[] = [];
-  for (const shot of project.storyboard?.shots ?? []) {
+  for (const shot of shots) {
     if (shot.asset) {
       const path = resolve(project.paths.root, shot.asset);
       if (!existsSync(path)) missing.push(shot.asset);

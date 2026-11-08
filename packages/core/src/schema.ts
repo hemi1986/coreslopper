@@ -33,6 +33,12 @@ export const ProjectConfigSchema = z.object({
       song: z.enum(['suno', 'import', 'mock']).default('import'),
     })
     .default({ image: 'mock', video: 'mock', song: 'import' }),
+  song: z
+    .object({
+      variants: z.number().int().min(1).max(4).default(2),
+      pinned_variant: z.string().optional(),
+    })
+    .default({ variants: 2 }),
   brand: z.string().min(1).default('example'),
   models: z.record(z.string(), z.unknown()).default({}),
 });

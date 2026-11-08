@@ -191,6 +191,22 @@ export function setStageSkipped(state: State, stageId: string, reason?: string):
   return state;
 }
 
+export function resetStage(state: State, stageId: string): State {
+  const stage = state.stages[stageId];
+  if (!stage) throw new Error(`Unknown stage "${stageId}".`);
+  stage.status = 'pending';
+  stage.outputs = [];
+  stage.attempts = 0;
+  delete stage.inputHash;
+  delete stage.lastError;
+  delete stage.startedAt;
+  delete stage.finishedAt;
+  state.stage = stageId;
+  state.status = overallStatus(state);
+  state.updatedAt = new Date().toISOString();
+  return state;
+}
+
 export function remainingBudget(state: State): number {
   return Math.max(0, state.budget.totalUsd - state.budget.spentUsd - state.budget.reservedUsd);
 }

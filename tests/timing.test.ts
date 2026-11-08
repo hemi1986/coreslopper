@@ -89,6 +89,15 @@ describe('timing', () => {
     ).toThrow(/missing style token/);
   });
 
+  it('rejects an unknown motion component', async () => {
+    const project = await loadProject(projectDir);
+    const storyboard = structuredClone(project.storyboard!);
+    storyboard.shots[0]!.motion = { component: 'NotARealComponent', props: {} };
+    expect(() =>
+      resolveStoryboard(storyboard, project.effectiveTiming!, project.style!, project.characters!, 30),
+    ).toThrow(/unknown component/);
+  });
+
   it('rejects an invalid timing override that creates a section overlap', async () => {
     const project = await loadProject(projectDir);
     const overrides = TimingOverridesSchema.parse({

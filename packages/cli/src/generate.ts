@@ -116,7 +116,13 @@ export async function generateBatch(options: GenerateOptions): Promise<void> {
   }
   const batch = BatchSchema.parse(batchData);
   const models = await loadModelsConfig();
-  const resolved = batch.map((item) => resolveItem(item, project.config, models, project.paths.root));
+  const imageProvider = project.config.providers.image;
+  const videoProvider = project.config.providers.video;
+  const resolved = batch.map((item) => {
+    const value = resolveItem(item, project.config, models, project.paths.root);
+    const provider = item.operation === 'imageToVideo' ? videoProvider : imageProvider;
+    return provider === 'mock' ? { ...value, cost: 0 } : value;
+  });
   const totalEstimate = resolved.reduce((sum, item) => sum + item.cost, 0);
 
   console.log(`Batch: ${resolved.length} generation(s), worst-case estimate ${formatUsd(totalEstimate)}`);
@@ -133,8 +139,6 @@ export async function generateBatch(options: GenerateOptions): Promise<void> {
     return;
   }
 
-  const imageProvider = project.config.providers.image;
-  const videoProvider = project.config.providers.video;
   const cacheDir = join(repoRoot(), '.cache', 'generations');
   const imageRunner = new GenerationRunner({
     provider: createProvider(imageProvider),

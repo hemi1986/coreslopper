@@ -98,8 +98,7 @@ No creative approval gate blocks the run. A stage stops only on budget, missing 
 ```bash
 cd scripts/audio-analysis
 uv sync                 # core: librosa, numpy, soundfile, jsonschema
-uv sync --extra asr     # WhisperX word alignment
-uv sync --extra stems   # Demucs vocal separation
+uv sync --extra asr --extra stems   # WhisperX + Demucs
 uv run python analyze.py --project ../../projects/my-video --device cuda
 ```
 
@@ -223,6 +222,7 @@ Derivatives are separate compositions with safe-area-aware layouts, not naive cr
 - [docs/glossary.md](docs/glossary.md) — ubiquitous language.
 - [docs/adr/](docs/adr/) — architecture decision records.
 - [docs/THIRD_PARTY.md](docs/THIRD_PARTY.md) — licenses and attribution.
+- [docs/mcp.md](docs/mcp.md) — Suno and optional fal.ai MCP configuration.
 
 ## Contributing
 

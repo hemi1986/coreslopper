@@ -325,8 +325,10 @@ def main() -> int:
         jsonschema.validate(timing, schema)
 
     output = Path(args.output).resolve() if args.output else project / "timing.json"
+    output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(timing, indent=2) + "\n", encoding="utf-8")
     report = Path(args.report).resolve() if args.report else project / "timing.report.md"
+    report.parent.mkdir(parents=True, exist_ok=True)
     write_report(
         report,
         sections,

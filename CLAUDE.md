@@ -26,7 +26,7 @@ The hook calls `npm run cli -- validate-file <file>`, which is also runnable by 
 
 `.mcp.json` configures the official Suno MCP server at `https://api.suno.com/mcp`. Authentication is handled by Claude Code's MCP login flow. Suno is optional when a project imports an existing song.
 
-fal.ai is used through the pipeline adapter (`FAL_KEY`), not through MCP. If you want to explore fal.ai models interactively, add a project-scoped MCP server for fal.ai and keep it out of the pipeline.
+fal.ai is used through the pipeline adapter (`FAL_KEY`), not through MCP. If you want to explore fal.ai models interactively, see `docs/mcp.md` and add a project-scoped MCP server for fal.ai; keep it out of the pipeline.
 
 ## Permissions and safety
 

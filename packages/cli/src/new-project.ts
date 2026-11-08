@@ -102,6 +102,7 @@ export async function createProject(options: NewProjectOptions): Promise<string>
       video: options.videoProvider ?? 'mock',
       song: options.songProvider ?? 'import',
     },
+    song: { variants: 2 },
     brand: options.brand ?? 'example',
     models: {},
   };

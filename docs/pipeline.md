@@ -53,8 +53,7 @@ Completion: audio plays, `song.json` records source/license/duration/BPM/variant
 ```bash
 cd scripts/audio-analysis
 uv sync
-uv sync --extra asr      # WhisperX
-uv sync --extra stems    # Demucs
+uv sync --extra asr --extra stems   # WhisperX + Demucs
 uv run python analyze.py --project ../../projects/my-video --device cuda
 cd ../..
 npm run cli -- validate projects/my-video
@@ -129,6 +128,12 @@ npm run cli -- contact-sheet projects/demo
 npm run cli -- render projects/demo --format 16x9
 ```
 
+To exercise the Python analyzer without changing the committed timing fixture:
+
+```bash
+npm run demo:analyze
+```
+
 The demo is motion-only and uses no paid provider. It is the fastest way to check the pipeline and the renderer.
 
 ## Hard stops and resume
@@ -140,7 +145,11 @@ A stage stops when:
 - validation fails after the stage's retries;
 - a script would overwrite `timing.overrides.json` or `project.yaml`.
 
-After fixing the cause, re-run `/video-next <slug>` or the specific stage with `--stage <stage>`. The state machine skips completed stages and resumes the failed one.
+After fixing the cause, re-run `/video-next <slug>` or the specific stage with `--stage <stage>`. The state machine skips completed stages and resumes the failed one. To deliberately re-run a completed stage after changing an input, reset it first:
+
+```bash
+npm run cli -- stage-reset projects/my-video storyboard
+```
 
 ## State inspection
 

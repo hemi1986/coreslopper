@@ -105,7 +105,12 @@ npm run schema
 | `npm run cli -- contact-sheet <project>` | Write `review/contact-sheet.svg`. |
 | `npm run cli -- render <project> --format 16x9` | Render with Remotion. |
 | `npm run cli -- new <slug> --budget <usd>` | Create a project from the template. |
-| `npm run cli -- stage-start/-done/-fail/-skip` | Update `state.json` from the orchestrator. |
+| `npm run cli -- generate <project> --batch <file>` | Run a cached, budget-checked generation batch. |
+| `npm run cli -- qa <project> [--determinism <frame>]` | Write `review/report.md`; optionally check frame hashes. |
+| `npm run cli -- normalize-audio <project> --input <file>` | Normalize audio to −14 LUFS / −1 dBTP. |
+| `npm run cli -- footage <project> --input <file> --name <name>` | Normalize a footage proxy. |
+| `npm run cli -- frame <project> --input <clip> --position last` | Extract a review or chaining frame. |
+| `npm run cli -- stage-start/-done/-fail/-skip/-reset` | Update `state.json` from the orchestrator. |
 | `npm run cli -- estimate --role <role> --units <n>` | Check a generation cost against the budget. |
 | `npm run cli -- validate-file <file>` | Validate one changed artifact (used by the hook). |
 | `npm run cli -- doctor` | Check Node, ffmpeg, fonts, Remotion, and keys. |
@@ -147,6 +152,7 @@ CI runs without API keys and uses the mock provider. GPU tests are opt-in.
 - `docs/pipeline.md` — stage-by-stage runbook.
 - `docs/adr/` — architecture decision records.
 - `docs/THIRD_PARTY.md` — vendored skills, licenses, fonts, providers.
+- `docs/mcp.md` — Suno and optional fal.ai MCP configuration.
 
 ## License
 

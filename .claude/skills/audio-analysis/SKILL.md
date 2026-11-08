@@ -23,10 +23,8 @@ license: MIT
 
 1. Ensure the Python environment is installed:
    `cd scripts/audio-analysis && uv sync`
-   For real word alignment, also install the ASR extra:
-   `uv sync --extra asr`
-   For Demucs stems, install the stems extra:
-   `uv sync --extra stems`
+   For real word alignment and Demucs stems, install both extras:
+   `uv sync --extra asr --extra stems`
 2. Run the analyzer from the repository root:
    `cd scripts/audio-analysis && uv run python analyze.py --project ../../projects/<slug>`
    Pass `--vocals ../../projects/<slug>/audio/stems/vocals.wav` when a stem exists. Pass `--device cuda` on the RTX machine.

@@ -1,12 +1,12 @@
 import type { ResolvedShot, StyleBible, Timing } from '@coreslopper/core';
 import type { ReactNode } from 'react';
-import { AbsoluteFill, useCurrentFrame, useVideoConfig } from 'remotion';
+import { AbsoluteFill } from 'remotion';
 import { GlitchBackdrop, Grid, LyricCard, ParticleField, Scanlines, TitleCard } from './Backdrops';
 import { MediaLayer } from './MediaLayer';
 import { NeonTorus } from './NeonTorus';
 import { TextOverlay } from './TextOverlay';
 import { Transition } from './Transition';
-import { beatAt, energyAt } from '../lib/timing';
+import { useBeat, useEnergy } from '../hooks/useTiming';
 
 interface ShotRendererProps {
   shot: ResolvedShot;
@@ -64,11 +64,8 @@ function MotionLayer({
 }
 
 export function ShotRenderer({ shot, timing, style, width, height }: ShotRendererProps) {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const time = shot.startSeconds + frame / fps;
-  const energy = energyAt(timing, time);
-  const beat = beatAt(timing, time);
+  const energy = useEnergy(timing, shot.startSeconds);
+  const beat = useBeat(timing, shot.startSeconds);
   const isTitleSection = ['intro', 'outro'].some((name) => shot.section.includes(name));
   const variant = shot.source === 'motion' && isTitleSection ? 'title' : 'lyric';
 

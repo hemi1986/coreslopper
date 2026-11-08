@@ -18,6 +18,7 @@ import {
   setStageFailed,
   setStageRunning,
   setStageSkipped,
+  resetStage,
   stageTable,
 } from '@coreslopper/core';
 import { validateProject } from './validate.js';
@@ -27,7 +28,7 @@ import { renderProject } from './render.js';
 import { createProject } from './new-project.js';
 import { generateBatch } from './generate.js';
 import { runQa } from './qa.js';
-import { importFootage, normalizeAudio } from './media.js';
+import { importFootage, normalizeAudio, extractFrame } from './media.js';
 import { formatSeconds, parseCsv, projectDirFromArg, run } from './utils.js';
 import type { FormatId } from '../../remotion/src/types.js';
 
@@ -236,6 +237,18 @@ program
   );
 
 program
+  .command('stage-reset <project> <stage>')
+  .description('Reset a done, failed, or skipped stage to pending so it can run again.')
+  .action((project: string, stage: string) =>
+    run(async () => {
+      const { loaded } = await loadAndSave(project);
+      resetStage(loaded.state, stage);
+      await saveState(loaded.paths.state, loaded.state);
+      console.log(`↺ ${stage} reset to pending`);
+    }),
+  );
+
+program
   .command('spend <project> <usd>')
   .description('Record a completed generation spend in state.json.')
   .action((project: string, usd: string) =>
@@ -319,6 +332,26 @@ program
   .action((project: string | undefined, options: { input: string; name: string }) =>
     run(async () => {
       await importFootage(projectDirFromArg(project), options.input, options.name);
+    }),
+  );
+
+program
+  .command('frame [project]')
+  .description('Extract the first, middle, or last frame of a clip for review or frame chaining.')
+  .requiredOption('--input <path>', 'Source clip')
+  .option('--position <position>', 'first | middle | last', 'last')
+  .option('--out <path>', 'Override the output path')
+  .action((project: string | undefined, options: { input: string; position: string; out?: string }) =>
+    run(async () => {
+      if (!['first', 'middle', 'last'].includes(options.position)) {
+        throw new ValidationError('Position must be first, middle, or last.');
+      }
+      await extractFrame(
+        projectDirFromArg(project),
+        options.input,
+        options.position as 'first' | 'middle' | 'last',
+        options.out,
+      );
     }),
   );
 

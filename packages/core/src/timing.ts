@@ -13,6 +13,16 @@ import { ValidationError } from './errors.js';
 
 export const TIMING_TOLERANCE_SECONDS = 0.05;
 
+export const MOTION_COMPONENTS = new Set([
+  'TitleCard',
+  'LyricCard',
+  'GlitchBackdrop',
+  'ParticleField',
+  'Grid',
+  'Scanlines',
+  'NeonTorus',
+]);
+
 export interface ResolvedShot extends Shot {
   startSeconds: number;
   endSeconds: number;
@@ -226,8 +236,15 @@ function validateRefs(shot: Shot, style: StyleBible, characters: CharacterBible)
 }
 
 function validateSource(shot: Shot): void {
-  if (shot.source === 'motion' && !shot.motion?.component) {
-    throw new ValidationError(`Motion shot "${shot.id}" must set motion.component.`);
+  if (shot.source === 'motion') {
+    if (!shot.motion?.component) {
+      throw new ValidationError(`Motion shot "${shot.id}" must set motion.component.`);
+    }
+    if (!MOTION_COMPONENTS.has(shot.motion.component)) {
+      throw new ValidationError(
+        `Motion shot "${shot.id}" uses unknown component "${shot.motion.component}". Known: ${[...MOTION_COMPONENTS].join(', ')}.`,
+      );
+    }
   }
   if (shot.source === 'ai-clip') {
     if (!shot.prompts?.keyframe || !shot.prompts.video) {
@@ -245,8 +262,15 @@ function validateSource(shot: Shot): void {
       if (layer.type === 'footage' && !layer.asset) {
         throw new ValidationError(`Mixed shot "${shot.id}" layer ${index} is footage but has no asset.`);
       }
-      if (layer.type === 'motion' && !layer.component) {
-        throw new ValidationError(`Mixed shot "${shot.id}" layer ${index} is motion but has no component.`);
+      if (layer.type === 'motion') {
+        if (!layer.component) {
+          throw new ValidationError(`Mixed shot "${shot.id}" layer ${index} is motion but has no component.`);
+        }
+        if (!MOTION_COMPONENTS.has(layer.component)) {
+          throw new ValidationError(
+            `Mixed shot "${shot.id}" layer ${index} uses unknown component "${layer.component}".`,
+          );
+        }
       }
       if (layer.type === 'ai-clip' && !layer.asset && !shot.prompts?.video) {
         throw new ValidationError(

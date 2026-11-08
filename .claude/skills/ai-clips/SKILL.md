@@ -46,7 +46,9 @@ license: MIT
 4. Run `npm run cli -- estimate --role <role> --units <n> --project projects/<slug>` and check the batch cap. If the batch exceeds it, split the batch or ask before spending.
 5. Run `npm run cli -- generate projects/<slug> --batch <file>` with the project provider. The runner checks the budget, computes a cache key, reuses cached assets, writes `assets/manifest.jsonl`, and records spend.
 6. Inspect the keyframe at full size and the clip at first/middle/last frame with the art-director critic. If a character drifts, regenerate with the same references and a corrected prompt; do not ignore it.
-7. Use frame chaining only when the storyboard enables it. Extract the last frame of the previous clip and pass it as the first reference of the next.
+7. Use frame chaining only when the storyboard enables it. Extract the last frame of the previous clip with
+   `npm run cli -- frame <project> --input <previous-clip> --position last --out <path>`
+   and pass it as the first reference of the next clip.
 8. Update the storyboard's `asset` path or layer asset. Re-run `npm run cli -- validate projects/<slug>`.
 9. Update the state when the asset batch is complete.
 

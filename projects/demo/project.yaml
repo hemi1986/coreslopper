@@ -25,5 +25,7 @@ providers:
   image: mock
   video: mock
   song: import
+song:
+  variants: 2
 brand: example
 models: {}
