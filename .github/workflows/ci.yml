@@ -81,6 +81,8 @@ jobs:
           npx -y -p "$TARBALL" coreslopper doctor "$RUNNER_TEMP/coreslopper-npx"
           npx -y -p "$TARBALL" coreslopper update "$RUNNER_TEMP/coreslopper-npx" --no-install | tee "$RUNNER_TEMP/update.log"
           grep -q "already up to date" "$RUNNER_TEMP/update.log"
+          test ! -e "$RUNNER_TEMP/coreslopper-npx/.github/workflows/release.yml"
+          test ! -e "$RUNNER_TEMP/coreslopper-npx/release-please-config.json"
           test -f "$RUNNER_TEMP/coreslopper-npx/packages/cli/src/init.ts"
 
       - name: Upload demo artifacts
