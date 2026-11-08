@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.2.1](https://github.com/hemi1986/coreslopper/compare/v0.2.0...v0.2.1) (2026-11-08)
+
+
+### Bug Fixes
+
+* **cli:** accept a bare project slug in workspace commands ([58084e6](https://github.com/hemi1986/coreslopper/commit/58084e68a053abc42f95c9c3d0866611bccf2d68))
+
+
+### Documentation
+
+* restructure README around the user's path ([1a877ab](https://github.com/hemi1986/coreslopper/commit/1a877ab6a371f6dc3ab23a999cee1b0714617b09))
+* restructure README around the user's path ([c11e0ec](https://github.com/hemi1986/coreslopper/commit/c11e0ec174b4c950a8cfe8c77556689f39938f80))
+
 ## [0.2.0](https://github.com/hemi1986/coreslopper/compare/v0.1.0...v0.2.0) (2026-11-08)
 
 
