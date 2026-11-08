@@ -147,15 +147,36 @@ The base install is enough for the motion-only demo and for projects that import
 
 ## Updating a workspace
 
-The workspace is a snapshot. To pick up a newer workflow version, commit your projects first, then merge the runtime in place:
+The workspace is a snapshot. Pick up a newer workflow version with `update`, run from inside the workspace. Commit first, so `git diff` shows exactly what the update changed:
 
 ```bash
-npx coreslopper@latest init . --force --skip-project --no-install
-npm install
-npm run python:sync
+git add -A && git commit -m "chore: before coreslopper update"
+npx coreslopper@latest update --dry-run   # optional: preview
+npx coreslopper@latest update
 ```
 
-This replaces the workflow files (skills, commands, config, packages, scripts, docs) but leaves your project artifacts under `projects/<your-slug>/` and your `.env` untouched. It merges files; workflow files removed upstream are not deleted from the workspace.
+`update` compares three states per file: the **baseline** recorded in `coreslopper.workspace.json` at the last init or update, your workspace, and the new runtime.
+
+| Your file | Upstream | Result |
+|---|---|---|
+| unchanged | changed | updated |
+| unchanged | removed | deleted |
+| changed | unchanged | kept |
+| changed | changed | kept; new version written as `<file>.coreslopper-new` |
+| changed | removed | kept |
+| deleted | any | stays deleted |
+
+Merge each `.coreslopper-new` file into the original and delete it. `--force` overwrites changed files instead.
+
+`projects/` belongs to you: `update` adds new upstream files there but never overwrites or deletes anything. `.env`, `.mcp.json`, and `GETTING_STARTED.md` are never touched. `package-lock.json` always follows upstream. Afterwards `update` runs `npm install` and `uv sync`; pass `--no-install` to skip them.
+
+| Flag | Effect |
+|---|---|
+| `--dry-run` | List the changes without writing anything. |
+| `--force` | Overwrite locally changed files; also allows a downgrade. |
+| `--no-install` | Skip `npm install` and `uv sync`. |
+
+Workspaces created before `update` existed have no baseline, so every file that differs from upstream counts as a conflict. Commit, then run `npx coreslopper@latest update --force` once; it records the baseline for later updates.
 
 ## Troubleshooting
 

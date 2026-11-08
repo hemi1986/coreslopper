@@ -131,6 +131,7 @@ npm run schema
 | `npm run cli -- validate-file <file>` | Validate one changed artifact (used by the hook). |
 | `npm run cli -- doctor` | Check workspace, tools, fonts, Remotion, and keys. |
 | `npx coreslopper init [dir]` | Create a workspace, install tools, configure fal.ai, Higgsfield, and Suno. |
+| `npx coreslopper@latest update [dir]` | Update a workspace to the latest workflow; keeps local edits (`--dry-run`, `--force`). |
 | `npx coreslopper doctor` | Check a workspace from outside it. |
 | `npx coreslopper new <slug> --budget <usd>` | Create a project inside a workspace. |
 | `npm run build` | Build `runtime/` and the npx bundle in `dist/`. |
@@ -140,7 +141,7 @@ In Claude Code: `/new-video`, `/video-next`, `/video-status`.
 
 ## Distribution
 
-The root package is published as `coreslopper`. `npm run build` copies the tracked workflow into `runtime/` and bundles `packages/cli/src/npx.ts` into `dist/cli.js`; `prepack` runs the same build. The npm package ships the onboarding CLI (init, doctor, new, status, validate) plus the runtime snapshot, not the Remotion dependency tree. `npx coreslopper init` copies `runtime/` into a private workspace, then the workspace's own `npm install` provides rendering and audio-analysis dependencies. Never publish generated media or `.env`.
+The root package is published as `coreslopper`. `npm run build` copies the tracked workflow into `runtime/` and bundles `packages/cli/src/npx.ts` into `dist/cli.js`; `prepack` runs the same build. The npm package ships the onboarding CLI (init, update, doctor, new, status, validate) plus the runtime snapshot, not the Remotion dependency tree. `npx coreslopper init` copies `runtime/` into a private workspace, then the workspace's own `npm install` provides rendering and audio-analysis dependencies. Never publish generated media or `.env`.
 
 ## Skills
 

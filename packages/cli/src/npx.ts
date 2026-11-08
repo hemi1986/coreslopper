@@ -9,6 +9,7 @@ import {
 import { createProject } from './new-project.js';
 import { onboard } from './onboarding.js';
 import { printStatus } from './status.js';
+import { printUpdateSummary, updateWorkspace } from './update.js';
 import { formatSeconds, run } from './utils.js';
 import { validateProject } from './validate.js';
 import {
@@ -50,7 +51,7 @@ function workspaceSummary(root: string): void {
   } else {
     console.log('No projects yet. Create one with: npx coreslopper new <slug> --budget 50');
   }
-  console.log('Commands: init, doctor, new, status, validate');
+  console.log('Commands: init, update, doctor, new, status, validate');
 }
 
 const program = new Command();
@@ -94,6 +95,32 @@ program
       }
       await runInitCommand(dir, options);
     }),
+  );
+
+program
+  .command('update [dir]')
+  .description('Update the workflow files of a workspace to this coreslopper version; keeps local changes.')
+  .option('--dry-run', 'Show what would change without writing anything')
+  .option('--force', 'Overwrite locally changed files and allow a downgrade')
+  .option('--no-install', 'Skip npm install and uv sync')
+  .option('--runtime <dir>', 'Runtime directory (development only)')
+  .action(
+    (
+      dir: string | undefined,
+      options: { dryRun?: boolean; force?: boolean; install: boolean; runtime?: string },
+    ) =>
+      run(async () => {
+        const target = dir ? resolve(dir) : requireWorkspaceRoot();
+        const result = await updateWorkspace({
+          targetDir: target,
+          runtimeDir: options.runtime,
+          dryRun: options.dryRun,
+          force: options.force,
+          install: options.install,
+          onProgress: (message) => console.log(message),
+        });
+        printUpdateSummary(result);
+      }),
   );
 
 program

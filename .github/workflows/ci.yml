@@ -79,6 +79,8 @@ jobs:
           TARBALL=$(ls "$RUNNER_TEMP"/pkg/coreslopper-*.tgz)
           npx -y -p "$TARBALL" coreslopper init "$RUNNER_TEMP/coreslopper-npx" --yes --no-install --no-git --skip-project
           npx -y -p "$TARBALL" coreslopper doctor "$RUNNER_TEMP/coreslopper-npx"
+          npx -y -p "$TARBALL" coreslopper update "$RUNNER_TEMP/coreslopper-npx" --no-install | tee "$RUNNER_TEMP/update.log"
+          grep -q "already up to date" "$RUNNER_TEMP/update.log"
           test -f "$RUNNER_TEMP/coreslopper-npx/packages/cli/src/init.ts"
 
       - name: Upload demo artifacts

@@ -5,6 +5,7 @@ import { homedir } from 'node:os';
 import { basename, isAbsolute, join, parse, relative, resolve, sep } from 'node:path';
 import { ValidationError } from '@coreslopper/core';
 import { createProject } from './new-project.js';
+import { SKIPPED_DIRECTORIES, hashRuntime } from './update.js';
 import {
   commandExists,
   detectTools,
@@ -58,20 +59,6 @@ export interface InitResult {
   gitInitialized: boolean;
   warnings: string[];
 }
-
-const SKIPPED_DIRECTORIES = new Set([
-  '.git',
-  '.cache',
-  '.tools',
-  '.vitest',
-  '.venv',
-  '__pycache__',
-  '.pytest_cache',
-  'node_modules',
-  'dist',
-  'runtime',
-  'tmp',
-]);
 
 export function sanitizeSlug(value: string): string {
   const slug = value
@@ -188,12 +175,13 @@ function writeFileSyncJson(path: string, value: unknown): void {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
 }
 
-function writeMarker(target: string, projectSlug?: string): void {
+function writeMarker(target: string, files: Record<string, string>, projectSlug?: string): void {
   const marker: WorkspaceMarker = {
     version: 1,
     runtimeVersion: ownVersion(),
     created: new Date().toISOString(),
     ...(projectSlug ? { project: projectSlug } : {}),
+    files,
   };
   writeFileSyncJson(join(target, WORKSPACE_MARKER), marker);
 }
@@ -343,7 +331,7 @@ export async function initWorkspace(options: InitOptions): Promise<InitResult> {
     ? await createFirstProject(target, options.project, warnings)
     : undefined;
 
-  writeMarker(target, projectSlug);
+  writeMarker(target, await hashRuntime(runtime), projectSlug);
 
   let installed = false;
   let uvSynced = false;
