@@ -56,7 +56,7 @@ Completion: every line under a section tag, original lyrics, concise style promp
 
 Completion: audio plays, `song.json` records source/license/duration/BPM/variant choice, no media committed.
 
-To import an existing Suno song, copy `audio/song.wav` and `audio/stems/vocals.wav`, write `song.json`, then skip the `lyrics` and `song` stages. See the existing-song quickstart in the [README](../README.md#quickstarts).
+To import an existing Suno song, copy `audio/song.wav` and `audio/stems/vocals.wav`, write `song.json`, then skip the `lyrics` and `song` stages. See the existing-song quickstart in the [README](../README.md#2-new-project-with-an-existing-suno-song).
 
 ## 5. Audio analysis
 

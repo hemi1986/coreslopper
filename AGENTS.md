@@ -176,6 +176,7 @@ CI runs without API keys and uses the mock provider. GPU tests are opt-in.
 - `docs/glossary.md` — ubiquitous language.
 - `docs/architecture.md` — data flow, state, cache, providers, rendering.
 - `docs/pipeline.md` — stage-by-stage runbook.
+- `docs/providers.md` — provider selection, credentials, batches, budget, and model roles.
 - `docs/adr/` — architecture decision records.
 - `docs/THIRD_PARTY.md` — vendored skills, licenses, fonts, providers.
 - `docs/mcp.md` — Suno and optional fal.ai MCP configuration; provider adapters.

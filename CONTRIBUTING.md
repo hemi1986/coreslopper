@@ -4,11 +4,26 @@ Thanks for helping make coreslopper better. This repository is an open-source wo
 
 ## Setup
 
+Work in a clone of this repository, not in an npx workspace:
+
 ```bash
-npm install
+git clone https://github.com/hemi1986/coreslopper.git
+cd coreslopper
+./scripts/setup.sh        # or: npm install && (cd scripts/audio-analysis && uv sync --group dev)
 npm test
 npm run typecheck
-cd scripts/audio-analysis && uv sync --group dev && uv run pytest -q
+npm run python:test
+```
+
+The repository contains a 12-second, motion-only demo project that needs no API keys:
+
+```bash
+npm run demo:audio                                  # generate the license-safe demo audio
+npm run cli -- validate projects/demo
+npm run cli -- contact-sheet projects/demo
+npm run cli -- render projects/demo --format 16x9   # → projects/demo/renders/16x9.mp4
+npm run demo                                        # all of the above, three formats, and QA
+npm run cli -- doctor                               # check tools, fonts, Remotion, and keys
 ```
 
 Optional system dependency: `ffmpeg` and `ffprobe` for footage import and loudness normalization. On Linux x64, `./scripts/install-ffmpeg.sh` installs a static build into `.tools/ffmpeg`; the media commands use it automatically.
