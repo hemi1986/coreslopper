@@ -1,0 +1,31 @@
+version: 1
+
+formats:
+  master:
+    aspect: "16:9"
+    width: 1920
+    height: 1080
+    fps: 30
+  derivatives:
+    - aspect: "9:16"
+      width: 1080
+      height: 1920
+    - aspect: "1:1"
+      width: 1080
+      height: 1080
+
+budget:
+  minimum_usd: 5
+  suggested_usd: 50
+
+render:
+  loudness_lufs: -14
+  true_peak_dbtp: -1
+  video_bitrate: "12M"
+
+asset_batch_size: 5
+
+retries:
+  max_attempts: 4
+  base_delay_ms: 1000
+  request_timeout_ms: 180000

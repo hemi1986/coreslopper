@@ -1,0 +1,54 @@
+{
+  "name": "coreslopper",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "An open-source, Claude Code-native workflow for producing music videos from brief to render.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "cli": "tsx packages/cli/src/index.ts",
+    "schema": "tsx scripts/generate-schema.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "validate": "npm run cli -- validate",
+    "status": "npm run cli -- status",
+    "render": "npm run cli -- render",
+    "contact-sheet": "npm run cli -- contact-sheet",
+    "demo:audio": "node scripts/fixtures/generate-audio.mjs projects/demo/audio/song.wav",
+    "demo": "npm run demo:audio && npm run cli -- validate projects/demo && npm run cli -- render projects/demo --format 16x9",
+    "python:test": "cd scripts/audio-analysis && uv run pytest -q",
+    "python:sync": "cd scripts/audio-analysis && uv sync"
+  },
+  "dependencies": {
+    "commander": "^14.0.2",
+    "yaml": "^2.8.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@remotion/bundler": "4.0.541",
+    "@remotion/cli": "4.0.541",
+    "@remotion/fonts": "4.0.541",
+    "@remotion/renderer": "4.0.541",
+    "@remotion/three": "4.0.541",
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.4.0",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@types/three": "^0.181.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "remotion": "4.0.541",
+    "three": "^0.181.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

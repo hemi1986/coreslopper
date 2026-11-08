@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="718" viewBox="0 0 1600 718">
+  <rect width="1600" height="718" fill="#050510"/>
+  <rect x="0" y="0" width="1600" height="154" fill="#0d0d24"/>
+  <text x="48" y="62" fill="#ff2a6d" font-family="JetBrains Mono, monospace" font-size="14" letter-spacing="4">CORESLOPPER / CONTACT SHEET</text>
+  <text x="48" y="108" fill="#f8f8ff" font-family="Orbitron, Space Grotesk, sans-serif" font-size="38" font-weight="800">Neon Rain</text>
+  <text x="48" y="136" fill="#8b8ba7" font-family="JetBrains Mono, monospace" font-size="13">6 shots · 0:12.00 · 120.0 BPM · 1600×718</text>
+  <g transform="translate(48 154)">
+  <rect width="361" height="226" rx="14" fill="#0d0d24" stroke="#f8f8ff" stroke-opacity="0.55"/>
+  <rect width="361" height="5" rx="2.5" fill="#f8f8ff"/>
+  <text x="18" y="34" fill="#f8f8ff" font-family="JetBrains Mono, monospace" font-size="15" font-weight="700">shot-001</text>
+  <text x="343" y="34" text-anchor="end" fill="#f8f8ff" font-family="JetBrains Mono, monospace" font-size="12">MOTION</text>
+  <text x="18" y="58" fill="#8b8ba7" font-family="JetBrains Mono, monospace" font-size="12">intro · 0:00.00–0:02.00</text>
+  <text x="18" y="86" fill="#f8f8ff" font-family="Space Grotesk, sans-serif" font-size="15" opacity="0.9">The title surfaces through a rain-lit grid</text>
+  <text x="18" y="106" fill="#f8f8ff" font-family="Space Grotesk, sans-serif" font-size="15" opacity="0.9">while particles drift upward.</text>
+  <text x="18" y="204" fill="#f9f002" font-family="Space Grotesk, sans-serif" font-size="14" font-weight="700">“NEON RAIN”</text>
+</g>
+<g transform="translate(429 154)">
+  <rect width="361" height="226" rx="14" fill="#0d0d24" stroke="#f8f8ff" stroke-opacity="0.55"/>
+  <rect width="361" height="5" rx="2.5" fill="#f8f8ff"/>
+  <text x="18" y="34" fill="#f8f8ff" font-family="JetBrains Mono, monospace" font-size="15" font-weight="700">shot-002</text>
+  <text x="343" y="34" text-anchor="end" fill="#f8f8ff" font-family="JetBrains Mono, monospace" font-size="12">MOTION</text>
+  <text x="18" y="58" fill="#8b8ba7" font-family="JetBrains Mono, monospace" font-size="12">verse_1 · 0:02.00–0:05.00</text>
+  <text x="18" y="86" fill="#f8f8ff" font-family="Space Grotesk, sans-serif" font-size="15" opacity="0.9">A narrow corridor of neon signage and wet</text>
+  <text x="18" y="106" fill="#f8f8ff" font-family="Space Grotesk, sans-serif" font-size="15" opacity="0.9">reflections, pushing forward.</text>
+  <text x="18" y="204" fill="#f9f002" font-family="Space Grotesk, sans-serif" font-size="14" font-weight="700">“City lights are calling”</text>
+</g>
+<g transform="translate(810 154)">
+  <rect width="361" height="226" rx="14" fill="#0d0d24" stroke="#f8f8ff" stroke-opacity="0.55"/>
+  <rect width="361" height="5" rx="2.5" fill="#f8f8ff"/>
+  <text x="18" y="34" fill="#f8f8ff" font-family="JetBrains Mono, monospace" font-size="15" font-weight="700">shot-003</text>
+  <text x="343" y="34" text-anchor="end" fill="#f8f8ff" font-family="JetBrains Mono, monospace" font-size="12">MOTION</text>
+  <text x="18" y="58" fill="#8b8ba7" font-family="JetBrains Mono, monospace" font-size="12">chorus_1 · 0:05.00–0:07.50</text>
+  <text x="18" y="86" fill="#f8f8ff" font-family="Space Grotesk, sans-serif" font-size="15" opacity="0.9">The grid opens into a wide horizon; the</text>
+  <text x="18" y="106" fill="#f8f8ff" font-family="Space Grotesk, sans-serif" font-size="15" opacity="0.9">palette blooms with the chorus.</text>
+  <text x="18" y="204" fill="#f9f002" font-family="Space Grotesk, sans-serif" font-size="14" font-weight="700">“We are electric”</text>
+</g>
+<g transform="translate(1191 154)">
+  <rect width="361" height="226" rx="14" fill="#0d0d24" stroke="#f8f8ff" stroke-opacity="0.55"/>
+  <rect width="361" height="5" rx="2.5" fill="#f8f8ff"/>
+  <text x="18" y="34" fill="#f8f8ff" font-family="JetBrains Mono, monospace" font-size="15" font-weight="700">shot-004</text>
+  <text x="343" y="34" text-anchor="end" fill="#f8f8ff" font-family="JetBrains Mono, monospace" font-size="12">MOTION</text>
+  <text x="18" y="58" fill="#8b8ba7" font-family="JetBrains Mono, monospace" font-size="12">chorus_1 · 0:07.50–0:09.00</text>
+  <text x="18" y="86" fill="#f8f8ff" font-family="Space Grotesk, sans-serif" font-size="15" opacity="0.9">Rain streaks catch the light as the camera</text>
+  <text x="18" y="106" fill="#f8f8ff" font-family="Space Grotesk, sans-serif" font-size="15" opacity="0.9">drifts sideways.</text>
+  <text x="18" y="204" fill="#f9f002" font-family="Space Grotesk, sans-serif" font-size="14" font-weight="700">“Run through the rain”</text>
+</g>
+<g transform="translate(48 400)">
+  <rect width="361" height="226" rx="14" fill="#0d0d24" stroke="#f8f8ff" stroke-opacity="0.55"/>
+  <rect width="361" height="5" rx="2.5" fill="#f8f8ff"/>
+  <text x="18" y="34" fill="#f8f8ff" font-family="JetBrains Mono, monospace" font-size="15" font-weight="700">shot-005</text>
+  <text x="343" y="34" text-anchor="end" fill="#f8f8ff" font-family="JetBrains Mono, monospace" font-size="12">MOTION</text>
+  <text x="18" y="58" fill="#8b8ba7" font-family="JetBrains Mono, monospace" font-size="12">outro · 0:09.00–0:10.50</text>
+  <text x="18" y="86" fill="#f8f8ff" font-family="Space Grotesk, sans-serif" font-size="15" opacity="0.9">The city recedes into a single pink glow;</text>
+  <text x="18" y="106" fill="#f8f8ff" font-family="Space Grotesk, sans-serif" font-size="15" opacity="0.9">the lyric lands softly.</text>
+  <text x="18" y="204" fill="#f9f002" font-family="Space Grotesk, sans-serif" font-size="14" font-weight="700">“Neon hearts”</text>
+</g>
+<g transform="translate(429 400)">
+  <rect width="361" height="226" rx="14" fill="#0d0d24" stroke="#f8f8ff" stroke-opacity="0.55"/>
+  <rect width="361" height="5" rx="2.5" fill="#f8f8ff"/>
+  <text x="18" y="34" fill="#f8f8ff" font-family="JetBrains Mono, monospace" font-size="15" font-weight="700">shot-006</text>
+  <text x="343" y="34" text-anchor="end" fill="#f8f8ff" font-family="JetBrains Mono, monospace" font-size="12">MOTION</text>
+  <text x="18" y="58" fill="#8b8ba7" font-family="JetBrains Mono, monospace" font-size="12">outro · 0:10.50–0:12.00</text>
+  <text x="18" y="86" fill="#f8f8ff" font-family="Space Grotesk, sans-serif" font-size="15" opacity="0.9">A glitch hit resolves to the coreslopper</text>
+  <text x="18" y="106" fill="#f8f8ff" font-family="Space Grotesk, sans-serif" font-size="15" opacity="0.9">mark, then cuts to black.</text>
+  <text x="18" y="204" fill="#f9f002" font-family="Space Grotesk, sans-serif" font-size="14" font-weight="700">“CORESLOPPER”</text>
+</g>
+  <text x="48" y="690" fill="#8b8ba7" font-family="JetBrains Mono, monospace" font-size="12">Generated by coreslopper</text>
+</svg>

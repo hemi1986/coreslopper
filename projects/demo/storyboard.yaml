@@ -1,0 +1,101 @@
+version: 1
+timing: timing.effective.json
+style: style.yaml
+characters: characters.yaml
+shots:
+  - id: shot-001
+    section: intro
+    start: { type: section, id: intro, edge: start }
+    end: { type: section, id: intro, edge: end }
+    source: motion
+    description: The title surfaces through a rain-lit grid while particles drift upward.
+    camera: slow push in
+    text: NEON RAIN
+    highlights: [NEON, RAIN]
+    transition: { type: cut, duration: 0 }
+    refs:
+      style: [palette.primary, palette.accent, typography.display]
+      characters: []
+    motion:
+      component: TitleCard
+      props: {}
+  - id: shot-002
+    section: verse_1
+    start: { type: section, id: verse_1, edge: start }
+    end: { type: section, id: verse_1, edge: end }
+    source: motion
+    description: A narrow corridor of neon signage and wet reflections, pushing forward.
+    camera: dolly forward
+    text: City lights are calling
+    highlights: [calling]
+    transition: { type: fade, duration: 0.25 }
+    refs:
+      style: [palette.secondary, palette.text, typography.body]
+      characters: []
+    motion:
+      component: LyricCard
+      props: {}
+  - id: shot-003
+    section: chorus_1
+    start: { type: section, id: chorus_1, edge: start }
+    end: { type: section, id: chorus_1, edge: start, offset: 2.5 }
+    source: motion
+    description: The grid opens into a wide horizon; the palette blooms with the chorus.
+    camera: rise and push
+    text: We are electric
+    highlights: [electric]
+    transition: { type: cut, duration: 0 }
+    refs:
+      style: [palette.primary, palette.accent, typography.display]
+      characters: []
+    motion:
+      component: NeonTorus
+      props: {}
+  - id: shot-004
+    section: chorus_1
+    start: { type: section, id: chorus_1, edge: start, offset: 2.5 }
+    end: { type: section, id: chorus_1, edge: end }
+    source: motion
+    description: Rain streaks catch the light as the camera drifts sideways.
+    camera: lateral drift
+    text: Run through the rain
+    highlights: [rain]
+    transition: { type: glitch, duration: 0.18 }
+    refs:
+      style: [palette.secondary, palette.primary, typography.body]
+      characters: []
+    motion:
+      component: LyricCard
+      props: {}
+  - id: shot-005
+    section: outro
+    start: { type: section, id: outro, edge: start }
+    end: { type: section, id: outro, edge: start, offset: 1.5 }
+    source: motion
+    description: The city recedes into a single pink glow; the lyric lands softly.
+    camera: slow pull out
+    text: Neon hearts
+    highlights: [Neon]
+    transition: { type: fade, duration: 0.3 }
+    refs:
+      style: [palette.primary, palette.text, typography.display]
+      characters: []
+    motion:
+      component: TitleCard
+      props: {}
+  - id: shot-006
+    section: outro
+    start: { type: section, id: outro, edge: start, offset: 1.5 }
+    end: { type: section, id: outro, edge: end }
+    source: motion
+    description: A glitch hit resolves to the coreslopper mark, then cuts to black.
+    camera: static
+    text: CORESLOPPER
+    highlights: [CORESLOPPER]
+    transition: { type: glitch, duration: 0.22 }
+    refs:
+      style: [palette.accent, palette.primary, typography.display]
+      characters: []
+    motion:
+      component: GlitchBackdrop
+      props: {}

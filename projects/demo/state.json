@@ -1,0 +1,116 @@
+{
+  "version": 1,
+  "project": "demo",
+  "workflowVersion": "0.1.0",
+  "stage": "qa-export",
+  "status": "done",
+  "stages": {
+    "brief": {
+      "status": "done",
+      "inputHash": "fixture:brief",
+      "outputs": [
+        "brief.md"
+      ],
+      "attempts": 1,
+      "finishedAt": "2026-11-08T12:01:00.000Z"
+    },
+    "treatment": {
+      "status": "done",
+      "inputHash": "fixture:treatment",
+      "outputs": [
+        "treatment.md"
+      ],
+      "attempts": 1,
+      "finishedAt": "2026-11-08T12:02:00.000Z"
+    },
+    "lyrics": {
+      "status": "done",
+      "inputHash": "fixture:lyrics",
+      "outputs": [
+        "lyrics.txt",
+        "suno-style.txt"
+      ],
+      "attempts": 1,
+      "finishedAt": "2026-11-08T12:03:00.000Z"
+    },
+    "song": {
+      "status": "done",
+      "inputHash": "fixture:song",
+      "outputs": [
+        "song.json",
+        "audio/song.wav"
+      ],
+      "attempts": 1,
+      "finishedAt": "2026-11-08T12:04:00.000Z"
+    },
+    "audio-analysis": {
+      "status": "done",
+      "inputHash": "fixture:timing",
+      "outputs": [
+        "timing.json",
+        "timing.report.md"
+      ],
+      "attempts": 1,
+      "finishedAt": "2026-11-08T12:05:00.000Z"
+    },
+    "style-character": {
+      "status": "done",
+      "inputHash": "fixture:style",
+      "outputs": [
+        "style.yaml",
+        "characters.yaml"
+      ],
+      "attempts": 1,
+      "finishedAt": "2026-11-08T12:06:00.000Z"
+    },
+    "storyboard": {
+      "status": "done",
+      "inputHash": "fixture:storyboard",
+      "outputs": [
+        "storyboard.yaml",
+        "storyboard.md",
+        "review/contact-sheet.svg"
+      ],
+      "attempts": 1,
+      "finishedAt": "2026-11-08T12:07:00.000Z"
+    },
+    "assets": {
+      "status": "skipped",
+      "outputs": [],
+      "attempts": 1,
+      "lastError": "Motion-only demo; no generated assets.",
+      "finishedAt": "2026-11-08T12:08:00.000Z"
+    },
+    "assembly": {
+      "status": "done",
+      "outputs": [
+        "renders/16x9.mp4",
+        "renders/9x16.mp4",
+        "renders/1x1.mp4"
+      ],
+      "attempts": 1,
+      "startedAt": "2026-11-08T11:18:47.054Z",
+      "finishedAt": "2026-11-08T11:18:47.812Z"
+    },
+    "qa-export": {
+      "status": "done",
+      "outputs": [
+        "review/report.md",
+        "renders/16x9.mp4",
+        "renders/9x16.mp4",
+        "renders/1x1.mp4"
+      ],
+      "attempts": 1,
+      "startedAt": "2026-11-08T11:18:48.591Z",
+      "finishedAt": "2026-11-08T11:18:49.403Z"
+    }
+  },
+  "budget": {
+    "totalUsd": 50,
+    "spentUsd": 0,
+    "reservedUsd": 0
+  },
+  "artifacts": {},
+  "errors": [],
+  "updatedAt": "2026-11-08T11:18:49.403Z"
+}

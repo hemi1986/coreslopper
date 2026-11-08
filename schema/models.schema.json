@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "version": {
+      "default": 1,
+      "type": "number",
+      "const": 1
+    },
+    "last_verified": {
+      "type": "string"
+    },
+    "roles": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1
+          },
+          "params": {
+            "default": {},
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "pricing": {
+            "type": "object",
+            "properties": {
+              "unit": {
+                "type": "string",
+                "enum": [
+                  "image",
+                  "second",
+                  "request"
+                ]
+              },
+              "usd": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "unit",
+              "usd"
+            ]
+          },
+          "maxDuration": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "notes": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "model"
+        ]
+      }
+    }
+  },
+  "required": [
+    "roles"
+  ]
+}

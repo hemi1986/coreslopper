@@ -1,0 +1,103 @@
+# Model roles used by the generation adapter.
+#
+# These are planning estimates. Before a paid run, verify the exact model slug
+# and price at https://fal.ai and update this file. The estimator refuses to
+# run a paid batch when a role has no pricing entry.
+version: 1
+last_verified: "2026-11-08 (planning estimates; verify before paid use)"
+
+roles:
+  image.character_sheet:
+    model: google/nano-banana-2.1/edit
+    params:
+      num_images: 1
+      output_format: png
+      resolution: 2K
+    pricing:
+      unit: image
+      usd: 0.15
+    notes: Multi-reference character sheets. Requires reference images; text-only prompts are rejected.
+  image.keyframe:
+    model: fal-ai/flux-2-pro
+    params:
+      num_images: 1
+      output_format: png
+      resolution: 1080p
+    pricing:
+      unit: image
+      usd: 0.05
+    notes: Hero keyframes and look development.
+  image.edit:
+    model: fal-ai/flux-2-pro/edit
+    params:
+      num_images: 1
+      output_format: png
+    pricing:
+      unit: image
+      usd: 0.05
+    notes: Reference-preserving edits.
+  image.keyframe.budget:
+    model: fal-ai/flux-2
+    params:
+      num_images: 1
+      output_format: png
+    pricing:
+      unit: image
+      usd: 0.03
+    notes: Cheaper drafts and background stills.
+
+  video.image_to_video.quality:
+    model: kling/v4/image-to-video
+    params:
+      duration: 5
+      resolution: 1080p
+      generate_audio: false
+    pricing:
+      unit: second
+      usd: 0.17
+    maxDuration: 30
+    notes: 3-30 s, optional end frame for frame chaining. Audio is disabled; the song is the only audio source.
+  video.image_to_video.fast:
+    model: kling/v4/flash/image-to-video
+    params:
+      duration: 5
+      resolution: 720p
+      generate_audio: false
+    pricing:
+      unit: second
+      usd: 0.08
+    maxDuration: 20
+    notes: Cheap drafts and B-roll.
+  video.image_to_video.premium:
+    model: bytedance/seedance-2.5/us/image-to-video
+    params:
+      duration: 5
+      resolution: 1080p
+      generate_audio: false
+    pricing:
+      unit: second
+      usd: 0.30
+    maxDuration: 30
+    notes: Hero shots only.
+  video.image_to_video.budget:
+    model: alibaba/wan-3.0/image-to-video
+    params:
+      duration: 5
+      resolution: 720p
+      generate_audio: false
+    pricing:
+      unit: second
+      usd: 0.06
+    notes: Lowest-cost motion pass.
+
+  video.premium.veo:
+    model: fal-ai/veo3.1/image-to-video
+    params:
+      duration: 5
+      resolution: 1080p
+      generate_audio: false
+    pricing:
+      unit: second
+      usd: 0.40
+    maxDuration: 8
+    notes: Expensive hero fallback; verify the current slug and price.

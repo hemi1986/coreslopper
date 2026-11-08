@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@coreslopper/core": ["packages/core/src/index.ts"],
+      "@coreslopper/core/*": ["packages/core/src/*"],
+      "@coreslopper/providers": ["packages/providers/src/index.ts"],
+      "@coreslopper/providers/*": ["packages/providers/src/*"]
+    }
+  },
+  "include": [
+    "packages/**/*.ts",
+    "packages/**/*.tsx",
+    "scripts/**/*.ts",
+    "tests/**/*.ts",
+    "vitest.config.ts"
+  ],
+  "exclude": ["node_modules", "dist", "**/node_modules"]
+}

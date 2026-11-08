@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: TypeScript tests
+        run: npm test
+
+      - name: Python tests
+        working-directory: scripts/audio-analysis
+        run: |
+          uv sync --group dev
+          uv run pytest -q
+
+      - name: Generate demo audio
+        run: npm run demo:audio
+
+      - name: Validate demo
+        run: npm run cli -- validate projects/demo
+
+      - name: Contact sheet
+        run: npm run cli -- contact-sheet projects/demo
+
+      - name: Cache Remotion browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/remotion
+          key: remotion-browser-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Ensure Remotion browser
+        run: npx remotion browser ensure
+
+      - name: Remotion still smoke test
+        run: |
+          npm run cli -- render projects/demo --still 130 --still-scale 0.25
+          test -s projects/demo/renders/still-130.png
+
+      - name: Upload demo artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-artifacts
+          path: |
+            projects/demo/review/contact-sheet.svg
+            projects/demo/renders/still-130.png
+          if-no-files-found: error

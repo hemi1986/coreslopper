@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+coverage/
+.remotion/
+
+# Secrets and local config
+.env
+.env.*
+!.env.example
+
+# Caches and local tools
+.cache/
+.tools/
+.vitest/
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Project media (text artifacts stay tracked)
+projects/*/audio/*
+!projects/*/audio/.gitkeep
+projects/*/assets/*
+!projects/*/assets/.gitkeep
+projects/*/renders/*
+!projects/*/renders/.gitkeep
+projects/*/timing.effective.json
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Temporary
+tmp/

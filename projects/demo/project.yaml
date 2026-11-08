@@ -1,0 +1,29 @@
+version: 1
+slug: demo
+title: Neon Rain
+created: "2026-11-08T12:00:00.000Z"
+workflow:
+  version: 0.1.0
+budget_usd: 50
+review_mode: auto
+formats:
+  master:
+    aspect: "16:9"
+    width: 1920
+    height: 1080
+    fps: 30
+  derivatives:
+    - aspect: "9:16"
+      width: 1080
+      height: 1920
+      fps: 30
+    - aspect: "1:1"
+      width: 1080
+      height: 1080
+      fps: 30
+providers:
+  image: mock
+  video: mock
+  song: import
+brand: example
+models: {}

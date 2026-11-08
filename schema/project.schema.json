@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "number",
+      "const": 1
+    },
+    "slug": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "created": {
+      "type": "string",
+      "minLength": 1
+    },
+    "workflow": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "commit": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "version"
+      ]
+    },
+    "budget_usd": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "batch_cap_usd": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "review_mode": {
+      "default": "auto",
+      "type": "string",
+      "enum": [
+        "auto",
+        "final"
+      ]
+    },
+    "formats": {
+      "type": "object",
+      "properties": {
+        "master": {
+          "type": "object",
+          "properties": {
+            "aspect": {
+              "type": "string",
+              "minLength": 1
+            },
+            "width": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "height": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "fps": {
+              "default": 30,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "aspect",
+            "width",
+            "height"
+          ]
+        },
+        "derivatives": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "aspect": {
+                "type": "string",
+                "minLength": 1
+              },
+              "width": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "height": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "fps": {
+                "default": 30,
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "aspect",
+              "width",
+              "height"
+            ]
+          }
+        }
+      },
+      "required": [
+        "master"
+      ]
+    },
+    "providers": {
+      "default": {
+        "image": "mock",
+        "video": "mock",
+        "song": "import"
+      },
+      "type": "object",
+      "properties": {
+        "image": {
+          "default": "mock",
+          "type": "string",
+          "enum": [
+            "fal",
+            "mock"
+          ]
+        },
+        "video": {
+          "default": "mock",
+          "type": "string",
+          "enum": [
+            "fal",
+            "mock"
+          ]
+        },
+        "song": {
+          "default": "import",
+          "type": "string",
+          "enum": [
+            "suno",
+            "import",
+            "mock"
+          ]
+        }
+      }
+    },
+    "brand": {
+      "default": "example",
+      "type": "string",
+      "minLength": 1
+    },
+    "models": {
+      "default": {},
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {}
+    }
+  },
+  "required": [
+    "version",
+    "slug",
+    "title",
+    "created",
+    "workflow",
+    "budget_usd",
+    "formats"
+  ]
+}

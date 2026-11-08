@@ -1,0 +1,37 @@
+version: 1
+name: Neon Rain / Example
+palette:
+  background: "#050510"
+  surface: "#0d0d24"
+  primary: "#ff2a6d"
+  secondary: "#05d9e8"
+  accent: "#f9f002"
+  text: "#f8f8ff"
+  muted: "#8b8ba7"
+typography:
+  display:
+    family: Orbitron
+    weight: 800
+    letterSpacing: 0.02
+  body:
+    family: Space Grotesk
+    weight: 500
+  mono:
+    family: JetBrains Mono
+    weight: 400
+look:
+  keywords:
+    - neon noir
+    - wet asphalt
+    - chrome
+    - rain
+    - volumetric glow
+    - circuit board
+  negative:
+    - daylight
+    - pastel
+    - stock-photo smiles
+  references: []
+motion:
+  easing: easeOut
+  grain: 0.08
