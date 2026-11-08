@@ -16,6 +16,71 @@ function resolveBinary(name: 'ffmpeg' | 'ffprobe'): string {
   }
 }
 
+export function probeDuration(path: string): number {
+  const ffprobe = resolveBinary('ffprobe');
+  const duration = Number(
+    execFileSync(
+      ffprobe,
+      ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', path],
+      { encoding: 'utf8' },
+    ).trim(),
+  );
+  if (!Number.isFinite(duration) || duration <= 0) {
+    throw new ValidationError(`Could not read the duration of ${path}.`);
+  }
+  return duration;
+}
+
+/**
+ * Cut a time range from the vocal stem (or the mix) for a lip-sync shot.
+ * Output is a small mono MP3 under assets/audio-segments/<name>.mp3, so the
+ * generated clip lines up exactly with the song at the shot's start time.
+ */
+export async function extractAudioSegment(
+  projectDir: string,
+  start: number,
+  end: number,
+  name: string,
+  source = 'audio/stems/vocals.wav',
+): Promise<string> {
+  const ffmpeg = resolveBinary('ffmpeg');
+  const project = await loadProject(projectDir);
+  if (!(Number.isFinite(start) && Number.isFinite(end)) || start < 0 || end <= start) {
+    throw new ValidationError(`Invalid segment ${start}s–${end}s.`);
+  }
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(name)) {
+    throw new ValidationError('Segment name must be lowercase letters, digits, and dashes.');
+  }
+  const input = resolve(project.paths.root, source);
+  if (!existsSync(input)) throw new ValidationError(`Missing audio source: ${input}`);
+  const destination = resolve(project.paths.assets, 'audio-segments', `${name}.mp3`);
+  await ensureDir(dirname(destination));
+  execFileSync(
+    ffmpeg,
+    [
+      '-y',
+      '-loglevel',
+      'error',
+      '-ss',
+      start.toFixed(3),
+      '-t',
+      (end - start).toFixed(3),
+      '-i',
+      input,
+      '-ac',
+      '1',
+      '-ar',
+      '44100',
+      '-b:a',
+      '128k',
+      destination,
+    ],
+    { stdio: 'inherit' },
+  );
+  console.log(`Audio segment ${start.toFixed(3)}s–${end.toFixed(3)}s written to ${destination}`);
+  return destination;
+}
+
 export async function normalizeAudio(projectDir: string, input: string, output?: string): Promise<string> {
   const ffmpeg = resolveBinary('ffmpeg');
   const project = await loadProject(projectDir);

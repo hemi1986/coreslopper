@@ -125,6 +125,7 @@ npm run schema
 | `npm run cli -- normalize-audio <project> --input <file>` | Normalize audio to −14 LUFS / −1 dBTP. |
 | `npm run cli -- footage <project> --input <file> --name <name>` | Normalize a footage proxy. |
 | `npm run cli -- frame <project> --input <clip> --position last` | Extract a review or chaining frame. |
+| `npm run cli -- audio-segment <project> --start <s> --end <s> --name <shot-id>` | Cut a vocal segment for a lip-sync shot. |
 | `npm run cli -- stage-start/-done/-fail/-skip/-reset` | Update `state.json` from the orchestrator. |
 | `npm run cli -- estimate --role <role> --units <n>` | Check a generation cost against the budget. |
 | `npm run cli -- validate-file <file>` | Validate one changed artifact (used by the hook). |

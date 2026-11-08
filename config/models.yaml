@@ -101,3 +101,16 @@ roles:
       usd: 0.40
     maxDuration: 8
     notes: Expensive hero fallback; verify the current slug and price.
+
+  video.lipsync:
+    model: fal-ai/bytedance/omnihuman/v1.5
+    params:
+      resolution: 1080p
+    pricing:
+      unit: second
+      usd: 0.16
+    maxDuration: 30
+    notes: >-
+      Image + audio -> singing/talking clip (OmniHuman 1.5). Billed per second of
+      driving audio. fal docs list $0.14/s (2026-11-08); third-party pages say
+      $0.16/s, so the estimate is conservative. Audio max 30 s at 1080p.

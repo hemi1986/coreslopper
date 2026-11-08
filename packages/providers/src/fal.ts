@@ -25,6 +25,10 @@ function mimeForPath(path: string): string {
   if (extension === '.gif') return 'image/gif';
   if (extension === '.mp4') return 'video/mp4';
   if (extension === '.webm') return 'video/webm';
+  if (extension === '.mp3') return 'audio/mpeg';
+  if (extension === '.wav') return 'audio/wav';
+  if (extension === '.m4a') return 'audio/mp4';
+  if (extension === '.ogg') return 'audio/ogg';
   return 'application/octet-stream';
 }
 
@@ -171,6 +175,22 @@ export class FalProvider implements Provider {
       image_url: await toDataUri(reference),
       duration: input.durationSeconds ?? 5,
       generate_audio: false,
+      ...input.params,
+    });
+  }
+
+  async lipSync(input: ProviderInput): Promise<ProviderOutput> {
+    const reference = input.references?.[0];
+    if (!reference) {
+      throw new Error('lipSync requires a face reference image.');
+    }
+    if (!input.audio) {
+      throw new Error('lipSync requires an audio file.');
+    }
+    return this.runModel(input, {
+      image_url: await toDataUri(reference),
+      audio_url: await toDataUri(input.audio),
+      ...(input.prompt ? { prompt: input.prompt } : {}),
       ...input.params,
     });
   }
