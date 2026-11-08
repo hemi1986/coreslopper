@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.0](https://github.com/hemi1986/coreslopper/compare/v0.1.0...v0.2.0) (2026-11-08)
+
+
+### Features
+
+* add `coreslopper update` to merge a newer workflow into a workspace ([3eddb5c](https://github.com/hemi1986/coreslopper/commit/3eddb5caa64a534a9bf21ca13d45d24c747976e3))
+* add `coreslopper update` to merge a newer workflow into a workspace ([1d10ffd](https://github.com/hemi1986/coreslopper/commit/1d10ffda2a6639d1a5b2a489564a54c9b2422cda))
+
 ## 0.1.0 (2026-11-08)
 
 
