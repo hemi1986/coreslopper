@@ -2,6 +2,8 @@
 
 An open-source, Claude Code-native workflow for making music videos: from a brief, through lyrics and a song, to a validated storyboard and a finished Remotion render.
 
+> **Status: work in progress.** This workflow is currently being tested end to end. The pipeline, schemas, skills, and provider integrations may still change, and it is not yet clear that every stage works as documented. Treat it as an experiment, not a production-ready tool.
+
 ![A frame from the motion-only demo](docs/assets/demo-still.png)
 
 The demo is a 12-second, motion-only project. It runs without API keys and is the first vertical slice of the pipeline.
