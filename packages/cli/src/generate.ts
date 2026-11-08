@@ -26,18 +26,27 @@ import {
   type GenerationRequest,
   type Operation,
 } from '@coreslopper/providers';
+import { probeDuration } from './media.js';
 
-export const BatchItemSchema = z.object({
-  operation: z.enum(['generateImage', 'editImage', 'imageToVideo']),
-  role: z.string().min(1),
-  prompt: z.string().min(1),
-  references: z.array(z.string()).default([]),
-  seed: z.number().int().optional(),
-  width: z.number().int().positive().optional(),
-  height: z.number().int().positive().optional(),
-  durationSeconds: z.number().positive().optional(),
-  params: z.record(z.string(), z.unknown()).default({}),
-});
+const VIDEO_OPERATIONS = new Set(['imageToVideo', 'lipSync']);
+
+export const BatchItemSchema = z
+  .object({
+    operation: z.enum(['generateImage', 'editImage', 'imageToVideo', 'lipSync']),
+    role: z.string().min(1),
+    prompt: z.string().min(1),
+    references: z.array(z.string()).default([]),
+    /** Vocal segment for lipSync, relative to the project (see `audio-segment`). */
+    audio: z.string().optional(),
+    seed: z.number().int().optional(),
+    width: z.number().int().positive().optional(),
+    height: z.number().int().positive().optional(),
+    durationSeconds: z.number().positive().optional(),
+    params: z.record(z.string(), z.unknown()).default({}),
+  })
+  .refine((item) => item.operation !== 'lipSync' || (item.audio && item.references.length > 0), {
+    message: 'lipSync needs "audio" (a vocal segment) and a face image as the first reference.',
+  });
 
 export const BatchSchema = z.array(BatchItemSchema).min(1);
 
@@ -54,6 +63,7 @@ interface ResolvedItem {
   pricing: ModelPricing;
   cost: number;
   references: string[];
+  audio?: string;
 }
 
 function roleOverride(config: ProjectConfig, role: string): Record<string, unknown> {
@@ -85,9 +95,23 @@ function resolveItem(
     );
   }
 
+  const audio = item.audio
+    ? resolve(item.audio.startsWith('/') ? item.audio : join(projectRoot, item.audio))
+    : undefined;
+  if (audio && !existsSync(audio)) {
+    throw new ValidationError(`Missing audio input: ${audio}`);
+  }
+  // A lip-sync clip is billed by the length of its driving audio.
+  const audioSeconds = audio ? Math.ceil(probeDuration(audio)) : undefined;
+  if (audioSeconds !== undefined && role.maxDuration && audioSeconds > role.maxDuration) {
+    throw new ValidationError(
+      `Audio ${item.audio} is ${audioSeconds}s; role "${item.role}" allows at most ${role.maxDuration}s.`,
+    );
+  }
+
   const units =
     pricing.unit === 'second'
-      ? item.durationSeconds ?? Number(params.duration ?? role.maxDuration ?? 5)
+      ? audioSeconds ?? item.durationSeconds ?? Number(params.duration ?? role.maxDuration ?? 5)
       : pricing.unit === 'image'
         ? Number(params.num_images ?? 1)
         : 1;
@@ -102,7 +126,7 @@ function resolveItem(
     }
   }
 
-  return { item, model, params, pricing, cost, references };
+  return { item, model, params, pricing, cost, references, audio };
 }
 
 export async function generateBatch(options: GenerateOptions): Promise<void> {
@@ -120,7 +144,7 @@ export async function generateBatch(options: GenerateOptions): Promise<void> {
   const videoProvider = project.config.providers.video;
   const resolved = batch.map((item) => {
     const value = resolveItem(item, project.config, models, project.paths.root);
-    const provider = item.operation === 'imageToVideo' ? videoProvider : imageProvider;
+    const provider = VIDEO_OPERATIONS.has(item.operation) ? videoProvider : imageProvider;
     return provider === 'mock' ? { ...value, cost: 0 } : value;
   });
   const totalEstimate = resolved.reduce((sum, item) => sum + item.cost, 0);
@@ -154,7 +178,7 @@ export async function generateBatch(options: GenerateOptions): Promise<void> {
   let actualSpend = 0;
   let cacheHits = 0;
   for (const [index, item] of resolved.entries()) {
-    const runner = item.item.operation === 'imageToVideo' ? videoRunner : imageRunner;
+    const runner = VIDEO_OPERATIONS.has(item.item.operation) ? videoRunner : imageRunner;
     const outputDir = join(project.paths.assets, item.item.role.replaceAll('.', '/'));
     await ensureDir(outputDir);
     const request: GenerationRequest = {
@@ -164,6 +188,7 @@ export async function generateBatch(options: GenerateOptions): Promise<void> {
       prompt: item.item.prompt,
       seed: item.item.seed,
       references: item.references,
+      audio: item.audio,
       width: item.item.width ?? project.config.formats.master.width,
       height: item.item.height ?? project.config.formats.master.height,
       durationSeconds: item.item.durationSeconds,

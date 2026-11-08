@@ -1,6 +1,6 @@
 ---
 name: ai-clips
-description: Use when generating AI keyframes or image-to-video clips for storyboard shots, enforcing character references, estimating cost, caching generations, and logging a manifest.
+description: Use when generating AI keyframes, image-to-video clips, or lip-sync clips for storyboard shots, enforcing character references, estimating cost, caching generations, and logging a manifest.
 license: MIT
 ---
 
@@ -50,8 +50,25 @@ license: MIT
 7. Use frame chaining only when the storyboard enables it. Extract the last frame of the previous clip with
    `npm run cli -- frame <project> --input <previous-clip> --position last --out <path>`
    and pass it as the first reference of the next clip.
-8. Update the storyboard's `asset` path or layer asset. Re-run `npm run cli -- validate projects/<slug>`.
-9. Update the state when the asset batch is complete.
+8. **Lip-sync shots** (`lipSync` set on the shot):
+   1. Generate a dedicated keyframe with `editImage` from the character sheet: face frontal or slight 3/4, evenly lit, mouth slightly open, face filling at least a third of the frame. Never feed the multi-view sheet itself.
+   2. Resolve the shot's start and end anchors to seconds from `timing.effective.json` and cut the vocal segment:
+      `npm run cli -- audio-segment projects/<slug> --start <s> --end <s> --name <shot-id>`
+      (source defaults to `audio/stems/vocals.wav`; use `--source audio/song.wav` only if there is no vocal stem).
+   3. Add a batch item:
+      ```json
+      {
+        "operation": "lipSync",
+        "role": "video.lipsync",
+        "prompt": "she sings with intensity, subtle head movement",
+        "references": ["assets/image/keyframe/<keyframe>.png"],
+        "audio": "assets/audio-segments/<shot-id>.mp3"
+      }
+      ```
+      Cost is billed by the audio length; keep each segment ≤ 30 s and as tight as the sung line.
+   4. The clip must start exactly at the shot start; do not trim its head in Remotion. Its audio is muted; the song stays the only audio source. Check sync at first/middle/last frame against the lyric word timestamps.
+9. Update the storyboard's `asset` path or layer asset. Re-run `npm run cli -- validate projects/<slug>`.
+10. Update the state when the asset batch is complete.
 
 ## Completion criteria
 
@@ -66,5 +83,6 @@ license: MIT
 
 - Text-only character prompts.
 - Re-generating a cached shot because the prompt was reworded without changing the hash inputs.
+- Lip-syncing from the full mix instead of the vocal stem, or with a segment that is offset from the shot start.
 - Ignoring native audio in the generated clip; the song is the only audio source.
 - Forgetting to record the spend and exceeding the budget silently.

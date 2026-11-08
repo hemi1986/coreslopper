@@ -1,10 +1,12 @@
-export type Operation = 'generateImage' | 'editImage' | 'imageToVideo';
+export type Operation = 'generateImage' | 'editImage' | 'imageToVideo' | 'lipSync';
 
 export interface ProviderInput {
   model: string;
   prompt: string;
   negativePrompt?: string;
   references?: string[];
+  /** Audio file that drives a lipSync generation (vocal segment). */
+  audio?: string;
   seed: number;
   width?: number;
   height?: number;
@@ -23,6 +25,8 @@ export interface Provider {
   generateImage(input: ProviderInput): Promise<ProviderOutput>;
   editImage(input: ProviderInput): Promise<ProviderOutput>;
   imageToVideo(input: ProviderInput): Promise<ProviderOutput>;
+  /** Animate a still face image so it sings or speaks the given audio. */
+  lipSync(input: ProviderInput): Promise<ProviderOutput>;
 }
 
 export interface GenerationRequest extends Omit<ProviderInput, 'seed'> {
@@ -43,6 +47,7 @@ export interface GenerationResult {
   prompt: string;
   seed: number;
   references: string[];
+  audio?: string;
   params: Record<string, unknown>;
   costUsd: number;
   cached: boolean;

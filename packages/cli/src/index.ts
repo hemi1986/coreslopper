@@ -23,7 +23,7 @@ import { renderProject } from './render.js';
 import { createProject } from './new-project.js';
 import { generateBatch } from './generate.js';
 import { runQa } from './qa.js';
-import { importFootage, normalizeAudio, extractFrame } from './media.js';
+import { importFootage, normalizeAudio, extractFrame, extractAudioSegment } from './media.js';
 import { runDoctor } from './doctor.js';
 import { runInitCommand, validateChoice, type InitCommandOptions } from './init-command.js';
 import { printStatus } from './status.js';
@@ -342,6 +342,25 @@ program
   .action((project: string | undefined, options: { input: string; name: string }) =>
     run(async () => {
       await importFootage(projectDirFromArg(project), options.input, options.name);
+    }),
+  );
+
+program
+  .command('audio-segment [project]')
+  .description('Cut a vocal segment (seconds) for a lip-sync shot into assets/audio-segments/<name>.mp3.')
+  .requiredOption('--start <seconds>', 'Segment start in song seconds')
+  .requiredOption('--end <seconds>', 'Segment end in song seconds')
+  .requiredOption('--name <name>', 'Output name (lowercase, dashes), e.g. shot-012')
+  .option('--source <path>', 'Audio source relative to the project', 'audio/stems/vocals.wav')
+  .action((project: string | undefined, options: { start: string; end: string; name: string; source: string }) =>
+    run(async () => {
+      await extractAudioSegment(
+        projectDirFromArg(project),
+        Number(options.start),
+        Number(options.end),
+        options.name,
+        options.source,
+      );
     }),
   );
 

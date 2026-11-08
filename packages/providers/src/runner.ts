@@ -58,6 +58,10 @@ export class GenerationRunner {
         sha256: await hashFile(path),
       })),
     );
+    if (request.operation === 'lipSync' && !request.audio) {
+      throw new Error('lipSync requires an audio file.');
+    }
+    const audioHash = request.audio ? await hashFile(request.audio) : undefined;
     const seed = request.seed ?? defaultSeed(request);
     const params = request.params ?? {};
     const hash = hashObject({
@@ -72,6 +76,7 @@ export class GenerationRunner {
       durationSeconds: request.durationSeconds,
       params,
       references: referenceHashes,
+      ...(audioHash ? { audio: audioHash } : {}),
     });
 
     const cacheDir = join(this.options.cacheDir, hash);
@@ -99,6 +104,7 @@ export class GenerationRunner {
         prompt: request.prompt,
         negativePrompt: request.negativePrompt,
         references,
+        audio: request.audio,
         seed,
         width: request.width,
         height: request.height,
@@ -108,6 +114,7 @@ export class GenerationRunner {
       };
       if (request.operation === 'generateImage') output = await this.options.provider.generateImage(input);
       else if (request.operation === 'editImage') output = await this.options.provider.editImage(input);
+      else if (request.operation === 'lipSync') output = await this.options.provider.lipSync(input);
       else output = await this.options.provider.imageToVideo(input);
     } catch (error) {
       const failed: GenerationResult = {
@@ -145,6 +152,7 @@ export class GenerationRunner {
       prompt: request.prompt,
       seed,
       references,
+      ...(request.audio ? { audio: request.audio } : {}),
       params,
       costUsd: request.estimatedCostUsd,
       files: output.files,
@@ -189,6 +197,7 @@ export class GenerationRunner {
       ...(error ? { error } : {}),
       files: result.files.map((file) => relative(baseDir, file)),
       references: result.references.map((file) => relative(baseDir, file)),
+      ...(result.audio ? { audio: relative(baseDir, result.audio) } : {}),
     };
     await mkdir(dirname(this.options.manifestPath), { recursive: true });
     await appendFile(this.options.manifestPath, `${JSON.stringify(record)}\n`, 'utf8');

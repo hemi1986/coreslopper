@@ -453,6 +453,22 @@
           "asset": {
             "type": "string"
           },
+          "lipSync": {
+            "type": "object",
+            "properties": {
+              "character": {
+                "type": "string",
+                "minLength": 1
+              },
+              "source": {
+                "default": "audio/stems/vocals.wav",
+                "type": "string"
+              }
+            },
+            "required": [
+              "character"
+            ]
+          },
           "layers": {
             "type": "array",
             "items": {

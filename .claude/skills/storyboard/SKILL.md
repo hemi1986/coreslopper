@@ -27,6 +27,7 @@ license: MIT
    - Shots ordered by start time, IDs `shot-001`, `shot-002`, …
    - Symbolic anchors (`section`, `line`, `word`, `beat`, `downbeat`, or `time` only as an escape hatch).
    - Source-specific fields: `motion.component`, `prompts.keyframe`/`prompts.video`, `asset`, or `layers` for mixed shots.
+   - Lip-sync shots: `source: ai-clip` plus `lipSync: { character: <id> }`. Anchor start/end tightly to the sung line (word timestamps), keep each ≤ 30 s, and write `prompts.keyframe` for a frontal face shot.
    - Text, highlights, transition, style refs, character refs, and chaining when relevant.
 4. Run `npm run cli -- validate projects/<slug>`. Fix schema errors, unresolved anchors, gaps, overlaps, missing references, and source-rule violations.
 5. Run `npm run cli -- contact-sheet projects/<slug>`.
