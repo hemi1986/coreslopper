@@ -19,6 +19,11 @@ const SKIPPED_FILES = new Set([
   'scripts/build-runtime.mjs',
   'tsup.config.ts',
   '.env',
+  // Upstream release automation: in a workspace it would open release PRs and
+  // try to publish the coreslopper package from the user's repository.
+  '.github/workflows/release.yml',
+  'release-please-config.json',
+  '.release-please-manifest.json',
 ]);
 
 const SKIPPED_DIRECTORIES = new Set([
