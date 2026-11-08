@@ -361,14 +361,23 @@ program
   .action(() =>
     run(async () => {
       const root = process.cwd();
-      const checks: Array<{ name: string; ok: boolean; detail: string }> = [];
+      const checks: Array<{ name: string; ok: boolean; detail: string; optional?: boolean }> = [];
       const major = Number(process.versions.node.split('.')[0]);
       checks.push({ name: 'Node >= 22', ok: major >= 22, detail: process.versions.node });
-      try {
-        execFileSync('which', ['ffmpeg'], { stdio: 'ignore' });
-        checks.push({ name: 'ffmpeg', ok: true, detail: 'found on PATH' });
-      } catch {
-        checks.push({ name: 'ffmpeg', ok: false, detail: 'missing (needed for footage and loudness normalization)' });
+      const localFfmpeg = join(root, '.tools', 'ffmpeg', 'ffmpeg');
+      if (existsSync(localFfmpeg)) {
+        checks.push({ name: 'ffmpeg', ok: true, detail: localFfmpeg });
+      } else {
+        try {
+          execFileSync('which', ['ffmpeg'], { stdio: 'ignore' });
+          checks.push({ name: 'ffmpeg', ok: true, detail: 'found on PATH' });
+        } catch {
+          checks.push({
+            name: 'ffmpeg',
+            ok: false,
+            detail: 'missing (run ./scripts/install-ffmpeg.sh or install with your package manager)',
+          });
+        }
       }
       checks.push({
         name: 'Example fonts',
@@ -384,14 +393,19 @@ program
         name: 'FAL_KEY',
         ok: Boolean(process.env.FAL_KEY),
         detail: process.env.FAL_KEY ? 'set' : 'not set (mock works without it)',
+        optional: true,
       });
       checks.push({
         name: 'Suno MCP',
         ok: existsSync(join(root, '.mcp.json')),
         detail: '.mcp.json',
+        optional: true,
       });
-      for (const check of checks) console.log(`${check.ok ? '✔' : '✖'} ${check.name}: ${check.detail}`);
-      if (checks.some((check) => !check.ok)) process.exitCode = 1;
+      for (const check of checks) {
+        const mark = check.ok ? '✔' : check.optional ? '○' : '✖';
+        console.log(`${mark} ${check.name}: ${check.detail}`);
+      }
+      if (checks.some((check) => !check.ok && !check.optional)) process.exitCode = 1;
     }),
   );
 

@@ -11,7 +11,7 @@ npm run typecheck
 cd scripts/audio-analysis && uv sync --group dev && uv run pytest -q
 ```
 
-Optional system dependency: `ffmpeg` and `ffprobe` for footage import and loudness normalization.
+Optional system dependency: `ffmpeg` and `ffprobe` for footage import and loudness normalization. On Linux x64, `./scripts/install-ffmpeg.sh` installs a static build into `.tools/ffmpeg`; the media commands use it automatically.
 
 ## What to work on
 

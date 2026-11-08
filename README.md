@@ -34,7 +34,7 @@ Read [the plan](docs/PLAN.md) for the full rationale, [the ADRs](docs/adr/) for 
 
 - Node.js 22 or newer.
 - Python 3.12 or newer and [uv](https://docs.astral.sh/uv/).
-- `ffmpeg` and `ffprobe` on `PATH` for footage import and loudness normalization. The motion-only demo does not need them.
+- `ffmpeg` and `ffprobe` on `PATH` for footage import and loudness normalization. The motion-only demo does not need them. On Linux x64 without a package manager, run `./scripts/install-ffmpeg.sh`; the media commands check `.tools/ffmpeg` automatically.
 - Optional: a CUDA GPU for WhisperX/Demucs. CPU works but is slower.
 - Optional: a Suno account for song generation and a `FAL_KEY` for AI image/video generation.
 
@@ -55,6 +55,12 @@ npm run cli -- render projects/demo --format 16x9
 ```
 
 The render is written to `projects/demo/renders/16x9.mp4`.
+
+Or run the full demo (audio, validation, contact sheet, all three formats, and QA):
+
+```bash
+npm run demo
+```
 
 Check your environment at any time:
 

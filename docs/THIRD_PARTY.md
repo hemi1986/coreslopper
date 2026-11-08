@@ -54,14 +54,19 @@ SOFTWARE.
 ## Remotion
 
 - **Package:** `remotion`, `@remotion/three`, and related `@remotion/*` packages
-- **Version:** pinned in `package.json` (4.x at planning time)
+- **Version:** 4.0.541 (pinned in `package.json`)
 - **License:** Remotion License — source-available, not OSI open source
 - **Terms:** <https://www.remotion.dev/docs/license>
 - **Summary:** Free for individuals, for-profit organizations with up to 3 employees, and non-profit organizations. Larger for-profit organizations need a company license. The license does not cover third-party codec patents.
 - **Obligation:** This repository's MIT license does not relicense Remotion. Users are responsible for complying with the Remotion License for their entity and use case.
 
-## Fonts (example brand)
+## ffmpeg
 
+- **Use:** footage normalization, frame extraction, and loudness normalization.
+- **Install:** on Linux x64, `scripts/install-ffmpeg.sh` downloads a static build from johnvansickle.com into `.tools/ffmpeg` (gitignored). Other platforms should use their package manager.
+- **License:** ffmpeg is LGPL/GPL depending on the build and its enabled components. The static build is not committed or redistributed by this repository. Users are responsible for complying with the ffmpeg license and any codec patent requirements in their jurisdiction.
+
+## Fonts (example brand)
 The example brand uses only SIL Open Font License (OFL) fonts. License files are stored next to the font files in `brand/example/fonts/`.
 
 | Font | License | Use |

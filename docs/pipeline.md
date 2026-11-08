@@ -161,7 +161,7 @@ The status table shows every stage, attempts, outputs, spend, remaining budget, 
 
 ## Troubleshooting
 
-- **`ffmpeg` missing:** install it for footage and loudness normalization. The motion-only demo still renders without it.
+- **`ffmpeg` missing:** run `./scripts/install-ffmpeg.sh` on Linux x64, or install it with your package manager. The motion-only demo still renders without it; footage and loudness normalization need it.
 - **WhisperX/Demucs missing:** install the `asr`/`stems` extras. Do not silently skip word alignment for a real lyric video.
 - **FAL_KEY missing:** switch `providers.image`/`providers.video` to `mock` or add the key to `.env`.
 - **Storyboard gap/overlap:** inspect the anchors. Prefer a symbolic anchor over a `time` escape hatch.

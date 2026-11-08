@@ -1,33 +1,30 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { basename, dirname, extname, resolve } from 'node:path';
-import { ensureDir, loadProject, ValidationError } from '@coreslopper/core';
+import { basename, dirname, extname, join, resolve } from 'node:path';
+import { ensureDir, loadProject, repoRoot, ValidationError } from '@coreslopper/core';
 
-function requireFfmpeg(): void {
+function resolveBinary(name: 'ffmpeg' | 'ffprobe'): string {
+  const local = join(repoRoot(), '.tools', 'ffmpeg', name);
+  if (existsSync(local)) return local;
   try {
-    execFileSync('which', ['ffmpeg'], { stdio: 'ignore' });
+    execFileSync('which', [name], { stdio: 'ignore' });
+    return name;
   } catch {
-    throw new ValidationError('ffmpeg is not on PATH. Install it before importing footage or normalizing audio.');
-  }
-}
-
-function requireFfprobe(): void {
-  try {
-    execFileSync('which', ['ffprobe'], { stdio: 'ignore' });
-  } catch {
-    throw new ValidationError('ffprobe is not on PATH. Install ffmpeg before extracting frames.');
+    throw new ValidationError(
+      `${name} is not on PATH and ${local} is missing. Run ./scripts/install-ffmpeg.sh on Linux x64, or install ffmpeg with your package manager.`,
+    );
   }
 }
 
 export async function normalizeAudio(projectDir: string, input: string, output?: string): Promise<string> {
-  requireFfmpeg();
+  const ffmpeg = resolveBinary('ffmpeg');
   const project = await loadProject(projectDir);
   const source = resolve(input);
   if (!existsSync(source)) throw new ValidationError(`Missing audio input: ${source}`);
   const destination = output ? resolve(output) : resolve(project.paths.root, 'audio', 'song.wav');
   await ensureDir(dirname(destination));
   execFileSync(
-    'ffmpeg',
+    ffmpeg,
     [
       '-y',
       '-i',
@@ -54,7 +51,7 @@ export async function importFootage(
   height = 1080,
   fps = 30,
 ): Promise<string> {
-  requireFfmpeg();
+  const ffmpeg = resolveBinary('ffmpeg');
   const project = await loadProject(projectDir);
   const source = resolve(input);
   if (!existsSync(source)) throw new ValidationError(`Missing footage input: ${source}`);
@@ -64,7 +61,7 @@ export async function importFootage(
   const destination = resolve(project.paths.assets, 'footage', `${name}.mp4`);
   await ensureDir(dirname(destination));
   execFileSync(
-    'ffmpeg',
+    ffmpeg,
     [
       '-y',
       '-i',
@@ -92,14 +89,14 @@ export async function extractFrame(
   position: 'first' | 'middle' | 'last',
   output?: string,
 ): Promise<string> {
-  requireFfmpeg();
-  requireFfprobe();
+  const ffmpeg = resolveBinary('ffmpeg');
+  const ffprobe = resolveBinary('ffprobe');
   const project = await loadProject(projectDir);
   const source = resolve(input);
   if (!existsSync(source)) throw new ValidationError(`Missing clip: ${source}`);
   const duration = Number(
     execFileSync(
-      'ffprobe',
+      ffprobe,
       ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', source],
       { encoding: 'utf8' },
     ).trim(),
@@ -113,7 +110,7 @@ export async function extractFrame(
     : resolve(project.paths.assets, 'frames', `${basename(source, extname(source))}-${position}.png`);
   await ensureDir(dirname(destination));
   execFileSync(
-    'ffmpeg',
+    ffmpeg,
     ['-y', '-ss', timestamp.toFixed(3), '-i', source, '-frames:v', '1', destination],
     { stdio: 'inherit' },
   );
