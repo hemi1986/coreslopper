@@ -289,10 +289,12 @@ export function runSetup(root: string): SetupResult {
 
 export type FalKeyStatus = 'valid' | 'invalid' | 'unknown';
 
-export interface FalKeyResult {
+export interface ProviderKeyResult {
   status: FalKeyStatus;
   message: string;
 }
+
+export type FalKeyResult = ProviderKeyResult;
 
 /**
  * Check a fal.ai key against the model-list endpoint. A network failure is
@@ -301,7 +303,7 @@ export interface FalKeyResult {
 export async function validateFalKey(
   key: string,
   fetchImpl: (input: string, init?: RequestInit) => Promise<Response> = fetch,
-): Promise<FalKeyResult> {
+): Promise<ProviderKeyResult> {
   const trimmed = key.trim();
   if (!trimmed) return { status: 'invalid', message: 'empty key' };
 
@@ -313,6 +315,35 @@ export async function validateFalKey(
     if (response.ok) return { status: 'valid', message: `HTTP ${response.status}` };
     if (response.status === 401) return { status: 'invalid', message: 'HTTP 401 (key rejected)' };
     if (response.status === 403) return { status: 'unknown', message: 'HTTP 403 (key may lack API permission)' };
+    return { status: 'unknown', message: `HTTP ${response.status}` };
+  } catch (error) {
+    return {
+      status: 'unknown',
+      message: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+/**
+ * Check a Higgsfield credential against a lightweight authenticated endpoint.
+ * Network failures are reported as unknown, not as an invalid credential.
+ */
+export async function validateHiggsfieldKey(
+  key: string,
+  fetchImpl: (input: string, init?: RequestInit) => Promise<Response> = fetch,
+): Promise<ProviderKeyResult> {
+  const trimmed = key.trim();
+  if (!trimmed) return { status: 'invalid', message: 'empty credential' };
+
+  try {
+    const response = await fetchImpl('https://api.higgsfield.ai/v1/text2image/soul-styles/v2', {
+      headers: { Authorization: `Key ${trimmed}` },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (response.ok) return { status: 'valid', message: `HTTP ${response.status}` };
+    if (response.status === 401) return { status: 'invalid', message: 'HTTP 401 (credential rejected)' };
+    if (response.status === 402) return { status: 'unknown', message: 'HTTP 402 (balance required)' };
+    if (response.status === 403) return { status: 'unknown', message: 'HTTP 403 (credential may lack API permission)' };
     return { status: 'unknown', message: `HTTP ${response.status}` };
   } catch (error) {
     return {

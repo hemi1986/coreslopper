@@ -7,6 +7,8 @@ export const FormatSchema = z.object({
   fps: z.number().int().positive().default(30),
 });
 
+export const ProviderKindSchema = z.enum(['fal', 'higgsfield', 'mock']);
+
 export const ProjectConfigSchema = z.object({
   version: z.literal(1),
   slug: z
@@ -28,8 +30,10 @@ export const ProjectConfigSchema = z.object({
   }),
   providers: z
     .object({
-      image: z.enum(['fal', 'mock']).default('mock'),
-      video: z.enum(['fal', 'mock']).default('mock'),
+      image: ProviderKindSchema.default('mock'),
+      video: ProviderKindSchema.default('mock'),
+      /** Lip-sync can use a different provider from the rest of the video. */
+      lipsync: ProviderKindSchema.optional(),
       song: z.enum(['suno', 'import', 'mock']).default('import'),
     })
     .default({ image: 'mock', video: 'mock', song: 'import' }),
@@ -323,12 +327,24 @@ export const ModelPricingSchema = z.object({
   usd: z.number().nonnegative(),
 });
 
-export const ModelRoleSchema = z.object({
+export const ModelRoleVariantSchema = z.object({
   model: z.string().min(1),
   params: z.record(z.string(), z.unknown()).default({}),
   pricing: ModelPricingSchema.optional(),
   maxDuration: z.number().positive().optional(),
   notes: z.string().optional(),
+});
+
+export const ModelRoleSchema = z.object({
+  /** Provider whose model slug and defaults are in the fields below. */
+  provider: z.string().min(1).default('fal'),
+  model: z.string().min(1),
+  params: z.record(z.string(), z.unknown()).default({}),
+  pricing: ModelPricingSchema.optional(),
+  maxDuration: z.number().positive().optional(),
+  notes: z.string().optional(),
+  /** Provider-specific model slugs, params, and prices. */
+  alternatives: z.record(z.string(), ModelRoleVariantSchema).default({}),
 });
 
 export const ModelsConfigSchema = z.object({
@@ -358,5 +374,7 @@ export type Character = z.infer<typeof CharacterSchema>;
 export type CharacterBible = z.infer<typeof CharacterBibleSchema>;
 export type BrandKit = z.infer<typeof BrandKitSchema>;
 export type ModelPricing = z.infer<typeof ModelPricingSchema>;
+export type ModelRoleVariant = z.infer<typeof ModelRoleVariantSchema>;
 export type ModelRole = z.infer<typeof ModelRoleSchema>;
 export type ModelsConfig = z.infer<typeof ModelsConfigSchema>;
+export type ProviderKind = z.infer<typeof ProviderKindSchema>;

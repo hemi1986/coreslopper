@@ -52,7 +52,7 @@ The pipeline runs autonomously by default. Quality is established **before** the
 | 10 | Budget | `budget_usd` is mandatory at project creation; `batch_cap_usd` defaults to 30 % of the remaining budget. |
 | 11 | Music source | Official Suno MCP (`https://api.suno.com/mcp`) or import of an existing file; stems when available. |
 | 12 | Audio analysis | Local Demucs + WhisperX + librosa on the RTX 5070 Ti; CPU fallback. |
-| 13 | Image/video provider | fal.ai behind a narrow adapter; `config/models.yaml` selects models and defaults. |
+| 13 | Image/video provider | fal.ai and Higgsfield behind one narrow adapter; `config/models.yaml` selects models, provider alternatives, and defaults. |
 | 14 | Repository language | English for all repository artifacts (docs, skills, schema, lyrics, commit messages). |
 | 15 | License | MIT for our code and docs. The project is non-commercial in positioning; MIT still allows commercial use by others. |
 | 16 | Schema source of truth | Zod → generated JSON Schema + TypeScript types; Python validates with `jsonschema`. |
@@ -81,7 +81,7 @@ flowchart TD
     S1 & S2 & S3 & S6 & S7 --> C[Creative skill + fresh subagent]
     S4 --> SUNO[Suno MCP / import]
     S5 --> PY[Python: Demucs + WhisperX + librosa]
-    S8 --> PROV[Provider adapter: fal.ai / mock]
+    S8 --> PROV[Provider adapter: fal.ai / Higgsfield / mock]
     S9 & S10 --> REM[Remotion renderer]
     C & PY & PROV & REM --> F[(Project files)]
     F --> ST[state.json]
@@ -157,7 +157,7 @@ flowchart TD
 │   └── adr/
 ├── packages/
 │   ├── core/            # schemas, state, config, hash, manifest, timing, cost
-│   ├── providers/       # narrow generation interface, fal adapter, mock adapter
+│   ├── providers/       # narrow generation interface, fal.ai + Higgsfield + mock adapters
 │   ├── remotion/        # compositions, components, hooks, effects
 │   └── cli/             # validate, estimate, render, export, project management
 ├── scripts/
@@ -222,8 +222,9 @@ formats:
     - { aspect: "9:16", width: 1080, height: 1920 }
     - { aspect: "1:1",  width: 1080, height: 1080 }
 providers:
-  image: fal
+  image: higgsfield
   video: fal
+  lipsync: fal          # optional; falls back to video
   song: suno
 song:
   variants: 2          # 1-4; the skill scores each variant and selects one
@@ -352,19 +353,21 @@ The analysis is a Python `uv` project with pinned dependencies and a `--device a
 
 ### 9.1 Provider interface
 
-`packages/providers` exposes exactly three operations:
+`packages/providers` exposes exactly four operations:
 
 ```ts
 generateImage(input: ImageInput): Promise<ImageResult>;
 editImage(input: EditImageInput): Promise<ImageResult>;
 imageToVideo(input: VideoInput): Promise<VideoResult>;
+lipSync(input: LipSyncInput): Promise<VideoResult>;
 ```
 
-`ImageInput` and `VideoInput` carry model, prompt, negative prompt, references, seed, dimensions/duration, and provider-specific params. Results carry local file paths, provider, model, seed, cost, and raw response metadata. The interface is intentionally too small to leak fal.ai-specific concepts.
+`ImageInput` and `VideoInput` carry model, prompt, negative prompt, references, seed, dimensions/duration, and provider-specific params. Results carry local file paths, provider, model, seed, cost, and raw response metadata. The interface is intentionally too small to leak fal.ai- or Higgsfield-specific concepts.
 
 ### 9.2 Adapters
 
-- **fal.ai** — first real adapter, using the fal SDK/REST. `FAL_KEY` comes from the environment.
+- **fal.ai** — using the fal REST API. `FAL_KEY` comes from the environment.
+- **Higgsfield** — using the asynchronous Higgsfield API, presigned uploads for local references, and idempotent submissions. Credentials come from `HIGGSFIELD_API_KEY` or `HF_API_KEY_ID` + `HF_API_KEY_SECRET`.
 - **mock** — deterministic placeholders (gradient stills, short generated clips) for tests, CI, and users without accounts.
 - Future adapters are additive; the pipeline does not change.
 
@@ -382,7 +385,7 @@ imageToVideo(input: VideoInput): Promise<VideoResult>;
 | `video.image_to_video.premium` | `bytedance/seedance-2.5/us/image-to-video` or Veo 3.1 | Hero shots only. |
 | `video.image_to_video.budget` | `alibaba/wan-3.0/image-to-video` or `fal-ai/wan/v2.7/image-to-video` | Lowest-cost motion. |
 
-The exact fal.ai slugs and prices are verified during implementation and pinned in `config/models.yaml` with a `last_verified` date. Model changes are configuration changes, not code changes. Video is generated **without native audio** where the model supports it; the song is the only audio source.
+The exact provider slugs and prices are verified during implementation and pinned in `config/models.yaml` with a `last_verified` date. Each role names a base provider and can add `alternatives.<provider>` for Higgsfield or a future adapter. Model changes are configuration changes, not code changes. Video is generated **without native audio** where the model supports it; the song is the only audio source.
 
 `config/models.yaml` also stores per-unit prices and constraints (max duration, supported resolutions, reference limits). The estimator refuses to guess: an unknown price is a hard error.
 
@@ -504,8 +507,9 @@ A failure exits non-zero with a short, actionable message. Validators are also r
 
 - **Suno** — official HTTP MCP at `https://api.suno.com/mcp`; authentication via Claude Code's MCP login flow.
 - **fal.ai** — optional, for exploratory use only; the pipeline uses the adapter, not MCP.
+- **Higgsfield** — adapter only; no pipeline MCP dependency.
 
-No secrets are committed. `.env.example` documents `FAL_KEY`, optional `OPENAI_API_KEY` (only if a user chooses API Whisper), and paths/flags. Suno uses OAuth, not an env key.
+No secrets are committed. `.env.example` documents `FAL_KEY`, Higgsfield credentials (`HIGGSFIELD_API_KEY` or `HF_API_KEY_ID` + `HF_API_KEY_SECRET`), optional `OPENAI_API_KEY` (only if a user chooses API Whisper), and paths/flags. Suno uses OAuth, not an env key.
 
 ## 13. Projects and brand kits
 
@@ -548,7 +552,7 @@ Project-specific brands live in the project, not in the workflow repo. The examp
 
 - **License:** MIT for our code and docs. The project is positioned as non-commercial, but MIT permits commercial use by others; this is intentional and documented.
 - **No secrets:** `.env.example` only; `.env` gitignored; CI uses mocks.
-- **No copyrighted media:** generated Suno/fal.ai assets, audio, and renders are gitignored; examples use synthetic or CC0 material.
+- **No copyrighted media:** generated Suno/fal.ai/Higgsfield assets, audio, and renders are gitignored; examples use synthetic or CC0 material.
 - **Third-party notices:** `docs/THIRD_PARTY.md` with source, pinned commit, license, summary, and adaptations for vendored skills; Remotion's source-available license; font licenses; provider terms.
 - **Docs:** `README.md` (what/why/quickstart/requirements/costs/security/license), `AGENTS.md` (agent-facing project description), `CLAUDE.md` (`@AGENTS.md` plus Claude Code specifics), `docs/architecture.md`, `docs/pipeline.md`, `docs/glossary.md`, `docs/adr/`.
 - **Community:** `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1), `SECURITY.md`, issue/PR templates.
@@ -581,11 +585,11 @@ Project-specific brands live in the project, not in the workflow repo. The examp
 
 ### Phase 3 — AI clips, footage, mixed shots
 
-- fal.ai adapter, mock adapter, manifest, cache, cost estimator, retry/resume.
+- fal.ai and Higgsfield adapters, mock adapter, manifest, cache, cost estimator, retry/resume.
 - Character bible with reference sheets; keyframe and image-to-video generation; frame chaining.
 - Footage import, trimming, proxy normalization, and mixed-shot composition.
 - `art-director` and `qa-checker` agents wired into the pipeline.
-- Model matrix verified against the live fal.ai catalog and pinned.
+- Model matrix verified against the live fal.ai and Higgsfield catalogs and pinned.
 
 **Acceptance:** a storyboard with motion, AI, footage, and mixed shots renders end-to-end; cache hits avoid duplicate spend; a deliberate budget overrun aborts before the first paid call.
 
@@ -610,7 +614,7 @@ Project-specific brands live in the project, not in the workflow repo. The examp
 | Determinism | Remotion + frame hashes | Two renders of the same fixture are identical |
 | GPU (optional) | pytest marker | Demucs/WhisperX on CUDA; never required in CI |
 
-CI runs on Ubuntu, installs `ffmpeg`, uses Node 22, Python 3.12, and `uv`, and never calls Suno or fal.ai. A short Remotion render validates the composition; the browser is downloaded by Remotion and cached.
+CI runs on Ubuntu, installs `ffmpeg`, uses Node 22, Python 3.12, and `uv`, and never calls Suno, fal.ai, or Higgsfield. A short Remotion render validates the composition; the browser is downloaded by Remotion and cached.
 
 ## 17. Risks and mitigations
 
@@ -631,7 +635,7 @@ CI runs on Ubuntu, installs `ffmpeg`, uses Node 22, Python 3.12, and `uv`, and n
 
 ## 18. Open questions before public release
 
-- Exact fal.ai model slugs and prices; verify and pin at implementation time.
+- Exact provider model slugs and prices; verify and pin at implementation time.
 - Suno MCP authentication details and whether stems are available on the user's plan.
 - WhisperX/PyTorch CUDA build that works reliably on the RTX 5070 Ti (Blackwell).
 - Whether 4K/60 or 4:5 should become first-class formats after v1.
@@ -654,6 +658,6 @@ Updated 2026-11-08:
 
 - **Phase 1 — skeleton and contracts:** complete. Zod schemas, generated JSON Schema, state machine, timing resolver, budget/hash utilities, project loader, CLI, config, template, and brand kit are in place.
 - **Phase 2 — motion-only vertical slice:** complete. `projects/demo` renders 16:9, 9:16, and 1:1; coverage validation, contact sheet, QA report, and frame-hash determinism pass.
-- **Phase 3 — AI clips, footage, mixed shots:** the fal.ai adapter, mock adapter, cache, manifest, budget guard, batch CLI, character reference rules, frame chaining, footage normalization command, and 3D component are implemented. The fal.ai adapter has not been exercised against a live `FAL_KEY`; the mock path is tested. Demucs/WhisperX extras are not installed in this environment; the pure audio-analysis helpers are tested.
+- **Phase 3 — AI clips, footage, mixed shots:** the fal.ai and Higgsfield adapters, mock adapter, cache, manifest, budget guard, batch CLI, character reference rules, frame chaining, footage normalization command, and 3D component are implemented. The adapters have not been exercised against live credentials in this environment; the mock path is tested. Demucs/WhisperX extras are not installed in this environment; the pure audio-analysis helpers are tested.
 - **Phase 4 — open-source polish:** README, AGENTS/CLAUDE, architecture, pipeline, glossary, ADRs, third-party notices, CI, contribution/security/conduct docs, and a license-safe demo are in place. A public repository name and a live model/pricing verification remain.
 - **Known local gap:** `ffmpeg` is not on the current machine's `PATH`. The motion-only demo does not need it; footage import and loudness normalization do. CI installs it.

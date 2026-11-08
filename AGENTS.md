@@ -22,7 +22,7 @@ cd my-video
 claude
 ```
 
-The wizard checks and optionally installs Node-adjacent tools, validates an optional fal.ai key, configures the Suno MCP server, and creates the first project. In Claude Code, run `/mcp` once and then `/video-next my-video`. Use `--yes` for a non-interactive run and see `docs/onboarding.md` for all flags.
+The wizard checks and optionally installs Node-adjacent tools, validates optional fal.ai and Higgsfield credentials, configures the Suno MCP server, and creates the first project. In Claude Code, run `/mcp` once and then `/video-next my-video`. Use `--yes` for a non-interactive run and see `docs/onboarding.md` for all flags.
 
 Work in this repository instead:
 
@@ -59,7 +59,7 @@ config/            models.yaml and defaults.yaml
 docs/              PLAN.md, glossary.md, architecture.md, pipeline.md, ADRs, third-party notices
 packages/
   core/            Zod schemas, state, timing resolver, hash, cost, project loader
-  providers/       generateImage/editImage/imageToVideo, fal.ai + mock, cache/manifest runner
+  providers/       generateImage/editImage/imageToVideo/lipSync, fal.ai + Higgsfield + mock, cache/manifest runner
   cli/             validate, status, new, render, contact-sheet, stage-*, estimate, doctor
                    npx entry, onboarding, tool checks, workspace init
   remotion/        MusicVideo composition, motion components, effects, 3D
@@ -130,7 +130,7 @@ npm run schema
 | `npm run cli -- estimate --role <role> --units <n>` | Check a generation cost against the budget. |
 | `npm run cli -- validate-file <file>` | Validate one changed artifact (used by the hook). |
 | `npm run cli -- doctor` | Check workspace, tools, fonts, Remotion, and keys. |
-| `npx coreslopper init [dir]` | Create a workspace, install tools, configure fal.ai and Suno. |
+| `npx coreslopper init [dir]` | Create a workspace, install tools, configure fal.ai, Higgsfield, and Suno. |
 | `npx coreslopper doctor` | Check a workspace from outside it. |
 | `npx coreslopper new <slug> --budget <usd>` | Create a project inside a workspace. |
 | `npm run build` | Build `runtime/` and the npx bundle in `dist/`. |
@@ -177,8 +177,8 @@ CI runs without API keys and uses the mock provider. GPU tests are opt-in.
 - `docs/pipeline.md` — stage-by-stage runbook.
 - `docs/adr/` — architecture decision records.
 - `docs/THIRD_PARTY.md` — vendored skills, licenses, fonts, providers.
-- `docs/mcp.md` — Suno and optional fal.ai MCP configuration.
+- `docs/mcp.md` — Suno and optional fal.ai MCP configuration; provider adapters.
 
 ## License
 
-MIT. Remotion is source-available under its own license; see `docs/THIRD_PARTY.md`. Do not commit generated Suno/fal.ai media or copyrighted music to this repository.
+MIT. Remotion is source-available under its own license; see `docs/THIRD_PARTY.md`. Do not commit generated Suno/fal.ai/Higgsfield media or copyrighted music to this repository.

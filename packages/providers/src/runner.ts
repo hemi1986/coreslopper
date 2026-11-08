@@ -111,6 +111,7 @@ export class GenerationRunner {
         durationSeconds: request.durationSeconds,
         params,
         outputDir: cacheDir,
+        idempotencyKey: hash,
       };
       if (request.operation === 'generateImage') output = await this.options.provider.generateImage(input);
       else if (request.operation === 'editImage') output = await this.options.provider.editImage(input);

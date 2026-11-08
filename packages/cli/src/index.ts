@@ -7,14 +7,17 @@ import {
   formatUsd,
   loadModelsConfig,
   loadProject,
+  providerForRole,
   recordSpend,
   remainingBudget,
+  resolveModelRole,
   saveState,
   setStageDone,
   setStageFailed,
   setStageRunning,
   setStageSkipped,
   resetStage,
+  type ModelPricing,
 } from '@coreslopper/core';
 import { validateProject } from './validate.js';
 import { validateChangedFile } from './validate-file.js';
@@ -139,17 +142,27 @@ program
   .option('--install-tools', 'Install missing uv, Python, ffmpeg, and Claude Code')
   .option('--no-tool-install', 'Do not offer to install system tools')
   .option('--song <provider>', 'suno | import', 'import')
-  .option('--visual <provider>', 'mock | fal', 'mock')
+  .option('--visual <provider>', 'mock | fal | higgsfield', 'mock')
+  .option('--image-provider <provider>', 'mock | fal | higgsfield')
+  .option('--video-provider <provider>', 'mock | fal | higgsfield')
   .option('--budget <usd>', 'First project budget in USD', (value) => Number(value))
   .option('--project <slug>', 'First project slug')
   .option('--title <title>', 'First project title')
   .option('--fal-key <key>', 'fal.ai API key (prefer FAL_KEY in the environment)')
+  .option('--higgsfield-key <key>', 'Higgsfield credential (prefer HIGGSFIELD_API_KEY in the environment)')
   .option('--no-suno', 'Do not configure the Suno MCP server')
   .option('--skip-project', 'Create the workspace without a first project')
   .action((dir: string | undefined, options: InitCommandOptions) =>
     run(async () => {
+      const visuals = ['mock', 'fal', 'higgsfield'] as const;
       if (options.song) options.song = validateChoice(options.song, ['suno', 'import'] as const, 'song provider');
-      if (options.visual) options.visual = validateChoice(options.visual, ['mock', 'fal'] as const, 'visual provider');
+      if (options.visual) options.visual = validateChoice(options.visual, visuals, 'visual provider');
+      if (options.imageProvider) {
+        options.imageProvider = validateChoice(options.imageProvider, visuals, 'image provider');
+      }
+      if (options.videoProvider) {
+        options.videoProvider = validateChoice(options.videoProvider, visuals, 'video provider');
+      }
       await runInitCommand(dir, options);
     }),
   );
@@ -160,8 +173,9 @@ program
   .option('--title <title>')
   .option('--budget <usd>', 'Project budget in USD (required)', (value) => Number(value))
   .option('--brand <kit>', 'Brand kit', 'example')
-  .option('--image-provider <provider>', 'fal | mock', 'mock')
-  .option('--video-provider <provider>', 'fal | mock', 'mock')
+  .option('--visual <provider>', 'mock | fal | higgsfield', 'mock')
+  .option('--image-provider <provider>', 'mock | fal | higgsfield')
+  .option('--video-provider <provider>', 'mock | fal | higgsfield')
   .option('--song-provider <provider>', 'suno | import | mock', 'import')
   .action(
     (
@@ -170,19 +184,28 @@ program
         title?: string;
         budget?: number;
         brand: string;
-        imageProvider: 'fal' | 'mock';
-        videoProvider: 'fal' | 'mock';
+        visual: string;
+        imageProvider?: string;
+        videoProvider?: string;
         songProvider: 'suno' | 'import' | 'mock';
       },
     ) =>
       run(async () => {
+        const visuals = ['mock', 'fal', 'higgsfield'] as const;
+        const visual = validateChoice(options.visual ?? 'mock', visuals, 'visual provider');
+        const imageProvider = options.imageProvider
+          ? validateChoice(options.imageProvider, visuals, 'image provider')
+          : visual;
+        const videoProvider = options.videoProvider
+          ? validateChoice(options.videoProvider, visuals, 'video provider')
+          : visual;
         await createProject({
           slug,
           title: options.title,
           budget: options.budget,
           brand: options.brand,
-          imageProvider: options.imageProvider,
-          videoProvider: options.videoProvider,
+          imageProvider,
+          videoProvider,
           songProvider: options.songProvider,
         });
       }),
@@ -276,16 +299,37 @@ program
   .requiredOption('--role <role>', 'Role from config/models.yaml')
   .requiredOption('--units <n>', 'Number of images, seconds, or requests', (value) => Number(value))
   .option('--project <project>', 'Project directory for budget checks')
-  .action((options: { role: string; units: number; project?: string }) =>
+  .option('--provider <provider>', 'Provider override: fal | higgsfield | mock')
+  .action((options: { role: string; units: number; project?: string; provider?: string }) =>
     run(async () => {
       const models = await loadModelsConfig();
       const role = models.roles[options.role];
       if (!role) throw new ValidationError(`Unknown model role "${options.role}".`);
-      if (!role.pricing) throw new ValidationError(`Role "${options.role}" has no pricing entry.`);
-      const cost = estimateCost(options.units, role.pricing);
-      console.log(`${options.role}: ${options.units} ${role.pricing.unit}(s) × ${formatUsd(role.pricing.usd)} = ${formatUsd(cost)}`);
-      if (options.project) {
-        const loaded = await loadProject(projectDirFromArg(options.project));
+      const loaded = options.project ? await loadProject(projectDirFromArg(options.project)) : undefined;
+      const provider = options.provider
+        ? validateChoice(options.provider, ['fal', 'higgsfield', 'mock'] as const, 'provider')
+        : loaded
+          ? providerForRole(loaded.config, options.role)
+          : role.provider;
+      const override = (() => {
+        const value = loaded?.config.models[options.role];
+        return value && typeof value === 'object' && !Array.isArray(value)
+          ? (value as Record<string, unknown>)
+          : {};
+      })();
+      const resolved = resolveModelRole(role, provider, override, options.role);
+      const pricing =
+        provider === 'mock' ? ({ unit: 'request', usd: 0 } satisfies ModelPricing) : resolved.pricing;
+      if (!pricing) {
+        throw new ValidationError(
+          `Role "${options.role}" has no pricing entry for provider "${provider}".`,
+        );
+      }
+      const cost = provider === 'mock' ? 0 : estimateCost(options.units, pricing);
+      console.log(
+        `${options.role} [${provider}/${resolved.model}]: ${options.units} ${pricing.unit}(s) × ${formatUsd(pricing.usd)} = ${formatUsd(cost)}`,
+      );
+      if (loaded) {
         const cap = effectiveBatchCap(loaded.config, loaded.state);
         console.log(
           `Project remaining: ${formatUsd(remainingBudget(loaded.state))} · batch cap: ${formatUsd(cap)}`,

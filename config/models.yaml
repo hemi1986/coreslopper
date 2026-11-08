@@ -1,13 +1,24 @@
 # Model roles used by the generation adapter.
 #
+# Each role has a base provider (fal.ai unless stated otherwise) and optional
+# `alternatives` for other providers. When a project selects higgsfield, the
+# adapter uses `alternatives.higgsfield` instead of the fal.ai slug.
+#
 # These are planning estimates. Before a paid run, verify the exact model slug
-# and price at https://fal.ai and update this file. The estimator refuses to
-# run a paid batch when a role has no pricing entry.
+# and price at https://fal.ai or https://console.higgsfield.ai and update this
+# file. The estimator refuses to run a paid batch when a role has no pricing
+# entry for the selected provider.
+#
+# Higgsfield adapter options (stripped before the request is sent):
+#   send_seed: true            send the generation seed to models that support it
+#   send_negative_prompt: true send negative_prompt to models that support it
+#   reference_field: <name>    body field for uploaded edit references
 version: 1
 last_verified: "2026-11-08 (planning estimates; verify before paid use)"
 
 roles:
   image.character_sheet:
+    provider: fal
     model: google/nano-banana-2.1/edit
     params:
       num_images: 1
@@ -17,7 +28,21 @@ roles:
       unit: image
       usd: 0.15
     notes: Multi-reference character sheets. Requires reference images; text-only prompts are rejected.
+    alternatives:
+      higgsfield:
+        model: alibaba/qwen-image-3/edit
+        params:
+          resolution: 2k
+          aspect_ratio: 1:1
+          prompt_extend: false
+          enable_thinking: false
+          reference_field: image_urls
+        pricing:
+          unit: image
+          usd: 0.03
+        notes: One to three reference images. Verify the current Qwen edit price.
   image.keyframe:
+    provider: fal
     model: fal-ai/flux-2-pro
     params:
       num_images: 1
@@ -27,7 +52,22 @@ roles:
       unit: image
       usd: 0.05
     notes: Hero keyframes and look development.
+    alternatives:
+      higgsfield:
+        model: higgsfield-ai/soul/v2/standard
+        params:
+          resolution: 1080p
+          aspect_ratio: 16:9
+          enhance_prompt: false
+          batch_size: 1
+          send_seed: true
+          reference_field: image_reference_url
+        pricing:
+          unit: image
+          usd: 0.006
+        notes: Soul 2 text-to-image. Planning estimate for 1080p.
   image.edit:
+    provider: fal
     model: fal-ai/flux-2-pro/edit
     params:
       num_images: 1
@@ -36,7 +76,22 @@ roles:
       unit: image
       usd: 0.05
     notes: Reference-preserving edits.
+    alternatives:
+      higgsfield:
+        model: alibaba/qwen-image-3/edit
+        params:
+          resolution: 2k
+          aspect_ratio: 16:9
+          prompt_extend: false
+          enable_thinking: false
+          send_seed: true
+          reference_field: image_urls
+        pricing:
+          unit: image
+          usd: 0.03
+        notes: Up to three reference images. Verify the current Qwen edit price.
   image.keyframe.budget:
+    provider: fal
     model: fal-ai/flux-2
     params:
       num_images: 1
@@ -45,8 +100,23 @@ roles:
       unit: image
       usd: 0.03
     notes: Cheaper drafts and background stills.
+    alternatives:
+      higgsfield:
+        model: higgsfield-ai/soul/v2/standard
+        params:
+          resolution: 720p
+          aspect_ratio: 16:9
+          enhance_prompt: false
+          batch_size: 1
+          send_seed: true
+          reference_field: image_reference_url
+        pricing:
+          unit: image
+          usd: 0.0032
+        notes: Soul 2 at 720p. Planning estimate.
 
   video.image_to_video.quality:
+    provider: fal
     model: kling/v4/image-to-video
     params:
       duration: 5
@@ -57,7 +127,20 @@ roles:
       usd: 0.17
     maxDuration: 30
     notes: 3-30 s, optional end frame for frame chaining. Audio is disabled; the song is the only audio source.
+    alternatives:
+      higgsfield:
+        model: kling-video/v3.0/std/image-to-video
+        params:
+          duration: 5
+          sound: "off"
+          cfg_scale: 0.5
+        pricing:
+          unit: second
+          usd: 0.063
+        maxDuration: 15
+        notes: Kling 3.0 Standard. Verify the current price and duration limit.
   video.image_to_video.fast:
+    provider: fal
     model: kling/v4/flash/image-to-video
     params:
       duration: 5
@@ -68,7 +151,18 @@ roles:
       usd: 0.08
     maxDuration: 20
     notes: Cheap drafts and B-roll.
+    alternatives:
+      higgsfield:
+        model: kling-video/v2.5-turbo/standard/image-to-video
+        params:
+          duration: 5
+        pricing:
+          unit: second
+          usd: 0.042
+        maxDuration: 10
+        notes: Kling 2.5 Turbo Standard. 5 s or 10 s only.
   video.image_to_video.premium:
+    provider: fal
     model: bytedance/seedance-2.5/us/image-to-video
     params:
       duration: 5
@@ -79,7 +173,20 @@ roles:
       usd: 0.30
     maxDuration: 30
     notes: Hero shots only.
+    alternatives:
+      higgsfield:
+        model: bytedance/seedance-2.5/image-to-video
+        params:
+          duration: 5
+          resolution: 1080p
+          generate_audio: false
+        pricing:
+          unit: second
+          usd: 0.207
+        maxDuration: 30
+        notes: Seedance 2.5 list price at 1080p; discounts may lower it.
   video.image_to_video.budget:
+    provider: fal
     model: alibaba/wan-3.0/image-to-video
     params:
       duration: 5
@@ -89,8 +196,23 @@ roles:
       unit: second
       usd: 0.06
     notes: Lowest-cost motion pass.
+    alternatives:
+      higgsfield:
+        model: alibaba/wan-3.0/image-to-video
+        params:
+          duration: 5
+          resolution: 720p
+          aspect_ratio: 16:9
+          generate_audio: false
+          send_seed: true
+        pricing:
+          unit: second
+          usd: 0.05
+        maxDuration: 30
+        notes: Wan 3.0 at 720p. Planning estimate.
 
   video.premium.veo:
+    provider: fal
     model: fal-ai/veo3.1/image-to-video
     params:
       duration: 5
@@ -101,8 +223,22 @@ roles:
       usd: 0.40
     maxDuration: 8
     notes: Expensive hero fallback; verify the current slug and price.
+    alternatives:
+      higgsfield:
+        model: veo3.1/fast/image-to-video
+        params:
+          duration: 4
+          resolution: 1080p
+          aspect_ratio: 16:9
+          generate_audio: false
+        pricing:
+          unit: second
+          usd: 0.12
+        maxDuration: 8
+        notes: Veo 3.1 Fast supports 4, 6, or 8 second clips.
 
   video.lipsync:
+    provider: fal
     model: fal-ai/bytedance/omnihuman/v1.5
     params:
       resolution: 1080p
@@ -114,3 +250,4 @@ roles:
       Image + audio -> singing/talking clip (OmniHuman 1.5). Billed per second of
       driving audio. fal docs list $0.14/s (2026-11-08); third-party pages say
       $0.16/s, so the estimate is conservative. Audio max 30 s at 1080p.
+      Higgsfield has no lip-sync adapter yet; set providers.lipsync to fal.

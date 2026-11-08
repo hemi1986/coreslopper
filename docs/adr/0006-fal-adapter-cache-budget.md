@@ -1,5 +1,7 @@
 # Narrow generation interface, fal.ai first, hash cache and budget guard
 
+> Extended by [ADR 0011](0011-higgsfield-provider.md): Higgsfield is a second real adapter, the interface also includes `lipSync`, and roles carry provider alternatives.
+
 **Status:** Accepted
 
 ## Context

@@ -1,5 +1,7 @@
 # npx onboarding with a versioned runtime snapshot
 
+> Extended by [ADR 0011](0011-higgsfield-provider.md): onboarding also checks and stores Higgsfield credentials.
+
 **Status:** Accepted
 
 ## Context

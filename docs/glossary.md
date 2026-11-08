@@ -141,8 +141,12 @@ A JSON or YAML array of one or more generation requests executed with budget, ca
 _Avoid_: job
 
 **Provider Adapter**:
-The small implementation behind `generateImage`, `editImage`, and `imageToVideo`; fal.ai is the first real adapter, and mock is the deterministic test adapter.
+The small implementation behind `generateImage`, `editImage`, `imageToVideo`, and `lipSync`; fal.ai and Higgsfield are the real adapters, and mock is the deterministic test adapter.
 _Avoid_: client, SDK
+
+**Provider Alternative**:
+The `alternatives.<provider>` entry on a model role in `config/models.yaml`. It supplies the provider-specific model slug, params, and price so the same creative role can run on fal.ai or Higgsfield.
+_Avoid_: fallback, alias
 
 **Mock Provider**:
 A deterministic provider that returns placeholder assets and costs nothing; used by tests, CI, and no-account runs.

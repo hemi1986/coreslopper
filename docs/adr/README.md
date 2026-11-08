@@ -14,5 +14,6 @@ Short records of decisions that are hard to reverse, surprising without context,
 | [0008](0008-local-audio-analysis.md) | Local Demucs + WhisperX + librosa; lyrics text wins. |
 | [0009](0009-mit-open-source.md) | MIT open source with explicit third-party notices. |
 | [0010](0010-npx-onboarding.md) | npx onboarding with a versioned runtime snapshot. |
+| [0011](0011-higgsfield-provider.md) | Higgsfield as a second provider; per-project provider selection and role alternatives. |
 
 Status values: `Accepted`, `Deprecated`, `Superseded by ADR-NNNN`.

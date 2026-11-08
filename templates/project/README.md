@@ -35,4 +35,4 @@ User-provided references belong in `assets/references/` (moodboards, composition
 
 ## Media policy
 
-Do not commit generated Suno/fal.ai assets, commercial music, or renders. The repository is open source; keep it license-safe.
+Do not commit generated Suno, fal.ai, or Higgsfield assets, commercial music, or renders. The repository is open source; keep it license-safe.

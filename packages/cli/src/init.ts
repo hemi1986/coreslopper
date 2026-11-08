@@ -24,7 +24,7 @@ import {
 } from './workspace.js';
 
 export type SongProvider = 'suno' | 'import';
-export type VisualProvider = 'fal' | 'mock';
+export type VisualProvider = 'fal' | 'higgsfield' | 'mock';
 
 export interface FirstProjectOptions {
   slug: string;
@@ -44,6 +44,7 @@ export interface InitOptions {
   tools?: boolean;
   project?: FirstProjectOptions | null;
   falKey?: string;
+  higgsfieldKey?: string;
   suno?: boolean;
   onProgress?: (message: string) => void;
 }
@@ -137,7 +138,11 @@ async function copyRuntime(runtime: string, target: string): Promise<void> {
   });
 }
 
-async function ensureEnvFile(target: string, falKey?: string): Promise<void> {
+async function ensureEnvFile(
+  target: string,
+  falKey?: string,
+  higgsfieldKey?: string,
+): Promise<void> {
   const envPath = join(target, '.env');
   let content: string;
   if (existsSync(envPath)) {
@@ -150,6 +155,10 @@ async function ensureEnvFile(target: string, falKey?: string): Promise<void> {
   }
   if (falKey) content = upsertEnv(content, 'FAL_KEY', falKey.trim());
   if (!/^FAL_KEY=/m.test(content)) content = `${content.trimEnd()}\nFAL_KEY=\n`;
+  if (higgsfieldKey) content = upsertEnv(content, 'HIGGSFIELD_API_KEY', higgsfieldKey.trim());
+  if (!/^HIGGSFIELD_API_KEY=/m.test(content)) {
+    content = `${content.trimEnd()}\nHIGGSFIELD_API_KEY=\n`;
+  }
   await writeFile(envPath, content, { encoding: 'utf8', mode: 0o600 });
   await chmod(envPath, 0o600).catch(() => undefined);
 }
@@ -255,6 +264,7 @@ function gettingStarted(target: string, result: InitResult, options: InitOptions
     '## Credentials',
     '',
     '- fal.ai: `FAL_KEY` in `.env` (gitignored).',
+    '- Higgsfield: `HIGGSFIELD_API_KEY` (or `HF_API_KEY_ID` + `HF_API_KEY_SECRET`) in `.env`.',
     '- Suno: OAuth through the Suno MCP server in `.mcp.json`.',
     '',
     'Generated audio, images, clips, and renders stay in the project folders and are gitignored.',
@@ -319,7 +329,7 @@ export async function initWorkspace(options: InitOptions): Promise<InitResult> {
   await copyRuntime(runtime, target);
 
   options.onProgress?.('Writing credentials and MCP configuration...');
-  await ensureEnvFile(target, options.falKey);
+  await ensureEnvFile(target, options.falKey, options.higgsfieldKey);
   writeMcpConfig(target, options.suno !== false);
 
   if (options.tools) {

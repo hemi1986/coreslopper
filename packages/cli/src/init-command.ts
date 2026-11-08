@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
 import { ValidationError } from '@coreslopper/core';
+import { resolveHiggsfieldCredentials } from '@coreslopper/providers';
 import {
   defaultProjectSlug,
   initWorkspace,
@@ -9,7 +10,7 @@ import {
   type VisualProvider,
 } from './init.js';
 import { onboard } from './onboarding.js';
-import { validateFalKey } from './tools.js';
+import { validateFalKey, validateHiggsfieldKey } from './tools.js';
 
 export interface InitCommandOptions {
   yes?: boolean;
@@ -20,10 +21,13 @@ export interface InitCommandOptions {
   toolInstall?: boolean;
   song?: SongProvider;
   visual?: VisualProvider;
+  imageProvider?: VisualProvider;
+  videoProvider?: VisualProvider;
   budget?: number;
   project?: string;
   title?: string;
   falKey?: string;
+  higgsfieldKey?: string;
   suno?: boolean;
   skipProject?: boolean;
   runtime?: string;
@@ -67,10 +71,13 @@ export async function runInitCommand(targetArg: string | undefined, options: Ini
       installTools: options.toolInstall === false ? false : options.installTools,
       song: options.song,
       visual: options.visual,
+      imageProvider: options.imageProvider,
+      videoProvider: options.videoProvider,
       budget: options.budget,
       projectSlug: options.project,
       title: options.title,
       falKey: options.falKey,
+      higgsfieldKey: options.higgsfieldKey,
       suno: options.suno,
       noProject: options.skipProject,
     });
@@ -79,13 +86,30 @@ export async function runInitCommand(targetArg: string | undefined, options: Ini
 
   const target = resolve(targetArg ?? '.');
   const visual = options.visual ?? 'mock';
+  const image = options.imageProvider ?? visual;
+  const video = options.videoProvider ?? visual;
   const falKey = options.falKey ?? process.env.FAL_KEY;
-  if (visual === 'fal') {
-    if (!falKey) {
-      console.warn('! No FAL_KEY was provided. Add it to .env before generating paid assets.');
-    } else {
-      const check = await validateFalKey(falKey);
-      if (check.status !== 'valid') console.warn(`! Could not verify the fal.ai key (${check.message}).`);
+  const higgsfieldKey = options.higgsfieldKey ?? resolveHiggsfieldCredentials();
+  for (const provider of new Set([image, video])) {
+    if (provider === 'fal') {
+      if (!falKey) {
+        console.warn('! No FAL_KEY was provided. Add it to .env before generating paid assets.');
+      } else {
+        const check = await validateFalKey(falKey);
+        if (check.status !== 'valid') console.warn(`! Could not verify the fal.ai key (${check.message}).`);
+      }
+    }
+    if (provider === 'higgsfield') {
+      if (!higgsfieldKey) {
+        console.warn(
+          '! No Higgsfield credential was provided. Add HIGGSFIELD_API_KEY to .env before generating paid assets.',
+        );
+      } else {
+        const check = await validateHiggsfieldKey(higgsfieldKey);
+        if (check.status !== 'valid') {
+          console.warn(`! Could not verify the Higgsfield credential (${check.message}).`);
+        }
+      }
     }
   }
 
@@ -97,8 +121,8 @@ export async function runInitCommand(targetArg: string | undefined, options: Ini
         title: options.title,
         budget: options.budget ?? 50,
         song: options.song ?? 'import',
-        image: visual,
-        video: visual,
+        image,
+        video,
       };
 
   const result = await initWorkspace({
@@ -110,6 +134,7 @@ export async function runInitCommand(targetArg: string | undefined, options: Ini
     tools: options.toolInstall === false ? false : options.installTools,
     project,
     falKey,
+    higgsfieldKey,
     suno: options.suno !== false,
   });
   printInitSummary(result);

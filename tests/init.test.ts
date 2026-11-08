@@ -4,7 +4,7 @@ import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { initWorkspace, sanitizeSlug, upsertEnv, writeMcpConfig } from '../packages/cli/src/init.ts';
-import { validateFalKey } from '../packages/cli/src/tools.ts';
+import { validateFalKey, validateHiggsfieldKey } from '../packages/cli/src/tools.ts';
 import { findWorkspaceRoot } from '../packages/cli/src/workspace.ts';
 
 const temporary: string[] = [];
@@ -47,6 +47,7 @@ describe('workspace init', () => {
       install: false,
       git: false,
       falKey: 'test-fal-key',
+      higgsfieldKey: 'test-key-id:test-secret',
       project: {
         slug: 'test-video',
         budget: 25,
@@ -69,6 +70,7 @@ describe('workspace init', () => {
 
     const env = await readFile(join(target, '.env'), 'utf8');
     expect(env).toContain('FAL_KEY=test-fal-key');
+    expect(env).toContain('HIGGSFIELD_API_KEY=test-key-id:test-secret');
 
     const mcp = JSON.parse(await readFile(join(target, '.mcp.json'), 'utf8')) as {
       mcpServers: Record<string, { url: string }>;
@@ -139,6 +141,19 @@ describe('onboarding helpers', () => {
     expect(rejected.status).toBe('invalid');
 
     const offline = await validateFalKey('key', async () => {
+      throw new Error('offline');
+    });
+    expect(offline.status).toBe('unknown');
+  });
+
+  it('validates a Higgsfield credential and treats network failures as unknown', async () => {
+    const ok = await validateHiggsfieldKey('id:secret', async () => new Response('[]', { status: 200 }));
+    expect(ok.status).toBe('valid');
+
+    const rejected = await validateHiggsfieldKey('id:secret', async () => new Response('{}', { status: 401 }));
+    expect(rejected.status).toBe('invalid');
+
+    const offline = await validateHiggsfieldKey('id:secret', async () => {
       throw new Error('offline');
     });
     expect(offline.status).toBe('unknown');

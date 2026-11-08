@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { resolveHiggsfieldCredentials } from '@coreslopper/providers';
 import { detectTools, type ToolCheck } from './tools.js';
 import { isWorkspace, loadWorkspaceEnv } from './workspace.js';
 
@@ -90,6 +91,7 @@ function toolCheck(tool: ToolCheck): DoctorCheck {
 
 export async function runDoctor(root: string, options: DoctorOptions = {}): Promise<DoctorResult> {
   loadWorkspaceEnv(root);
+  const higgsfield = resolveHiggsfieldCredentials();
 
   const checks: DoctorCheck[] = [
     {
@@ -112,6 +114,14 @@ export async function runDoctor(root: string, options: DoctorOptions = {}): Prom
       name: 'FAL_KEY',
       ok: Boolean(process.env.FAL_KEY),
       detail: process.env.FAL_KEY ? 'set (from environment or .env)' : 'not set (mock works without it)',
+      required: false,
+      group: 'credentials',
+    },
+    {
+      id: 'higgsfield-key',
+      name: 'HIGGSFIELD_API_KEY',
+      ok: Boolean(higgsfield),
+      detail: higgsfield ? 'set (from environment or .env)' : 'not set (mock works without it)',
       required: false,
       group: 'credentials',
     },

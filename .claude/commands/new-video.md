@@ -8,7 +8,7 @@ allowed-tools: Bash, Read, Write, Edit, Glob, Grep
 
 Create one new project. Do not start the creative pipeline in this command.
 
-1. Parse `$ARGUMENTS`. The first token is the slug. Supported flags: `--budget <usd>`, `--title <title>`, `--brand <kit>`, `--image-provider <fal|mock>`, `--video-provider <fal|mock>`, `--song-provider <suno|import|mock>`.
+1. Parse `$ARGUMENTS`. The first token is the slug. Supported flags: `--budget <usd>`, `--title <title>`, `--brand <kit>`, `--visual <mock|fal|higgsfield>`, `--image-provider <mock|fal|higgsfield>`, `--video-provider <mock|fal|higgsfield>`, `--song-provider <suno|import|mock>`.
 2. **Budget is mandatory.** If `--budget` is missing, ask the user for it and stop. Do not invent a number.
 3. Run from the repository root:
    `npm run cli -- new <slug> --budget <usd> [flags]`

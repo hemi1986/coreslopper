@@ -11,6 +11,7 @@ import {
   writeJsonAtomic,
   writeTextAtomic,
   type ProjectConfig,
+  type ProviderKind,
 } from '@coreslopper/core';
 import { stringify } from 'yaml';
 
@@ -19,8 +20,8 @@ export interface NewProjectOptions {
   title?: string;
   budget?: number;
   brand?: string;
-  imageProvider?: 'fal' | 'mock';
-  videoProvider?: 'fal' | 'mock';
+  imageProvider?: ProviderKind;
+  videoProvider?: ProviderKind;
   songProvider?: 'suno' | 'import' | 'mock';
   /** Workspace root. Defaults to the repository root discovered from cwd. */
   root?: string;
@@ -50,6 +51,7 @@ function workflowCommit(root: string): string | undefined {
       cwd: root,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
+      timeout: 2_000,
     }).trim();
   } catch {
     return undefined;

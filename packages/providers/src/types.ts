@@ -13,6 +13,8 @@ export interface ProviderInput {
   durationSeconds?: number;
   params?: Record<string, unknown>;
   outputDir: string;
+  /** Stable request key for providers that support idempotent submissions. */
+  idempotencyKey?: string;
 }
 
 export interface ProviderOutput {

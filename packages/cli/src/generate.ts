@@ -13,12 +13,15 @@ import {
   formatUsd,
   loadModelsConfig,
   loadProject,
+  providerForRole,
   recordSpend,
   remainingBudget,
   repoRoot,
+  resolveModelRole,
   saveState,
   type ModelPricing,
   type ProjectConfig,
+  type ProviderKind,
 } from '@coreslopper/core';
 import {
   GenerationRunner,
@@ -27,8 +30,6 @@ import {
   type Operation,
 } from '@coreslopper/providers';
 import { probeDuration } from './media.js';
-
-const VIDEO_OPERATIONS = new Set(['imageToVideo', 'lipSync']);
 
 export const BatchItemSchema = z
   .object({
@@ -58,6 +59,7 @@ export interface GenerateOptions {
 
 interface ResolvedItem {
   item: z.infer<typeof BatchItemSchema>;
+  provider: ProviderKind;
   model: string;
   params: Record<string, unknown>;
   pricing: ModelPricing;
@@ -80,18 +82,20 @@ function resolveItem(
   const role = models.roles[item.role];
   if (!role) throw new ValidationError(`Unknown model role "${item.role}". Add it to config/models.yaml.`);
   const override = roleOverride(config, item.role);
-  const model = typeof override.model === 'string' ? override.model : role.model;
-  const overrideParams =
-    override.params && typeof override.params === 'object' && !Array.isArray(override.params)
-      ? (override.params as Record<string, unknown>)
-      : {};
-  const params = { ...role.params, ...overrideParams, ...item.params };
+  const provider = providerForRole(config, item.role);
+  if (item.operation === 'lipSync' && provider === 'higgsfield') {
+    throw new ConfigError(
+      'The Higgsfield adapter does not support lip-sync. Set providers.lipsync to "fal" and provide FAL_KEY, or keep providers.video on fal.',
+    );
+  }
+  const resolved = resolveModelRole(role, provider, override, item.role);
+  const params = { ...resolved.params, ...item.params };
   const pricing =
-    (override.pricing as ModelPricing | undefined) ??
-    role.pricing;
+    resolved.pricing ?? (provider === 'mock' ? ({ unit: 'request', usd: 0 } satisfies ModelPricing) : undefined);
   if (!pricing) {
     throw new ConfigError(
-      `Role "${item.role}" has no pricing entry. Set pricing in config/models.yaml before a paid batch.`,
+      `Role "${item.role}" has no pricing entry for provider "${provider}". ` +
+        'Add pricing to config/models.yaml or override models.<role>.pricing in project.yaml.',
     );
   }
 
@@ -103,17 +107,17 @@ function resolveItem(
   }
   // A lip-sync clip is billed by the length of its driving audio.
   const audioSeconds = audio ? Math.ceil(probeDuration(audio)) : undefined;
-  if (audioSeconds !== undefined && role.maxDuration && audioSeconds > role.maxDuration) {
+  if (audioSeconds !== undefined && resolved.maxDuration && audioSeconds > resolved.maxDuration) {
     throw new ValidationError(
-      `Audio ${item.audio} is ${audioSeconds}s; role "${item.role}" allows at most ${role.maxDuration}s.`,
+      `Audio ${item.audio} is ${audioSeconds}s; role "${item.role}" allows at most ${resolved.maxDuration}s.`,
     );
   }
 
   const units =
     pricing.unit === 'second'
-      ? audioSeconds ?? item.durationSeconds ?? Number(params.duration ?? role.maxDuration ?? 5)
+      ? audioSeconds ?? item.durationSeconds ?? Number(params.duration ?? resolved.maxDuration ?? 5)
       : pricing.unit === 'image'
-        ? Number(params.num_images ?? 1)
+        ? Number(params.num_images ?? params.batch_size ?? 1)
         : 1;
   const cost = estimateCost(units, pricing);
 
@@ -126,7 +130,16 @@ function resolveItem(
     }
   }
 
-  return { item, model, params, pricing, cost, references, audio };
+  return {
+    item,
+    provider,
+    model: resolved.model,
+    params,
+    pricing,
+    cost,
+    references,
+    audio,
+  };
 }
 
 export async function generateBatch(options: GenerateOptions): Promise<void> {
@@ -140,12 +153,9 @@ export async function generateBatch(options: GenerateOptions): Promise<void> {
   }
   const batch = BatchSchema.parse(batchData);
   const models = await loadModelsConfig();
-  const imageProvider = project.config.providers.image;
-  const videoProvider = project.config.providers.video;
   const resolved = batch.map((item) => {
     const value = resolveItem(item, project.config, models, project.paths.root);
-    const provider = VIDEO_OPERATIONS.has(item.operation) ? videoProvider : imageProvider;
-    return provider === 'mock' ? { ...value, cost: 0 } : value;
+    return value.provider === 'mock' ? { ...value, cost: 0 } : value;
   });
   const totalEstimate = resolved.reduce((sum, item) => sum + item.cost, 0);
 
@@ -158,27 +168,31 @@ export async function generateBatch(options: GenerateOptions): Promise<void> {
   assertAffordable(project.config, project.state, totalEstimate, 'generation batch');
   if (options.dryRun) {
     for (const item of resolved) {
-      console.log(`  ${item.item.operation} ${item.item.role} -> ${item.model} (${formatUsd(item.cost)})`);
+      console.log(
+        `  ${item.item.operation} ${item.item.role} -> ${item.provider}/${item.model} (${formatUsd(item.cost)})`,
+      );
     }
     return;
   }
 
   const cacheDir = join(repoRoot(), '.cache', 'generations');
-  const imageRunner = new GenerationRunner({
-    provider: createProvider(imageProvider),
-    cacheDir,
-    manifestPath: project.paths.manifest,
-  });
-  const videoRunner = new GenerationRunner({
-    provider: createProvider(videoProvider),
-    cacheDir,
-    manifestPath: project.paths.manifest,
-  });
+  const runners = new Map<ProviderKind, GenerationRunner>();
+  for (const provider of new Set(resolved.map((item) => item.provider))) {
+    runners.set(
+      provider,
+      new GenerationRunner({
+        provider: createProvider(provider),
+        cacheDir,
+        manifestPath: project.paths.manifest,
+      }),
+    );
+  }
 
   let actualSpend = 0;
   let cacheHits = 0;
   for (const [index, item] of resolved.entries()) {
-    const runner = VIDEO_OPERATIONS.has(item.item.operation) ? videoRunner : imageRunner;
+    const runner = runners.get(item.provider);
+    if (!runner) throw new ConfigError(`No generation runner for provider "${item.provider}".`);
     const outputDir = join(project.paths.assets, item.item.role.replaceAll('.', '/'));
     await ensureDir(outputDir);
     const request: GenerationRequest = {

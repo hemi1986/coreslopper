@@ -38,5 +38,10 @@ export function assertAffordable(
 }
 
 export function formatUsd(value: number): string {
-  return `$${value.toFixed(2)}`;
+  const absolute = Math.abs(value);
+  const digits = absolute > 0 && absolute < 0.01 ? 4 : absolute < 1 ? 3 : 2;
+  const fixed = value.toFixed(digits);
+  const [whole, fraction = ''] = fixed.split('.');
+  const trimmed = fraction.replace(/0+$/, '');
+  return `$${whole}.${trimmed.padEnd(2, '0')}`;
 }

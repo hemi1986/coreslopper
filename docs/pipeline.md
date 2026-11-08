@@ -12,7 +12,7 @@ cd my-video
 npm run cli -- doctor
 ```
 
-The wizard installs dependencies, stores an optional `FAL_KEY` in `.env`, and configures the Suno MCP server. Open Claude Code in the workspace, run `/mcp` once to authenticate Suno, and then run `/video-next my-video`. See [onboarding.md](onboarding.md) for flags and troubleshooting. If you work in a clone of this repository, skip this section and use `npm run cli -- new <slug> --budget <usd>`.
+The wizard installs dependencies, stores optional `FAL_KEY` and Higgsfield credentials in `.env`, and configures the Suno MCP server. Open Claude Code in the workspace, run `/mcp` once to authenticate Suno, and then run `/video-next my-video`. See [onboarding.md](onboarding.md) for flags and troubleshooting. If you work in a clone of this repository, skip this section and use `npm run cli -- new <slug> --budget <usd>`.
 
 ## Stage IDs
 
@@ -55,6 +55,8 @@ Completion: every line under a section tag, original lyrics, concise style promp
 - Output: `audio/song.wav`, `song.json`, optional stems
 
 Completion: audio plays, `song.json` records source/license/duration/BPM/variant choice, no media committed.
+
+To import an existing Suno song, copy `audio/song.wav` and `audio/stems/vocals.wav`, write `song.json`, then skip the `lyrics` and `song` stages. See the existing-song quickstart in the [README](../README.md#quickstarts).
 
 ## 5. Audio analysis
 
@@ -104,6 +106,8 @@ Completion: schema, anchors, coverage, references, source rules, highlights, and
 npm run cli -- estimate --role image.keyframe --units 8 --project projects/my-video
 npm run cli -- generate projects/my-video --batch assets/batches/scene-01.json
 ```
+
+Roles resolve to the project's provider. A Higgsfield project uses the `alternatives.higgsfield` entries in `config/models.yaml`; lip-sync stays on fal.ai via `providers.lipsync: fal`.
 
 Completion: every shot has its source asset or a documented reason; every character shot used references; manifest and budget reconciled; art-director passes.
 
@@ -175,7 +179,8 @@ The status table shows every stage, attempts, outputs, spend, remaining budget, 
 
 - **`ffmpeg` missing:** run `./scripts/install-ffmpeg.sh` on Linux x64, or install it with your package manager. The motion-only demo still renders without it; footage and loudness normalization need it.
 - **WhisperX/Demucs missing:** install the `asr`/`stems` extras. Do not silently skip word alignment for a real lyric video.
-- **FAL_KEY missing:** switch `providers.image`/`providers.video` to `mock` or add the key to `.env`.
+- **FAL_KEY missing:** switch `providers.image`/`providers.video` to `mock` or add the key to `.env`. If only lip-sync uses fal.ai, set `providers.lipsync: fal` and add `FAL_KEY`; the rest of the project can stay on Higgsfield or mock.
+- **Higgsfield credential missing or rejected:** add `HIGGSFIELD_API_KEY` (or `HF_API_KEY_ID` + `HF_API_KEY_SECRET`) to `.env`, or switch the provider to `mock` or `fal`. Lip-sync shots always need fal.ai.
 - **Storyboard gap/overlap:** inspect the anchors. Prefer a symbolic anchor over a `time` escape hatch.
 - **Render too slow:** use `--preview`, lower the concurrency, or render a still first.
 - **Audio/video out of sync:** check `timing.effective.json` and the normalized song; re-run validation before re-rendering.

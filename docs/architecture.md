@@ -123,9 +123,10 @@ Section and line anchors carry an `edge` (`start` or `end`). Word, beat, and dow
 generateImage(input)
 editImage(input)
 imageToVideo(input)
+lipSync(input)
 ```
 
-The first real adapter is fal.ai; the mock adapter returns deterministic SVG placeholders. Model IDs, params, and prices live in `config/models.yaml`. The `GenerationRunner`:
+The real adapters are fal.ai and Higgsfield; the mock adapter returns deterministic SVG placeholders. Model IDs, provider-specific slugs, params, and prices live in `config/models.yaml`: each role names a base provider and can add `alternatives.<provider>` for another adapter. A project selects `providers.image`, `.video`, and optional `.lipsync`. The `GenerationRunner`:
 
 1. hashes the canonical request, including SHA-256 hashes of every reference file;
 2. checks `.cache/generations/<hash>/result.json`;
@@ -134,7 +135,9 @@ The first real adapter is fal.ai; the mock adapter returns deterministic SVG pla
 5. retries transient provider errors with backoff and timeouts;
 6. records failures in the manifest.
 
-A batch is estimated before the first paid call. Unknown pricing is a hard error. The budget and batch cap are enforced before generation, and spend is recorded in `state.json` after each successful call.
+fal.ai accepts file references as data URIs and uses a queue endpoint. Higgsfield uses an asynchronous request API; the adapter uploads local references through the presigned-upload endpoint, sends a stable `Idempotency-Key`, polls the status URL with backoff, and downloads the result before caching. Higgsfield model schemas are strict, so adapter-only options such as `send_seed` and `reference_field` are stripped before the request is sent. Higgsfield does not implement lip-sync, so `providers.lipsync` can stay on fal.ai.
+
+A batch is estimated before the first paid call. Unknown pricing for the selected provider is a hard error. The budget and batch cap are enforced before generation, and spend is recorded in `state.json` after each successful call.
 
 ## Remotion
 
@@ -169,7 +172,7 @@ The root package is publishable as `coreslopper`. `npm run build` produces two a
 - `runtime/` — a snapshot of the tracked workflow, excluding generated media and local credentials;
 - `dist/cli.js` — a bundled npx entry point with `init`, `doctor`, `new`, `status`, and `validate`.
 
-`npx coreslopper init` copies `runtime/` into a private workspace, checks the local toolchain, optionally installs uv/Python/ffmpeg/Claude Code, writes `FAL_KEY` to `.env`, and configures the Suno MCP server in `.mcp.json`. The npx package deliberately does not depend on Remotion; the workspace's `npm install` provides rendering and audio-analysis dependencies. The workspace is a snapshot, not a clone, so updates use `init --force` rather than `git pull`. See [onboarding.md](onboarding.md) and [ADR 0010](adr/0010-npx-onboarding.md).
+`npx coreslopper init` copies `runtime/` into a private workspace, checks the local toolchain, optionally installs uv/Python/ffmpeg/Claude Code, writes `FAL_KEY` and `HIGGSFIELD_API_KEY` to `.env`, and configures the Suno MCP server in `.mcp.json`. The npx package deliberately does not depend on Remotion; the workspace's `npm install` provides rendering and audio-analysis dependencies. The workspace is a snapshot, not a clone, so updates use `init --force` rather than `git pull`. See [onboarding.md](onboarding.md) and [ADR 0010](adr/0010-npx-onboarding.md).
 
 ## Security and licensing
 

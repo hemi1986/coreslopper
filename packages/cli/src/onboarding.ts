@@ -13,6 +13,7 @@ import {
 } from '@clack/prompts';
 import { resolve } from 'node:path';
 import { ValidationError } from '@coreslopper/core';
+import { resolveHiggsfieldCredentials } from '@coreslopper/providers';
 import {
   defaultProjectSlug,
   initWorkspace,
@@ -31,6 +32,7 @@ import {
   installUv,
   missingTools,
   validateFalKey,
+  validateHiggsfieldKey,
 } from './tools.js';
 
 export interface OnboardOptions {
@@ -41,10 +43,13 @@ export interface OnboardOptions {
   installTools?: boolean;
   song?: SongProvider;
   visual?: VisualProvider;
+  imageProvider?: VisualProvider;
+  videoProvider?: VisualProvider;
   budget?: number;
   projectSlug?: string;
   title?: string;
   falKey?: string;
+  higgsfieldKey?: string;
   suno?: boolean;
   noProject?: boolean;
 }
@@ -159,9 +164,9 @@ async function offerTools(target: string, enabled: boolean): Promise<{ ffmpeg: b
   return { ffmpeg: installFfmpegNow };
 }
 
-async function chooseFalKey(options: OnboardOptions, visual: VisualProvider): Promise<string | undefined> {
+async function chooseFalKey(options: OnboardOptions, needed: boolean): Promise<string | undefined> {
   let key = options.falKey ?? process.env.FAL_KEY;
-  if (visual !== 'fal') return key;
+  if (!needed) return key;
 
   if (!key) {
     key = unwrap(
@@ -190,6 +195,48 @@ async function chooseFalKey(options: OnboardOptions, visual: VisualProvider): Pr
     const keep = unwrap(
       await confirm({
         message: 'The key was rejected. Keep it in .env anyway?',
+        initialValue: false,
+      }),
+    );
+    if (!keep) return undefined;
+  }
+  return key;
+}
+
+async function chooseHiggsfieldKey(
+  options: OnboardOptions,
+  needed: boolean,
+): Promise<string | undefined> {
+  let key = options.higgsfieldKey ?? resolveHiggsfieldCredentials();
+  if (!needed) return key;
+
+  if (!key) {
+    key = unwrap(
+      await password({
+        message: 'Higgsfield API credential key_id:key_secret (leave empty to add it later)',
+        mask: '•',
+      }),
+    );
+  }
+
+  if (!key) {
+    log.warn('No Higgsfield credential yet. Add HIGGSFIELD_API_KEY to .env before generating paid assets.');
+    return undefined;
+  }
+
+  const check = spinner();
+  check.start('Checking the Higgsfield credential...');
+  const result = await validateHiggsfieldKey(key);
+  if (result.status === 'valid') {
+    check.stop('Higgsfield credential is valid.');
+    return key;
+  }
+
+  check.stop(`Could not verify the Higgsfield credential (${result.message}).`);
+  if (result.status === 'invalid') {
+    const keep = unwrap(
+      await confirm({
+        message: 'The credential was rejected. Keep it in .env anyway?',
         initialValue: false,
       }),
     );
@@ -239,6 +286,8 @@ export async function onboard(options: OnboardOptions = {}): Promise<InitResult>
   const { ffmpeg: installFfmpegNow } = await offerTools(target, options.installTools !== false);
 
   let falKey: string | undefined = options.falKey ?? process.env.FAL_KEY;
+  let higgsfieldKey: string | undefined =
+    options.higgsfieldKey ?? resolveHiggsfieldCredentials();
   let project: FirstProjectOptions | null = null;
 
   if (!options.noProject) {
@@ -257,18 +306,31 @@ export async function onboard(options: OnboardOptions = {}): Promise<InitResult>
 
     const visual =
       options.visual ??
-      (unwrap(
-        await select({
-          message: 'How should visuals be generated?',
-          options: [
-            { value: 'mock', label: 'Mock provider', hint: 'motion graphics and dry runs, no API key' },
-            { value: 'fal', label: 'fal.ai', hint: 'AI keyframes and image-to-video, needs FAL_KEY' },
-          ],
-          initialValue: 'mock',
-        }),
-      ) as VisualProvider);
+      (options.imageProvider && options.videoProvider
+        ? options.imageProvider
+        : (unwrap(
+            await select({
+              message: 'How should visuals be generated?',
+              options: [
+                { value: 'mock', label: 'Mock provider', hint: 'motion graphics and dry runs, no API key' },
+                { value: 'fal', label: 'fal.ai', hint: 'AI keyframes and image-to-video, needs FAL_KEY' },
+                {
+                  value: 'higgsfield',
+                  label: 'Higgsfield',
+                  hint: 'AI keyframes and image-to-video, needs HIGGSFIELD_API_KEY',
+                },
+              ],
+              initialValue: 'mock',
+            }),
+          ) as VisualProvider));
+    const image = options.imageProvider ?? visual;
+    const video = options.videoProvider ?? visual;
 
-    falKey = await chooseFalKey(options, visual);
+    falKey = await chooseFalKey(options, image === 'fal' || video === 'fal');
+    higgsfieldKey = await chooseHiggsfieldKey(
+      options,
+      image === 'higgsfield' || video === 'higgsfield',
+    );
 
     const budget =
       options.budget ??
@@ -298,7 +360,7 @@ export async function onboard(options: OnboardOptions = {}): Promise<InitResult>
     const slugError = validSlug(projectSlug);
     if (slugError) throw new ValidationError(slugError);
 
-    project = { slug: projectSlug, title: options.title, budget, song, image: visual, video: visual };
+    project = { slug: projectSlug, title: options.title, budget, song, image, video };
   }
 
   const install =
@@ -322,7 +384,7 @@ export async function onboard(options: OnboardOptions = {}): Promise<InitResult>
     `Target:   ${target}`,
     `Project:  ${project ? project.slug : 'none'}`,
     `Song:     ${project ? project.song : '-'}`,
-    `Visuals:  ${project ? project.image : '-'}`,
+    `Visuals:  ${project ? (project.image === project.video ? project.image : `image=${project.image}, video=${project.video}`) : '-'}`,
     `Budget:   ${project ? `$${project.budget.toFixed(2)}` : '-'}`,
     `Install:  ${install ? 'yes' : 'no'}`,
     `Git:      ${git ? 'yes' : 'no'}`,
@@ -347,6 +409,7 @@ export async function onboard(options: OnboardOptions = {}): Promise<InitResult>
     git,
     project,
     falKey,
+    higgsfieldKey,
     suno: options.suno !== false,
     onProgress: (message) => log.step(message),
   });

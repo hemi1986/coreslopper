@@ -135,6 +135,7 @@
           "type": "string",
           "enum": [
             "fal",
+            "higgsfield",
             "mock"
           ]
         },
@@ -143,6 +144,15 @@
           "type": "string",
           "enum": [
             "fal",
+            "higgsfield",
+            "mock"
+          ]
+        },
+        "lipsync": {
+          "type": "string",
+          "enum": [
+            "fal",
+            "higgsfield",
             "mock"
           ]
         },

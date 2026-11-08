@@ -12,7 +12,7 @@
 
 ## Workspace setup
 
-Create a workspace with `npx coreslopper init <dir>` (or `npx coreslopper@latest init`). The onboarding CLI checks tools, writes `FAL_KEY` to `.env`, and configures the Suno MCP server. The workspace is a private runtime snapshot, so run day-to-day commands with its local `npm run cli -- ...`; `npx coreslopper doctor` works from anywhere. See `docs/onboarding.md`.
+Create a workspace with `npx coreslopper init <dir>` (or `npx coreslopper@latest init`). The onboarding CLI checks tools, writes `FAL_KEY` and Higgsfield credentials to `.env`, and configures the Suno MCP server. The workspace is a private runtime snapshot, so run day-to-day commands with its local `npm run cli -- ...`; `npx coreslopper doctor` works from anywhere. See `docs/onboarding.md`.
 
 ## Agents
 
@@ -30,7 +30,7 @@ The hook calls `npm run cli -- validate-file <file>`, which is also runnable by 
 
 `.mcp.json` configures the official Suno MCP server at `https://api.suno.com/mcp`. Authentication is handled by Claude Code's MCP login flow. Suno is optional when a project imports an existing song.
 
-fal.ai is used through the pipeline adapter (`FAL_KEY`), not through MCP. If you want to explore fal.ai models interactively, see `docs/mcp.md` and add a project-scoped MCP server for fal.ai; keep it out of the pipeline.
+fal.ai and Higgsfield are used through the pipeline adapters (`FAL_KEY`, `HIGGSFIELD_API_KEY`), not through MCP. If you want to explore fal.ai models interactively, see `docs/mcp.md` and add a project-scoped MCP server for fal.ai; keep it out of the pipeline.
 
 ## Permissions and safety
 

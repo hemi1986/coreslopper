@@ -42,6 +42,10 @@ Do not put an API key in `.mcp.json`. If the server needs a bearer token, use Cl
 
 The pipeline does not depend on the fal MCP server. Keeping exploration separate from the adapter keeps generation reproducible and cacheable.
 
+## Higgsfield (adapter, not MCP)
+
+Higgsfield is also used through the adapter in `packages/providers`, with `HIGGSFIELD_API_KEY` or `HF_API_KEY_ID` + `HF_API_KEY_SECRET`. It does not need an MCP server for pipeline generation. If you want to explore Higgsfield models interactively and its documentation offers an MCP endpoint, add that server as a separate exploration tool; keep production generation behind the adapter so it stays cached, budgeted, and reproducible.
+
 ## Other providers
 
 Add a new HTTP or stdio server under `mcpServers` only if it is useful for exploration. Production generation belongs behind the narrow provider interface so it can be cached, budgeted, and reproduced.
