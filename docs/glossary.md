@@ -128,6 +128,18 @@ _Avoid_: previz
 The append-only record of every generation with model, prompt, seed, references, cost, and cache status.
 _Avoid_: log
 
+**Generation Batch**:
+A JSON or YAML array of one or more generation requests executed with budget, cache, and manifest checks.
+_Avoid_: job
+
+**Provider Adapter**:
+The small implementation behind `generateImage`, `editImage`, and `imageToVideo`; fal.ai is the first real adapter, and mock is the deterministic test adapter.
+_Avoid_: client, SDK
+
+**Mock Provider**:
+A deterministic provider that returns placeholder assets and costs nothing; used by tests, CI, and no-account runs.
+_Avoid_: fake
+
 **Cache Key**:
 The SHA-256 hash of a canonical generation request, including reference-file hashes, used to reuse an asset.
 _Avoid_: hash
@@ -147,6 +159,10 @@ _Avoid_: gate
 **Stage Runner**:
 The isolated subagent or process that executes exactly one stage and returns a short summary.
 _Avoid_: worker
+
+**Stage Reset**:
+The explicit action that returns a done, failed, or skipped stage to pending so it can run again after an input change.
+_Avoid_: rerun
 
 **Art Director**:
 The automated critic that judges stills and keyframes against the style bible and character references.
