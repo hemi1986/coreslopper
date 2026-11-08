@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import {
   CharacterBibleSchema,
+  BrandKitSchema,
   ModelsConfigSchema,
   ProjectConfigSchema,
   StateSchema,
@@ -20,6 +21,7 @@ const schemas = {
   storyboard: StoryboardSchema,
   style: StyleBibleSchema,
   characters: CharacterBibleSchema,
+  brand: BrandKitSchema,
   models: ModelsConfigSchema,
 };
 

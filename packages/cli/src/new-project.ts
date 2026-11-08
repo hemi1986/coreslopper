@@ -125,13 +125,14 @@ export async function createProject(options: NewProjectOptions): Promise<string>
     words: [],
   });
 
-  for (const directory of ['audio', 'assets', 'renders', 'review']) {
+  for (const directory of ['audio', 'assets', 'renders', 'review', 'brand']) {
     await mkdir(join(projectDir, directory), { recursive: true });
   }
   await writeFile(join(projectDir, 'audio', '.gitkeep'), '');
   await writeFile(join(projectDir, 'assets', '.gitkeep'), '');
   await writeFile(join(projectDir, 'renders', '.gitkeep'), '');
   await writeFile(join(projectDir, 'review', '.gitkeep'), '');
+  await writeFile(join(projectDir, 'brand', '.gitkeep'), '');
 
   // Validate the project shell. Timing and storyboard are intentionally absent
   // at this point; only the project config and state are checked.

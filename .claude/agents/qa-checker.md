@@ -1,6 +1,6 @@
 ---
 name: qa-checker
-description: Run the final quality checks for a music-video project: schema, coverage, assets, sync, readability, determinism, budget reconciliation, and all-format renders. Write review/report.md.
+description: "Run the final quality checks for a music-video project: schema, coverage, assets, sync, readability, determinism, budget reconciliation, and all-format renders. Write review/report.md."
 tools: Read, Write, Bash, Glob, Grep
 model: inherit
 ---

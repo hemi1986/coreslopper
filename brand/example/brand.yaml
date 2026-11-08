@@ -1,0 +1,38 @@
+version: 1
+id: example
+name: Neon Rain
+description: A neutral synthwave/cyberpunk example kit for coreslopper projects.
+logo: logo.svg
+tokens: tokens.json
+palette:
+  background: "#050510"
+  surface: "#0d0d24"
+  primary: "#ff2a6d"
+  secondary: "#05d9e8"
+  accent: "#f9f002"
+  text: "#f8f8ff"
+  muted: "#8b8ba7"
+typography:
+  display:
+    family: Orbitron
+    weight: 800
+    letterSpacing: 0.02
+  body:
+    family: Space Grotesk
+    weight: 500
+  mono:
+    family: JetBrains Mono
+    weight: 400
+motion:
+  easing: easeOut
+  grain: 0.08
+fonts:
+  - family: Orbitron
+    file: fonts/Orbitron.ttf
+    license: fonts/OFL-Orbitron.txt
+  - family: Space Grotesk
+    file: fonts/SpaceGrotesk.ttf
+    license: fonts/OFL-SpaceGrotesk.txt
+  - family: JetBrains Mono
+    file: fonts/JetBrainsMono.ttf
+    license: fonts/OFL-JetBrainsMono.txt

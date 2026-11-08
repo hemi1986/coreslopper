@@ -26,6 +26,7 @@ A coreslopper music-video project.
 | `storyboard.yaml` | Machine-readable shot list. |
 | `storyboard.md` | Human-readable shot list. |
 | `state.json` | Resumable pipeline state and spend. |
+| `brand/` | Optional project-specific brand overrides. |
 | `review/` | Contact sheet, QA report, small stills. |
 | `audio/`, `assets/`, `renders/` | Local media; gitignored. |
 

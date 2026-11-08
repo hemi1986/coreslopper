@@ -278,6 +278,30 @@ export const CharacterBibleSchema = z.object({
   characters: z.array(CharacterSchema).default([]),
 });
 
+export const BrandKitSchema = z.object({
+  version: z.literal(1).default(1),
+  id: z.string().min(1),
+  name: z.string().min(1),
+  description: z.string().optional(),
+  logo: z.string().min(1),
+  tokens: z.string().min(1),
+  palette: z.record(z.string(), z.string().regex(/^#[0-9a-fA-F]{6}$/)),
+  typography: z.record(z.string(), TypographyStyleSchema),
+  motion: z.object({
+    easing: z.string().default('easeOut'),
+    grain: z.number().min(0).max(1).default(0.08),
+  }),
+  fonts: z
+    .array(
+      z.object({
+        family: z.string().min(1),
+        file: z.string().min(1),
+        license: z.string().min(1),
+      }),
+    )
+    .default([]),
+});
+
 export const ModelPricingSchema = z.object({
   unit: z.enum(['image', 'second', 'request']),
   usd: z.number().nonnegative(),
@@ -316,6 +340,7 @@ export type Storyboard = z.infer<typeof StoryboardSchema>;
 export type StyleBible = z.infer<typeof StyleBibleSchema>;
 export type Character = z.infer<typeof CharacterSchema>;
 export type CharacterBible = z.infer<typeof CharacterBibleSchema>;
+export type BrandKit = z.infer<typeof BrandKitSchema>;
 export type ModelPricing = z.infer<typeof ModelPricingSchema>;
 export type ModelRole = z.infer<typeof ModelRoleSchema>;
 export type ModelsConfig = z.infer<typeof ModelsConfigSchema>;
