@@ -72,7 +72,7 @@ cd my-video
 claude
 ```
 
-Run `/mcp` once to authenticate Suno, then `/video-next my-video`. The generated workspace contains the full workflow runtime, so every `npm run cli -- ...` command in this README works inside it. Running `npx coreslopper` without arguments inside a workspace prints the available commands. See [docs/onboarding.md](docs/onboarding.md) for all flags and troubleshooting.
+Run `/mcp` once to authenticate Suno, then `/video-next my-video`. The generated workspace contains the full workflow runtime, so every `npm run cli -- ...` command in this README works inside it. Running `npx coreslopper` without arguments inside a workspace prints the available commands. To move a workspace to a newer release, run `npx coreslopper@latest update` inside it; local edits are kept. See [docs/onboarding.md](docs/onboarding.md) for all flags, updating, and troubleshooting.
 
 ## Quickstarts
 

@@ -9,8 +9,12 @@ A self-contained directory created by `npx coreslopper init` that holds the work
 _Avoid_: repo, checkout
 
 **Runtime Snapshot**:
-The versioned copy of the workflow files that `npx coreslopper init` writes into a workspace. It is not a git clone and is updated by re-running init.
+The versioned copy of the workflow files that `npx coreslopper init` writes into a workspace. It is not a git clone and is updated with `npx coreslopper@latest update`, which merges against the **Baseline**.
 _Avoid_: install, template
+
+**Baseline**:
+The SHA-256 of every runtime file as last installed, stored in `coreslopper.workspace.json`. `coreslopper update` compares it with the workspace to tell local edits from untouched workflow files.
+_Avoid_: lockfile, manifest
 
 **Brief**:
 The one-page statement of topic, source, audience, length, formats, and style that anchors every later creative decision.

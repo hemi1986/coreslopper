@@ -15,5 +15,6 @@ Short records of decisions that are hard to reverse, surprising without context,
 | [0009](0009-mit-open-source.md) | MIT open source with explicit third-party notices. |
 | [0010](0010-npx-onboarding.md) | npx onboarding with a versioned runtime snapshot. |
 | [0011](0011-higgsfield-provider.md) | Higgsfield as a second provider; per-project provider selection and role alternatives. |
+| [0012](0012-workspace-update.md) | `coreslopper update` merges a new runtime against a recorded baseline. |
 
 Status values: `Accepted`, `Deprecated`, `Superseded by ADR-NNNN`.

@@ -10,6 +10,10 @@ export interface WorkspaceMarker {
   runtimeVersion: string;
   created: string;
   project?: string;
+  /** Last `coreslopper update`. */
+  updated?: string;
+  /** SHA-256 of every workflow file as installed; the baseline for `coreslopper update`. */
+  files?: Record<string, string>;
 }
 
 function readPackage(path: string): { name?: string; version?: string } | undefined {
