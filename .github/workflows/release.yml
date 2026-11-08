@@ -1,0 +1,78 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  publish:
+    needs: release-please
+    # Publish when release-please just cut a release, or on a manual retry
+    # (workflow_dispatch publishes the version currently in package.json).
+    if: needs.release-please.outputs.release_created == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write # npm trusted publishing (OIDC) and provenance
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name || github.ref }}
+
+      # Node 24 ships npm 11, which supports npm trusted publishing.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm test
+
+      - name: Build and smoke-test package
+        run: |
+          mkdir -p "$RUNNER_TEMP/pkg"
+          npm pack --pack-destination "$RUNNER_TEMP/pkg"
+          TARBALL=$(ls "$RUNNER_TEMP"/pkg/coreslopper-*.tgz)
+          npx -y -p "$TARBALL" coreslopper init "$RUNNER_TEMP/coreslopper-npx" --yes --no-install --no-git --skip-project
+          npx -y -p "$TARBALL" coreslopper doctor "$RUNNER_TEMP/coreslopper-npx"
+
+      # Trusted publishing: the npm CLI detects the OIDC environment and exchanges
+      # it for a short-lived publish token. No npm token in the repository, no OTP.
+      # Provenance is generated automatically for a public package from a public repo.
+      # The tarball was already built and tested above, so lifecycle scripts are skipped.
+      - name: Publish to npm
+        run: npm publish --access public --ignore-scripts

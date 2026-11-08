@@ -74,9 +74,11 @@ jobs:
 
       - name: Package smoke test
         run: |
-          npm pack
-          npx -y -p ./coreslopper-0.1.0.tgz coreslopper init "$RUNNER_TEMP/coreslopper-npx" --yes --no-install --no-git --skip-project
-          npx -y -p ./coreslopper-0.1.0.tgz coreslopper doctor "$RUNNER_TEMP/coreslopper-npx"
+          mkdir -p "$RUNNER_TEMP/pkg"
+          npm pack --pack-destination "$RUNNER_TEMP/pkg"
+          TARBALL=$(ls "$RUNNER_TEMP"/pkg/coreslopper-*.tgz)
+          npx -y -p "$TARBALL" coreslopper init "$RUNNER_TEMP/coreslopper-npx" --yes --no-install --no-git --skip-project
+          npx -y -p "$TARBALL" coreslopper doctor "$RUNNER_TEMP/coreslopper-npx"
           test -f "$RUNNER_TEMP/coreslopper-npx/packages/cli/src/init.ts"
 
       - name: Upload demo artifacts

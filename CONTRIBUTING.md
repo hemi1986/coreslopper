@@ -68,22 +68,52 @@ Do not hand-edit `schema/*.json`; regenerate it.
 
 CI runs without API keys and uses the mock provider. GPU tests are opt-in.
 
-## Publishing the npx package
+## Releases and publishing
 
-The root package is published as `coreslopper`. The `prepack` hook builds `runtime/` and `dist/cli.js`, so the tarball always contains the current workflow.
+Releases are automated with [release-please](https://github.com/googleapis/release-please) in `.github/workflows/release.yml`:
+
+1. Every push to `main` updates an open **release PR** that bumps the version in `package.json` and adds the new entries to `CHANGELOG.md`. The entries come from Conventional Commit messages.
+2. Merging the release PR creates the `vX.Y.Z` tag and a GitHub release with the same notes.
+3. The same workflow then runs typecheck, tests, and a package smoke test, and publishes `coreslopper` to npm with provenance. After that, `npx coreslopper@latest` picks up the new version.
+
+Do not edit the version in `package.json` or `CHANGELOG.md` by hand. To force a specific version, add a `Release-As: 1.0.0` line to a commit body.
+
+The `publish` job uses npm trusted publishing (OIDC): no npm token in the repository and no one-time password. A manual run (`workflow_dispatch`) publishes whatever version is in `package.json` on `main`, which helps when a publish failed after the release was created. Never put a token in `.env`, a workflow file, or a commit.
+
+### First time only: placeholder and trusted publisher
+
+A trusted publisher can only be configured for a package that already exists on npm. Publish once by hand (this is the only step that needs 2FA; pass `--otp=<code>` when the shell cannot open a browser):
 
 ```bash
 npm login
-npm run typecheck
-npm test
-npm run pack:check     # builds and inspects the tarball
-npm publish            # add --provenance in CI
+npm version 0.0.0 --no-git-tag-version
+npm publish --access public
+npm version 0.1.0 --no-git-tag-version   # back to the version release-please expects
 ```
 
-The GitHub Actions `publish` workflow runs the same checks on a manual dispatch or a published release. It expects an `NPM_TOKEN` secret with publish access to the `coreslopper` package. Never put a token in `.env`, a workflow file, or a commit.
+With staged publishing, npm answers the first publish with a stub `0.0.0-stage` placeholder and holds `0.0.0` for approval on npmjs.com. The stub is enough to configure the trusted publisher; the staged `0.0.0` can be discarded.
+
+Then on npmjs.com → `coreslopper` → Settings → **Trusted publishing** → GitHub Actions:
+
+| Field | Value |
+|---|---|
+| Organization or user | `hemi1986` |
+| Repository | `coreslopper` |
+| Workflow filename | `release.yml` |
+| Environment name | – (leave empty) |
+| Allowed actions | **Allow npm publish** (the default `npm stage publish` alone is not enough) |
+
+The first CI publish has to succeed within two days, otherwise the configuration expires and has to be created again. Once it works, lock the old path down: Settings → **Publishing access** → "Require two-factor authentication and disallow tokens". Trusted publishers keep working; tokens stop working.
+
+Inspect the tarball locally without publishing:
+
+```bash
+npm run pack:check
+```
 
 ## Commits and pull requests
 
+- Use [Conventional Commits](https://www.conventionalcommits.org/): `feat:` (minor bump before 1.0), `fix:` (patch), `docs:`, `chore:`, `test:`, `ci:`, `refactor:`. Mark breaking changes with `feat!:` or a `BREAKING CHANGE:` footer. With squash merges, the PR title becomes the commit message, so it must follow the same format.
 - Keep commits focused.
 - Describe the user-visible change and the test you ran.
 - Link an issue when one exists.
