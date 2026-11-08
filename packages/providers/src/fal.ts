@@ -41,6 +41,8 @@ function isRetryableStatus(status: number): boolean {
   return status === 408 || status === 409 || status === 429 || status >= 500;
 }
 
+class NonRetryableError extends Error {}
+
 async function fetchJson(
   url: string,
   init: RequestInit,
@@ -59,14 +61,17 @@ async function fetchJson(
         body = { raw: text };
       }
       if (!response.ok) {
-        if (isRetryableStatus(response.status) && attempt < attempts - 1) {
+        const message = `fal.ai ${response.status}: ${typeof body === 'string' ? body : JSON.stringify(body)}`;
+        if (!isRetryableStatus(response.status)) throw new NonRetryableError(message);
+        if (attempt < attempts - 1) {
           await delay(500 * 2 ** attempt);
           continue;
         }
-        throw new Error(`fal.ai ${response.status}: ${typeof body === 'string' ? body : JSON.stringify(body)}`);
+        throw new Error(message);
       }
       return body as Record<string, unknown>;
     } catch (error) {
+      if (error instanceof NonRetryableError) throw error;
       lastError = error;
       if (attempt >= attempts - 1) break;
       await delay(500 * 2 ** attempt);
@@ -127,7 +132,7 @@ export class FalProvider implements Provider {
     this.apiKey = key;
     this.baseUrl = options.baseUrl ?? 'https://fal.run';
     this.queueUrl = options.queueUrl ?? 'https://queue.fal.run';
-    this.requestTimeoutMs = options.requestTimeoutMs ?? 180_000;
+    this.requestTimeoutMs = options.requestTimeoutMs ?? 600_000;
     this.pollIntervalMs = options.pollIntervalMs ?? 1_000;
   }
 

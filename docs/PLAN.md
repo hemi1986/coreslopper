@@ -89,7 +89,7 @@ flowchart TD
     F --> RV[review/report.md]
 ```
 
-**Control plane:** `state.json` records stage status, input hashes, output paths, retries, and spend. A stage is skipped when its inputs are unchanged and its outputs exist. Mechanical reruns are safe.
+**Control plane:** `state.json` records stage status, input hashes when available, output paths, retries, and spend. Done and skipped stages are not repeated; `stage-reset` reopens one after an input change. Mechanical reruns are safe.
 
 **Data plane:** All stage inputs and outputs are files in the project directory. The orchestrator passes paths and short summaries, never raw assets or full transcripts.
 
@@ -192,7 +192,7 @@ No stage waits for a human. Each stage has an automated completion check. The pi
 
 ### Stage behavior
 
-- A stage is **idempotent**: rerunning it with the same inputs produces the same outputs or a cache hit.
+- Mechanical stages are **idempotent**: rerunning with the same inputs produces the same outputs or a cache hit. Creative stages are re-run only after a reset and are bounded by their critics.
 - A stage writes outputs atomically (temporary file + rename) and records them in `state.json`.
 - A failed stage records `attempts`, `last_error`, and a resumable checkpoint. The next run continues from the checkpoint.
 - A stage never overwrites `timing.overrides.json`, `project.yaml`, or any user-authored file.

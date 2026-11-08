@@ -28,4 +28,4 @@ asset_batch_size: 5
 retries:
   max_attempts: 4
   base_delay_ms: 1000
-  request_timeout_ms: 180000
+  request_timeout_ms: 600000
