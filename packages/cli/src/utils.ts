@@ -1,4 +1,5 @@
-import { resolve } from 'node:path';
+import { existsSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { ZodError } from 'zod';
 import { BudgetError, ValidationError, formatZodError } from '@coreslopper/core';
 
@@ -33,8 +34,17 @@ export async function run(action: () => Promise<void>): Promise<void> {
   }
 }
 
+/**
+ * Resolve a project argument. A path to a project directory wins; otherwise a
+ * bare slug resolves to `projects/<slug>`.
+ */
 export function projectDirFromArg(arg: string | undefined, fallback = 'projects/demo'): string {
-  return resolve(process.cwd(), arg ?? fallback);
+  const direct = resolve(process.cwd(), arg ?? fallback);
+  if (arg && !existsSync(join(direct, 'project.yaml'))) {
+    const named = resolve(process.cwd(), 'projects', arg);
+    if (existsSync(join(named, 'project.yaml'))) return named;
+  }
+  return direct;
 }
 
 export function formatSeconds(value: number): string {
