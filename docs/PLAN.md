@@ -628,7 +628,6 @@ CI runs on Ubuntu, installs `ffmpeg`, uses Node 22, Python 3.12, and `uv`, and n
 
 ## 18. Open questions before public release
 
-- Final repository name and GitHub organization (working title `coreslopper`).
 - Exact fal.ai model slugs and prices; verify and pin at implementation time.
 - Suno MCP authentication details and whether stems are available on the user's plan.
 - WhisperX/PyTorch CUDA build that works reliably on the RTX 5070 Ti (Blackwell).
@@ -638,10 +637,20 @@ CI runs on Ubuntu, installs `ffmpeg`, uses Node 22, Python 3.12, and `uv`, and n
 
 ## 19. Approval
 
-This plan is ready for review. Implementation starts only after explicit approval.
+Approved on 2026-11-08. The working title `coreslopper` is confirmed.
 
-- [ ] Pipeline stages and no-gate autonomy are correct.
-- [ ] Formats and shot mix are correct.
-- [ ] Budget and licensing decisions are correct.
-- [ ] Third-party skill substitutions (`writing-for-agents`, `domain-modeling`) are acceptable.
-- [ ] Repository layout and phased delivery are acceptable.
+- [x] Pipeline stages and no-gate autonomy are correct.
+- [x] Formats and shot mix are correct.
+- [x] Budget and licensing decisions are correct.
+- [x] Third-party skill substitutions (`writing-for-agents`, `domain-modeling`) are acceptable.
+- [x] Repository layout and phased delivery are acceptable.
+
+## 20. Implementation status
+
+Updated 2026-11-08:
+
+- **Phase 1 — skeleton and contracts:** complete. Zod schemas, generated JSON Schema, state machine, timing resolver, budget/hash utilities, project loader, CLI, config, template, and brand kit are in place.
+- **Phase 2 — motion-only vertical slice:** complete. `projects/demo` renders 16:9, 9:16, and 1:1; coverage validation, contact sheet, QA report, and frame-hash determinism pass.
+- **Phase 3 — AI clips, footage, mixed shots:** the fal.ai adapter, mock adapter, cache, manifest, budget guard, batch CLI, character reference rules, frame chaining, footage normalization command, and 3D component are implemented. The fal.ai adapter has not been exercised against a live `FAL_KEY`; the mock path is tested. Demucs/WhisperX extras are not installed in this environment; the pure audio-analysis helpers are tested.
+- **Phase 4 — open-source polish:** README, AGENTS/CLAUDE, architecture, pipeline, glossary, ADRs, third-party notices, CI, contribution/security/conduct docs, and a license-safe demo are in place. A public repository name and a live model/pricing verification remain.
+- **Known local gap:** `ffmpeg` is not on the current machine's `PATH`. The motion-only demo does not need it; footage import and loudness normalization do. CI installs it.

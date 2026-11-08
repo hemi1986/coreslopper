@@ -43,7 +43,7 @@ Read [the plan](docs/PLAN.md) for the full rationale, [the ADRs](docs/adr/) for 
 ```bash
 git clone <your-fork> coreslopper
 cd coreslopper
-npm install
+./scripts/setup.sh        # or: npm install && (cd scripts/audio-analysis && uv sync --group dev)
 
 # Generate the license-safe demo audio and validate the project
 npm run demo:audio

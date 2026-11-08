@@ -22,7 +22,8 @@
     "render": "npm run cli -- render",
     "contact-sheet": "npm run cli -- contact-sheet",
     "demo:audio": "node scripts/fixtures/generate-audio.mjs projects/demo/audio/song.wav",
-    "demo": "npm run demo:audio && npm run cli -- validate projects/demo && npm run cli -- render projects/demo --format 16x9",
+    "demo": "npm run demo:audio && npm run cli -- validate projects/demo && npm run cli -- contact-sheet projects/demo && npm run cli -- render projects/demo --format 16x9 && npm run cli -- render projects/demo --format 9x16 && npm run cli -- render projects/demo --format 1x1 && npm run cli -- qa projects/demo",
+    "demo:preview": "npm run demo:audio && npm run cli -- validate projects/demo && npm run cli -- render projects/demo --format 16x9 --preview",
     "python:test": "cd scripts/audio-analysis && uv run pytest -q",
     "python:sync": "cd scripts/audio-analysis && uv sync"
   },

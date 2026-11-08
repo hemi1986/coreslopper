@@ -13,7 +13,7 @@ Budget: $0.00 spent / $50.00
 | Master render | PASS | renders/16x9.mp4 |
 | Format 9x16 | PASS | renders/9x16.mp4 |
 | Format 1x1 | PASS | renders/1x1.mp4 |
-| Determinism | N/A | run with --determinism <frame> |
+| Determinism | PASS | 77524f503728906a vs 77524f503728906a at frame 190 |
 
 READY: yes
 
