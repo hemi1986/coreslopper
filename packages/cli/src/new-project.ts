@@ -128,11 +128,12 @@ export async function createProject(options: NewProjectOptions): Promise<string>
     words: [],
   });
 
-  for (const directory of ['audio', 'assets', 'renders', 'review', 'brand']) {
+  for (const directory of ['audio', 'assets', 'characters', 'renders', 'review', 'brand']) {
     await mkdir(join(projectDir, directory), { recursive: true });
   }
   await writeFile(join(projectDir, 'audio', '.gitkeep'), '');
   await writeFile(join(projectDir, 'assets', '.gitkeep'), '');
+  await writeFile(join(projectDir, 'characters', '.gitkeep'), '');
   await writeFile(join(projectDir, 'renders', '.gitkeep'), '');
   await writeFile(join(projectDir, 'review', '.gitkeep'), '');
   await writeFile(join(projectDir, 'brand', '.gitkeep'), '');

@@ -53,8 +53,10 @@ storyboard.yaml
 storyboard.md
 state.json
 assets/manifest.jsonl
-audio/              gitignored
-assets/             gitignored
+assets/references/  user-provided moodboards and reference images, gitignored
+assets/footage/     normalized real footage, gitignored
+audio/              song and stems, gitignored
+characters/<id>/    character sheets and refs, gitignored
 renders/            gitignored
 review/             report, contact sheet, small stills
 ```

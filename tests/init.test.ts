@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { existsSync } from 'node:fs';
 import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -64,6 +65,7 @@ describe('workspace init', () => {
     const project = await readFile(join(target, 'projects', 'test-video', 'project.yaml'), 'utf8');
     expect(project).toContain('slug: test-video');
     expect(project).toContain('budget_usd: 25');
+    expect(existsSync(join(target, 'projects', 'test-video', 'characters', '.gitkeep'))).toBe(true);
 
     const env = await readFile(join(target, '.env'), 'utf8');
     expect(env).toContain('FAL_KEY=test-fal-key');

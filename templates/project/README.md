@@ -28,7 +28,10 @@ A coreslopper music-video project.
 | `state.json` | Resumable pipeline state and spend. |
 | `brand/` | Optional project-specific brand overrides. |
 | `review/` | Contact sheet, QA report, small stills. |
+| `characters/<id>/` | Character sheets and reference images; gitignored. |
 | `audio/`, `assets/`, `renders/` | Local media; gitignored. |
+
+User-provided references belong in `assets/references/` (moodboards, composition, color) or `characters/<id>/` (recurring characters). Actual footage or stills used in the timeline belong in `assets/footage/`. All of these stay local.
 
 ## Media policy
 

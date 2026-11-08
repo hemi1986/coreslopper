@@ -33,6 +33,8 @@ projects/*/audio/*
 !projects/*/audio/.gitkeep
 projects/*/assets/*
 !projects/*/assets/.gitkeep
+projects/*/characters/*
+!projects/*/characters/.gitkeep
 projects/*/renders/*
 !projects/*/renders/.gitkeep
 projects/*/timing.effective.json

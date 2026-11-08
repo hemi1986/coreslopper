@@ -15,13 +15,14 @@ license: MIT
 ## Inputs
 
 - `storyboard.yaml`, `style.yaml`, `characters.yaml`
+- `assets/references/` for user-provided moodboards and composition references
 - `config/models.yaml` and `project.yaml`
 - `packages/providers` and the `npm run cli -- generate` command
 - `docs/glossary.md`
 
 ## Process
 
-1. Read the shot's prompts, style refs, and character refs. If the shot names a character but the character has no reference image, stop and run `character-bible` first.
+1. Read the shot's prompts, style refs, and character refs. If the shot names a character but the character has no reference image, stop and run `character-bible` first. Pick any user-provided moodboard or composition references from `assets/references/` and pass their project-relative paths in the batch `references` array.
 2. Choose roles from `config/models.yaml`, not hard-coded model IDs. Use the cheapest role that meets the shot's quality needs.
 3. Write a batch JSON file outside the repo or under `projects/<slug>/assets/batches/`. Shape:
    ```json
