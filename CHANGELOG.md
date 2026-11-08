@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.2](https://github.com/hemi1986/coreslopper/compare/v0.2.1...v0.2.2) (2026-11-08)
+
+
+### Bug Fixes
+
+* keep upstream release automation out of workspaces ([e7f3fa2](https://github.com/hemi1986/coreslopper/commit/e7f3fa2e087c3be4545a57d63aaab50702d3cf5e))
+* keep upstream release automation out of workspaces ([f692c72](https://github.com/hemi1986/coreslopper/commit/f692c7264106dcd29319c1e949018cda22fa98b1))
+
 ## [0.2.1](https://github.com/hemi1986/coreslopper/compare/v0.2.0...v0.2.1) (2026-11-08)
 
 

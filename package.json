@@ -1,6 +1,6 @@
 {
   "name": "coreslopper",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": false,
   "type": "module",
   "description": "An open-source, Claude Code-native workflow for producing music videos from brief to render.",
