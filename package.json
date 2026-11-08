@@ -6,12 +6,13 @@
   "description": "An open-source, Claude Code-native workflow for producing music videos from brief to render.",
   "license": "MIT",
   "bin": {
-    "coreslopper": "./dist/cli.js"
+    "coreslopper": "dist/cli.js"
   },
   "files": [
     "dist",
     "runtime",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "repository": {
@@ -70,13 +71,13 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.4.0",
     "@remotion/bundler": "4.0.541",
     "@remotion/cli": "4.0.541",
     "@remotion/fonts": "4.0.541",
     "@remotion/renderer": "4.0.541",
     "@remotion/three": "4.0.541",
-    "@react-three/drei": "^10.7.7",
-    "@react-three/fiber": "^9.4.0",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
