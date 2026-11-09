@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { basename, dirname, extname, join, resolve } from 'node:path';
 import { ensureDir, loadProject, repoRoot, ValidationError, writeJsonAtomic } from '@coreslopper/core';
 
-function resolveBinary(name: 'ffmpeg' | 'ffprobe'): string {
+export function resolveBinary(name: 'ffmpeg' | 'ffprobe'): string {
   const local = join(repoRoot(), '.tools', 'ffmpeg', name);
   if (existsSync(local)) return local;
   try {
