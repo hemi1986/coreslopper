@@ -34,7 +34,7 @@ async function runtimeFixture(version: string, files: Record<string, string>): P
 
 async function workspaceFrom(runtime: string): Promise<string> {
   const target = await temporaryDir('coreslopper-workspace-');
-  await initWorkspace({ targetDir: target, runtimeDir: runtime, install: false, git: false, suno: true });
+  await initWorkspace({ targetDir: target, runtimeDir: runtime, install: false, git: false });
   return target;
 }
 

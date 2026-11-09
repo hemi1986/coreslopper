@@ -15,7 +15,7 @@ license: MIT
 ## Inputs
 
 - `brief.md`
-- `lyrics.txt` and `suno-style.txt`
+- `lyrics.txt` and `song.json` (duration, language)
 - `brand/<kit>/` or project brand overrides
 - `docs/glossary.md`
 

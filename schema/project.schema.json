@@ -125,8 +125,7 @@
     "providers": {
       "default": {
         "image": "mock",
-        "video": "mock",
-        "song": "import"
+        "video": "mock"
       },
       "type": "object",
       "properties": {
@@ -155,32 +154,6 @@
             "higgsfield",
             "mock"
           ]
-        },
-        "song": {
-          "default": "import",
-          "type": "string",
-          "enum": [
-            "suno",
-            "import",
-            "mock"
-          ]
-        }
-      }
-    },
-    "song": {
-      "default": {
-        "variants": 2
-      },
-      "type": "object",
-      "properties": {
-        "variants": {
-          "default": 2,
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 4
-        },
-        "pinned_variant": {
-          "type": "string"
         }
       }
     },

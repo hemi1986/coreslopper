@@ -15,7 +15,8 @@ license: MIT
 ## Inputs
 
 - `projects/<slug>/project.yaml` (budget, formats, providers, brand).
-- The user's idea, references, and constraints.
+- `lyrics.txt` and `song.json` (title, artist, language, rights, duration). The song already exists.
+- The user's idea, references, and constraints, usually gathered by `new-video` through `grilling`.
 - `docs/glossary.md` for terminology.
 - `brand/<kit>/` when a brand kit exists.
 

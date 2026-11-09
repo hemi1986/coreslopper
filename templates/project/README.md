@@ -4,9 +4,9 @@ A coreslopper music-video project.
 
 ## Start here
 
-1. Read `project.yaml` for the budget, formats, and providers.
-2. Run `/video-status` in Claude Code to see the next stage.
-3. Run `/video-next` to execute the pipeline. The default review mode is `auto`, so the pipeline runs without creative approval gates.
+1. Run `/new-video {{SLUG}}` in Claude Code. It asks for the lyrics, tells you where to put the song and the vocal stem (`audio/song.wav`, `audio/stems/vocals.wav`), and grills you into the brief and treatment.
+2. Run `/video-next {{SLUG}}` to execute the rest of the pipeline. The default review mode is `auto`, so it runs without creative approval gates.
+3. Run `/video-status {{SLUG}}` at any time to see the next stage.
 4. Validate at any time with `npm run validate -- projects/{{SLUG}}`.
 5. Render the master with `npm run render -- projects/{{SLUG}} --format 16x9`.
 
@@ -17,8 +17,7 @@ A coreslopper music-video project.
 | `brief.md` | Topic, audience, length, formats, style, constraints. |
 | `treatment.md` | Visual concept, dramaturgy, shot mix. |
 | `lyrics.txt` | Authoritative lyric text with section tags. |
-| `suno-style.txt` | Style prompt for Suno. |
-| `song.json` | Song provenance and metadata. |
+| `song.json` | Song title, artist, language, rights, duration, stem status. |
 | `timing.json` | Generated timing. |
 | `timing.overrides.json` | User-owned corrections; never overwritten. |
 | `style.yaml` | Style bible. |
@@ -35,4 +34,4 @@ User-provided references belong in `assets/references/` (moodboards, composition
 
 ## Media policy
 
-Do not commit generated Suno, fal.ai, or Higgsfield assets, commercial music, or renders. The repository is open source; keep it license-safe.
+Do not commit the song, stems, generated fal.ai or Higgsfield assets, commercial music, or renders. The repository is open source; keep it license-safe.

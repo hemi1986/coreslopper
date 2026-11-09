@@ -6,8 +6,8 @@ coreslopper is a file-based pipeline. Every stage reads files from a project dir
 
 ```mermaid
 flowchart TD
-    U[User] --> NV["/new-video"]
-    NV --> P["projects/&lt;slug&gt;/"]
+    U[User] --> NV["/new-video skill"]
+    NV -->|setup, brief, treatment| P["projects/&lt;slug&gt;/"]
     U --> VN["/video-next"]
     VN --> O[Stage orchestrator]
     O --> R[stage-runner subagent]
@@ -31,7 +31,7 @@ flowchart TD
 - project budget: total, spent, reserved;
 - a global `stage` and `status`.
 
-`/video-next` uses `npm run cli -- status` to find the next stage and `stage-start`, `stage-done`, `stage-fail`, and `stage-skip` to persist transitions. Done and skipped stages are not repeated; use `stage-reset` to re-run one after changing an input. Input hashes are recorded when the stage provides them.
+The first three stages (`setup`, `brief`, `treatment`) are interactive: the `new-video` skill runs them with the user in the main session. `/video-next` uses `npm run cli -- status` to find the next stage and `stage-start`, `stage-done`, `stage-fail`, and `stage-skip` to persist transitions. Done and skipped stages are not repeated; use `stage-reset` to re-run one after changing an input. Input hashes are recorded when the stage provides them.
 
 ## Data plane
 
@@ -41,9 +41,8 @@ The project directory is the only interface between stages:
 project.yaml        configuration and budget
 brief.md
 treatment.md
-lyrics.txt
-suno-style.txt
-song.json
+lyrics.txt          user-supplied lyrics with section tags
+song.json           song metadata: title, artist, language, rights, duration
 timing.json         generated timing
 timing.overrides.json  user-owned corrections
 timing.effective.json  resolved base + overrides (derived, gitignored)
@@ -55,7 +54,7 @@ state.json
 assets/manifest.jsonl
 assets/references/  user-provided moodboards and reference images, gitignored
 assets/footage/     normalized real footage, gitignored
-audio/              song and stems, gitignored
+audio/              the user's song.wav and stems/vocals.wav, gitignored
 characters/<id>/    character sheets and refs, gitignored
 renders/            gitignored
 review/             report, contact sheet, small stills
@@ -157,13 +156,12 @@ Formats are separate compositions (`16x9`, `9x16`, `1x1`, `4x5`) with safe-area-
 ## Claude Code layer
 
 - `.claude/skills/<name>/SKILL.md` — the stage skills.
-- `.claude/commands/` — `/new-video`, `/video-next`, `/video-status`.
+- `.claude/commands/` — `/video-next`, `/video-status`. `/new-video` is a skill in `.claude/skills/new-video/`.
 - `.claude/agents/` — `stage-runner`, `art-director`, `qa-checker`.
 - `.claude/hooks/validate-artifacts.mjs` — validates project artifacts after `Write|Edit`.
 - `.claude/settings.json` — registers the hook.
-- `.mcp.json` — Suno MCP.
 
-The core skills and scripts are tool-agnostic. The commands, agents, hooks, and MCP config are the Claude Code layer.
+The core skills and scripts are tool-agnostic. The commands, agents, and hooks are the Claude Code layer.
 
 ## Distribution and onboarding
 
@@ -172,7 +170,7 @@ The root package is publishable as `coreslopper`. `npm run build` produces two a
 - `runtime/` — a snapshot of the tracked workflow, excluding generated media and local credentials;
 - `dist/cli.js` — a bundled npx entry point with `init`, `doctor`, `new`, `status`, and `validate`.
 
-`npx coreslopper init` copies `runtime/` into a private workspace, checks the local toolchain, optionally installs uv/Python/ffmpeg/Claude Code, writes `FAL_KEY` and `HIGGSFIELD_API_KEY` to `.env`, and configures the Suno MCP server in `.mcp.json`. The npx package deliberately does not depend on Remotion; the workspace's `npm install` provides rendering and audio-analysis dependencies. The workspace is a snapshot, not a clone, so updates use `init --force` rather than `git pull`. See [onboarding.md](onboarding.md) and [ADR 0010](adr/0010-npx-onboarding.md).
+`npx coreslopper init` copies `runtime/` into a private workspace, checks the local toolchain, optionally installs uv/Python/ffmpeg/Claude Code, and writes `FAL_KEY` and `HIGGSFIELD_API_KEY` to `.env`. The npx package deliberately does not depend on Remotion; the workspace's `npm install` provides rendering and audio-analysis dependencies. The workspace is a snapshot, not a clone, so updates use `init --force` rather than `git pull`. See [onboarding.md](onboarding.md) and [ADR 0010](adr/0010-npx-onboarding.md).
 
 ## Security and licensing
 

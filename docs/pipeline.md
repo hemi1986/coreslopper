@@ -12,53 +12,51 @@ cd my-video
 npm run cli -- doctor
 ```
 
-The wizard installs dependencies, stores optional `FAL_KEY` and Higgsfield credentials in `.env`, and configures the Suno MCP server. Open Claude Code in the workspace, run `/mcp` once to authenticate Suno, and then run `/video-next my-video`. See [onboarding.md](onboarding.md) for flags and troubleshooting. If you work in a clone of this repository, skip this section and use `npm run cli -- new <slug> --budget <usd>`.
+The wizard installs dependencies and stores optional `FAL_KEY` and Higgsfield credentials in `.env`. Open Claude Code in the workspace and run `/new-video` (or `/new-video my-video` for the project the wizard created). See [onboarding.md](onboarding.md) for flags and troubleshooting.
 
 ## Stage IDs
 
-`brief`, `treatment`, `lyrics`, `song`, `audio-analysis`, `style-character`, `storyboard`, `assets`, `assembly`, `qa-export`.
+`setup`, `brief`, `treatment`, `audio-analysis`, `style-character`, `storyboard`, `assets`, `assembly`, `qa-export`.
 
-## 1. Brief
+The first three are **interactive**: the `new-video` skill runs them in the main session with the user. `/video-next` refuses to start while one of them is open and points back to `/new-video <slug>`. Every later stage runs autonomously in a fresh `stage-runner`.
 
-- Skill: `video-brief`
-- Input: `project.yaml`, user idea, brand kit
-- Output: `brief.md`
+The song always exists already. There is no lyric-writing or song-generation stage.
+
+## 1. Setup
+
+- Skill: `new-video`
+- Input: project data, pasted lyrics, the song at `audio/song.wav` and the vocal stem at `audio/stems/vocals.wav`
+- Output: `project.yaml`, `lyrics.txt`, `song.json`, `audio/song.wav`, `audio/stems/vocals.wav` (optional)
 
 ```bash
-npm run cli -- stage-start projects/my-video brief
-# invoke the video-brief skill (and grilling when the idea is fuzzy)
-npm run cli -- stage-done projects/my-video brief --outputs brief.md
+npm run cli -- new my-video --budget 50 --title "My Video" --visual fal
+# user pastes lyrics → lyrics.txt with section tags
+# user drops audio/song.wav and audio/stems/vocals.wav
+npm run cli -- import-song projects/my-video
+npm run cli -- stage-done projects/my-video setup --outputs lyrics.txt,song.json,audio/song.wav
 ```
 
-Completion: topic, source, audience, length, formats, style, constraints, success criteria; budget and formats match `project.yaml`.
+`import-song` uses WAV files as they are and converts another format with the same name (`song.mp3`, `stems/vocals.flac`, …) to 48 kHz WAV. It merges path, duration, and stem status into `song.json`, keeping the title, artist, language, and rights the skill wrote, and warns when stem and mix differ in length. Pass `--song <file>` or `--vocals <file>` to import from elsewhere. Loudness normalization stays a separate, optional step: `npm run cli -- normalize-audio`.
 
-## 2. Treatment
+Completion: every lyric line under a confirmed section tag, `audio/song.wav` exists, `song.json` records language and rights.
 
-- Skill: `video-treatment`
+## 2. Brief
+
+- Skills: `grilling`, `video-brief`
+- Input: `project.yaml`, `lyrics.txt`, `song.json`, the user's answers, brand kit
+- Output: `brief.md`
+
+Completion: topic, source, audience, length, formats, style, constraints, success criteria; budget and formats match `project.yaml`; the grilling frontier is empty.
+
+## 3. Treatment
+
+- Skills: `grilling`, `video-treatment`
 - Input: `brief.md`, `lyrics.txt`, brand kit
 - Output: `treatment.md`
 
-Completion: one-sentence core idea, visual world, section-by-section dramaturgy, explicit shot mix.
+Completion: one-sentence core idea, visual world, section-by-section dramaturgy, explicit shot mix; the user accepted it.
 
-## 3. Lyrics
-
-- Skill: `lyrics-writer`
-- Input: brief, treatment
-- Output: `lyrics.txt`, `suno-style.txt`
-
-Completion: every line under a section tag, original lyrics, concise style prompt, language matches the brief.
-
-## 4. Song
-
-- Skill: `suno-song`
-- Input: lyrics, style prompt, Suno MCP or an imported file
-- Output: `audio/song.wav`, `song.json`, optional stems
-
-Completion: audio plays, `song.json` records source/license/duration/BPM/variant choice, no media committed.
-
-To import an existing Suno song, copy `audio/song.wav` and `audio/stems/vocals.wav`, write `song.json`, then skip the `lyrics` and `song` stages. See the existing-song quickstart in the [README](../README.md#2-new-project-with-an-existing-suno-song).
-
-## 5. Audio analysis
+## 4. Audio analysis
 
 - Skill: `audio-analysis`
 - Input: `audio/song.wav`, `audio/stems/vocals.wav` (optional), `lyrics.txt`
@@ -75,7 +73,7 @@ npm run cli -- validate projects/my-video
 
 Completion: timing validates; sections cover the song; low-confidence boundaries reviewed; overrides untouched.
 
-## 6. Style & character bible
+## 5. Style & character bible
 
 - Skills: `style-bible`, `character-bible`
 - Input: brief, treatment, brand kit, model config
@@ -83,7 +81,7 @@ Completion: timing validates; sections cover the song; low-confidence boundaries
 
 Completion: style validates; every storyboard style key exists; every recurring character has a sheet and reference image; art-director passes.
 
-## 7. Storyboard
+## 6. Storyboard
 
 - Skill: `storyboard`
 - Input: treatment, effective timing, style, characters
@@ -96,7 +94,7 @@ npm run cli -- contact-sheet projects/my-video
 
 Completion: schema, anchors, coverage, references, source rules, highlights, and chaining all pass; contact sheet exists.
 
-## 8. Asset production
+## 7. Asset production
 
 - Skills: `remotion-motion`, `ai-clips`, `footage`
 - Input: storyboard, style, characters, model config
@@ -111,7 +109,7 @@ Roles resolve to the project's provider. A Higgsfield project uses the `alternat
 
 Completion: every shot has its source asset or a documented reason; every character shot used references; manifest and budget reconciled; art-director passes.
 
-## 9. Assembly
+## 8. Assembly
 
 - Skill: `assembly-render`
 - Input: validated storyboard, assets, audio
@@ -126,7 +124,7 @@ npm run cli -- render projects/my-video --format 1x1
 
 Completion: preview plays with the song; master is 1080p30 H.264; derivatives use designed layouts; no clipping.
 
-## 10. QA & export
+## 9. QA & export
 
 - Skill: `video-qa`
 - Input: all renders, manifest, state

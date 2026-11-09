@@ -14,8 +14,8 @@ license: MIT
 
 ## Inputs
 
-- `audio/song.wav` (or an imported song)
-- `audio/stems/vocals.wav` when Suno stems exist
+- `audio/song.wav`, imported by `npm run cli -- import-song`
+- `audio/stems/vocals.wav` when the user supplied a vocal stem
 - `lyrics.txt` — the authoritative text and section tags
 - `timing.overrides.json` — user-owned corrections; never overwrite it
 
@@ -27,8 +27,7 @@ license: MIT
    `uv sync --extra asr --extra stems`
 2. Run the analyzer from the repository root:
    `cd scripts/audio-analysis && uv run python analyze.py --project ../../projects/<slug>`
-   Pass `--vocals ../../projects/<slug>/audio/stems/vocals.wav` when a stem exists. Pass `--device cuda` on the RTX machine.
-   Use the vocal stem when one exists (`--vocals ../../projects/<slug>/audio/stems/vocals.wav`). Make sure `song.json` has `language`; pass `--language` otherwise. The analyzer aligns lyrics first: text and order come from `lyrics.txt`, ASR supplies only timestamps, and section boundaries are derived from the aligned lines.
+   Pass `--vocals ../../projects/<slug>/audio/stems/vocals.wav` when a stem exists. Pass `--device cuda` on the RTX machine. Make sure `song.json` has `language`; pass `--language` otherwise. The analyzer aligns lyrics first: text and order come from `lyrics.txt`, ASR supplies only timestamps, and section boundaries are derived from the aligned lines.
 3. Read `timing.report.md`. Check the section table, low-confidence boundaries, low-confidence lines (`meta.lineConfidence` < 0.6), and lines placed without an ASR anchor. Prefer lines ≥ 0.8 for lip-sync.
 4. If a boundary or word is wrong, edit `timing.overrides.json`. The loader merges it over `timing.json` and never writes it. Do not edit `timing.json` by hand unless the analysis is fundamentally wrong.
 5. Validate with `npm run cli -- validate projects/<slug>`. This writes `timing.effective.json` and resolves the storyboard.

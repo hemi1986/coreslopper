@@ -1,7 +1,8 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { basename, dirname, extname, join, resolve } from 'node:path';
-import { ensureDir, loadProject, repoRoot, ValidationError } from '@coreslopper/core';
+import { ensureDir, loadProject, repoRoot, ValidationError, writeJsonAtomic } from '@coreslopper/core';
 
 function resolveBinary(name: 'ffmpeg' | 'ffprobe'): string {
   const local = join(repoRoot(), '.tools', 'ffmpeg', name);
@@ -106,6 +107,104 @@ export async function normalizeAudio(projectDir: string, input: string, output?:
   );
   console.log(`Normalized audio written to ${destination}`);
   return destination;
+}
+
+const AUDIO_EXTENSIONS = new Set(['.wav', '.mp3', '.flac', '.aif', '.aiff', '.m4a', '.ogg', '.opus']);
+
+/**
+ * Find `<dir>/<stem>.<ext>`. A `<stem>.wav` always wins; otherwise exactly one
+ * file in another audio format may exist, and it will be converted to WAV.
+ */
+export function findSourceAudio(dir: string, stem: 'song' | 'vocals'): string | undefined {
+  if (!existsSync(dir)) return undefined;
+  const matches = readdirSync(dir).filter((file) => {
+    const extension = extname(file).toLowerCase();
+    return AUDIO_EXTENSIONS.has(extension) && basename(file, extname(file)).toLowerCase() === stem;
+  });
+  const wav = matches.find((file) => file === `${stem}.wav`);
+  if (wav) return join(dir, wav);
+  if (matches.length > 1) {
+    throw new ValidationError(`More than one ${stem} file in ${dir}: ${matches.join(', ')}. Keep exactly one.`);
+  }
+  return matches[0] ? join(dir, matches[0]) : undefined;
+}
+
+export interface ImportSongOptions {
+  song?: string;
+  vocals?: string;
+}
+
+/** Bring an audio file to `destination` as 48 kHz stereo WAV; a file already there is left untouched. */
+function toWav(ffmpeg: string, source: string, destination: string): void {
+  if (resolve(source) === resolve(destination)) return;
+  execFileSync(ffmpeg, ['-y', '-loglevel', 'error', '-i', source, '-ar', '48000', '-ac', '2', destination], {
+    stdio: 'inherit',
+  });
+  console.log(`Converted ${basename(source)} to ${destination}`);
+}
+
+/**
+ * Register the finished song. The user puts the mix at audio/song.wav and the
+ * vocal stem at audio/stems/vocals.wav; another audio format (song.mp3,
+ * stems/vocals.flac, ...) is converted to those paths. A WAV is used as is,
+ * without loudness changes. The result is merged into song.json, keeping the
+ * metadata the setup skill wrote.
+ */
+export async function importSong(projectDir: string, options: ImportSongOptions = {}): Promise<void> {
+  const ffmpeg = resolveBinary('ffmpeg');
+  const project = await loadProject(projectDir);
+  const audioDir = join(project.paths.root, 'audio');
+  const stemsDir = join(audioDir, 'stems');
+  const songWav = join(audioDir, 'song.wav');
+  const vocalsWav = join(stemsDir, 'vocals.wav');
+
+  const song = options.song ? resolve(options.song) : findSourceAudio(audioDir, 'song');
+  if (!song || !existsSync(song)) {
+    throw new ValidationError(
+      `No song found. Put the finished mix at ${songWav} (or song.mp3/.flac/.aiff/.m4a/.ogg next to it) or pass --song <file>.`,
+    );
+  }
+  const vocals = options.vocals ? resolve(options.vocals) : findSourceAudio(stemsDir, 'vocals');
+  if (vocals && !existsSync(vocals)) throw new ValidationError(`Missing vocal stem: ${vocals}`);
+
+  await ensureDir(audioDir);
+  toWav(ffmpeg, song, songWav);
+  const duration = probeDuration(songWav);
+
+  if (vocals) {
+    await ensureDir(stemsDir);
+    toWav(ffmpeg, vocals, vocalsWav);
+    const vocalsDuration = probeDuration(vocalsWav);
+    if (Math.abs(vocalsDuration - duration) > 0.5) {
+      console.warn(
+        `Warning: the vocal stem is ${vocalsDuration.toFixed(2)} s, the song ${duration.toFixed(2)} s. Export both from the same session so they line up.`,
+      );
+    }
+  } else {
+    console.warn(`No vocal stem at ${vocalsWav}; audio analysis will separate vocals with Demucs.`);
+  }
+
+  let existing: Record<string, unknown> = {};
+  if (existsSync(project.paths.song)) {
+    try {
+      existing = JSON.parse(await readFile(project.paths.song, 'utf8')) as Record<string, unknown>;
+    } catch {
+      throw new ValidationError(`song.json is not valid JSON: ${project.paths.song}`);
+    }
+  }
+  await writeJsonAtomic(project.paths.song, {
+    ...existing,
+    source: 'import',
+    path: 'audio/song.wav',
+    duration: Number(duration.toFixed(3)),
+    stems: Boolean(vocals),
+    ...(vocals ? { vocals: 'audio/stems/vocals.wav' } : {}),
+    sourceFiles: {
+      song: basename(song),
+      ...(vocals ? { vocals: basename(vocals) } : {}),
+    },
+  });
+  console.log(`Song registered: ${duration.toFixed(2)} s${vocals ? ' with vocal stem' : ''}. song.json updated.`);
 }
 
 export async function importFootage(

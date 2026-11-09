@@ -1,13 +1,13 @@
 # coreslopper
 
-An open-source, Claude Code-native workflow for producing music videos from a brief to final renders. Creative work is done by agent skills; mechanical work is done by tested TypeScript and Python scripts. The repository is both the workflow and the home of its video projects.
+An open-source, Claude Code-native workflow for producing music videos for an existing song, from a brief to final renders. Creative work is done by agent skills; mechanical work is done by tested TypeScript and Python scripts. The repository is both the workflow and the home of its video projects.
 
 ## Principles
 
 - **Tool-independent core.** Skills live in `.claude/skills/<name>/SKILL.md` with minimal frontmatter (`name`, `description`, optional `license`). `AGENTS.md` describes the project; `CLAUDE.md` imports it and adds Claude Code specifics.
-- **Creative vs. mechanical.** Ideas, lyrics, treatments, storyboards, and prompts are agent work. Audio analysis, validation, caching, budget checks, rendering, and export are scripts.
+- **Creative vs. mechanical.** Ideas, treatments, storyboards, and prompts are agent work. Song import, audio analysis, validation, caching, budget checks, rendering, and export are scripts.
 - **Flexible image source.** A shot can be motion graphics, an AI clip, real footage, or mixed. The decision is made per shot in the storyboard.
-- **Autonomous by default.** There are no creative approval gates. `review_mode: auto` runs the pipeline; it stops only for budget, missing credentials, or an unrecoverable validation failure. Quality comes from upfront grilling, automated critics, schema validation, and deterministic rendering.
+- **Interactive setup, autonomous pipeline.** The `new-video` skill collects project data, lyrics, and the song, then grills the user into brief and treatment. After that there are no creative approval gates: `review_mode: auto` runs the pipeline; it stops only for budget, missing credentials, or an unrecoverable validation failure. Quality comes from upfront grilling, automated critics, schema validation, and deterministic rendering.
 - **Resumable and thrifty.** `state.json` tracks stages, hashes, attempts, and spend. Generated assets are cached by a hash of model, prompt, seed, references, and params.
 - **No secrets.** API keys live in environment variables; `.env.example` documents them. Generated media and copyrighted material are gitignored.
 - **Open source.** MIT for our code and docs. Remotion is source-available and documented separately.
@@ -22,7 +22,7 @@ cd my-video
 claude
 ```
 
-The wizard checks and optionally installs Node-adjacent tools, validates optional fal.ai and Higgsfield credentials, configures the Suno MCP server, and creates the first project. In Claude Code, run `/mcp` once and then `/video-next my-video`. Use `--yes` for a non-interactive run and see `docs/onboarding.md` for all flags.
+The wizard checks and optionally installs Node-adjacent tools, validates optional fal.ai and Higgsfield credentials, and creates the first project. In Claude Code, run `/new-video my-video` to add lyrics, import the song, and write the brief, then `/video-next my-video`. Use `--yes` for a non-interactive run and see `docs/onboarding.md` for all flags.
 
 Work in this repository instead:
 
@@ -42,14 +42,14 @@ Create a real project:
 npm run cli -- new my-video --budget 50
 ```
 
-Then open Claude Code and run `/video-next my-video`.
+Or open Claude Code and run `/new-video`, which asks for the project data itself. Then run `/video-next my-video`.
 
 ## Repository map
 
 ```text
 .claude/
   skills/          Own stage skills + vendored Matt Pocock skills
-  commands/        /new-video, /video-next, /video-status
+  commands/        /video-next, /video-status
   agents/          art-director, qa-checker, stage-runner
   hooks/           PostToolUse validation for project artifacts
   settings.json    Hook registration
@@ -65,7 +65,7 @@ packages/
   remotion/        MusicVideo composition, motion components, effects, 3D
 schema/            Generated JSON Schema for cross-language validation
 scripts/           Audio analysis (Python/uv), fixture generators, runtime build
-templates/project/ Project template used by /new-video
+templates/project/ Project template used by the new-video skill
 brand/example/     Neutral synthwave/cyberpunk brand kit with OFL fonts
 projects/          Video projects (media gitignored)
 runtime/           Generated npm runtime snapshot (gitignored)
@@ -76,18 +76,19 @@ dist/              Generated npx bundle (gitignored)
 
 | # | Stage ID | Skill(s) | Output | Automated check |
 |---|---|---|---|---|
-| 1 | `brief` | `video-brief` | `brief.md` | Budget/formats present; brief critic |
-| 2 | `treatment` | `video-treatment` | `treatment.md` | Critic vs. brief; bounded revisions |
-| 3 | `lyrics` | `lyrics-writer` | `lyrics.txt`, `suno-style.txt` | Section tags; lyric critic |
-| 4 | `song` | `suno-song` | `song.json`, `audio/song.wav`, stems | Variant scoring or import; budget |
-| 5 | `audio-analysis` | `audio-analysis` | `timing.json`, `timing.report.md` | Schema; confidence flags |
-| 6 | `style-character` | `style-bible`, `character-bible` | `style.yaml`, `characters.yaml`, refs | Schema; image QA |
-| 7 | `storyboard` | `storyboard` | `storyboard.yaml`, `storyboard.md`, contact sheet | Schema, anchors, coverage, refs, source rules |
-| 8 | `assets` | `remotion-motion`, `ai-clips`, `footage` | Components, keyframes, clips, footage | Per-batch cost + QA; cache |
-| 9 | `assembly` | `assembly-render` | `renders/preview-16x9.mp4` | Preview; sync/legibility |
-| 10 | `qa-export` | `video-qa` | `review/report.md`, all formats | Sync, readability, determinism |
+| 1 | `setup` ✋ | `new-video` | `project.yaml`, `lyrics.txt`, `song.json`, `audio/song.wav`, vocal stem | User confirms section tags; `import-song` |
+| 2 | `brief` ✋ | `grilling`, `video-brief` | `brief.md` | Budget/formats present; grilling frontier empty |
+| 3 | `treatment` ✋ | `grilling`, `video-treatment` | `treatment.md` | Critic vs. brief; user accepts |
+| 4 | `audio-analysis` | `audio-analysis` | `timing.json`, `timing.report.md` | Schema; confidence flags |
+| 5 | `style-character` | `style-bible`, `character-bible` | `style.yaml`, `characters.yaml`, refs | Schema; image QA |
+| 6 | `storyboard` | `storyboard` | `storyboard.yaml`, `storyboard.md`, contact sheet | Schema, anchors, coverage, refs, source rules |
+| 7 | `assets` | `remotion-motion`, `ai-clips`, `footage` | Components, keyframes, clips, footage | Per-batch cost + QA; cache |
+| 8 | `assembly` | `assembly-render` | `renders/preview-16x9.mp4` | Preview; sync/legibility |
+| 9 | `qa-export` | `video-qa` | `review/report.md`, all formats | Sync, readability, determinism |
 
-No stage waits for a human. A stage can stop the pipeline only on a hard stop: budget exceeded, missing credentials, or a validation/QA failure that cannot be fixed after its retries.
+The song always exists already; the workflow never writes lyrics or generates music. ✋ marks the **interactive stages**: the `new-video` skill runs them in the main session with the user (project data, lyrics, song import, grilling). `/video-next` refuses to start while one is open.
+
+From `audio-analysis` on, no stage waits for a human. A stage can stop the pipeline only on a hard stop: budget exceeded, missing credentials, or a validation/QA failure that cannot be fixed after its retries.
 
 ## Context discipline
 
@@ -122,6 +123,7 @@ npm run schema
 | `npm run cli -- new <slug> --budget <usd>` | Create a project from the template. |
 | `npm run cli -- generate <project> --batch <file>` | Run a cached, budget-checked generation batch. |
 | `npm run cli -- qa <project> [--determinism <frame>]` | Write `review/report.md`; optionally check frame hashes. |
+| `npm run cli -- import-song <project>` | Register `audio/song.wav` and `audio/stems/vocals.wav` in `song.json`; converts other formats. |
 | `npm run cli -- normalize-audio <project> --input <file>` | Normalize audio to −14 LUFS / −1 dBTP. |
 | `npm run cli -- footage <project> --input <file> --name <name>` | Normalize a footage proxy. |
 | `npm run cli -- frame <project> --input <clip> --position last` | Extract a review or chaining frame. |
@@ -130,14 +132,14 @@ npm run schema
 | `npm run cli -- estimate --role <role> --units <n>` | Check a generation cost against the budget. |
 | `npm run cli -- validate-file <file>` | Validate one changed artifact (used by the hook). |
 | `npm run cli -- doctor` | Check workspace, tools, fonts, Remotion, and keys. |
-| `npx coreslopper init [dir]` | Create a workspace, install tools, configure fal.ai, Higgsfield, and Suno. |
+| `npx coreslopper init [dir]` | Create a workspace, install tools, configure fal.ai and Higgsfield. |
 | `npx coreslopper@latest update [dir]` | Update a workspace to the latest workflow; keeps local edits (`--dry-run`, `--force`). |
 | `npx coreslopper doctor` | Check a workspace from outside it. |
 | `npx coreslopper new <slug> --budget <usd>` | Create a project inside a workspace. |
 | `npm run build` | Build `runtime/` and the npx bundle in `dist/`. |
 | `npm run pack:check` | Build and inspect the npm tarball. |
 
-In Claude Code: `/new-video`, `/video-next`, `/video-status`.
+In Claude Code: `/new-video` (skill), `/video-next`, `/video-status`.
 
 ## Distribution
 
@@ -145,7 +147,7 @@ The root package is published as `coreslopper`. `npm run build` copies the track
 
 ## Skills
 
-Own skills: `video-brief`, `video-treatment`, `lyrics-writer`, `suno-song`, `audio-analysis`, `style-bible`, `character-bible`, `storyboard`, `remotion-motion`, `ai-clips`, `footage`, `assembly-render`, `video-qa`.
+Own skills: `new-video`, `video-brief`, `video-treatment`, `audio-analysis`, `style-bible`, `character-bible`, `storyboard`, `remotion-motion`, `ai-clips`, `footage`, `assembly-render`, `video-qa`.
 
 Vendored from Matt Pocock (MIT, see `docs/THIRD_PARTY.md`): `grill-me`, `grilling`, `writing-for-agents`, `domain-modeling`.
 
@@ -179,8 +181,8 @@ CI runs without API keys and uses the mock provider. GPU tests are opt-in.
 - `docs/providers.md` — provider selection, credentials, batches, budget, and model roles.
 - `docs/adr/` — architecture decision records.
 - `docs/THIRD_PARTY.md` — vendored skills, licenses, fonts, providers.
-- `docs/mcp.md` — Suno and optional fal.ai MCP configuration; provider adapters.
+- `docs/mcp.md` — optional exploration MCP servers; provider adapters.
 
 ## License
 
-MIT. Remotion is source-available under its own license; see `docs/THIRD_PARTY.md`. Do not commit generated Suno/fal.ai/Higgsfield media or copyrighted music to this repository.
+MIT. Remotion is source-available under its own license; see `docs/THIRD_PARTY.md`. Do not commit songs, stems, generated fal.ai/Higgsfield media, or copyrighted music to this repository.

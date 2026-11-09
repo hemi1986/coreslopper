@@ -34,15 +34,8 @@ export const ProjectConfigSchema = z.object({
       video: ProviderKindSchema.default('mock'),
       /** Lip-sync can use a different provider from the rest of the video. */
       lipsync: ProviderKindSchema.optional(),
-      song: z.enum(['suno', 'import', 'mock']).default('import'),
     })
-    .default({ image: 'mock', video: 'mock', song: 'import' }),
-  song: z
-    .object({
-      variants: z.number().int().min(1).max(4).default(2),
-      pinned_variant: z.string().optional(),
-    })
-    .default({ variants: 2 }),
+    .default({ image: 'mock', video: 'mock' }),
   brand: z.string().min(1).default('example'),
   models: z.record(z.string(), z.unknown()).default({}),
 });
