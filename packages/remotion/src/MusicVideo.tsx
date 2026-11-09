@@ -1,11 +1,16 @@
+import { withResolvedPalette } from '@coreslopper/core/browser';
+import { useMemo } from 'react';
 import { AbsoluteFill, Audio, Sequence, staticFile } from 'remotion';
 import { ensureFonts } from './fonts';
 import { Grain } from './components/Grain';
 import { ShotRenderer } from './components/ShotRenderer';
 import type { VideoProps } from './types';
 
-export function MusicVideo(props: VideoProps) {
-  ensureFonts();
+export function MusicVideo(input: VideoProps) {
+  ensureFonts(input.fonts);
+  // Map style.yaml palettes without the standard role names (roles: or name hints).
+  const style = useMemo(() => withResolvedPalette(input.style), [input.style]);
+  const props = { ...input, style };
 
   return (
     <AbsoluteFill style={{ backgroundColor: props.style.palette.background }}>

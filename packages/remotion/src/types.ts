@@ -2,6 +2,15 @@ import type { CharacterBible, ResolvedShot, StyleBible, Timing } from '@coreslop
 
 export type FormatId = '16x9' | '9x16' | '1x1' | '4x5';
 
+/** A brand font served from the public dir. */
+export interface BrandFont {
+  family: string;
+  url: string;
+  /** CSS font-weight value or range, e.g. "400" or "100 900". */
+  weight: string;
+  style: 'normal' | 'italic';
+}
+
 export interface VideoProps extends Record<string, unknown> {
   project: {
     slug: string;
@@ -17,6 +26,8 @@ export interface VideoProps extends Record<string, unknown> {
   characters: CharacterBible;
   timing: Timing;
   shots: ResolvedShot[];
+  /** Brand fonts to load; when empty the example brand fonts are loaded. */
+  fonts?: BrandFont[];
 }
 
 const fixtureTiming: Timing = {

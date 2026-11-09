@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { ValidationError, formatZodError } from './errors.js';
 import { mergeTiming } from './timing.js';
 import {
+  BrandKitSchema,
   CharacterBibleSchema,
   ModelsConfigSchema,
   ProjectConfigSchema,
@@ -14,6 +15,7 @@ import {
   StyleBibleSchema,
   TimingOverridesSchema,
   TimingSchema,
+  type BrandKit,
   type CharacterBible,
   type ModelsConfig,
   type ProjectConfig,
@@ -241,4 +243,31 @@ export type Defaults = z.infer<typeof DefaultsSchema>;
 
 export async function loadDefaults(root = repoRoot()): Promise<Defaults> {
   return readYamlFile(join(root, 'config', 'defaults.yaml'), DefaultsSchema);
+}
+
+export interface ResolvedBrand {
+  kit: BrandKit;
+  /** Absolute directory that holds brand.yaml; font and logo paths are relative to it. */
+  dir: string;
+  /** `project` for `<project>/brand/brand.yaml`, `repo` for `brand/<id>/brand.yaml`. */
+  origin: 'project' | 'repo';
+}
+
+/**
+ * Brand kit for a project: a project-local `brand/brand.yaml` overrides the
+ * shared `brand/<project.brand>/brand.yaml` from the workspace. Returns
+ * undefined when neither exists.
+ */
+export async function loadBrand(projectDir: string, brandId?: string, root = repoRoot()): Promise<ResolvedBrand | undefined> {
+  const local = join(resolve(projectDir), 'brand');
+  if (existsSync(join(local, 'brand.yaml'))) {
+    return { kit: await readYamlFile(join(local, 'brand.yaml'), BrandKitSchema), dir: local, origin: 'project' };
+  }
+  if (brandId) {
+    const shared = join(root, 'brand', brandId);
+    if (existsSync(join(shared, 'brand.yaml'))) {
+      return { kit: await readYamlFile(join(shared, 'brand.yaml'), BrandKitSchema), dir: shared, origin: 'repo' };
+    }
+  }
+  return undefined;
 }
