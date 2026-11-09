@@ -54,12 +54,12 @@ license: MIT
    ```
 4. Run `npm run cli -- estimate --role <role> --units <n> --project projects/<slug>` and check the batch cap. If the batch exceeds it, split the batch or ask before spending.
 5. Run `npm run cli -- generate projects/<slug> --batch <file>` with the project provider. The runner checks the budget, computes a cache key, reuses cached assets, writes `assets/manifest.jsonl`, and records spend.
-6. Inspect the keyframe at full size and the clip at first/middle/last frame with the art-director critic. If a character drifts, regenerate with the same references and a corrected prompt; do not ignore it.
+6. Inspect every keyframe at full resolution with the art-director critic **before** animating it; thumbnails (400–640 px) miss anatomy errors. Count hands, arms, and legs, check where bodies overlap, and check that the background matches the shot's location. A flawed keyframe yields a flawed clip, so fix it first. If the defect is a hand, limb, or body-overlap error, change the composition (see the composition rules in `.claude/skills/storyboard/SKILL.md`) instead of rerolling the same framing. Then inspect the clip at first/middle/last frame. If a character drifts, regenerate with the same references and a corrected prompt; do not ignore it.
 7. Use frame chaining only when the storyboard enables it. Extract the last frame of the previous clip with
    `npm run cli -- frame <project> --input <previous-clip> --position last --out <path>`
    and pass it as the first reference of the next clip. To land on a planned frame, use `firstLastFrameToVideo` with that keyframe as the second reference.
 8. **Lip-sync shots** (`lipSync` set on the shot):
-   1. Generate a dedicated keyframe with `editImage` from the character sheet: face frontal or slight 3/4, evenly lit, mouth slightly open, face filling at least a third of the frame. Never feed the multi-view sheet itself.
+   1. Generate a dedicated keyframe with `editImage` from the character sheet: face frontal or slight 3/4, evenly lit, mouth slightly open, face filling at least a third of the frame, modest clothing (high neckline, covered shoulders). Never feed the multi-view sheet itself. Keep the prompt neutral; words such as "sexy", "intimate", or "seductive" trigger the provider's content moderation.
    2. Resolve the shot's start and end anchors to seconds from `timing.effective.json` and cut the vocal segment:
       `npm run cli -- audio-segment projects/<slug> --start <s> --end <s> --name <shot-id>`
       (source defaults to `audio/stems/vocals.wav`; use `--source audio/song.wav` only if there is no vocal stem).
@@ -74,6 +74,7 @@ license: MIT
       }
       ```
       Cost is billed by the audio length; keep each segment ≤ 30 s and as tight as the sung line.
+      A `422 content_policy_violation` (`partner_validation_failed` or a `sexual` category) means moderation rejected the image or prompt; the call is not billed. Retry once with a more covered close-up and a neutral prompt. If it fails again, stop retrying that shot, because repeated rejections can flag the account. Use a non-lip-synced clip as a stand-in and report it.
    4. The clip must start exactly at the shot start; do not trim its head in Remotion. Its audio is muted; the song stays the only audio source. Check sync at first/middle/last frame against the lyric word timestamps.
 9. Update the storyboard's `asset` path or layer asset. Re-run `npm run cli -- validate projects/<slug>`.
 10. Update the state when the asset batch is complete.
@@ -90,6 +91,9 @@ license: MIT
 ## Common failures
 
 - Text-only character prompts.
+- Animating a keyframe with an extra limb or merged hands because it was only checked as a thumbnail.
+- Rerolling a hand-contact or group shot again and again instead of changing its composition.
+- Expecting 1080p from Kling 3.0 Standard: it returns 1280×720, so check `notes` in `config/models.yaml` for the output resolution before choosing a hero-shot role.
 - Re-generating a cached shot because the prompt was reworded without changing the hash inputs.
 - Lip-syncing from the full mix instead of the vocal stem, or with a segment that is offset from the shot start.
 - Ignoring native audio in the generated clip; the song is the only audio source.
