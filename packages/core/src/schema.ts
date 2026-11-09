@@ -7,7 +7,14 @@ export const FormatSchema = z.object({
   fps: z.number().int().positive().default(30),
 });
 
-export const ProviderKindSchema = z.enum(['fal', 'higgsfield', 'mock']);
+/** Every generation provider. `comfyui` is a local backend for video clips only. */
+export const ProviderKindSchema = z.enum(['fal', 'higgsfield', 'comfyui', 'mock']);
+/** Providers that can generate and edit stills. */
+export const ImageProviderKindSchema = z.enum(['fal', 'higgsfield', 'mock']);
+/** Providers that can generate video clips. */
+export const VideoProviderKindSchema = z.enum(['fal', 'higgsfield', 'comfyui', 'mock']);
+/** Providers that can lip-sync a face to a vocal segment. */
+export const LipSyncProviderKindSchema = z.enum(['fal', 'higgsfield', 'mock']);
 
 export const ProjectConfigSchema = z.object({
   version: z.literal(1),
@@ -30,10 +37,13 @@ export const ProjectConfigSchema = z.object({
   }),
   providers: z
     .object({
-      image: ProviderKindSchema.default('mock'),
-      video: ProviderKindSchema.default('mock'),
-      /** Lip-sync can use a different provider from the rest of the video. */
-      lipsync: ProviderKindSchema.optional(),
+      image: ImageProviderKindSchema.default('mock'),
+      video: VideoProviderKindSchema.default('mock'),
+      /**
+       * Lip-sync can use a different provider from the rest of the video.
+       * Defaults to `video`, or to `fal` when `video` is `comfyui`.
+       */
+      lipsync: LipSyncProviderKindSchema.optional(),
     })
     .default({ image: 'mock', video: 'mock' }),
   brand: z.string().min(1).default('example'),
@@ -371,3 +381,5 @@ export type ModelRoleVariant = z.infer<typeof ModelRoleVariantSchema>;
 export type ModelRole = z.infer<typeof ModelRoleSchema>;
 export type ModelsConfig = z.infer<typeof ModelsConfigSchema>;
 export type ProviderKind = z.infer<typeof ProviderKindSchema>;
+export type ImageProviderKind = z.infer<typeof ImageProviderKindSchema>;
+export type VideoProviderKind = z.infer<typeof VideoProviderKindSchema>;

@@ -64,6 +64,7 @@ export class GenerationRunner {
     const audioHash = request.audio ? await hashFile(request.audio) : undefined;
     const seed = request.seed ?? defaultSeed(request);
     const params = request.params ?? {};
+    const fingerprint = await this.options.provider.fingerprint?.(request.operation, request.model);
     const hash = hashObject({
       operation: request.operation,
       provider: this.options.provider.name,
@@ -77,6 +78,7 @@ export class GenerationRunner {
       params,
       references: referenceHashes,
       ...(audioHash ? { audio: audioHash } : {}),
+      ...(fingerprint ? { fingerprint } : {}),
     });
 
     const cacheDir = join(this.options.cacheDir, hash);
@@ -113,10 +115,13 @@ export class GenerationRunner {
         outputDir: cacheDir,
         idempotencyKey: hash,
       };
-      if (request.operation === 'generateImage') output = await this.options.provider.generateImage(input);
-      else if (request.operation === 'editImage') output = await this.options.provider.editImage(input);
-      else if (request.operation === 'lipSync') output = await this.options.provider.lipSync(input);
-      else output = await this.options.provider.imageToVideo(input);
+      const provider = this.options.provider;
+      if (request.operation === 'generateImage') output = await provider.generateImage(input);
+      else if (request.operation === 'editImage') output = await provider.editImage(input);
+      else if (request.operation === 'textToVideo') output = await provider.textToVideo(input);
+      else if (request.operation === 'firstLastFrameToVideo') output = await provider.firstLastFrameToVideo(input);
+      else if (request.operation === 'lipSync') output = await provider.lipSync(input);
+      else output = await provider.imageToVideo(input);
     } catch (error) {
       const failed: GenerationResult = {
         id: `gen_${hash.slice(0, 12)}`,

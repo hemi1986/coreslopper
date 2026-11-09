@@ -13,6 +13,17 @@
 #   send_seed: true            send the generation seed to models that support it
 #   send_negative_prompt: true send negative_prompt to models that support it
 #   reference_field: <name>    body field for uploaded edit references
+#   end_reference_field: <name> body field for the end frame (firstLastFrameToVideo)
+#
+# ComfyUI (local, providers.video: comfyui): `model` is the name of a workflow
+# exported with "Export (API)" into comfyui/workflows/<model>.json. Local runs
+# cost nothing, so comfyui entries need no pricing. Adapter params:
+#   fps: 24            frame rate the workflow renders at (sets cs_fps if present)
+#   frame_step: 8      round frame counts to step*n+1 (LTX needs 8n+1)
+#   size_multiple: 32  round width/height to a multiple (LTX needs 32)
+#   width/height       override the project's master size
+#   node_inputs        {"<node title or id>.<input>": value} for anything else
+# See comfyui/README.md for the node titles.
 version: 1
 last_verified: "2026-11-08 (planning estimates; verify before paid use)"
 
@@ -139,6 +150,14 @@ roles:
           usd: 0.063
         maxDuration: 15
         notes: Kling 3.0 Standard. Verify the current price and duration limit.
+      comfyui:
+        model: ltx-i2v
+        params:
+          fps: 24
+          frame_step: 8
+          size_multiple: 32
+        maxDuration: 10
+        notes: Local LTX image-to-video workflow. Duration limit depends on the workflow and VRAM.
   video.image_to_video.fast:
     provider: fal
     model: kling/v4/flash/image-to-video
@@ -161,6 +180,14 @@ roles:
           usd: 0.042
         maxDuration: 10
         notes: Kling 2.5 Turbo Standard. 5 s or 10 s only.
+      comfyui:
+        model: ltx-i2v
+        params:
+          fps: 24
+          frame_step: 8
+          size_multiple: 32
+        maxDuration: 10
+        notes: Local LTX image-to-video workflow. Duration limit depends on the workflow and VRAM.
   video.image_to_video.premium:
     provider: fal
     model: bytedance/seedance-2.5/us/image-to-video
@@ -185,6 +212,14 @@ roles:
           usd: 0.207
         maxDuration: 30
         notes: Seedance 2.5 list price at 1080p; discounts may lower it.
+      comfyui:
+        model: ltx-i2v
+        params:
+          fps: 24
+          frame_step: 8
+          size_multiple: 32
+        maxDuration: 10
+        notes: Local LTX image-to-video workflow. Duration limit depends on the workflow and VRAM.
   video.image_to_video.budget:
     provider: fal
     model: alibaba/wan-3.0/image-to-video
@@ -210,6 +245,14 @@ roles:
           usd: 0.05
         maxDuration: 30
         notes: Wan 3.0 at 720p. Planning estimate.
+      comfyui:
+        model: ltx-i2v
+        params:
+          fps: 24
+          frame_step: 8
+          size_multiple: 32
+        maxDuration: 10
+        notes: Local LTX image-to-video workflow. Duration limit depends on the workflow and VRAM.
 
   video.premium.veo:
     provider: fal
@@ -236,6 +279,42 @@ roles:
           usd: 0.12
         maxDuration: 8
         notes: Veo 3.1 Fast supports 4, 6, or 8 second clips.
+      comfyui:
+        model: ltx-i2v
+        params:
+          fps: 24
+          frame_step: 8
+          size_multiple: 32
+        maxDuration: 10
+        notes: Local LTX image-to-video workflow. Duration limit depends on the workflow and VRAM.
+
+  video.text_to_video:
+    provider: comfyui
+    model: ltx-t2v
+    params:
+      fps: 24
+      frame_step: 8
+      size_multiple: 32
+    maxDuration: 10
+    notes: >-
+      Text-to-video for abstract B-roll and atmospheres without a keyframe. Local
+      LTX workflow by default. Do not use it for character shots; they need a
+      reference frame. Add alternatives.fal (model slug and pricing) to run it in
+      the cloud.
+    alternatives: {}
+  video.first_last_frame:
+    provider: comfyui
+    model: ltx-flf2v
+    params:
+      fps: 24
+      frame_step: 8
+      size_multiple: 32
+    maxDuration: 10
+    notes: >-
+      Animate between a start and an end keyframe (firstLastFrameToVideo). Local
+      LTX workflow by default. A cloud alternative needs end_reference_field set
+      to the model's end-frame field.
+    alternatives: {}
 
   video.lipsync:
     provider: fal

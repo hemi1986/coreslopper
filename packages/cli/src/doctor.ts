@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
-import { resolveHiggsfieldCredentials } from '@coreslopper/providers';
+import { join, resolve } from 'node:path';
+import { checkComfyUI, inspectWorkflowDir, resolveHiggsfieldCredentials } from '@coreslopper/providers';
 import { detectTools, type ToolCheck } from './tools.js';
 import { isWorkspace, loadWorkspaceEnv } from './workspace.js';
 
@@ -10,7 +10,7 @@ export interface DoctorCheck {
   ok: boolean;
   detail: string;
   required: boolean;
-  group: 'workspace' | 'tool' | 'credentials';
+  group: 'workspace' | 'tool' | 'credentials' | 'local';
 }
 
 export interface DoctorResult {
@@ -52,6 +52,44 @@ function toolCheck(tool: ToolCheck): DoctorCheck {
   };
 }
 
+/** Optional local video backend: server reachability and the workflow exports. */
+async function comfyUIChecks(root: string): Promise<DoctorCheck[]> {
+  const server = await checkComfyUI();
+  const dir = process.env.COMFYUI_WORKFLOWS_DIR ? resolve(process.env.COMFYUI_WORKFLOWS_DIR) : join(root, 'comfyui', 'workflows');
+  const reports = await inspectWorkflowDir(dir);
+  const checks: DoctorCheck[] = [
+    {
+      id: 'comfyui',
+      name: 'ComfyUI (local video)',
+      ok: server.ok,
+      detail: server.ok ? `${server.message} at ${server.url}` : `not reachable at ${server.url} (only needed for providers.video: comfyui)`,
+      required: false,
+      group: 'local',
+    },
+  ];
+  if (reports.length === 0) {
+    checks.push({
+      id: 'comfyui-workflows',
+      name: 'ComfyUI workflows',
+      ok: false,
+      detail: `none in ${dir} (see comfyui/README.md)`,
+      required: false,
+      group: 'local',
+    });
+  }
+  for (const report of reports) {
+    checks.push({
+      id: `comfyui-workflow-${report.name}`,
+      name: `ComfyUI workflow ${report.name}`,
+      ok: report.ok,
+      detail: report.error ?? [report.operation, ...report.warnings].join('; '),
+      required: false,
+      group: 'local',
+    });
+  }
+  return checks;
+}
+
 export async function runDoctor(root: string, options: DoctorOptions = {}): Promise<DoctorResult> {
   loadWorkspaceEnv(root);
   const higgsfield = resolveHiggsfieldCredentials();
@@ -89,6 +127,7 @@ export async function runDoctor(root: string, options: DoctorOptions = {}): Prom
       group: 'credentials',
     },
     ...detectTools(root).map(toolCheck),
+    ...(await comfyUIChecks(root)),
   ];
 
   const ok = checks.every((check) => check.ok || !check.required);

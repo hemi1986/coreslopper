@@ -88,3 +88,21 @@ describe('provider-specific model roles', () => {
     expect(models.roles['video.lipsync']?.alternatives.higgsfield).toBeUndefined();
   });
 });
+
+describe('ComfyUI model roles', () => {
+  it('resolves the comfyui alternative of every video role without pricing', async () => {
+    const models = await loadModelsConfig();
+    for (const [name, videoRole] of Object.entries(models.roles)) {
+      if (!name.startsWith('video.') || name === 'video.lipsync') continue;
+      const resolved = resolveModelRole(videoRole, 'comfyui', {}, name);
+      expect(resolved.model, name).toMatch(/^ltx-/);
+      expect(resolved.params, name).not.toHaveProperty('reference_field');
+    }
+  });
+
+  it('lets a project point a role at its own workflow without a price', () => {
+    const resolved = resolveModelRole(role, 'comfyui', { model: 'my-wan-i2v' });
+    expect(resolved.model).toBe('my-wan-i2v');
+    expect(resolved.pricing).toBeUndefined();
+  });
+});

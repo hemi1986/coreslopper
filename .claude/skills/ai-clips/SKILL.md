@@ -17,13 +17,21 @@ license: MIT
 - `storyboard.yaml`, `style.yaml`, `characters.yaml`
 - `assets/references/` for user-provided moodboards and composition references
 - `config/models.yaml` and `project.yaml`
+- `comfyui/README.md` when `providers.video` is `comfyui`
 - `packages/providers` and the `npm run cli -- generate` command
 - `docs/glossary.md`
 
 ## Process
 
 1. Read the shot's prompts, style refs, and character refs. If the shot names a character but the character has no reference image, stop and run `character-bible` first. Pick any user-provided moodboard or composition references from `assets/references/` and pass their project-relative paths in the batch `references` array.
-2. Choose roles from `config/models.yaml`, not hard-coded model IDs. Use the cheapest role that meets the shot's quality needs.
+2. Choose roles from `config/models.yaml`, not hard-coded model IDs. Use the cheapest role that meets the shot's quality needs. Pick the clip operation per shot:
+   | Operation | References | Role | Use for |
+   |---|---|---|---|
+   | `imageToVideo` | start frame | `video.image_to_video.*` | Default; every character shot. |
+   | `firstLastFrameToVideo` | start frame, end frame | `video.first_last_frame` | A move or morph between two keyframes. |
+   | `textToVideo` | none | `video.text_to_video` | Abstract B-roll and atmospheres without a character. |
+
+   With `providers.video: comfyui` the clip renders locally from the workflow the role names (`comfyui/workflows/<model>.json`). It costs $0 but takes minutes per clip, so keep batches small. Run `npm run cli -- doctor` first; if ComfyUI is unreachable or the workflow is missing, stop with a credential-class hard stop.
 3. Write a batch JSON file outside the repo or under `projects/<slug>/assets/batches/`. Shape:
    ```json
    [
@@ -49,7 +57,7 @@ license: MIT
 6. Inspect the keyframe at full size and the clip at first/middle/last frame with the art-director critic. If a character drifts, regenerate with the same references and a corrected prompt; do not ignore it.
 7. Use frame chaining only when the storyboard enables it. Extract the last frame of the previous clip with
    `npm run cli -- frame <project> --input <previous-clip> --position last --out <path>`
-   and pass it as the first reference of the next clip.
+   and pass it as the first reference of the next clip. To land on a planned frame, use `firstLastFrameToVideo` with that keyframe as the second reference.
 8. **Lip-sync shots** (`lipSync` set on the shot):
    1. Generate a dedicated keyframe with `editImage` from the character sheet: face frontal or slight 3/4, evenly lit, mouth slightly open, face filling at least a third of the frame. Never feed the multi-view sheet itself.
    2. Resolve the shot's start and end anchors to seconds from `timing.effective.json` and cut the vocal segment:

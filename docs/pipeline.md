@@ -105,7 +105,7 @@ npm run cli -- estimate --role image.keyframe --units 8 --project projects/my-vi
 npm run cli -- generate projects/my-video --batch assets/batches/scene-01.json
 ```
 
-Roles resolve to the project's provider. A Higgsfield project uses the `alternatives.higgsfield` entries in `config/models.yaml`; lip-sync stays on fal.ai via `providers.lipsync: fal`.
+Roles resolve to the project's provider. A Higgsfield project uses the `alternatives.higgsfield` entries in `config/models.yaml`; lip-sync stays on fal.ai via `providers.lipsync: fal`. With `providers.video: comfyui`, clips render locally from `comfyui/workflows/` at $0 and lip-sync falls back to fal.ai ([comfyui/README.md](../comfyui/README.md)).
 
 Completion: every shot has its source asset or a documented reason; every character shot used references; manifest and budget reconciled; art-director passes.
 
@@ -178,6 +178,7 @@ The status table shows every stage, attempts, outputs, spend, remaining budget, 
 - **`ffmpeg` missing:** run `./scripts/install-ffmpeg.sh` on Linux x64, or install it with your package manager. The motion-only demo still renders without it; footage and loudness normalization need it.
 - **WhisperX/Demucs missing:** install the `asr`/`stems` extras. Do not silently skip word alignment for a real lyric video.
 - **FAL_KEY missing:** switch `providers.image`/`providers.video` to `mock` or add the key to `.env`. If only lip-sync uses fal.ai, set `providers.lipsync: fal` and add `FAL_KEY`; the rest of the project can stay on Higgsfield or mock.
+- **ComfyUI unreachable or workflow missing:** start ComfyUI or set `COMFYUI_URL` in `.env`, export the workflow with Export (API) into `comfyui/workflows/`, and check with `npm run cli -- doctor`. Or switch `providers.video` to a cloud provider.
 - **Higgsfield credential missing or rejected:** add `HIGGSFIELD_API_KEY` (or `HF_API_KEY_ID` + `HF_API_KEY_SECRET`) to `.env`, or switch the provider to `mock` or `fal`. Lip-sync shots always need fal.ai.
 - **Storyboard gap/overlap:** inspect the anchors. Prefer a symbolic anchor over a `time` escape hatch.
 - **Render too slow:** use `--preview`, lower the concurrency, or render a still first.

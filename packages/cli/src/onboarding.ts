@@ -13,13 +13,14 @@ import {
 } from '@clack/prompts';
 import { resolve } from 'node:path';
 import { ValidationError } from '@coreslopper/core';
-import { resolveHiggsfieldCredentials } from '@coreslopper/providers';
+import { checkComfyUI, comfyUIBaseUrl, resolveHiggsfieldCredentials } from '@coreslopper/providers';
 import {
   defaultProjectSlug,
   initWorkspace,
   isDirectoryEmpty,
   type FirstProjectOptions,
   type InitResult,
+  type VideoProvider,
   type VisualProvider,
 } from './init.js';
 import {
@@ -42,7 +43,7 @@ export interface OnboardOptions {
   installTools?: boolean;
   visual?: VisualProvider;
   imageProvider?: VisualProvider;
-  videoProvider?: VisualProvider;
+  videoProvider?: VideoProvider;
   budget?: number;
   projectSlug?: string;
   title?: string;
@@ -307,7 +308,34 @@ export async function onboard(options: OnboardOptions = {}): Promise<InitResult>
             }),
           ) as VisualProvider));
     const image = options.imageProvider ?? visual;
-    const video = options.videoProvider ?? visual;
+    const video: VideoProvider =
+      options.videoProvider ??
+      (visual === 'mock'
+        ? visual
+        : (unwrap(
+            await select({
+              message: 'Where should video clips be rendered?',
+              options: [
+                { value: visual, label: `${visual === 'fal' ? 'fal.ai' : 'Higgsfield'} (cloud)`, hint: 'same as images' },
+                {
+                  value: 'comfyui',
+                  label: 'ComfyUI (local)',
+                  hint: 'workflows from comfyui/workflows/, free; lip-sync stays on fal.ai',
+                },
+              ],
+              initialValue: visual,
+            }),
+          ) as VideoProvider));
+    if (video === 'comfyui') {
+      const server = await checkComfyUI();
+      if (server.ok) log.success(`${server.message} at ${server.url}`);
+      else {
+        log.warn(
+          `ComfyUI is not reachable at ${comfyUIBaseUrl()} (${server.message}). Start it before generating clips, ` +
+            'or set COMFYUI_URL in .env.',
+        );
+      }
+    }
 
     falKey = await chooseFalKey(options, image === 'fal' || video === 'fal');
     higgsfieldKey = await chooseHiggsfieldKey(

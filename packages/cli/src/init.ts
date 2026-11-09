@@ -25,13 +25,15 @@ import {
 } from './workspace.js';
 
 export type VisualProvider = 'fal' | 'higgsfield' | 'mock';
+/** Video clips can also come from a local ComfyUI server. */
+export type VideoProvider = VisualProvider | 'comfyui';
 
 export interface FirstProjectOptions {
   slug: string;
   title?: string;
   budget: number;
   image: VisualProvider;
-  video: VisualProvider;
+  video: VideoProvider;
 }
 
 export interface InitOptions {

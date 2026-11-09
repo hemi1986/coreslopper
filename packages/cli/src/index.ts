@@ -143,7 +143,7 @@ program
   .option('--no-tool-install', 'Do not offer to install system tools')
   .option('--visual <provider>', 'mock | fal | higgsfield', 'mock')
   .option('--image-provider <provider>', 'mock | fal | higgsfield')
-  .option('--video-provider <provider>', 'mock | fal | higgsfield')
+  .option('--video-provider <provider>', 'mock | fal | higgsfield | comfyui')
   .option('--budget <usd>', 'First project budget in USD', (value) => Number(value))
   .option('--project <slug>', 'First project slug')
   .option('--title <title>', 'First project title')
@@ -153,12 +153,13 @@ program
   .action((dir: string | undefined, options: InitCommandOptions) =>
     run(async () => {
       const visuals = ['mock', 'fal', 'higgsfield'] as const;
+      const videoProviders = [...visuals, 'comfyui'] as const;
       if (options.visual) options.visual = validateChoice(options.visual, visuals, 'visual provider');
       if (options.imageProvider) {
         options.imageProvider = validateChoice(options.imageProvider, visuals, 'image provider');
       }
       if (options.videoProvider) {
-        options.videoProvider = validateChoice(options.videoProvider, visuals, 'video provider');
+        options.videoProvider = validateChoice(options.videoProvider, videoProviders, 'video provider');
       }
       await runInitCommand(dir, options);
     }),
@@ -172,7 +173,7 @@ program
   .option('--brand <kit>', 'Brand kit', 'example')
   .option('--visual <provider>', 'mock | fal | higgsfield', 'mock')
   .option('--image-provider <provider>', 'mock | fal | higgsfield')
-  .option('--video-provider <provider>', 'mock | fal | higgsfield')
+  .option('--video-provider <provider>', 'mock | fal | higgsfield | comfyui')
   .action(
     (
       slug: string,
@@ -192,7 +193,7 @@ program
           ? validateChoice(options.imageProvider, visuals, 'image provider')
           : visual;
         const videoProvider = options.videoProvider
-          ? validateChoice(options.videoProvider, visuals, 'video provider')
+          ? validateChoice(options.videoProvider, [...visuals, 'comfyui'] as const, 'video provider')
           : visual;
         await createProject({
           slug,
@@ -293,7 +294,7 @@ program
   .requiredOption('--role <role>', 'Role from config/models.yaml')
   .requiredOption('--units <n>', 'Number of images, seconds, or requests', (value) => Number(value))
   .option('--project <project>', 'Project directory for budget checks')
-  .option('--provider <provider>', 'Provider override: fal | higgsfield | mock')
+  .option('--provider <provider>', 'Provider override: fal | higgsfield | comfyui | mock')
   .action((options: { role: string; units: number; project?: string; provider?: string }) =>
     run(async () => {
       const models = await loadModelsConfig();
@@ -301,7 +302,7 @@ program
       if (!role) throw new ValidationError(`Unknown model role "${options.role}".`);
       const loaded = options.project ? await loadProject(projectDirFromArg(options.project)) : undefined;
       const provider = options.provider
-        ? validateChoice(options.provider, ['fal', 'higgsfield', 'mock'] as const, 'provider')
+        ? validateChoice(options.provider, ['fal', 'higgsfield', 'comfyui', 'mock'] as const, 'provider')
         : loaded
           ? providerForRole(loaded.config, options.role)
           : role.provider;
@@ -313,13 +314,15 @@ program
       })();
       const resolved = resolveModelRole(role, provider, override, options.role);
       const pricing =
-        provider === 'mock' ? ({ unit: 'request', usd: 0 } satisfies ModelPricing) : resolved.pricing;
+        provider === 'mock' || provider === 'comfyui'
+          ? ({ unit: 'request', usd: 0 } satisfies ModelPricing)
+          : resolved.pricing;
       if (!pricing) {
         throw new ValidationError(
           `Role "${options.role}" has no pricing entry for provider "${provider}".`,
         );
       }
-      const cost = provider === 'mock' ? 0 : estimateCost(options.units, pricing);
+      const cost = provider === 'mock' || provider === 'comfyui' ? 0 : estimateCost(options.units, pricing);
       console.log(
         `${options.role} [${provider}/${resolved.model}]: ${options.units} ${pricing.unit}(s) × ${formatUsd(pricing.usd)} = ${formatUsd(cost)}`,
       );

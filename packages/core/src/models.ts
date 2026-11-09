@@ -58,7 +58,8 @@ export function resolveModelRole(
           `Add alternatives.${provider} to config/models.yaml or set models.${roleName}.model in project.yaml.`,
       );
     }
-    if (!overridePricing) {
+    // A local backend has no price; everything else needs one.
+    if (!overridePricing && provider !== 'comfyui') {
       throw new ConfigError(
         `Role "${roleName}" has no pricing for provider "${provider}". ` +
           `Add alternatives.${provider}.pricing to config/models.yaml or set models.${roleName}.pricing in project.yaml.`,
@@ -66,14 +67,16 @@ export function resolveModelRole(
     }
   }
 
-  const source = !isBaseProvider && alternative ? alternative : role;
-  const params = { ...source.params, ...overrideParams };
-  const pricing = overridePricing ?? source.pricing;
-  const maxDuration = source.maxDuration ?? role.maxDuration;
+  // Without an alternative, the base role's params and price belong to another
+  // provider's model; only the project override applies.
+  const source = isBaseProvider ? role : alternative;
+  const params = { ...(source?.params ?? {}), ...overrideParams };
+  const pricing = overridePricing ?? source?.pricing;
+  const maxDuration = source?.maxDuration ?? role.maxDuration;
 
   return {
     provider,
-    model: overrideModel ?? source.model,
+    model: overrideModel ?? source?.model ?? role.model,
     params,
     pricing,
     maxDuration,
@@ -83,7 +86,9 @@ export function resolveModelRole(
 /** The provider a role uses in a given project. */
 export function providerForRole(config: ProjectConfig, role: string): ProviderKind {
   if (role === 'video.lipsync') {
-    return config.providers.lipsync ?? config.providers.video;
+    if (config.providers.lipsync) return config.providers.lipsync;
+    // The local ComfyUI backend renders standard clips only; lip-sync stays in the cloud.
+    return config.providers.video === 'comfyui' ? 'fal' : config.providers.video;
   }
   if (role.startsWith('video.')) return config.providers.video;
   return config.providers.image;

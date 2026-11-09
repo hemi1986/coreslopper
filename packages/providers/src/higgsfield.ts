@@ -76,6 +76,11 @@ function takeReferenceField(
   return [typeof value === 'string' && value.length > 0 ? value : fallback, rest];
 }
 
+function takeEndField(params: Record<string, unknown>): [string | undefined, Record<string, unknown>] {
+  const { end_reference_field: value, ...rest } = params;
+  return [typeof value === 'string' && value.length > 0 ? value : undefined, rest];
+}
+
 function collectOutputUrls(result: Record<string, unknown>): string[] {
   const urls: string[] = [];
   for (const key of OUTPUT_KEYS) {
@@ -145,12 +150,50 @@ export class HiggsfieldProvider implements Provider {
     });
   }
 
+  async textToVideo(input: ProviderInput): Promise<ProviderOutput> {
+    const [, afterReference] = takeReferenceField(takeEndField(input.params ?? {})[1], 'image_url');
+    const [sendSeed, afterSeedSwitch] = takeSwitch(afterReference, 'send_seed');
+    const [sendNegative, params] = takeSwitch(afterSeedSwitch, 'send_negative_prompt');
+    return this.runModel(input, {
+      prompt: input.prompt,
+      duration: input.durationSeconds ?? 5,
+      ...(sendSeed ? { seed: normalizeSeed(input.seed) } : {}),
+      ...(sendNegative && input.negativePrompt ? { negative_prompt: input.negativePrompt } : {}),
+      ...params,
+    });
+  }
+
+  async firstLastFrameToVideo(input: ProviderInput): Promise<ProviderOutput> {
+    const [start, end] = input.references ?? [];
+    if (!start || !end) {
+      throw new Error('firstLastFrameToVideo requires a start frame and an end frame.');
+    }
+    const [endField, afterEnd] = takeEndField(input.params ?? {});
+    if (!endField) {
+      throw new Error(
+        `Model ${input.model} has no end_reference_field param. Set it in config/models.yaml to the field that takes the end frame.`,
+      );
+    }
+    const [field, afterReference] = takeReferenceField(afterEnd, 'image_url');
+    const [sendSeed, afterSeedSwitch] = takeSwitch(afterReference, 'send_seed');
+    const [sendNegative, params] = takeSwitch(afterSeedSwitch, 'send_negative_prompt');
+    return this.runModel(input, {
+      prompt: input.prompt,
+      [field]: await this.uploadReference(start),
+      [endField]: await this.uploadReference(end),
+      duration: input.durationSeconds ?? 5,
+      ...(sendSeed ? { seed: normalizeSeed(input.seed) } : {}),
+      ...(sendNegative && input.negativePrompt ? { negative_prompt: input.negativePrompt } : {}),
+      ...params,
+    });
+  }
+
   async imageToVideo(input: ProviderInput): Promise<ProviderOutput> {
     const reference = input.references?.[0];
     if (!reference) {
       throw new Error('imageToVideo requires a start-frame reference image.');
     }
-    const [field, afterReference] = takeReferenceField(input.params ?? {}, 'image_url');
+    const [field, afterReference] = takeReferenceField(takeEndField(input.params ?? {})[1], 'image_url');
     const [sendSeed, afterSeedSwitch] = takeSwitch(afterReference, 'send_seed');
     const [sendNegative, params] = takeSwitch(afterSeedSwitch, 'send_negative_prompt');
     const imageUrl = await this.uploadReference(reference);

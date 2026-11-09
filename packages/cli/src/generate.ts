@@ -33,7 +33,14 @@ import { probeDuration } from './media.js';
 
 export const BatchItemSchema = z
   .object({
-    operation: z.enum(['generateImage', 'editImage', 'imageToVideo', 'lipSync']),
+    operation: z.enum([
+      'generateImage',
+      'editImage',
+      'textToVideo',
+      'imageToVideo',
+      'firstLastFrameToVideo',
+      'lipSync',
+    ]),
     role: z.string().min(1),
     prompt: z.string().min(1),
     references: z.array(z.string()).default([]),
@@ -47,6 +54,15 @@ export const BatchItemSchema = z
   })
   .refine((item) => item.operation !== 'lipSync' || (item.audio && item.references.length > 0), {
     message: 'lipSync needs "audio" (a vocal segment) and a face image as the first reference.',
+  })
+  .refine((item) => item.operation !== 'textToVideo' || item.references.length === 0, {
+    message: 'textToVideo takes no references; use imageToVideo for a start frame.',
+  })
+  .refine((item) => item.operation !== 'imageToVideo' || item.references.length >= 1, {
+    message: 'imageToVideo needs a start frame as the first reference.',
+  })
+  .refine((item) => item.operation !== 'firstLastFrameToVideo' || item.references.length === 2, {
+    message: 'firstLastFrameToVideo needs exactly two references: the start frame, then the end frame.',
   });
 
 export const BatchSchema = z.array(BatchItemSchema).min(1);
@@ -88,10 +104,17 @@ function resolveItem(
       'The Higgsfield adapter does not support lip-sync. Set providers.lipsync to "fal" and provide FAL_KEY, or keep providers.video on fal.',
     );
   }
+  if (provider === 'comfyui' && (item.operation === 'generateImage' || item.operation === 'editImage' || item.operation === 'lipSync')) {
+    throw new ConfigError(
+      `The ComfyUI backend renders video clips only, but role "${item.role}" (${item.operation}) resolved to it. ` +
+        'Images use providers.image; lip-sync uses providers.lipsync (fal by default).',
+    );
+  }
   const resolved = resolveModelRole(role, provider, override, item.role);
   const params = { ...resolved.params, ...item.params };
   const pricing =
-    resolved.pricing ?? (provider === 'mock' ? ({ unit: 'request', usd: 0 } satisfies ModelPricing) : undefined);
+    resolved.pricing ??
+    (provider === 'mock' || provider === 'comfyui' ? ({ unit: 'request', usd: 0 } satisfies ModelPricing) : undefined);
   if (!pricing) {
     throw new ConfigError(
       `Role "${item.role}" has no pricing entry for provider "${provider}". ` +
@@ -155,7 +178,7 @@ export async function generateBatch(options: GenerateOptions): Promise<void> {
   const models = await loadModelsConfig();
   const resolved = batch.map((item) => {
     const value = resolveItem(item, project.config, models, project.paths.root);
-    return value.provider === 'mock' ? { ...value, cost: 0 } : value;
+    return value.provider === 'mock' || value.provider === 'comfyui' ? { ...value, cost: 0 } : value;
   });
   const totalEstimate = resolved.reduce((sum, item) => sum + item.cost, 0);
 

@@ -121,11 +121,13 @@ Section and line anchors carry an `edge` (`start` or `end`). Word, beat, and dow
 ```ts
 generateImage(input)
 editImage(input)
+textToVideo(input)
 imageToVideo(input)
+firstLastFrameToVideo(input)
 lipSync(input)
 ```
 
-The real adapters are fal.ai and Higgsfield; the mock adapter returns deterministic SVG placeholders. Model IDs, provider-specific slugs, params, and prices live in `config/models.yaml`: each role names a base provider and can add `alternatives.<provider>` for another adapter. A project selects `providers.image`, `.video`, and optional `.lipsync`. The `GenerationRunner`:
+The cloud adapters are fal.ai and Higgsfield, the local video adapter is ComfyUI, and the mock adapter returns deterministic SVG placeholders. Model IDs, provider-specific slugs, params, and prices live in `config/models.yaml`: each role names a base provider and can add `alternatives.<provider>` for another adapter. A project selects `providers.image`, `.video`, and optional `.lipsync`. The `GenerationRunner`:
 
 1. hashes the canonical request, including SHA-256 hashes of every reference file;
 2. checks `.cache/generations/<hash>/result.json`;
@@ -135,6 +137,8 @@ The real adapters are fal.ai and Higgsfield; the mock adapter returns determinis
 6. records failures in the manifest.
 
 fal.ai accepts file references as data URIs and uses a queue endpoint. Higgsfield uses an asynchronous request API; the adapter uploads local references through the presigned-upload endpoint, sends a stable `Idempotency-Key`, polls the status URL with backoff, and downloads the result before caching. Higgsfield model schemas are strict, so adapter-only options such as `send_seed` and `reference_field` are stripped before the request is sent. Higgsfield does not implement lip-sync, so `providers.lipsync` can stay on fal.ai.
+
+ComfyUI renders clips only. A role's `alternatives.comfyui.model` names a workflow exported with Export (API) into `comfyui/workflows/`. The adapter fills the nodes tagged by title (`cs_prompt`, `cs_start_image`, `cs_frames`, …), uploads frames through `/upload/image`, queues `/prompt`, polls `/history/<id>`, and downloads the video through `/view`. The provider's `fingerprint` adds the workflow's SHA-256 to the cache key, so editing a workflow regenerates. Local runs cost $0, and lip-sync falls back to fal.ai when `providers.video` is `comfyui`. See [ADR 0014](adr/0014-comfyui-local-video.md).
 
 A batch is estimated before the first paid call. Unknown pricing for the selected provider is a hard error. The budget and batch cap are enforced before generation, and spend is recorded in `state.json` after each successful call.
 

@@ -25,13 +25,14 @@ Ask in one round, with a recommended answer for each:
 - **Slug** (lowercase, digits, dashes; recommend one derived from the title).
 - **Budget in USD**. Mandatory. Never invent it; motion-only videos can run on a small budget, AI clips cost real money (`config/models.yaml` has prices).
 - **Visual provider**: `mock` (motion graphics only, no key), `fal`, or `higgsfield`. Check `npm run cli -- doctor` for which keys exist and recommend accordingly.
+- **Video clips**: the visual provider, or `comfyui` to render clips locally. Offer `comfyui` only when `doctor` shows ComfyUI reachable and at least one workflow; stills and lip-sync then stay on the visual provider and fal.ai.
 - **Sung language** as an ISO code (`de`, `en`, …).
 - **Rights**: who owns the song, and its license (for example "own song, all rights").
 
 Then create the project from the repository root:
 
 ```bash
-npm run cli -- new <slug> --budget <usd> --title "<title>" --visual <provider>
+npm run cli -- new <slug> --budget <usd> --title "<title>" --visual <provider> [--video-provider comfyui]
 ```
 
 Done when the command succeeds. On failure, show the error and stop; never create project files by hand.
