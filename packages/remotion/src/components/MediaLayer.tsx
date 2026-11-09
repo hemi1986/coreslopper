@@ -27,7 +27,12 @@ export function MediaLayer({
   focus?: { x: number; y: number };
 }) {
   const frame = useCurrentFrame();
-  const position = `${((focus?.x ?? 0.5) * 100).toFixed(2)}% ${((focus?.y ?? 0.5) * 100).toFixed(2)}%`;
+  // Focus applies only to formats narrower than the 16:9 sources (9:16, 1:1,
+  // 4:5). In the master nothing is cropped, and the zoom keeps its centre.
+  const cropped = width / height < 1.7;
+  const fx = cropped ? (focus?.x ?? 0.5) : 0.5;
+  const fy = cropped ? (focus?.y ?? 0.5) : 0.5;
+  const position = `${(fx * 100).toFixed(2)}% ${(fy * 100).toFixed(2)}%`;
   const { durationInFrames } = useVideoConfig();
   const zoom = interpolate(frame, [0, Math.max(1, durationInFrames)], [1.02, 1.09], {
     extrapolateRight: 'clamp',
