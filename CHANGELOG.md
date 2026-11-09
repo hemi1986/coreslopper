@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.4.0](https://github.com/hemi1986/coreslopper/compare/v0.3.0...v0.4.0) (2026-11-09)
+
+
+### Features
+
+* project brand kits with font weights and palette roles ([c4f7bd1](https://github.com/hemi1986/coreslopper/commit/c4f7bd1b23d4b2767d3f1711db7053a043d3a302))
+* project brand kits with font weights and palette roles ([02afa75](https://github.com/hemi1986/coreslopper/commit/02afa7518621c91ba2623085ca5804f1020567c0))
+
+
+### Bug Fixes
+
+* keep render memory bounded and allow an external media directory ([b133e35](https://github.com/hemi1986/coreslopper/commit/b133e355df3b6cd79212b2750bdb30c93eae6de0))
+* upload fal video and lip-sync inputs instead of sending data URIs ([2b69642](https://github.com/hemi1986/coreslopper/commit/2b6964281910a9741de40b82084363cea7636234))
+* upload fal video and lip-sync inputs instead of sending data URIs ([d1edc16](https://github.com/hemi1986/coreslopper/commit/d1edc1618f9fcbe6fe62485111e05056b9e34a65))
+* use the staged public dir for the QA determinism check ([d580b72](https://github.com/hemi1986/coreslopper/commit/d580b72ad04eab77e60c828aab018b27e5022382))
+
 ## [0.3.0](https://github.com/hemi1986/coreslopper/compare/v0.2.2...v0.3.0) (2026-11-09)
 
 
