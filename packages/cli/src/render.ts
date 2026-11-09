@@ -8,12 +8,14 @@ import { renderMedia, renderStill, selectComposition } from '@remotion/renderer'
 import {
   ValidationError,
   ensureDir,
+  loadBrand,
   projectPaths,
   repoRoot,
   type ResolvedShot,
   type ResolvedStoryboard,
 } from '@coreslopper/core';
-import type { FormatId, VideoProps } from '../../remotion/src/types.js';
+import type { BrandFont, FormatId, VideoProps } from '../../remotion/src/types.js';
+import { webpackOverride } from '../../remotion/webpack-override.js';
 import { resolveBinary } from './media.js';
 import { validateProject } from './validate.js';
 
@@ -74,6 +76,30 @@ function withPublicAssets(
   }));
 }
 
+/**
+ * Fonts of the project's brand kit (project-local `brand/` wins over
+ * `brand/<project.brand>/`), as public URLs. A family with a single file gets
+ * the full weight range so variable fonts work; extra files default to 400.
+ */
+async function brandFonts(projectDir: string, brandId: string, root: string): Promise<BrandFont[]> {
+  const brand = await loadBrand(projectDir, brandId, root);
+  if (!brand) return [];
+  const counts = new Map<string, number>();
+  for (const font of brand.kit.fonts) counts.set(font.family, (counts.get(font.family) ?? 0) + 1);
+  const fonts: BrandFont[] = [];
+  for (const font of brand.kit.fonts) {
+    const absolute = resolve(brand.dir, font.file);
+    if (!existsSync(absolute)) {
+      console.warn(`Brand font ${font.family} is missing: ${absolute}`);
+      continue;
+    }
+    const weight =
+      font.weight !== undefined ? String(font.weight) : (counts.get(font.family) ?? 1) > 1 ? '400' : '100 900';
+    fonts.push({ family: font.family, url: publicAsset(absolute, brand.dir, root)!, weight, style: font.style ?? 'normal' });
+  }
+  return fonts;
+}
+
 export async function buildVideoProps(
   options: RenderOptions,
 ): Promise<{ props: VideoProps; resolved: ResolvedStoryboard; paths: ReturnType<typeof projectPaths> }> {
@@ -103,6 +129,7 @@ export async function buildVideoProps(
     timing: project.effectiveTiming!,
     shots: withPublicAssets(resolved.shots, paths.root, root),
   };
+  props.fonts = await brandFonts(paths.root, project.config.brand, root);
   return { props, resolved, paths };
 }
 
@@ -173,6 +200,7 @@ export async function bundleFor(props: VideoProps, root: string, workDir: string
     entryPoint: join(root, 'packages/remotion/src/index.ts'),
     publicDir,
     symlinkPublicDir: true,
+    webpackOverride,
   });
 }
 

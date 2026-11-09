@@ -21,9 +21,10 @@ license: MIT
 ## Process
 
 1. Read the brief and treatment. Extract the visual rules that must stay stable: palette, type, light, texture, composition, motion.
-2. Start from the brand kit when one exists. Project-specific overrides belong in the project, not in the workflow repo.
+2. Start from the brand kit when one exists. Project-specific overrides belong in the project, not in the workflow repo: a project-local `brand/brand.yaml` (with its fonts under `brand/`) replaces `brand/<project.brand>/`. Give a font file `weight` (`700` or `"200 700"`) and `style` when a family has several files.
 3. Write `style.yaml` with:
    - `palette`: named hex colors.
+   - `roles` (optional): map the renderer roles `background`, `surface`, `primary`, `secondary`, `accent`, `text`, `muted` to palette keys or hex colors when the palette uses its own names. Unmapped roles fall back to name hints, then neutral defaults.
    - `typography`: display, body, and mono families with weights.
    - `look`: keywords, negative prompts, licensed references.
    - `motion`: easing and grain.

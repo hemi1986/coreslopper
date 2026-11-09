@@ -267,10 +267,19 @@ export const TypographyStyleSchema = z.object({
   lineHeight: z.number().positive().optional(),
 });
 
-export const StyleBibleSchema = z.object({
+export const PALETTE_ROLES = ['background', 'surface', 'primary', 'secondary', 'accent', 'text', 'muted'] as const;
+
+export const StyleBibleSchema = z
+  .object({
   version: z.literal(1).default(1),
   name: z.string().min(1),
   palette: z.record(z.string(), z.string().regex(/^#[0-9a-fA-F]{6}$/)),
+  /**
+   * Optional renderer roles (background, surface, primary, secondary, accent,
+   * text, muted, or any custom role) mapped to a palette key or a #rrggbb colour.
+   * Palettes that already use the role names need no mapping.
+   */
+  roles: z.record(z.string(), z.string().min(1)).optional(),
   typography: z.record(z.string(), TypographyStyleSchema),
   look: z
     .object({
@@ -285,7 +294,18 @@ export const StyleBibleSchema = z.object({
       grain: z.number().min(0).max(1).default(0.08),
     })
     .default({ easing: 'easeOut', grain: 0.08 }),
-});
+  })
+  .superRefine((style, ctx) => {
+    for (const [role, target] of Object.entries(style.roles ?? {})) {
+      if (!/^#[0-9a-fA-F]{6}$/.test(target) && !(target in style.palette)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['roles', role],
+          message: `role "${role}" maps to "${target}", which is neither a palette key nor a #rrggbb colour`,
+        });
+      }
+    }
+  });
 
 export const CharacterSchema = z.object({
   id: z.string().min(1),
@@ -320,6 +340,10 @@ export const BrandKitSchema = z.object({
         family: z.string().min(1),
         file: z.string().min(1),
         license: z.string().min(1),
+        /** CSS weight or range (`700`, `"200 700"`); defaults to the full range for a family's only file. */
+        weight: z.union([z.number().int().min(1).max(1000), z.string().min(1)]).optional(),
+        style: z.enum(['normal', 'italic']).optional(),
+        note: z.string().optional(),
       }),
     )
     .default([]),
