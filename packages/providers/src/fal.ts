@@ -1,5 +1,15 @@
+import { readFile } from 'node:fs/promises';
+import { basename } from 'node:path';
 import { ConfigError } from '@coreslopper/core';
-import { collectUrls, delay, downloadOutputs, fetchJsonWithRetry, fileToDataUri, type FetchLike } from './http.js';
+import {
+  collectUrls,
+  delay,
+  downloadOutputs,
+  fetchJsonWithRetry,
+  fileToDataUri,
+  mimeForPath,
+  type FetchLike,
+} from './http.js';
 import type { Provider, ProviderInput, ProviderOutput } from './types.js';
 
 export interface FalProviderOptions {
@@ -9,10 +19,25 @@ export interface FalProviderOptions {
   requestTimeoutMs?: number;
   pollIntervalMs?: number;
   fetchImpl?: FetchLike;
+  /** fal storage REST base used to upload input files for video and lip-sync models. */
+  storageUrl?: string;
 }
 
 function fieldName(value: unknown, fallback: string): string {
   return typeof value === 'string' && value.length > 0 ? value : fallback;
+}
+
+/**
+ * Split adapter-only params from the model body. `reference_field` names the
+ * start-frame field; the legacy `image_param` is accepted as an alias.
+ */
+function adapterParams(params: Record<string, unknown> | undefined): {
+  field: unknown;
+  endField: unknown;
+  body: Record<string, unknown>;
+} {
+  const { reference_field, end_reference_field, image_param, ...body } = params ?? {};
+  return { field: reference_field ?? image_param, endField: end_reference_field, body };
 }
 
 export class FalProvider implements Provider {
@@ -23,6 +48,8 @@ export class FalProvider implements Provider {
   private readonly requestTimeoutMs: number;
   private readonly pollIntervalMs: number;
   private readonly fetchImpl: FetchLike;
+  private readonly storageUrl: string;
+  private readonly uploads = new Map<string, string>();
 
   constructor(options: FalProviderOptions = {}) {
     const key = options.apiKey ?? process.env.FAL_KEY;
@@ -35,6 +62,44 @@ export class FalProvider implements Provider {
     this.requestTimeoutMs = options.requestTimeoutMs ?? 600_000;
     this.pollIntervalMs = options.pollIntervalMs ?? 1_000;
     this.fetchImpl = options.fetchImpl ?? fetch;
+    this.storageUrl = options.storageUrl ?? 'https://rest.alpha.fal.ai';
+  }
+
+  /**
+   * Upload a local file to fal storage and return its URL. Video and lip-sync
+   * models download their inputs and reject data URIs, so they get real URLs.
+   */
+  async uploadFile(path: string): Promise<string> {
+    const cached = this.uploads.get(path);
+    if (cached) return cached;
+    const contentType = mimeForPath(path);
+    const initiated = await fetchJsonWithRetry(
+      'fal.ai storage',
+      `${this.storageUrl}/storage/upload/initiate?storage_type=fal-cdn-v3`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Key ${this.apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content_type: contentType, file_name: basename(path) }),
+      },
+      this.requestTimeoutMs,
+      this.fetchImpl,
+    );
+    const uploadUrl = String(initiated.upload_url ?? '');
+    const fileUrl = String(initiated.file_url ?? '');
+    if (!uploadUrl || !fileUrl) {
+      throw new Error(`fal.ai storage did not return an upload URL: ${JSON.stringify(initiated).slice(0, 300)}`);
+    }
+    const response = await this.fetchImpl(uploadUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': contentType },
+      body: await readFile(path),
+      signal: AbortSignal.timeout(this.requestTimeoutMs),
+    });
+    if (!response.ok) {
+      throw new Error(`fal.ai storage upload failed for ${basename(path)}: ${response.status}`);
+    }
+    this.uploads.set(path, fileUrl);
+    return fileUrl;
   }
 
   async generateImage(input: ProviderInput): Promise<ProviderOutput> {
@@ -62,7 +127,7 @@ export class FalProvider implements Provider {
   }
 
   async textToVideo(input: ProviderInput): Promise<ProviderOutput> {
-    const { reference_field: _start, end_reference_field: _end, ...params } = input.params ?? {};
+    const { body: params } = adapterParams(input.params);
     return this.runModel(input, {
       prompt: input.prompt,
       seed: input.seed,
@@ -79,11 +144,11 @@ export class FalProvider implements Provider {
     }
     // Models disagree on the start-frame field (Kling v4 uses start_image_url),
     // so a model can name it with the adapter-only reference_field param.
-    const { reference_field: field, end_reference_field: _end, ...params } = input.params ?? {};
+    const { field, body: params } = adapterParams(input.params);
     return this.runModel(input, {
       prompt: input.prompt,
       seed: input.seed,
-      [fieldName(field, 'image_url')]: await fileToDataUri(reference),
+      [fieldName(field, 'image_url')]: await this.uploadFile(reference),
       duration: input.durationSeconds ?? 5,
       ...params,
     });
@@ -94,7 +159,7 @@ export class FalProvider implements Provider {
     if (!start || !end) {
       throw new Error('firstLastFrameToVideo requires a start frame and an end frame.');
     }
-    const { reference_field: field, end_reference_field: endField, ...params } = input.params ?? {};
+    const { field, endField, body: params } = adapterParams(input.params);
     if (typeof endField !== 'string' || endField.length === 0) {
       throw new Error(
         `Model ${input.model} has no end_reference_field param. Set it in config/models.yaml to the field that takes the end frame.`,
@@ -103,8 +168,8 @@ export class FalProvider implements Provider {
     return this.runModel(input, {
       prompt: input.prompt,
       seed: input.seed,
-      [fieldName(field, 'image_url')]: await fileToDataUri(start),
-      [endField]: await fileToDataUri(end),
+      [fieldName(field, 'image_url')]: await this.uploadFile(start),
+      [endField]: await this.uploadFile(end),
       duration: input.durationSeconds ?? 5,
       ...params,
     });
@@ -118,11 +183,12 @@ export class FalProvider implements Provider {
     if (!input.audio) {
       throw new Error('lipSync requires an audio file.');
     }
+    const { field, body: params } = adapterParams(input.params);
     return this.runModel(input, {
-      image_url: await fileToDataUri(reference),
-      audio_url: await fileToDataUri(input.audio),
+      [fieldName(field, 'image_url')]: await this.uploadFile(reference),
+      audio_url: await this.uploadFile(input.audio),
       ...(input.prompt ? { prompt: input.prompt } : {}),
-      ...input.params,
+      ...params,
     });
   }
 
