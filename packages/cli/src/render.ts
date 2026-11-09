@@ -120,7 +120,7 @@ function envInt(name: string, fallback: number): number {
   const value = Number(process.env[name]);
   return Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback;
 }
-const renderLimits = () => ({
+export const renderLimits = () => ({
   // Every Chrome tab holds its own decoded frames, so memory scales with it: clamp to 2–4.
   concurrency: Math.min(4, Math.max(2, envInt('CORESLOPPER_RENDER_CONCURRENCY', 4))),
   offthreadVideoCacheSizeInBytes: envInt('CORESLOPPER_VIDEO_CACHE_MB', 2048) * MB,
@@ -165,7 +165,7 @@ async function stagePublicDir(props: VideoProps, root: string, dir: string): Pro
   return files.size;
 }
 
-async function bundleFor(props: VideoProps, root: string, workDir: string): Promise<string> {
+export async function bundleFor(props: VideoProps, root: string, workDir: string): Promise<string> {
   const publicDir = join(workDir, 'public');
   const staged = await stagePublicDir(props, root, publicDir);
   console.log(`Bundling Remotion composition for ${props.project.slug} (${staged} public files)...`);
