@@ -27,7 +27,7 @@ uv run python analyze.py --project ../../projects/my-video --device cuda
 
 Useful flags:
 
-- `--vocals <path>` — use an existing Suno vocal stem.
+- `--vocals <path>` — use an existing vocal stem (`audio/stems/vocals.wav` after `import-song`).
 - `--no-separate` — do not run Demucs; analyze the mix.
 - `--skip-asr` — distribute lyric timings without WhisperX. Use only for fixtures or motion-only demos.
 - `--language <code>` — sung language for ASR and alignment. Default: `language` from `song.json`, else WhisperX auto-detection.
@@ -64,5 +64,5 @@ The tests cover the pure helpers: lyric parsing, Unicode normalisation, cues and
 - Always inspect `timing.report.md`. Heavily repeated hooks (e.g. a drop that repeats one phrase four times) can be under-transcribed by ASR; those lines are placed by position and flagged.
 - Downbeats assume 4/4 and are a phase guess from energy; treat bar positions as approximate.
 - Set `language` in `song.json` (or pass `--language`); auto-detection can be wrong for short or heavily processed vocals.
-- Demucs separation quality depends on the mix. A Suno vocal stem is preferred.
+- Demucs separation quality depends on the mix. A vocal stem from the original session is preferred.
 - The generated `timing.json` is small enough to commit; the audio and stems are not.

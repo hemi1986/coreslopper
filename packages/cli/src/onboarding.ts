@@ -20,7 +20,6 @@ import {
   isDirectoryEmpty,
   type FirstProjectOptions,
   type InitResult,
-  type SongProvider,
   type VisualProvider,
 } from './init.js';
 import {
@@ -41,7 +40,6 @@ export interface OnboardOptions {
   install?: boolean;
   git?: boolean;
   installTools?: boolean;
-  song?: SongProvider;
   visual?: VisualProvider;
   imageProvider?: VisualProvider;
   videoProvider?: VisualProvider;
@@ -50,7 +48,6 @@ export interface OnboardOptions {
   title?: string;
   falKey?: string;
   higgsfieldKey?: string;
-  suno?: boolean;
   noProject?: boolean;
 }
 
@@ -261,8 +258,7 @@ function printNextSteps(target: string, result: InitResult, options: OnboardOpti
     '  claude',
     '',
     'In Claude Code:',
-    ...(options.suno === false ? [] : ['  /mcp                 authenticate Suno once']),
-    ...(project ? [`  /video-next ${project}`] : []),
+    ...(project ? [`  /new-video ${project}    lyrics, song import, brief`] : ['  /new-video']),
   ];
   outro(lines.join('\n'));
 }
@@ -291,19 +287,6 @@ export async function onboard(options: OnboardOptions = {}): Promise<InitResult>
   let project: FirstProjectOptions | null = null;
 
   if (!options.noProject) {
-    const song =
-      options.song ??
-      (unwrap(
-        await select({
-          message: 'How will you get the song?',
-          options: [
-            { value: 'import', label: 'Import an existing audio file', hint: 'works immediately, no Suno account' },
-            { value: 'suno', label: 'Generate with Suno', hint: 'OAuth through the Suno MCP server' },
-          ],
-          initialValue: 'import',
-        }),
-      ) as SongProvider);
-
     const visual =
       options.visual ??
       (options.imageProvider && options.videoProvider
@@ -360,7 +343,7 @@ export async function onboard(options: OnboardOptions = {}): Promise<InitResult>
     const slugError = validSlug(projectSlug);
     if (slugError) throw new ValidationError(slugError);
 
-    project = { slug: projectSlug, title: options.title, budget, song, image, video };
+    project = { slug: projectSlug, title: options.title, budget, image, video };
   }
 
   const install =
@@ -383,7 +366,6 @@ export async function onboard(options: OnboardOptions = {}): Promise<InitResult>
   const summary = [
     `Target:   ${target}`,
     `Project:  ${project ? project.slug : 'none'}`,
-    `Song:     ${project ? project.song : '-'}`,
     `Visuals:  ${project ? (project.image === project.video ? project.image : `image=${project.image}, video=${project.video}`) : '-'}`,
     `Budget:   ${project ? `$${project.budget.toFixed(2)}` : '-'}`,
     `Install:  ${install ? 'yes' : 'no'}`,
@@ -410,7 +392,6 @@ export async function onboard(options: OnboardOptions = {}): Promise<InitResult>
     project,
     falKey,
     higgsfieldKey,
-    suno: options.suno !== false,
     onProgress: (message) => log.step(message),
   });
 

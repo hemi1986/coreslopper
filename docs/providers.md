@@ -1,6 +1,6 @@
 # Providers and AI generation
 
-coreslopper generates images and clips through a small adapter interface. fal.ai and Higgsfield are the real adapters; a deterministic mock adapter powers tests and runs without an account. Suno is used through MCP (see [mcp.md](mcp.md)).
+coreslopper generates images and clips through a small adapter interface. fal.ai and Higgsfield are the real adapters; a deterministic mock adapter powers tests and runs without an account. Songs are never generated; the user imports a finished song.
 
 ## Choose providers per project
 
@@ -11,7 +11,6 @@ providers:
   image: higgsfield
   video: fal
   lipsync: fal   # optional; defaults to providers.video
-  song: import
 ```
 
 | Key | Covers | Values |
@@ -19,7 +18,6 @@ providers:
 | `image` | `generateImage`, `editImage` | `fal`, `higgsfield`, `mock` |
 | `video` | `imageToVideo` | `fal`, `higgsfield`, `mock` |
 | `lipsync` | `lipSync` | `fal`, `mock` (Higgsfield has no lip-sync yet) |
-| `song` | the `song` stage | `suno`, `import`, `mock` |
 
 When a storyboard uses lip-sync shots and `video` is `higgsfield`, set `lipsync: fal`.
 
@@ -30,7 +28,6 @@ providers:
   image: mock
   video: mock
   lipsync: mock
-  song: import
 ```
 
 ## Credentials

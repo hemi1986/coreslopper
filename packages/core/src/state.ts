@@ -7,36 +7,37 @@ export interface StageDefinition {
   skills: string[];
   outputs: string[];
   mechanical: boolean;
+  /**
+   * Interactive stages run in the main session with the user (the
+   * `new-video` skill), never in an autonomous stage runner.
+   */
+  interactive: boolean;
 }
 
 export const STAGES: StageDefinition[] = [
   {
+    id: 'setup',
+    label: 'Project setup & song import',
+    skills: ['new-video'],
+    outputs: ['lyrics.txt', 'song.json', 'audio/song.wav'],
+    mechanical: false,
+    interactive: true,
+  },
+  {
     id: 'brief',
     label: 'Brief',
-    skills: ['video-brief'],
+    skills: ['grilling', 'video-brief'],
     outputs: ['brief.md'],
     mechanical: false,
+    interactive: true,
   },
   {
     id: 'treatment',
     label: 'Concept & treatment',
-    skills: ['video-treatment'],
+    skills: ['grilling', 'video-treatment'],
     outputs: ['treatment.md'],
     mechanical: false,
-  },
-  {
-    id: 'lyrics',
-    label: 'Lyrics',
-    skills: ['lyrics-writer'],
-    outputs: ['lyrics.txt', 'suno-style.txt'],
-    mechanical: false,
-  },
-  {
-    id: 'song',
-    label: 'Song',
-    skills: ['suno-song'],
-    outputs: ['song.json', 'audio/song.wav', 'audio/stems/vocals.wav'],
-    mechanical: false,
+    interactive: true,
   },
   {
     id: 'audio-analysis',
@@ -44,6 +45,7 @@ export const STAGES: StageDefinition[] = [
     skills: ['audio-analysis'],
     outputs: ['timing.json', 'timing.report.md'],
     mechanical: true,
+    interactive: false,
   },
   {
     id: 'style-character',
@@ -51,6 +53,7 @@ export const STAGES: StageDefinition[] = [
     skills: ['style-bible', 'character-bible'],
     outputs: ['style.yaml', 'characters.yaml'],
     mechanical: false,
+    interactive: false,
   },
   {
     id: 'storyboard',
@@ -58,6 +61,7 @@ export const STAGES: StageDefinition[] = [
     skills: ['storyboard'],
     outputs: ['storyboard.yaml', 'storyboard.md', 'review/contact-sheet.svg'],
     mechanical: false,
+    interactive: false,
   },
   {
     id: 'assets',
@@ -65,6 +69,7 @@ export const STAGES: StageDefinition[] = [
     skills: ['remotion-motion', 'ai-clips', 'footage'],
     outputs: ['assets/manifest.jsonl'],
     mechanical: false,
+    interactive: false,
   },
   {
     id: 'assembly',
@@ -72,6 +77,7 @@ export const STAGES: StageDefinition[] = [
     skills: ['assembly-render'],
     outputs: ['renders/preview-16x9.mp4'],
     mechanical: true,
+    interactive: false,
   },
   {
     id: 'qa-export',
@@ -79,6 +85,7 @@ export const STAGES: StageDefinition[] = [
     skills: ['video-qa'],
     outputs: ['review/report.md', 'renders/16x9.mp4'],
     mechanical: true,
+    interactive: false,
   },
 ];
 
@@ -114,6 +121,30 @@ export function createInitialState(config: ProjectConfig, workflowVersion: strin
     errors: [],
     updatedAt: now,
   };
+}
+
+/** Stages that existed before the song became a mandatory import. */
+const RETIRED_STAGES = ['lyrics', 'song'];
+
+/**
+ * Bring a state file written by an older workflow up to the current stage
+ * list: add missing stages as pending, drop retired ones, and treat a finished
+ * `song` stage as a finished `setup`.
+ */
+export function migrateState(state: State): State {
+  const songDone = state.stages.song?.status === 'done' || state.stages.song?.status === 'skipped';
+  for (const stage of STAGES) {
+    if (state.stages[stage.id]) continue;
+    state.stages[stage.id] =
+      stage.id === 'setup' && songDone
+        ? { status: 'done', outputs: state.stages.song?.outputs ?? [], attempts: 0 }
+        : { status: 'pending', outputs: [], attempts: 0 };
+  }
+  for (const id of RETIRED_STAGES) delete state.stages[id];
+  if (!STAGES.some((stage) => stage.id === state.stage)) {
+    state.stage = nextStage(state)?.id ?? STAGES[STAGES.length - 1]!.id;
+  }
+  return state;
 }
 
 export function nextStage(state: State): StageDefinition | undefined {

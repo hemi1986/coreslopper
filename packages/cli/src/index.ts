@@ -26,7 +26,7 @@ import { renderProject } from './render.js';
 import { createProject } from './new-project.js';
 import { generateBatch } from './generate.js';
 import { runQa } from './qa.js';
-import { importFootage, normalizeAudio, extractFrame, extractAudioSegment } from './media.js';
+import { importFootage, importSong, normalizeAudio, extractFrame, extractAudioSegment } from './media.js';
 import { runDoctor } from './doctor.js';
 import { runInitCommand, validateChoice, type InitCommandOptions } from './init-command.js';
 import { printStatus } from './status.js';
@@ -141,7 +141,6 @@ program
   .option('--no-git', 'Do not initialize a git repository')
   .option('--install-tools', 'Install missing uv, Python, ffmpeg, and Claude Code')
   .option('--no-tool-install', 'Do not offer to install system tools')
-  .option('--song <provider>', 'suno | import', 'import')
   .option('--visual <provider>', 'mock | fal | higgsfield', 'mock')
   .option('--image-provider <provider>', 'mock | fal | higgsfield')
   .option('--video-provider <provider>', 'mock | fal | higgsfield')
@@ -150,12 +149,10 @@ program
   .option('--title <title>', 'First project title')
   .option('--fal-key <key>', 'fal.ai API key (prefer FAL_KEY in the environment)')
   .option('--higgsfield-key <key>', 'Higgsfield credential (prefer HIGGSFIELD_API_KEY in the environment)')
-  .option('--no-suno', 'Do not configure the Suno MCP server')
   .option('--skip-project', 'Create the workspace without a first project')
   .action((dir: string | undefined, options: InitCommandOptions) =>
     run(async () => {
       const visuals = ['mock', 'fal', 'higgsfield'] as const;
-      if (options.song) options.song = validateChoice(options.song, ['suno', 'import'] as const, 'song provider');
       if (options.visual) options.visual = validateChoice(options.visual, visuals, 'visual provider');
       if (options.imageProvider) {
         options.imageProvider = validateChoice(options.imageProvider, visuals, 'image provider');
@@ -176,7 +173,6 @@ program
   .option('--visual <provider>', 'mock | fal | higgsfield', 'mock')
   .option('--image-provider <provider>', 'mock | fal | higgsfield')
   .option('--video-provider <provider>', 'mock | fal | higgsfield')
-  .option('--song-provider <provider>', 'suno | import | mock', 'import')
   .action(
     (
       slug: string,
@@ -187,7 +183,6 @@ program
         visual: string;
         imageProvider?: string;
         videoProvider?: string;
-        songProvider: 'suno' | 'import' | 'mock';
       },
     ) =>
       run(async () => {
@@ -206,7 +201,6 @@ program
           brand: options.brand,
           imageProvider,
           videoProvider,
-          songProvider: options.songProvider,
         });
       }),
   );
@@ -375,6 +369,17 @@ program
   .action((project: string | undefined, options: { input: string; output?: string }) =>
     run(async () => {
       await normalizeAudio(projectDirFromArg(project), options.input, options.output);
+    }),
+  );
+
+program
+  .command('import-song [project]')
+  .description('Register the song at audio/song.wav and the stem at audio/stems/vocals.wav in song.json; converts other formats to WAV.')
+  .option('--song <path>', 'Song file (default: audio/song.wav or audio/song.*)')
+  .option('--vocals <path>', 'Vocal stem (default: audio/stems/vocals.wav or audio/stems/vocals.*)')
+  .action((project: string | undefined, options: { song?: string; vocals?: string }) =>
+    run(async () => {
+      await importSong(projectDirFromArg(project), options);
     }),
   );
 

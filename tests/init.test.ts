@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { initWorkspace, sanitizeSlug, upsertEnv, writeMcpConfig } from '../packages/cli/src/init.ts';
+import { initWorkspace, sanitizeSlug, upsertEnv } from '../packages/cli/src/init.ts';
 import { validateFalKey, validateHiggsfieldKey } from '../packages/cli/src/tools.ts';
 import { findWorkspaceRoot } from '../packages/cli/src/workspace.ts';
 
@@ -51,7 +51,6 @@ describe('workspace init', () => {
       project: {
         slug: 'test-video',
         budget: 25,
-        song: 'import',
         image: 'mock',
         video: 'mock',
       },
@@ -75,8 +74,14 @@ describe('workspace init', () => {
     const mcp = JSON.parse(await readFile(join(target, '.mcp.json'), 'utf8')) as {
       mcpServers: Record<string, { url: string }>;
     };
-    expect(mcp.mcpServers.suno?.url).toBe('https://api.suno.com/mcp');
+    expect(mcp.mcpServers.suno).toBeUndefined();
     expect(mcp.mcpServers.other?.url).toBe('https://example.test');
+
+    const state = JSON.parse(await readFile(join(target, 'projects', 'test-video', 'state.json'), 'utf8')) as {
+      stage: string;
+    };
+    expect(state.stage).toBe('setup');
+    expect(existsSync(join(target, 'projects', 'test-video', 'audio', 'stems'))).toBe(true);
 
     const marker = JSON.parse(await readFile(join(target, 'coreslopper.workspace.json'), 'utf8')) as {
       version: number;
@@ -86,7 +91,7 @@ describe('workspace init', () => {
     expect(marker.project).toBe('test-video');
 
     const gettingStarted = await readFile(join(target, 'GETTING_STARTED.md'), 'utf8');
-    expect(gettingStarted).toContain('/video-next test-video');
+    expect(gettingStarted).toContain('/new-video test-video');
     expect(findWorkspaceRoot(join(target, 'projects', 'test-video'))).toBe(target);
   });
 
@@ -117,20 +122,6 @@ describe('onboarding helpers', () => {
     expect(sanitizeSlug('My Video!')).toBe('my-video');
     expect(sanitizeSlug('---')).toBe('my-video');
     expect(sanitizeSlug('already-ok-2')).toBe('already-ok-2');
-  });
-
-  it('merges the Suno server into an existing MCP config', async () => {
-    const directory = await temporaryDir('coreslopper-mcp-');
-    await writeFile(
-      join(directory, '.mcp.json'),
-      JSON.stringify({ mcpServers: { other: { url: 'https://example.test' } } }),
-    );
-    writeMcpConfig(directory, true);
-    const config = JSON.parse(await readFile(join(directory, '.mcp.json'), 'utf8')) as {
-      mcpServers: Record<string, { url: string }>;
-    };
-    expect(config.mcpServers.suno?.url).toBe('https://api.suno.com/mcp');
-    expect(config.mcpServers.other?.url).toBe('https://example.test');
   });
 
   it('validates a fal key and treats network failures as unknown', async () => {

@@ -5,6 +5,17 @@
   "stage": "qa-export",
   "status": "done",
   "stages": {
+    "setup": {
+      "status": "done",
+      "inputHash": "fixture:setup",
+      "outputs": [
+        "lyrics.txt",
+        "song.json",
+        "audio/song.wav"
+      ],
+      "attempts": 1,
+      "finishedAt": "2026-11-08T12:04:00.000Z"
+    },
     "brief": {
       "status": "done",
       "inputHash": "fixture:brief",
@@ -22,26 +33,6 @@
       ],
       "attempts": 1,
       "finishedAt": "2026-11-08T12:02:00.000Z"
-    },
-    "lyrics": {
-      "status": "done",
-      "inputHash": "fixture:lyrics",
-      "outputs": [
-        "lyrics.txt",
-        "suno-style.txt"
-      ],
-      "attempts": 1,
-      "finishedAt": "2026-11-08T12:03:00.000Z"
-    },
-    "song": {
-      "status": "done",
-      "inputHash": "fixture:song",
-      "outputs": [
-        "song.json",
-        "audio/song.wav"
-      ],
-      "attempts": 1,
-      "finishedAt": "2026-11-08T12:04:00.000Z"
     },
     "audio-analysis": {
       "status": "done",

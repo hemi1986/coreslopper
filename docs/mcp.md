@@ -2,34 +2,15 @@
 
 Claude Code reads project-scoped MCP servers from `.mcp.json` at the repository root.
 
-## Suno (included)
-
-```json
-{
-  "mcpServers": {
-    "suno": {
-      "type": "http",
-      "url": "https://api.suno.com/mcp"
-    }
-  }
-}
-```
-
-Authentication is handled by Claude Code's MCP login flow. The endpoint is the official Suno MCP endpoint. The `suno-song` skill uses the tools the server exposes; it does not hard-code a Suno API shape.
-
-Suno is optional. A project can import a finished song instead.
+The pipeline needs no MCP server, and the repository ships no `.mcp.json`. Songs are always supplied by the user and imported with `npm run cli -- import-song`; there is no song-generation integration. Create `.mcp.json` yourself only for the optional exploration servers below.
 
 ## fal.ai (optional, exploration only)
 
-The pipeline uses the fal.ai adapter in `packages/providers` with `FAL_KEY`, not MCP. If you want to explore fal.ai models interactively in Claude Code, add the HTTP MCP URL from your fal account to `.mcp.json`:
+The pipeline uses the fal.ai adapter in `packages/providers` with `FAL_KEY`, not MCP. If you want to explore fal.ai models interactively in Claude Code, create `.mcp.json` with the HTTP MCP URL from your fal account:
 
 ```json
 {
   "mcpServers": {
-    "suno": {
-      "type": "http",
-      "url": "https://api.suno.com/mcp"
-    },
     "fal": {
       "type": "http",
       "url": "<paste-the-fal-mcp-url-from-your-account>"

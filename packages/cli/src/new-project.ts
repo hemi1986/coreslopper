@@ -22,7 +22,6 @@ export interface NewProjectOptions {
   brand?: string;
   imageProvider?: ProviderKind;
   videoProvider?: ProviderKind;
-  songProvider?: 'suno' | 'import' | 'mock';
   /** Workspace root. Defaults to the repository root discovered from cwd. */
   root?: string;
 }
@@ -104,24 +103,21 @@ export async function createProject(options: NewProjectOptions): Promise<string>
     providers: {
       image: options.imageProvider ?? 'mock',
       video: options.videoProvider ?? 'mock',
-      song: options.songProvider ?? 'import',
     },
-    song: { variants: 2 },
     brand: options.brand ?? 'example',
     models: {},
   };
 
   await writeTextAtomic(join(projectDir, 'project.yaml'), stringify(config));
-  for (const file of ['brief.md', 'treatment.md', 'README.md', 'lyrics.txt', 'suno-style.txt']) {
+  for (const file of ['brief.md', 'treatment.md', 'README.md', 'lyrics.txt']) {
     const path = join(projectDir, file);
     if (!existsSync(path)) continue;
     const text = await readFile(path, 'utf8');
     await writeFile(path, text.replaceAll('{{TITLE}}', config.title).replaceAll('{{SLUG}}', slug), 'utf8');
   }
+  // New projects start at the interactive `setup` stage; the template carries
+  // the creative placeholders that the skills fill in.
   const state = createInitialState(config, config.workflow.version);
-  // New projects start with an empty project state; the template carries the
-  // creative placeholders that the skills fill in.
-  state.stage = 'brief';
   await writeJsonAtomic(join(projectDir, 'state.json'), state);
   await writeJsonAtomic(join(projectDir, 'timing.overrides.json'), {
     version: 1,
@@ -133,6 +129,7 @@ export async function createProject(options: NewProjectOptions): Promise<string>
   for (const directory of ['audio', 'assets', 'characters', 'renders', 'review', 'brand']) {
     await mkdir(join(projectDir, directory), { recursive: true });
   }
+  await mkdir(join(projectDir, 'audio', 'stems'), { recursive: true });
   await writeFile(join(projectDir, 'audio', '.gitkeep'), '');
   await writeFile(join(projectDir, 'assets', '.gitkeep'), '');
   await writeFile(join(projectDir, 'characters', '.gitkeep'), '');
@@ -145,8 +142,10 @@ export async function createProject(options: NewProjectOptions): Promise<string>
   await readFile(join(projectDir, 'project.yaml'), 'utf8');
 
   console.log(`Created project ${config.title} (${slug}) at ${projectDir}`);
-  console.log(`Budget: $${config.budget_usd.toFixed(2)} · providers: image=${config.providers.image}, video=${config.providers.video}, song=${config.providers.song}`);
-  console.log('Next: run /video-next ' + slug + ' in Claude Code, or npm run status -- ' + relativeToRoot(projectDir, root));
+  console.log(`Budget: $${config.budget_usd.toFixed(2)} · providers: image=${config.providers.image}, video=${config.providers.video}`);
+  const audio = relativeToRoot(join(projectDir, 'audio'), root);
+  console.log(`Song: put the finished mix at ${audio}/song.wav and the vocal stem at ${audio}/stems/vocals.wav.`);
+  console.log('Next: run /new-video ' + slug + ' in Claude Code to finish setup, lyrics, song import, and the brief.');
   return projectDir;
 }
 

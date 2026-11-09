@@ -25,16 +25,16 @@ The visual and dramatic interpretation of the brief: core idea, imagery, dramatu
 _Avoid_: script, outline
 
 **Lyrics**:
-The authoritative lyric text with section tags. Word text and spelling come from here, never from speech recognition.
+The authoritative lyric text with section tags, supplied by the user. Word text and spelling come from here, never from speech recognition.
 _Avoid_: transcript
 
-**Suno Style Prompt**:
-The compact style descriptor used to generate the song, separate from the treatment and the visual style.
-_Avoid_: genre tag
+**Song Import**:
+Registering the user's finished mix (`audio/song.wav`) and vocal stem (`audio/stems/vocals.wav`) in `song.json`, converting other formats to WAV. Every project starts from an existing song; coreslopper never generates music.
+_Avoid_: song generation, upload
 
-**Song Variant**:
-One generated or imported candidate song. The pipeline selects one variant per project.
-_Avoid_: take, version
+**Interactive Stage**:
+A stage the `new-video` skill runs with the user in the main session (`setup`, `brief`, `treatment`). `/video-next` never dispatches one.
+_Avoid_: approval gate
 
 **Stem**:
 An isolated audio part such as vocals, drums, bass, or other, used for analysis and mixing.
@@ -201,7 +201,7 @@ One music video, stored in `projects/<slug>/`, with its own config, state, artif
 _Avoid_: video, job
 
 **Template**:
-The skeleton copied by `/new-video` into a new project.
+The skeleton copied by `npm run cli -- new` (called from the `new-video` skill) into a new project.
 _Avoid_: boilerplate
 
 **Export**:

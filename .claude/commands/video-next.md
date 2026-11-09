@@ -14,13 +14,15 @@ Run the autonomous pipeline for one project. The default is to run **all** open 
 2. Run `npm run cli -- status projects/<slug>`. Read the project title, stage table, budget, and next stage.
 3. If `--dry-run`, stop after printing the next stage, its skills, and the remaining budget.
 4. If the next stage is missing because everything is done, report success and stop.
+5. If the next stage is `setup`, `brief`, or `treatment`, stop: these are interactive. Tell the user to run `/new-video <slug>`, which resumes where the project stands. Never dispatch them to a stage runner.
 
 ## Stage loop
 
 Repeat until the project is done or a hard stop occurs:
 
 1. Determine the next stage from `status`. The stage IDs are:
-   `brief`, `treatment`, `lyrics`, `song`, `audio-analysis`, `style-character`, `storyboard`, `assets`, `assembly`, `qa-export`.
+   `audio-analysis`, `style-character`, `storyboard`, `assets`, `assembly`, `qa-export`.
+   (`setup`, `brief`, and `treatment` come first and are done by `/new-video`.)
 2. Mark it running: `npm run cli -- stage-start projects/<slug> <stage>`.
 3. Dispatch **one** `stage-runner` subagent with a fresh context. The prompt must include:
    - the project path,

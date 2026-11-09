@@ -30,12 +30,12 @@ We will acknowledge the report and coordinate a disclosure timeline.
 
 This is a security-adjacent concern for this project:
 
-- Do not commit generated Suno/fal.ai/Higgsfield media or copyrighted music.
+- Do not commit songs, stems, generated fal.ai/Higgsfield media, or copyrighted music.
 - Do not generate a recognizable real person without consent.
 - Do not use a trademark or copyrighted character as a character reference.
 - Report a licensing or consent problem with the same private process if it involves a person or a rights holder.
 
 ## Out of scope
 
-- Vulnerabilities in Remotion, fal.ai, Higgsfield, Suno, or a model provider should be reported to that provider.
+- Vulnerabilities in Remotion, fal.ai, Higgsfield, or a model provider should be reported to that provider.
 - Cost overruns caused by ignoring the budget guard are not a security vulnerability, but they are a bug worth reporting.

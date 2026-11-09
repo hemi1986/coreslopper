@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
 import { chmod, cp, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, isAbsolute, join, parse, relative, resolve, sep } from 'node:path';
@@ -24,14 +24,12 @@ import {
   type WorkspaceMarker,
 } from './workspace.js';
 
-export type SongProvider = 'suno' | 'import';
 export type VisualProvider = 'fal' | 'higgsfield' | 'mock';
 
 export interface FirstProjectOptions {
   slug: string;
   title?: string;
   budget: number;
-  song: SongProvider;
   image: VisualProvider;
   video: VisualProvider;
 }
@@ -46,7 +44,6 @@ export interface InitOptions {
   project?: FirstProjectOptions | null;
   falKey?: string;
   higgsfieldKey?: string;
-  suno?: boolean;
   onProgress?: (message: string) => void;
 }
 
@@ -150,28 +147,8 @@ async function ensureEnvFile(
   await chmod(envPath, 0o600).catch(() => undefined);
 }
 
-export function writeMcpConfig(target: string, suno: boolean): void {
-  const path = join(target, '.mcp.json');
-  let config: { mcpServers?: Record<string, unknown> } = {};
-  if (existsSync(path)) {
-    try {
-      config = JSON.parse(readFileSync(path, 'utf8')) as { mcpServers?: Record<string, unknown> };
-    } catch {
-      config = {};
-    }
-  }
-  config.mcpServers ??= {};
-  if (suno) {
-    config.mcpServers.suno = { type: 'http', url: 'https://api.suno.com/mcp' };
-  } else {
-    delete config.mcpServers.suno;
-  }
-  writeFileSyncJson(path, config);
-}
-
 function writeFileSyncJson(path: string, value: unknown): void {
-  // Small synchronous write keeps init call sites simple and lets the MCP
-  // config be produced before dependency installation.
+  // Small synchronous write keeps init call sites simple.
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
 }
 
@@ -209,7 +186,6 @@ async function createFirstProject(
     title: project.title,
     budget: project.budget,
     root: target,
-    songProvider: project.song,
     imageProvider: project.image,
     videoProvider: project.video,
   });
@@ -228,7 +204,7 @@ function gettingStarted(target: string, result: InitResult, options: InitOptions
     `- Location: \`${target}\``,
     ...(project
       ? [
-          `- First project: \`${project.slug}\` (budget $${project.budget.toFixed(2)}, song: ${project.song}, visuals: ${project.image})`,
+          `- First project: \`${project.slug}\` (budget $${project.budget.toFixed(2)}, visuals: ${project.image})`,
         ]
       : ['- No first project yet. Create one with `npm run cli -- new <slug> --budget 50`.']),
     '',
@@ -245,15 +221,15 @@ function gettingStarted(target: string, result: InitResult, options: InitOptions
     'In Claude Code:',
     '',
     '```text',
-    ...(options.suno === false ? [] : ['/mcp                 # authenticate Suno once']),
-    ...(project ? [`/video-next ${project.slug}`] : []),
+    ...(project ? [`/new-video ${project.slug}    # lyrics, song import, brief`] : ['/new-video']),
     '```',
     '',
     '## Credentials',
     '',
     '- fal.ai: `FAL_KEY` in `.env` (gitignored).',
     '- Higgsfield: `HIGGSFIELD_API_KEY` (or `HF_API_KEY_ID` + `HF_API_KEY_SECRET`) in `.env`.',
-    '- Suno: OAuth through the Suno MCP server in `.mcp.json`.',
+    '',
+    'Bring a finished song: `/new-video` tells you where to put the mix and the vocal stem.',
     '',
     'Generated audio, images, clips, and renders stay in the project folders and are gitignored.',
     '',
@@ -316,9 +292,8 @@ export async function initWorkspace(options: InitOptions): Promise<InitResult> {
   options.onProgress?.('Copying the coreslopper runtime...');
   await copyRuntime(runtime, target);
 
-  options.onProgress?.('Writing credentials and MCP configuration...');
+  options.onProgress?.('Writing credentials...');
   await ensureEnvFile(target, options.falKey, options.higgsfieldKey);
-  writeMcpConfig(target, options.suno !== false);
 
   if (options.tools) {
     options.onProgress?.('Installing missing tools...');

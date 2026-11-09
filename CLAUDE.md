@@ -4,15 +4,15 @@
 
 ## Commands
 
-- `/new-video <slug> --budget <usd>` — create a project from `templates/project/`. Budget is mandatory.
-- `/video-next <slug>` — run all open stages. Add `--stage <stage>` to run one stage, or `--dry-run` to inspect the next stage.
+- `/new-video [slug]` — skill that creates a project for an existing song (or resumes one): asks for project data and lyrics, imports the song and vocal stem, then grills the user into the brief and treatment. Runs in the main session, not in a stage runner.
+- `/video-next <slug>` — run all open autonomous stages (from `audio-analysis` on). Add `--stage <stage>` to run one stage, or `--dry-run` to inspect the next stage.
 - `/video-status [slug]` — read-only stage and budget report.
 
 `/video-next` dispatches one `stage-runner` subagent per stage. Do not inline a whole stage into the main context.
 
 ## Workspace setup
 
-Create a workspace with `npx coreslopper init <dir>` (or `npx coreslopper@latest init`). The onboarding CLI checks tools, writes `FAL_KEY` and Higgsfield credentials to `.env`, and configures the Suno MCP server. The workspace is a private runtime snapshot, so run day-to-day commands with its local `npm run cli -- ...`; `npx coreslopper doctor` works from anywhere. See `docs/onboarding.md`.
+Create a workspace with `npx coreslopper init <dir>` (or `npx coreslopper@latest init`). The onboarding CLI checks tools and writes `FAL_KEY` and Higgsfield credentials to `.env`. The workspace is a private runtime snapshot, so run day-to-day commands with its local `npm run cli -- ...`; `npx coreslopper doctor` works from anywhere. See `docs/onboarding.md`.
 
 ## Agents
 
@@ -28,9 +28,7 @@ The hook calls `npm run cli -- validate-file <file>`, which is also runnable by 
 
 ## MCP
 
-`.mcp.json` configures the official Suno MCP server at `https://api.suno.com/mcp`. Authentication is handled by Claude Code's MCP login flow. Suno is optional when a project imports an existing song.
-
-fal.ai and Higgsfield are used through the pipeline adapters (`FAL_KEY`, `HIGGSFIELD_API_KEY`), not through MCP. If you want to explore fal.ai models interactively, see `docs/mcp.md` and add a project-scoped MCP server for fal.ai; keep it out of the pipeline.
+The pipeline needs no MCP server. The song is always supplied by the user. fal.ai and Higgsfield are used through the pipeline adapters (`FAL_KEY`, `HIGGSFIELD_API_KEY`), not through MCP. If you want to explore fal.ai models interactively, see `docs/mcp.md` and add a project-scoped MCP server for fal.ai; keep it out of the pipeline.
 
 ## Permissions and safety
 

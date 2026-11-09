@@ -19,18 +19,14 @@ The wizard:
 1. Picks a target directory and refuses to overwrite a non-empty directory unless you confirm or pass `--force`.
 2. Checks Node, npm, git, uv, Python, ffmpeg, and Claude Code.
 3. Offers to install uv, Python 3.12 (via uv), ffmpeg, and Claude Code.
-4. Asks how the song is made:
-   - `import` — bring your own `audio/song.wav`, no Suno account needed;
-   - `suno` — generate with Suno through the MCP server.
-5. Asks how visuals are generated:
+4. Asks how visuals are generated:
    - `mock` — motion graphics and dry runs, no API key;
    - `fal` — AI keyframes and image-to-video, needs `FAL_KEY`;
    - `higgsfield` — AI keyframes and image-to-video, needs a Higgsfield credential.
-6. Validates optional fal.ai and Higgsfield credentials and writes them to `.env` with mode `0600`.
-7. Writes `.mcp.json` with the Suno server at `https://api.suno.com/mcp`.
-8. Creates the first project and runs `npm install` plus `uv sync --group dev`.
+5. Validates optional fal.ai and Higgsfield credentials and writes them to `.env` with mode `0600`.
+6. Creates the first project and runs `npm install` plus `uv sync --group dev`.
 
-At the end, open Claude Code in the workspace, run `/mcp` once to authenticate Suno, and start the pipeline with `/video-next <slug>`.
+At the end, open Claude Code in the workspace and run `/new-video <slug>`. The skill asks for the lyrics, tells you where to put the song and its vocal stem, and grills you into the brief and treatment. Then `/video-next <slug>` runs the rest. coreslopper always works from a finished song; it does not generate music.
 
 ## Non-interactive
 
@@ -39,13 +35,12 @@ Use `--yes` in scripts, CI, or when you already know the answers:
 ```bash
 npx coreslopper@latest init my-video \
   --yes \
-  --song suno \
   --visual higgsfield \
   --budget 50 \
   --project my-video
 ```
 
-`--yes` uses `import` and `mock` by default. Set `FAL_KEY` or `HIGGSFIELD_API_KEY` in the environment for a real provider. Prefer environment variables or the interactive prompt; a key passed on the command line can end up in your shell history. Use `--image-provider` and `--video-provider` to mix providers, for example Higgsfield for keyframes and fal.ai for video.
+`--yes` uses the `mock` visual provider by default. Set `FAL_KEY` or `HIGGSFIELD_API_KEY` in the environment for a real provider. Prefer environment variables or the interactive prompt; a key passed on the command line can end up in your shell history. Use `--image-provider` and `--video-provider` to mix providers, for example Higgsfield for keyframes and fal.ai for video.
 
 Add `--install-tools` to let the non-interactive run install missing uv, Python, ffmpeg, and Claude Code.
 
@@ -60,7 +55,6 @@ Add `--install-tools` to let the non-interactive run install missing uv, Python,
 | `--no-git` | git init | Do not initialize a git repository. |
 | `--install-tools` | off | Install missing uv, Python, ffmpeg, and Claude Code in non-interactive mode. |
 | `--no-tool-install` | off | Do not offer to install system tools in interactive mode. |
-| `--song <suno\|import>` | `import` | Song source for the first project. |
 | `--visual <mock\|fal\|higgsfield>` | `mock` | Image and video provider for the first project. |
 | `--image-provider <mock\|fal\|higgsfield>` | `--visual` | Image provider override. |
 | `--video-provider <mock\|fal\|higgsfield>` | `--visual` | Video provider override. |
@@ -69,7 +63,6 @@ Add `--install-tools` to let the non-interactive run install missing uv, Python,
 | `--title <title>` | derived from slug | First project title. |
 | `--fal-key <key>` | `FAL_KEY` | fal.ai API key. |
 | `--higgsfield-key <key>` | `HIGGSFIELD_API_KEY` | Higgsfield credential (`key_id:key_secret`). |
-| `--no-suno` | configure | Do not add the Suno MCP server. |
 | `--skip-project` | off | Create the workspace without a first project. |
 
 Run `npx coreslopper init --help` for the current list.
@@ -80,7 +73,6 @@ Run `npx coreslopper init --help` for the current list.
 my-video/
   .claude/                 skills, commands, agents, hooks
   .env                     local secrets (gitignored, mode 0600)
-  .mcp.json                Suno MCP server
   coreslopper.workspace.json
   GETTING_STARTED.md
   config/                  defaults and model roles
@@ -112,7 +104,7 @@ HF_API_KEY_ID=...
 HF_API_KEY_SECRET=...
 ```
 
-Suno uses OAuth through the MCP server; it does not belong in `.env`. The mock provider and the motion-only demo need no credentials.
+The song needs no credential; you bring it yourself. The mock provider and the motion-only demo need no credentials.
 
 ## Day-to-day commands
 
@@ -168,7 +160,7 @@ npx coreslopper@latest update
 
 Merge each `.coreslopper-new` file into the original and delete it. `--force` overwrites changed files instead.
 
-`projects/` belongs to you: `update` adds new upstream files there but never overwrites or deletes anything. `.env`, `.mcp.json`, and `GETTING_STARTED.md` are never touched. `package-lock.json` always follows upstream. Afterwards `update` runs `npm install` and `uv sync`; pass `--no-install` to skip them.
+`projects/` belongs to you: `update` adds new upstream files there but never overwrites or deletes anything. `.env`, `.mcp.json` (if you added one), and `GETTING_STARTED.md` are never touched. `package-lock.json` always follows upstream. Afterwards `update` runs `npm install` and `uv sync`; pass `--no-install` to skip them.
 
 | Flag | Effect |
 |---|---|
@@ -182,7 +174,6 @@ Workspaces created before `update` existed have no baseline, so every file that 
 
 - **`uv: command not found` after installation** — open a new shell or add `~/.local/bin` to `PATH`.
 - **ffmpeg missing** — on Linux x64, run `./scripts/install-ffmpeg.sh` in the workspace; otherwise install it with your package manager. It is optional for the motion-only demo.
-- **Suno does not authenticate** — open Claude Code in the workspace and run `/mcp`; complete the OAuth flow in the browser. Suno is optional when you import a song.
 - **`FAL_KEY` rejected** — create a key on the `API` preset at <https://fal.ai/dashboard/keys> and update `.env`.
 - **Higgsfield credential rejected** — create or rotate an API key in the Higgsfield Console at <https://console.higgsfield.ai> and update `.env`. Use `key_id:key_secret` as one value or set `HF_API_KEY_ID` and `HF_API_KEY_SECRET`.
 - **`npm install` failed** — run it again in the workspace. The rest of the onboarding output is still valid.

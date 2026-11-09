@@ -6,13 +6,13 @@ An open-source, Claude Code-native workflow for making music videos: from an ide
 
 ![A frame from the motion-only demo](docs/assets/demo-still.png)
 
-Agent skills do the creative work (brief, treatment, lyrics, storyboard, prompts). Tested scripts do the mechanical work (audio analysis, validation, budget checks, caching, rendering). Each shot can be motion graphics, an AI clip, real footage, or a mix. The pipeline runs on its own and stops only for budget, missing credentials, or a validation failure it cannot fix.
+Agent skills do the creative work (brief, treatment, storyboard, prompts). Tested scripts do the mechanical work (audio analysis, validation, budget checks, caching, rendering). Each shot can be motion graphics, an AI clip, real footage, or a mix. The pipeline runs on its own and stops only for budget, missing credentials, or a validation failure it cannot fix.
 
 ## Requirements
 
 - Node.js 22+, Python 3.12+, [uv](https://docs.astral.sh/uv/), `ffmpeg`, and [Claude Code](https://claude.com/claude-code). `init` checks them and offers to install the missing ones.
 - For AI visuals: a [fal.ai](https://fal.ai) key or a [Higgsfield](https://higgsfield.ai) credential. Without one, the mock provider renders placeholders.
-- For song generation: a Suno account. Not needed when you bring your own song.
+- A finished song: the mix, ideally its vocal stem, and the lyrics. coreslopper does not generate music.
 - Optional: an NVIDIA GPU for faster lyric alignment. CPU works.
 
 ## 1. Create a workspace
@@ -24,65 +24,11 @@ npx coreslopper@latest init my-videos
 cd my-videos
 ```
 
-The wizard checks your tools, asks for provider keys (stored in `.env`, gitignored), sets up the Suno MCP server, and creates a first project. Every later command runs inside this folder. See [docs/onboarding.md](docs/onboarding.md) for all flags.
+The wizard checks your tools, asks for provider keys (stored in `.env`, gitignored), and creates a first project. Every later command runs inside this folder. See [docs/onboarding.md](docs/onboarding.md) for all flags.
 
-## 2. New project with an existing Suno song
+## 2. New project
 
-You have a finished song, ideally with its vocal stem, and the lyrics.
-
-**Create the project.** Pick `--visual higgsfield`, `fal`, or `mock`. Budget is in USD and mandatory:
-
-```bash
-npm run cli -- new neon-rain --budget 50 --visual higgsfield
-```
-
-Higgsfield has no lip-sync yet. For lip-sync shots, add a `FAL_KEY` to `.env` and set `lipsync: fal` in `projects/neon-rain/project.yaml` ([details](docs/providers.md)).
-
-**Add the song.** WAV goes straight in; MP3, M4A, and other formats are converted. The vocal stem is optional, but it makes the lyric timing much more accurate:
-
-```bash
-cp ~/Downloads/neon-rain.wav projects/neon-rain/audio/song.wav
-# or: npm run cli -- normalize-audio neon-rain --input ~/Downloads/neon-rain.mp3
-
-mkdir -p projects/neon-rain/audio/stems
-cp ~/Downloads/neon-rain-vocals.wav projects/neon-rain/audio/stems/vocals.wav
-```
-
-**Add the lyrics** to `projects/neon-rain/lyrics.txt`, exactly as sung, with section tags:
-
-```text
-[Verse 1]
-Line one
-Line two
-
-[Chorus]
-Line three
-Line four
-```
-
-**Describe the song** in `projects/neon-rain/song.json`. `language` matters: it selects the speech model for the lyric alignment.
-
-```json
-{
-  "source": "suno",
-  "title": "Neon Rain",
-  "path": "audio/song.wav",
-  "language": "en",
-  "hasVocals": true,
-  "stems": true,
-  "license": "Suno output; check your plan and local law"
-}
-```
-
-**Write your idea** in a few sentences into `projects/neon-rain/brief.md`: what the video is about, the mood, the look.
-
-**Tell the pipeline what you supplied**, so it does not write a new brief, new lyrics, or a new song:
-
-```bash
-npm run cli -- stage-done neon-rain brief --outputs brief.md
-npm run cli -- stage-skip neon-rain lyrics --reason "Imported lyrics"
-npm run cli -- stage-skip neon-rain song --reason "Imported Suno song"
-```
+coreslopper always starts from a finished song. Bring the mix, ideally its vocal stem, and the lyrics.
 
 **Install the lyric aligner once per workspace** (WhisperX and Demucs, a large download):
 
@@ -90,38 +36,36 @@ npm run cli -- stage-skip neon-rain song --reason "Imported Suno song"
 (cd scripts/audio-analysis && uv sync --extra asr --extra stems)
 ```
 
-**Run the pipeline** in Claude Code:
+**Start Claude Code and create the project:**
 
 ```bash
 claude
 ```
 
 ```text
-/video-next neon-rain
+/new-video
 ```
 
-It analyzes the song, builds the style and character bibles, writes and validates the storyboard, generates the assets, and renders `projects/neon-rain/renders/`.
+The `new-video` skill walks you through setup:
 
-## 3. New project without a song
+1. It asks for the title, artist, slug, budget (USD, mandatory), visual provider (`mock`, `fal`, or `higgsfield`), the sung language, and the song's rights, then creates the project.
+2. It asks you to paste the lyrics and adds section tags (`[Verse 1]`, `[Chorus]`, …) for you to confirm.
+3. It tells you where to put the audio:
+   - the mix at `projects/<slug>/audio/song.wav`,
+   - the vocal stem at `projects/<slug>/audio/stems/vocals.wav`.
 
-Suno writes and sings the song. The pipeline writes the lyrics.
+   WAV goes straight in; `song.mp3`, `vocals.flac`, and other formats with the same name are converted. Export both from the same session so they line up. The stem is optional, but it makes the lyric timing much more accurate. When you confirm, it runs `npm run cli -- import-song` to check the files and record them in `song.json`.
+4. It grills you about the video and writes `brief.md` and `treatment.md` with you.
 
-```bash
-npm run cli -- new my-video --budget 50 --visual higgsfield --song-provider suno
-```
+Higgsfield has no lip-sync yet. For lip-sync shots, add a `FAL_KEY` to `.env` and set `lipsync: fal` in `projects/<slug>/project.yaml` ([details](docs/providers.md)).
 
-Write your idea into `projects/my-video/brief.md` and mark it done (or skip this, and the pipeline drafts a brief from the title):
-
-```bash
-npm run cli -- stage-done my-video brief --outputs brief.md
-```
-
-Then, in Claude Code, authenticate Suno once and start:
+**Run the pipeline.** At the end, `new-video` offers to start it, or run it yourself:
 
 ```text
-/mcp
-/video-next my-video
+/video-next <slug>
 ```
+
+It analyzes the song, builds the style and character bibles, writes and validates the storyboard, generates the assets, and renders `projects/<slug>/renders/` without further questions. If you stop halfway through setup, `/new-video <slug>` resumes where you left off.
 
 ## Everyday commands
 
@@ -158,14 +102,14 @@ Your projects, `.env`, and your own edits to workflow files are kept. If a file 
 | Setup flags, credentials, updating, troubleshooting | [docs/onboarding.md](docs/onboarding.md) |
 | What each stage does, and running one by hand | [docs/pipeline.md](docs/pipeline.md) |
 | fal.ai, Higgsfield, budgets, and model roles | [docs/providers.md](docs/providers.md) |
-| Suno MCP | [docs/mcp.md](docs/mcp.md) |
+| Optional MCP servers | [docs/mcp.md](docs/mcp.md) |
 | How it works inside | [docs/architecture.md](docs/architecture.md), [docs/adr/](docs/adr/) |
 | Terms used everywhere | [docs/glossary.md](docs/glossary.md) |
 | Why it is built this way | [docs/PLAN.md](docs/PLAN.md) |
 
 ## License
 
-The workflow is [MIT](LICENSE). **Remotion, the renderer, is source-available, not open source:** it is free for individuals, non-profits, and companies with up to 3 employees; larger for-profit companies need a Remotion license. Check your Suno plan before you publish a video with a Suno song. See [docs/THIRD_PARTY.md](docs/THIRD_PARTY.md).
+The workflow is [MIT](LICENSE). **Remotion, the renderer, is source-available, not open source:** it is free for individuals, non-profits, and companies with up to 3 employees; larger for-profit companies need a Remotion license. Make sure you hold the rights to the song before you publish a video. See [docs/THIRD_PARTY.md](docs/THIRD_PARTY.md).
 
 ## Contributing and security
 

@@ -20,7 +20,7 @@ def slugify(value: str) -> str:
 
 
 def parse_lyrics(text: str) -> list[dict[str, Any]]:
-    """Parse Suno-style section tags and lyric lines, preserving order."""
+    """Parse bracketed section tags and lyric lines, preserving order."""
     sections: list[dict[str, Any]] = []
     used: set[str] = set()
     current: dict[str, Any] | None = None

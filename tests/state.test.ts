@@ -3,7 +3,9 @@ import {
   BudgetError,
   ProjectConfigSchema,
   createInitialState,
+  STAGES,
   effectiveBatchCap,
+  migrateState,
   nextStage,
   overallStatus,
   recordSpend,
@@ -25,9 +27,11 @@ const config = ProjectConfigSchema.parse({
 });
 
 describe('state machine', () => {
-  it('starts at brief and advances in order', () => {
+  it('starts at setup and advances in order', () => {
     const state = createInitialState(config, '0.1.0');
-    expect(state.stage).toBe('brief');
+    expect(state.stage).toBe('setup');
+    expect(nextStage(state)?.id).toBe('setup');
+    setStageDone(state, 'setup', ['lyrics.txt', 'song.json', 'audio/song.wav']);
     expect(nextStage(state)?.id).toBe('brief');
     setStageRunning(state, 'brief');
     expect(state.status).toBe('running');
@@ -35,6 +39,26 @@ describe('state machine', () => {
     expect(state.stages.brief!.status).toBe('done');
     expect(nextStage(state)?.id).toBe('treatment');
     expect(overallStatus(state)).toBe('pending');
+  });
+
+  it('runs the interactive stages before the song analysis', () => {
+    const interactive = STAGES.filter((stage) => stage.interactive).map((stage) => stage.id);
+    expect(interactive).toEqual(['setup', 'brief', 'treatment']);
+    expect(STAGES.map((stage) => stage.id)).not.toContain('song');
+    expect(STAGES.map((stage) => stage.id)).not.toContain('lyrics');
+  });
+
+  it('migrates a state file with the retired lyrics and song stages', () => {
+    const state = createInitialState(config, '0.1.0');
+    delete state.stages.setup;
+    state.stages.lyrics = { status: 'done', outputs: ['lyrics.txt'], attempts: 1 };
+    state.stages.song = { status: 'done', outputs: ['song.json', 'audio/song.wav'], attempts: 1 };
+    state.stage = 'song';
+    const migrated = migrateState(state);
+    expect(migrated.stages.setup?.status).toBe('done');
+    expect(migrated.stages.song).toBeUndefined();
+    expect(migrated.stages.lyrics).toBeUndefined();
+    expect(migrated.stage).toBe('brief');
   });
 
   it('enforces the project budget', () => {

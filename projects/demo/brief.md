@@ -30,7 +30,7 @@ Synthwave / cyberpunk: deep near-black backgrounds, hot pink and cyan neon, acid
 
 - Motion-only. No AI clips or footage in this demo.
 - Budget: $50, but the demo should not spend anything.
-- No secrets, no copyrighted media, no Suno/fal.ai/Higgsfield output committed.
+- No secrets, no copyrighted media, no song, fal.ai, or Higgsfield output committed.
 - Everything must pass the schema and coverage validators.
 
 ## Success criteria

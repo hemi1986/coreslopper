@@ -24,7 +24,6 @@ import {
 interface NewCommandOptions {
   budget?: number;
   title?: string;
-  song?: string;
   visual?: string;
   imageProvider?: string;
   videoProvider?: string;
@@ -63,14 +62,13 @@ program
 
 program
   .command('init [dir]')
-  .description('Create a workspace, install tools, and configure fal.ai, Higgsfield, and Suno.')
+  .description('Create a workspace, install tools, and configure fal.ai and Higgsfield.')
   .option('-y, --yes', 'Use defaults and skip prompts')
   .option('--force', 'Merge into a non-empty directory')
   .option('--no-install', 'Skip npm install and uv sync')
   .option('--no-git', 'Do not initialize a git repository')
   .option('--install-tools', 'Install missing uv, Python, ffmpeg, and Claude Code')
   .option('--no-tool-install', 'Do not offer to install system tools')
-  .option('--song <provider>', 'suno | import', 'import')
   .option('--visual <provider>', 'mock | fal | higgsfield', 'mock')
   .option('--image-provider <provider>', 'mock | fal | higgsfield')
   .option('--video-provider <provider>', 'mock | fal | higgsfield')
@@ -79,13 +77,11 @@ program
   .option('--title <title>', 'First project title')
   .option('--fal-key <key>', 'fal.ai API key (prefer FAL_KEY in the environment)')
   .option('--higgsfield-key <key>', 'Higgsfield credential (prefer HIGGSFIELD_API_KEY in the environment)')
-  .option('--no-suno', 'Do not configure the Suno MCP server')
   .option('--skip-project', 'Create the workspace without a first project')
   .option('--runtime <dir>', 'Runtime directory (development only)')
   .action((dir: string | undefined, options: InitCommandOptions) =>
     run(async () => {
       const visuals = ['mock', 'fal', 'higgsfield'] as const;
-      if (options.song) options.song = validateChoice(options.song, ['suno', 'import'] as const, 'song provider');
       if (options.visual) options.visual = validateChoice(options.visual, visuals, 'visual provider');
       if (options.imageProvider) {
         options.imageProvider = validateChoice(options.imageProvider, visuals, 'image provider');
@@ -140,7 +136,6 @@ program
   .description('Create a project inside the current workspace.')
   .option('--budget <usd>', 'Project budget in USD (required)', (value) => Number(value))
   .option('--title <title>')
-  .option('--song <provider>', 'suno | import', 'import')
   .option('--visual <provider>', 'mock | fal | higgsfield', 'mock')
   .option('--image-provider <provider>', 'mock | fal | higgsfield')
   .option('--video-provider <provider>', 'mock | fal | higgsfield')
@@ -148,7 +143,6 @@ program
     run(async () => {
       const root = requireWorkspace();
       const visuals = ['mock', 'fal', 'higgsfield'] as const;
-      const song = validateChoice(options.song ?? 'import', ['suno', 'import'] as const, 'song provider');
       const visual = validateChoice(options.visual ?? 'mock', visuals, 'visual provider');
       const image = options.imageProvider
         ? validateChoice(options.imageProvider, visuals, 'image provider')
@@ -161,7 +155,6 @@ program
         title: options.title,
         budget: options.budget,
         root,
-        songProvider: song,
         imageProvider: image,
         videoProvider: video,
       });

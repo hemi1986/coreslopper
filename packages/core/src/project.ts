@@ -23,7 +23,7 @@ import {
   type Timing,
   type TimingOverrides,
 } from './schema.js';
-import { createInitialState } from './state.js';
+import { createInitialState, migrateState } from './state.js';
 
 export interface ProjectPaths {
   root: string;
@@ -32,7 +32,6 @@ export interface ProjectPaths {
   brief: string;
   treatment: string;
   lyrics: string;
-  sunoStyle: string;
   song: string;
   timing: string;
   overrides: string;
@@ -57,7 +56,6 @@ export function projectPaths(projectDir: string): ProjectPaths {
     brief: join(root, 'brief.md'),
     treatment: join(root, 'treatment.md'),
     lyrics: join(root, 'lyrics.txt'),
-    sunoStyle: join(root, 'suno-style.txt'),
     song: join(root, 'song.json'),
     timing: join(root, 'timing.json'),
     overrides: join(root, 'timing.overrides.json'),
@@ -169,7 +167,7 @@ export async function loadProject(projectDir: string): Promise<LoadedProject> {
   const paths = projectPaths(projectDir);
   const config = await readYamlFile(paths.config, ProjectConfigSchema);
   const state = pathExists(paths.state)
-    ? await readJsonFile(paths.state, StateSchema)
+    ? migrateState(await readJsonFile(paths.state, StateSchema))
     : createInitialState(config, config.workflow.version);
   const timing = pathExists(paths.timing) ? await readJsonFile(paths.timing, TimingSchema) : undefined;
   const overrides = pathExists(paths.overrides)

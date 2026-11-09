@@ -67,7 +67,7 @@ Do not hand-edit `schema/*.json`; regenerate it.
 ## Media and secrets
 
 - Never commit `.env`, API keys, tokens, or private URLs.
-- Never commit Suno/fal.ai/Higgsfield output, commercial music, or copyrighted footage.
+- Never commit songs, stems, fal.ai/Higgsfield output, commercial music, or copyrighted footage.
 - Put fixture media under `scripts/fixtures/` and generate it from code when possible.
 - If a demo needs a real track, use a CC0/royalty-free track and record the source, author, license, and download date in `docs/THIRD_PARTY.md`.
 - The example brand uses OFL fonts only. Add the font license file next to the font.

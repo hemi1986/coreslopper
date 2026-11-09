@@ -6,7 +6,6 @@ import {
   initWorkspace,
   type FirstProjectOptions,
   type InitResult,
-  type SongProvider,
   type VisualProvider,
 } from './init.js';
 import { onboard } from './onboarding.js';
@@ -19,7 +18,6 @@ export interface InitCommandOptions {
   git?: boolean;
   installTools?: boolean;
   toolInstall?: boolean;
-  song?: SongProvider;
   visual?: VisualProvider;
   imageProvider?: VisualProvider;
   videoProvider?: VisualProvider;
@@ -28,7 +26,6 @@ export interface InitCommandOptions {
   title?: string;
   falKey?: string;
   higgsfieldKey?: string;
-  suno?: boolean;
   skipProject?: boolean;
   runtime?: string;
 }
@@ -55,7 +52,7 @@ export function printInitSummary(result: InitResult): void {
   if (!result.uvSynced) console.log('  npm run python:sync');
   console.log('  npm run cli -- doctor');
   console.log('  npm run demo:preview');
-  if (result.projectSlug) console.log(`  claude   # then /video-next ${result.projectSlug}`);
+  if (result.projectSlug) console.log(`  claude   # then /new-video ${result.projectSlug}`);
   else console.log('  claude');
 }
 
@@ -69,7 +66,6 @@ export async function runInitCommand(targetArg: string | undefined, options: Ini
       install: options.install,
       git: options.git,
       installTools: options.toolInstall === false ? false : options.installTools,
-      song: options.song,
       visual: options.visual,
       imageProvider: options.imageProvider,
       videoProvider: options.videoProvider,
@@ -78,7 +74,6 @@ export async function runInitCommand(targetArg: string | undefined, options: Ini
       title: options.title,
       falKey: options.falKey,
       higgsfieldKey: options.higgsfieldKey,
-      suno: options.suno,
       noProject: options.skipProject,
     });
     return;
@@ -120,7 +115,6 @@ export async function runInitCommand(targetArg: string | undefined, options: Ini
         slug: projectSlug,
         title: options.title,
         budget: options.budget ?? 50,
-        song: options.song ?? 'import',
         image,
         video,
       };
@@ -135,7 +129,6 @@ export async function runInitCommand(targetArg: string | undefined, options: Ini
     project,
     falKey,
     higgsfieldKey,
-    suno: options.suno !== false,
   });
   printInitSummary(result);
   if (!result.installed && options.install !== false) process.exitCode = 1;
