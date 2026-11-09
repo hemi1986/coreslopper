@@ -25,6 +25,7 @@ import {
 } from '@coreslopper/core';
 import {
   GenerationRunner,
+  clipDurationSeconds,
   createProvider,
   type GenerationRequest,
   type Operation,
@@ -71,6 +72,8 @@ export interface GenerateOptions {
   projectDir: string;
   batchPath: string;
   dryRun?: boolean;
+  /** Override the project provider for this batch (lip-sync keeps its own provider). */
+  provider?: ProviderKind;
 }
 
 interface ResolvedItem {
@@ -94,11 +97,13 @@ function resolveItem(
   config: ProjectConfig,
   models: Awaited<ReturnType<typeof loadModelsConfig>>,
   projectRoot: string,
+  providerOverride?: ProviderKind,
 ): ResolvedItem {
   const role = models.roles[item.role];
   if (!role) throw new ValidationError(`Unknown model role "${item.role}". Add it to config/models.yaml.`);
   const override = roleOverride(config, item.role);
-  const provider = providerForRole(config, item.role);
+  const provider =
+    providerOverride && item.operation !== 'lipSync' ? providerOverride : providerForRole(config, item.role);
   if (item.operation === 'lipSync' && provider === 'higgsfield') {
     throw new ConfigError(
       'The Higgsfield adapter does not support lip-sync. Set providers.lipsync to "fal" and provide FAL_KEY, or keep providers.video on fal.',
@@ -138,7 +143,7 @@ function resolveItem(
 
   const units =
     pricing.unit === 'second'
-      ? audioSeconds ?? item.durationSeconds ?? Number(params.duration ?? resolved.maxDuration ?? 5)
+      ? audioSeconds ?? clipDurationSeconds(item.durationSeconds, params)
       : pricing.unit === 'image'
         ? Number(params.num_images ?? params.batch_size ?? 1)
         : 1;
@@ -177,7 +182,7 @@ export async function generateBatch(options: GenerateOptions): Promise<void> {
   const batch = BatchSchema.parse(batchData);
   const models = await loadModelsConfig();
   const resolved = batch.map((item) => {
-    const value = resolveItem(item, project.config, models, project.paths.root);
+    const value = resolveItem(item, project.config, models, project.paths.root, options.provider);
     return value.provider === 'mock' || value.provider === 'comfyui' ? { ...value, cost: 0 } : value;
   });
   const totalEstimate = resolved.reduce((sum, item) => sum + item.cost, 0);

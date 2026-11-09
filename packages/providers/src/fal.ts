@@ -11,6 +11,7 @@ import {
   type FetchLike,
 } from './http.js';
 import type { Provider, ProviderInput, ProviderOutput } from './types.js';
+import { clipDurationSeconds, withoutDurationOptions } from './duration.js';
 
 export interface FalProviderOptions {
   apiKey?: string;
@@ -37,7 +38,7 @@ function adapterParams(params: Record<string, unknown> | undefined): {
   body: Record<string, unknown>;
 } {
   const { reference_field, end_reference_field, image_param, ...body } = params ?? {};
-  return { field: reference_field ?? image_param, endField: end_reference_field, body };
+  return { field: reference_field ?? image_param, endField: end_reference_field, body: withoutDurationOptions(body) };
 }
 
 export class FalProvider implements Provider {
@@ -131,9 +132,9 @@ export class FalProvider implements Provider {
     return this.runModel(input, {
       prompt: input.prompt,
       seed: input.seed,
-      duration: input.durationSeconds ?? 5,
       ...(input.negativePrompt ? { negative_prompt: input.negativePrompt } : {}),
       ...params,
+      duration: clipDurationSeconds(input.durationSeconds, input.params),
     });
   }
 
@@ -149,8 +150,8 @@ export class FalProvider implements Provider {
       prompt: input.prompt,
       seed: input.seed,
       [fieldName(field, 'image_url')]: await this.uploadFile(reference),
-      duration: input.durationSeconds ?? 5,
       ...params,
+      duration: clipDurationSeconds(input.durationSeconds, input.params),
     });
   }
 
@@ -170,8 +171,8 @@ export class FalProvider implements Provider {
       seed: input.seed,
       [fieldName(field, 'image_url')]: await this.uploadFile(start),
       [endField]: await this.uploadFile(end),
-      duration: input.durationSeconds ?? 5,
       ...params,
+      duration: clipDurationSeconds(input.durationSeconds, input.params),
     });
   }
 

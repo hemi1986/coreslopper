@@ -15,6 +15,12 @@
 #   reference_field: <name>    body field for uploaded edit references
 #   end_reference_field: <name> body field for the end frame (firstLastFrameToVideo)
 #
+# Clip length (fal.ai and Higgsfield video roles): a batch item's
+# `durationSeconds` wins and is rounded up to whole seconds; `params.duration`
+# is only the fallback. Adapter options, stripped before the request is sent:
+#   min_duration: 3            raise shorter requests to the model's minimum
+#   durations: [5, 10]         snap to the next allowed length
+#
 # ComfyUI (local, providers.video: comfyui): `model` is the name of a workflow
 # exported with "Export (API)" into comfyui/workflows/<model>.json. Local runs
 # cost nothing, so comfyui entries need no pricing. Adapter params:
@@ -143,6 +149,7 @@ roles:
         model: kling-video/v3.0/std/image-to-video
         params:
           duration: 5
+          min_duration: 3
           sound: "off"
           cfg_scale: 0.5
         pricing:
@@ -178,6 +185,7 @@ roles:
         model: kling-video/v2.5-turbo/standard/image-to-video
         params:
           duration: 5
+          durations: [5, 10]
         pricing:
           unit: second
           usd: 0.042
@@ -274,6 +282,7 @@ roles:
         model: veo3.1/fast/image-to-video
         params:
           duration: 4
+          durations: [4, 6, 8]
           resolution: 1080p
           aspect_ratio: 16:9
           generate_audio: false
