@@ -16,14 +16,18 @@ export function MediaLayer({
   width,
   height,
   description,
+  focus,
 }: {
   asset?: string;
   style: StyleBible;
   width: number;
   height: number;
   description: string;
+  /** Focus point (0–1) kept in view when the format crops the media. */
+  focus?: { x: number; y: number };
 }) {
   const frame = useCurrentFrame();
+  const position = `${((focus?.x ?? 0.5) * 100).toFixed(2)}% ${((focus?.y ?? 0.5) * 100).toFixed(2)}%`;
   const { durationInFrames } = useVideoConfig();
   const zoom = interpolate(frame, [0, Math.max(1, durationInFrames)], [1.02, 1.09], {
     extrapolateRight: 'clamp',
@@ -71,7 +75,9 @@ export function MediaLayer({
             width: '100%',
             height: '100%',
             objectFit: 'cover',
+            objectPosition: position,
             transform: `scale(${zoom})`,
+            transformOrigin: position,
           }}
         />
         <div
@@ -95,7 +101,9 @@ export function MediaLayer({
             width: '100%',
             height: '100%',
             objectFit: 'cover',
+            objectPosition: position,
             transform: `scale(${zoom})`,
+            transformOrigin: position,
           }}
         />
         <div

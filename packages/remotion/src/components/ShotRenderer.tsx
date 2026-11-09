@@ -110,6 +110,7 @@ export function ShotRenderer({ shot, timing, style, width, height }: ShotRendere
             width={width}
             height={height}
             description={shot.description}
+            focus={shot.focus}
           />,
         );
       }
@@ -123,6 +124,7 @@ export function ShotRenderer({ shot, timing, style, width, height }: ShotRendere
         width={width}
         height={height}
         description={shot.description}
+        focus={shot.focus}
       />,
     );
   }

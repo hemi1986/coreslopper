@@ -29,6 +29,7 @@ license: MIT
 5. Render the master:
    `npm run cli -- render projects/<slug> --format 16x9`
 6. Render 9:16 and 1:1 only after the master passes. The layouts must be designed for those formats, not naive crops.
+   Media layers fill the frame with `cover`, so a 16:9 source loses its sides in 9:16 and 1:1. Before the full render, render one still per shot in the derivative format (`npm run cli -- render <project> --format 9x16 --still <frame> --still-scale 0.5`) and look for a lost subject: a face at the edge, or a mirror reflection out of frame. For each such shot, set `focus: { x: <0–1> }` in `storyboard.yaml` (0 = left edge, 1 = right edge of the source) so that the crop keeps the subject in view. `focus` changes nothing in the master because the source is not cropped there.
    The render runs in segments and resumes from the last finished segment if it is interrupted. Use `--frames <start>-<end>` for a quick test render of one passage.
 7. Update the state with `npm run cli -- stage-done <project> assembly --outputs renders/preview-16x9.mp4`.
 8. Hand off to `video-qa` for the final report.

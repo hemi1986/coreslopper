@@ -243,6 +243,17 @@ export const ShotSchema = z.object({
     })
     .optional(),
   layers: z.array(LayerSchema).optional(),
+  /**
+   * Focus point of the shot's media as fractions of its width and height
+   * (0 = left/top, 1 = right/bottom). When a format crops the media (9:16 or
+   * 1:1 from 16:9 sources), the crop keeps this point in view. Default: centre.
+   */
+  focus: z
+    .object({
+      x: z.number().min(0).max(1).default(0.5),
+      y: z.number().min(0).max(1).default(0.5),
+    })
+    .optional(),
   chaining: z
     .object({
       enabled: z.boolean().default(false),
