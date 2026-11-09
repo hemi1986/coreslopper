@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.1](https://github.com/hemi1986/coreslopper/compare/v0.4.0...v0.4.1) (2026-11-09)
+
+
+### Documentation
+
+* **skills:** add composition rules and generation pitfalls ([0cc2e27](https://github.com/hemi1986/coreslopper/commit/0cc2e27ac0cc61c1d7255f11a3b5de98e115893c))
+* **skills:** add composition rules and generation pitfalls ([157f931](https://github.com/hemi1986/coreslopper/commit/157f931558000b645060808260eff59c8eea88da))
+
 ## [0.4.0](https://github.com/hemi1986/coreslopper/compare/v0.3.0...v0.4.0) (2026-11-09)
 
 
