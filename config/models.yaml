@@ -149,7 +149,10 @@ roles:
           unit: second
           usd: 0.063
         maxDuration: 15
-        notes: Kling 3.0 Standard. Verify the current price and duration limit.
+        notes: >-
+          Kling 3.0 Standard. Output is 1280x720 at 24 fps (observed 2026-11-09), so it is
+          upscaled in a 1080p master; use the Pro variant for native 1080p. Verify the
+          current price and duration limit.
       comfyui:
         model: ltx-i2v
         params:
