@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.3.0](https://github.com/hemi1986/coreslopper/compare/v0.2.2...v0.3.0) (2026-11-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* the lyrics and song stages, the --song, --song-provider, and --no-suno flags, and the Suno MCP server are removed. Projects always import a finished song; run /new-video <slug> to finish setup.
+
+### Features
+
+* render video clips locally with ComfyUI workflows ([08cb8bf](https://github.com/hemi1986/coreslopper/commit/08cb8bf8a9389bebcc34cbb04d525d2f419f180c))
+* render video clips locally with ComfyUI workflows ([67cc632](https://github.com/hemi1986/coreslopper/commit/67cc632b26657fbad7fdf3eaada7082c192a676a))
+* start every project from an existing song with a guided new-video skill ([1ebeb7e](https://github.com/hemi1986/coreslopper/commit/1ebeb7e28aae90fe7a8bd56b097647c3378942fd))
+
+
+### Bug Fixes
+
+* send Kling v4 start frame as start_image_url ([0b463b9](https://github.com/hemi1986/coreslopper/commit/0b463b9beb75b7e269fc5fe75aef186366fa1cdf))
+
 ## [0.2.2](https://github.com/hemi1986/coreslopper/compare/v0.2.1...v0.2.2) (2026-11-08)
 
 
