@@ -1,11 +1,12 @@
 import { resolve } from 'node:path';
 import { ValidationError } from '@coreslopper/core';
-import { resolveHiggsfieldCredentials } from '@coreslopper/providers';
+import { checkComfyUI, resolveHiggsfieldCredentials } from '@coreslopper/providers';
 import {
   defaultProjectSlug,
   initWorkspace,
   type FirstProjectOptions,
   type InitResult,
+  type VideoProvider,
   type VisualProvider,
 } from './init.js';
 import { onboard } from './onboarding.js';
@@ -20,7 +21,7 @@ export interface InitCommandOptions {
   toolInstall?: boolean;
   visual?: VisualProvider;
   imageProvider?: VisualProvider;
-  videoProvider?: VisualProvider;
+  videoProvider?: VideoProvider;
   budget?: number;
   project?: string;
   title?: string;
@@ -86,6 +87,12 @@ export async function runInitCommand(targetArg: string | undefined, options: Ini
   const falKey = options.falKey ?? process.env.FAL_KEY;
   const higgsfieldKey = options.higgsfieldKey ?? resolveHiggsfieldCredentials();
   for (const provider of new Set([image, video])) {
+    if (provider === 'comfyui') {
+      const server = await checkComfyUI();
+      if (!server.ok) {
+        console.warn(`! ComfyUI is not reachable at ${server.url} (${server.message}). Start it or set COMFYUI_URL in .env.`);
+      }
+    }
     if (provider === 'fal') {
       if (!falKey) {
         console.warn('! No FAL_KEY was provided. Add it to .env before generating paid assets.');

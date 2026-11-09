@@ -11,6 +11,10 @@ export interface FalProviderOptions {
   fetchImpl?: FetchLike;
 }
 
+function fieldName(value: unknown, fallback: string): string {
+  return typeof value === 'string' && value.length > 0 ? value : fallback;
+}
+
 export class FalProvider implements Provider {
   readonly name = 'fal';
   private readonly apiKey: string;
@@ -57,6 +61,17 @@ export class FalProvider implements Provider {
     });
   }
 
+  async textToVideo(input: ProviderInput): Promise<ProviderOutput> {
+    const { reference_field: _start, end_reference_field: _end, ...params } = input.params ?? {};
+    return this.runModel(input, {
+      prompt: input.prompt,
+      seed: input.seed,
+      duration: input.durationSeconds ?? 5,
+      ...(input.negativePrompt ? { negative_prompt: input.negativePrompt } : {}),
+      ...params,
+    });
+  }
+
   async imageToVideo(input: ProviderInput): Promise<ProviderOutput> {
     const reference = input.references?.[0];
     if (!reference) {
@@ -64,11 +79,32 @@ export class FalProvider implements Provider {
     }
     // Models disagree on the start-frame field (Kling v4 uses start_image_url),
     // so a model can name it with the adapter-only reference_field param.
-    const { reference_field: field, ...params } = input.params ?? {};
+    const { reference_field: field, end_reference_field: _end, ...params } = input.params ?? {};
     return this.runModel(input, {
       prompt: input.prompt,
       seed: input.seed,
-      [typeof field === 'string' && field.length > 0 ? field : 'image_url']: await fileToDataUri(reference),
+      [fieldName(field, 'image_url')]: await fileToDataUri(reference),
+      duration: input.durationSeconds ?? 5,
+      ...params,
+    });
+  }
+
+  async firstLastFrameToVideo(input: ProviderInput): Promise<ProviderOutput> {
+    const [start, end] = input.references ?? [];
+    if (!start || !end) {
+      throw new Error('firstLastFrameToVideo requires a start frame and an end frame.');
+    }
+    const { reference_field: field, end_reference_field: endField, ...params } = input.params ?? {};
+    if (typeof endField !== 'string' || endField.length === 0) {
+      throw new Error(
+        `Model ${input.model} has no end_reference_field param. Set it in config/models.yaml to the field that takes the end frame.`,
+      );
+    }
+    return this.runModel(input, {
+      prompt: input.prompt,
+      seed: input.seed,
+      [fieldName(field, 'image_url')]: await fileToDataUri(start),
+      [endField]: await fileToDataUri(end),
       duration: input.durationSeconds ?? 5,
       ...params,
     });

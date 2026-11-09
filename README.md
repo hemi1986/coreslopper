@@ -11,7 +11,7 @@ Agent skills do the creative work (brief, treatment, storyboard, prompts). Teste
 ## Requirements
 
 - Node.js 22+, Python 3.12+, [uv](https://docs.astral.sh/uv/), `ffmpeg`, and [Claude Code](https://claude.com/claude-code). `init` checks them and offers to install the missing ones.
-- For AI visuals: a [fal.ai](https://fal.ai) key or a [Higgsfield](https://higgsfield.ai) credential. Without one, the mock provider renders placeholders.
+- For AI visuals: a [fal.ai](https://fal.ai) key or a [Higgsfield](https://higgsfield.ai) credential. Without one, the mock provider renders placeholders. Video clips can also render locally in [ComfyUI](comfyui/README.md).
 - A finished song: the mix, ideally its vocal stem, and the lyrics. coreslopper does not generate music.
 - Optional: an NVIDIA GPU for faster lyric alignment. CPU works.
 
@@ -102,6 +102,7 @@ Your projects, `.env`, and your own edits to workflow files are kept. If a file 
 | Setup flags, credentials, updating, troubleshooting | [docs/onboarding.md](docs/onboarding.md) |
 | What each stage does, and running one by hand | [docs/pipeline.md](docs/pipeline.md) |
 | fal.ai, Higgsfield, budgets, and model roles | [docs/providers.md](docs/providers.md) |
+| Local video clips with ComfyUI | [comfyui/README.md](comfyui/README.md) |
 | Optional MCP servers | [docs/mcp.md](docs/mcp.md) |
 | How it works inside | [docs/architecture.md](docs/architecture.md), [docs/adr/](docs/adr/) |
 | Terms used everywhere | [docs/glossary.md](docs/glossary.md) |

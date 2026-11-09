@@ -11,7 +11,8 @@ import {
   writeJsonAtomic,
   writeTextAtomic,
   type ProjectConfig,
-  type ProviderKind,
+  type ImageProviderKind,
+  type VideoProviderKind,
 } from '@coreslopper/core';
 import { stringify } from 'yaml';
 
@@ -20,8 +21,8 @@ export interface NewProjectOptions {
   title?: string;
   budget?: number;
   brand?: string;
-  imageProvider?: ProviderKind;
-  videoProvider?: ProviderKind;
+  imageProvider?: ImageProviderKind;
+  videoProvider?: VideoProviderKind;
   /** Workspace root. Defaults to the repository root discovered from cwd. */
   root?: string;
 }

@@ -145,12 +145,16 @@ A JSON or YAML array of one or more generation requests executed with budget, ca
 _Avoid_: job
 
 **Provider Adapter**:
-The small implementation behind `generateImage`, `editImage`, `imageToVideo`, and `lipSync`; fal.ai and Higgsfield are the real adapters, and mock is the deterministic test adapter.
+The small implementation behind `generateImage`, `editImage`, `textToVideo`, `imageToVideo`, `firstLastFrameToVideo`, and `lipSync`; fal.ai and Higgsfield are the cloud adapters, ComfyUI is the local video adapter, and mock is the deterministic test adapter.
 _Avoid_: client, SDK
 
 **Provider Alternative**:
 The `alternatives.<provider>` entry on a model role in `config/models.yaml`. It supplies the provider-specific model slug, params, and price so the same creative role can run on fal.ai or Higgsfield.
 _Avoid_: fallback, alias
+
+**ComfyUI Workflow**:
+A ComfyUI graph saved with Export (API) in `comfyui/workflows/<name>.json`. Its name is the `model` of a role's `alternatives.comfyui` entry. The adapter finds the nodes it fills by **title tags** such as `cs_prompt` and `cs_start_image`; the image tags decide which clip operation the workflow fits.
+_Avoid_: UI workflow (the non-API save format, which the adapter rejects)
 
 **Mock Provider**:
 A deterministic provider that returns placeholder assets and costs nothing; used by tests, CI, and no-account runs.

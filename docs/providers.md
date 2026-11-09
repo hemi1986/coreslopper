@@ -1,6 +1,6 @@
 # Providers and AI generation
 
-coreslopper generates images and clips through a small adapter interface. fal.ai and Higgsfield are the real adapters; a deterministic mock adapter powers tests and runs without an account. Songs are never generated; the user imports a finished song.
+coreslopper generates images and clips through a small adapter interface. fal.ai and Higgsfield are the cloud adapters, ComfyUI renders clips locally, and a deterministic mock adapter powers tests and runs without an account. Songs are never generated; the user imports a finished song.
 
 ## Choose providers per project
 
@@ -16,8 +16,8 @@ providers:
 | Key | Covers | Values |
 |---|---|---|
 | `image` | `generateImage`, `editImage` | `fal`, `higgsfield`, `mock` |
-| `video` | `imageToVideo` | `fal`, `higgsfield`, `mock` |
-| `lipsync` | `lipSync` | `fal`, `mock` (Higgsfield has no lip-sync yet) |
+| `video` | `textToVideo`, `imageToVideo`, `firstLastFrameToVideo` | `fal`, `higgsfield`, `comfyui`, `mock` |
+| `lipsync` | `lipSync` | `fal`, `mock` (Higgsfield has no lip-sync yet). Defaults to `video`, or to `fal` when `video` is `comfyui`. |
 
 When a storyboard uses lip-sync shots and `video` is `higgsfield`, set `lipsync: fal`.
 
@@ -29,6 +29,10 @@ providers:
   video: mock
   lipsync: mock
 ```
+
+## Local clips with ComfyUI
+
+Set `providers.video: comfyui` to render clips on your own GPU. Stills stay on `providers.image`; lip-sync falls back to fal.ai. Each video role's `alternatives.comfyui.model` names a workflow in `comfyui/workflows/`, exported with Export (API) and tagged by node title. A local clip costs $0 against the budget. Setup, title tags, params, and server variables are in [comfyui/README.md](../comfyui/README.md).
 
 ## Credentials
 
@@ -51,11 +55,13 @@ HF_API_KEY_SECRET=...
 ```ts
 generateImage(input): Promise<ImageResult>;
 editImage(input): Promise<ImageResult>;
-imageToVideo(input): Promise<VideoResult>;
+textToVideo(input): Promise<VideoResult>;
+imageToVideo(input): Promise<VideoResult>;           // references[0] = start frame
+firstLastFrameToVideo(input): Promise<VideoResult>;  // references = [start, end]
 lipSync(input): Promise<VideoResult>;
 ```
 
-fal.ai implements all four operations; Higgsfield implements image and video generation but not lip-sync. The mock adapter returns deterministic SVG placeholders. Model IDs, provider-specific slugs, defaults, and prices live in [`config/models.yaml`](../config/models.yaml), not in code. A change of model is a configuration change.
+fal.ai implements every operation; Higgsfield implements everything but lip-sync; ComfyUI implements the three video operations. For `firstLastFrameToVideo` in the cloud, set the adapter-only `end_reference_field` param to the model's end-frame field. The mock adapter returns deterministic SVG placeholders. Model IDs, provider-specific slugs, defaults, and prices live in [`config/models.yaml`](../config/models.yaml), not in code. A change of model is a configuration change.
 
 Higgsfield submissions are asynchronous: the adapter uploads local references through the presigned-upload endpoint, polls the request, and downloads the result before it is cached. Its model schemas are strict, so provider-specific params stay in `config/models.yaml`. Three adapter-only options are stripped before the request is sent: `send_seed: true` for models that accept a seed, `send_negative_prompt: true` for models that accept a negative prompt, and `reference_field: <field>` when an edit model uses a name other than `image_urls` (for example `image_reference_url`).
 

@@ -78,4 +78,38 @@ describe('fal provider', () => {
     expect(body.image_url).toMatch(/^data:/);
     expect(body.generate_audio).toBe(false);
   });
+
+  it('sends start and end frames for first/last-frame models and requires the end field', async () => {
+    const directory = await tempDir();
+    const start = join(directory, 'start.png');
+    const end = join(directory, 'end.png');
+    await writeFile(start, 'start');
+    await writeFile(end, 'end');
+    let submitted: Record<string, unknown> | undefined;
+    const fetchImpl: FetchLike = async (url, init) => {
+      if (url === 'https://queue.fal.run/some/flf-model') {
+        submitted = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        return json({ request_id: 'r', status_url: 'https://queue.fal.run/status', response_url: 'https://queue.fal.run/response' });
+      }
+      if (url === 'https://queue.fal.run/status') return json({ status: 'COMPLETED' });
+      if (url === 'https://queue.fal.run/response') return json({ video: { url: 'https://cdn.example.com/clip.mp4' } });
+      return new Response(Buffer.from('mp4'), { status: 200, headers: { 'content-type': 'video/mp4' } });
+    };
+    const provider = new FalProvider({ apiKey: 'test-key', fetchImpl, pollIntervalMs: 1 });
+    const input = {
+      model: 'some/flf-model',
+      prompt: 'morph',
+      references: [start, end],
+      seed: 1,
+      outputDir: join(directory, 'out'),
+    };
+    await expect(provider.firstLastFrameToVideo({ ...input, params: {} })).rejects.toThrow(/end_reference_field/);
+    await provider.firstLastFrameToVideo({
+      ...input,
+      params: { reference_field: 'start_image_url', end_reference_field: 'end_image_url' },
+    });
+    expect(submitted!.start_image_url).toMatch(/^data:/);
+    expect(submitted!.end_image_url).toMatch(/^data:/);
+    expect(submitted).not.toHaveProperty('end_reference_field');
+  });
 });

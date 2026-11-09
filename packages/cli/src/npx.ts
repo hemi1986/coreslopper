@@ -71,7 +71,7 @@ program
   .option('--no-tool-install', 'Do not offer to install system tools')
   .option('--visual <provider>', 'mock | fal | higgsfield', 'mock')
   .option('--image-provider <provider>', 'mock | fal | higgsfield')
-  .option('--video-provider <provider>', 'mock | fal | higgsfield')
+  .option('--video-provider <provider>', 'mock | fal | higgsfield | comfyui')
   .option('--budget <usd>', 'First project budget in USD', (value) => Number(value))
   .option('--project <slug>', 'First project slug')
   .option('--title <title>', 'First project title')
@@ -82,12 +82,13 @@ program
   .action((dir: string | undefined, options: InitCommandOptions) =>
     run(async () => {
       const visuals = ['mock', 'fal', 'higgsfield'] as const;
+      const videoProviders = [...visuals, 'comfyui'] as const;
       if (options.visual) options.visual = validateChoice(options.visual, visuals, 'visual provider');
       if (options.imageProvider) {
         options.imageProvider = validateChoice(options.imageProvider, visuals, 'image provider');
       }
       if (options.videoProvider) {
-        options.videoProvider = validateChoice(options.videoProvider, visuals, 'video provider');
+        options.videoProvider = validateChoice(options.videoProvider, videoProviders, 'video provider');
       }
       await runInitCommand(dir, options);
     }),
@@ -138,7 +139,7 @@ program
   .option('--title <title>')
   .option('--visual <provider>', 'mock | fal | higgsfield', 'mock')
   .option('--image-provider <provider>', 'mock | fal | higgsfield')
-  .option('--video-provider <provider>', 'mock | fal | higgsfield')
+  .option('--video-provider <provider>', 'mock | fal | higgsfield | comfyui')
   .action((slug: string, options: NewCommandOptions) =>
     run(async () => {
       const root = requireWorkspace();
@@ -148,7 +149,7 @@ program
         ? validateChoice(options.imageProvider, visuals, 'image provider')
         : visual;
       const video = options.videoProvider
-        ? validateChoice(options.videoProvider, visuals, 'video provider')
+        ? validateChoice(options.videoProvider, [...visuals, 'comfyui'] as const, 'video provider')
         : visual;
       await createProject({
         slug,

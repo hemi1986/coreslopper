@@ -57,7 +57,7 @@ Add `--install-tools` to let the non-interactive run install missing uv, Python,
 | `--no-tool-install` | off | Do not offer to install system tools in interactive mode. |
 | `--visual <mock\|fal\|higgsfield>` | `mock` | Image and video provider for the first project. |
 | `--image-provider <mock\|fal\|higgsfield>` | `--visual` | Image provider override. |
-| `--video-provider <mock\|fal\|higgsfield>` | `--visual` | Video provider override. |
+| `--video-provider <mock\|fal\|higgsfield\|comfyui>` | `--visual` | Video provider override. `comfyui` renders clips locally ([comfyui/README.md](../comfyui/README.md)). |
 | `--budget <usd>` | `50` | First project budget. Minimum $5. |
 | `--project <slug>` | target folder name | First project slug. |
 | `--title <title>` | derived from slug | First project title. |

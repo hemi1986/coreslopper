@@ -59,8 +59,19 @@ export class MockProvider implements Provider {
     return writePlaceholder(input, 'MOCK EDIT', 'edit');
   }
 
+  async textToVideo(input: ProviderInput): Promise<ProviderOutput> {
+    return writePlaceholder(input, `MOCK T2V ${input.durationSeconds ?? 5}s`, 'clip');
+  }
+
   async imageToVideo(input: ProviderInput): Promise<ProviderOutput> {
     return writePlaceholder(input, `MOCK CLIP ${input.durationSeconds ?? 5}s`, 'clip');
+  }
+
+  async firstLastFrameToVideo(input: ProviderInput): Promise<ProviderOutput> {
+    if ((input.references ?? []).length < 2) {
+      throw new Error('firstLastFrameToVideo requires a start frame and an end frame.');
+    }
+    return writePlaceholder(input, `MOCK FLF ${input.durationSeconds ?? 5}s`, 'clip');
   }
 
   async lipSync(input: ProviderInput): Promise<ProviderOutput> {
