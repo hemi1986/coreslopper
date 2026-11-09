@@ -121,12 +121,12 @@ roles:
     params:
       duration: 5
       resolution: 1080p
-      generate_audio: false
+      reference_field: start_image_url
     pricing:
       unit: second
       usd: 0.17
     maxDuration: 30
-    notes: 3-30 s, optional end frame for frame chaining. Audio is disabled; the song is the only audio source.
+    notes: 3-30 s, optional end frame for frame chaining. Kling v4 has no audio switch and may return clips with sound; MediaLayer mutes clips, so the song stays the only audio source.
     alternatives:
       higgsfield:
         model: kling-video/v3.0/std/image-to-video
@@ -145,7 +145,7 @@ roles:
     params:
       duration: 5
       resolution: 720p
-      generate_audio: false
+      reference_field: start_image_url
     pricing:
       unit: second
       usd: 0.08

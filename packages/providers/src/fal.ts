@@ -62,13 +62,15 @@ export class FalProvider implements Provider {
     if (!reference) {
       throw new Error('imageToVideo requires a start-frame reference image.');
     }
+    // Models disagree on the start-frame field (Kling v4 uses start_image_url),
+    // so a model can name it with the adapter-only reference_field param.
+    const { reference_field: field, ...params } = input.params ?? {};
     return this.runModel(input, {
       prompt: input.prompt,
       seed: input.seed,
-      image_url: await fileToDataUri(reference),
+      [typeof field === 'string' && field.length > 0 ? field : 'image_url']: await fileToDataUri(reference),
       duration: input.durationSeconds ?? 5,
-      generate_audio: false,
-      ...input.params,
+      ...params,
     });
   }
 
