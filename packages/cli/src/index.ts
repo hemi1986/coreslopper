@@ -24,6 +24,7 @@ import { validateChangedFile } from './validate-file.js';
 import { writeContactSheet } from './contact-sheet.js';
 import { renderProject } from './render.js';
 import { createProject } from './new-project.js';
+import { linkProjectMedia } from './media-dir.js';
 import { generateBatch } from './generate.js';
 import { runQa } from './qa.js';
 import { importFootage, importSong, normalizeAudio, extractFrame, extractAudioSegment } from './media.js';
@@ -93,6 +94,15 @@ program
     }),
   );
 
+function parseFrameRange(value: string | undefined): [number, number] | undefined {
+  if (value === undefined) return undefined;
+  const match = /^(\d+)-(\d+)$/.exec(value.trim());
+  if (!match || Number(match[1]) > Number(match[2])) {
+    throw new ValidationError(`Invalid --frames "${value}". Use <start>-<end>, for example 0-899.`);
+  }
+  return [Number(match[1]), Number(match[2])];
+}
+
 program
   .command('render [project]')
   .description('Render a format with Remotion.')
@@ -102,6 +112,7 @@ program
   .option('--still-scale <scale>', 'Scale for --still (default 1)', (value) => Number(value))
   .option('--out <path>', 'Override the output path')
   .option('--require-audio', 'Fail if audio/song.wav is missing')
+  .option('--frames <range>', 'Render only frames <start>-<end> (inclusive), for test renders')
   .action(
     (
       project: string | undefined,
@@ -112,10 +123,12 @@ program
         stillScale?: number;
         out?: string;
         requireAudio?: boolean;
+        frames?: string;
       },
     ) =>
       run(async () => {
         const projectDir = projectDirFromArg(project);
+        const frames = parseFrameRange(options.frames);
         const format = options.format as FormatId;
         if (!['16x9', '9x16', '1x1', '4x5'].includes(format)) {
           throw new ValidationError(`Unknown format "${options.format}". Use 16x9, 9x16, 1x1, or 4x5.`);
@@ -128,6 +141,7 @@ program
           stillScale: options.stillScale,
           out: options.out,
           requireAudio: options.requireAudio,
+          frames,
         });
       }),
   );
@@ -383,6 +397,21 @@ program
   .action((project: string | undefined, options: { song?: string; vocals?: string }) =>
     run(async () => {
       await importSong(projectDirFromArg(project), options);
+    }),
+  );
+
+program
+  .command('media-link [project]')
+  .description('Store assets/ and renders/ in CORESLOPPER_MEDIA_DIR (e.g. /mnt/d/{slug}) and symlink them into the project.')
+  .option('--move', 'Move existing media into the media directory')
+  .option('--media-dir <path>', 'Override CORESLOPPER_MEDIA_DIR for this project')
+  .action((project: string | undefined, options: { move?: boolean; mediaDir?: string }) =>
+    run(async () => {
+      const results = await linkProjectMedia(projectDirFromArg(project), {
+        move: options.move,
+        mediaDir: options.mediaDir,
+      });
+      for (const link of results) console.log(`✔ ${link.dir} → ${link.target} (${link.action})`);
     }),
   );
 

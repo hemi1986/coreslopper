@@ -29,6 +29,7 @@ license: MIT
 5. Render the master:
    `npm run cli -- render projects/<slug> --format 16x9`
 6. Render 9:16 and 1:1 only after the master passes. The layouts must be designed for those formats, not naive crops.
+   The render runs in segments and resumes from the last finished segment if it is interrupted. Use `--frames <start>-<end>` for a quick test render of one passage.
 7. Update the state with `npm run cli -- stage-done <project> assembly --outputs renders/preview-16x9.mp4`.
 8. Hand off to `video-qa` for the final report.
 
@@ -45,4 +46,5 @@ license: MIT
 - Rendering a derivative by cropping the 16:9 master.
 - Rendering before validation, so a missing shot silently becomes a placeholder.
 - Normalizing audio on every render, which makes comparisons meaningless.
+- Running several full renders at once; render formats one after another.
 - Forgetting to mute AI clips or footage that carry their own audio.

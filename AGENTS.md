@@ -121,7 +121,8 @@ npm run schema
 | `npm run cli -- validate <project>` | Validate timing, style, characters, and storyboard coverage. |
 | `npm run cli -- status <project>` | Show stage state and budget. |
 | `npm run cli -- contact-sheet <project>` | Write `review/contact-sheet.svg`. |
-| `npm run cli -- render <project> --format 16x9` | Render with Remotion. |
+| `npm run cli -- render <project> --format 16x9` | Render with Remotion in segments; `--frames <a>-<b>` renders a test range. |
+| `npm run cli -- media-link <project> [--move]` | Move `assets/` and `renders/` to `CORESLOPPER_MEDIA_DIR` and symlink them. |
 | `npm run cli -- new <slug> --budget <usd>` | Create a project from the template. |
 | `npm run cli -- generate <project> --batch <file>` | Run a cached, budget-checked generation batch. |
 | `npm run cli -- qa <project> [--determinism <frame>]` | Write `review/report.md`; optionally check frame hashes. |

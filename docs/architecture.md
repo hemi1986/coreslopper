@@ -144,7 +144,7 @@ A batch is estimated before the first paid call. Unknown pricing for the selecte
 
 ## Remotion
 
-`packages/remotion` renders a single `MusicVideo` composition. The CLI resolves the project, builds a serializable `VideoProps` object, bundles the composition with the repository as `publicDir`, and calls `renderMedia` or `renderStill`.
+`packages/remotion` renders a single `MusicVideo` composition. The CLI resolves the project, builds a serializable `VideoProps` object, stages a public directory with symlinks to only the referenced files, bundles the composition, and calls `renderMedia` or `renderStill`. Videos render in segments (default 60 s, fresh browser each, video only) under `.cache/render/`; ffmpeg joins them with the concat demuxer (`-c copy`) and muxes the song once. Remotion's caches are capped (`CORESLOPPER_VIDEO_CACHE_MB`, `CORESLOPPER_MEDIA_CACHE_MB`) because its defaults take half of the free RAM each. Finished segments are reused when a render resumes. With `CORESLOPPER_MEDIA_DIR`, a project's `assets/` and `renders/` are symlinks into an external media directory.
 
 The composition:
 

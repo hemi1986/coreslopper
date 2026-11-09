@@ -2,7 +2,6 @@ import { existsSync } from 'node:fs';
 import { readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
-import { bundle } from '@remotion/bundler';
 import { renderStill, selectComposition } from '@remotion/renderer';
 import {
   ValidationError,
@@ -13,7 +12,7 @@ import {
   writeTextAtomic,
 } from '@coreslopper/core';
 import { validateProject } from './validate.js';
-import { buildVideoProps } from './render.js';
+import { buildVideoProps, bundleFor, renderLimits } from './render.js';
 
 export interface QaOptions {
   projectDir: string;
@@ -127,7 +126,8 @@ export async function runQa(options: QaOptions): Promise<string> {
   if (options.determinismFrame !== undefined) {
     const { props } = await buildVideoProps({ projectDir: options.projectDir });
     const root = repoRoot();
-    const serveUrl = await bundle({ entryPoint: join(root, 'packages/remotion/src/index.ts'), publicDir: root });
+    const workDir = join(root, '.cache', 'render', `${props.project.slug}-qa`);
+    const serveUrl = await bundleFor(props, root, workDir);
     const composition = await selectComposition({ serveUrl, id: 'MusicVideo', inputProps: props });
     const a = join(tmpdir(), `coreslopper-det-a-${process.pid}.png`);
     const b = join(tmpdir(), `coreslopper-det-b-${process.pid}.png`);
@@ -139,6 +139,8 @@ export async function runQa(options: QaOptions): Promise<string> {
       imageFormat: 'png' as const,
       scale: 0.25,
       overwrite: true,
+      offthreadVideoCacheSizeInBytes: renderLimits().offthreadVideoCacheSizeInBytes,
+      mediaCacheSizeInBytes: renderLimits().mediaCacheSizeInBytes,
     };
     await renderStill({ ...optionsCommon, output: a });
     await renderStill({ ...optionsCommon, output: b });
@@ -151,6 +153,8 @@ export async function runQa(options: QaOptions): Promise<string> {
     });
     await rm(a, { force: true });
     await rm(b, { force: true });
+    await rm(serveUrl, { recursive: true, force: true });
+    await rm(workDir, { recursive: true, force: true });
   } else {
     checks.push({ name: 'Determinism', result: 'N/A', evidence: 'run with --determinism <frame>' });
   }

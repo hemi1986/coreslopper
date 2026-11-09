@@ -15,6 +15,7 @@ import {
   type VideoProviderKind,
 } from '@coreslopper/core';
 import { stringify } from 'yaml';
+import { linkProjectMedia, mediaDirFor } from './media-dir.js';
 
 export interface NewProjectOptions {
   slug: string;
@@ -141,6 +142,14 @@ export async function createProject(options: NewProjectOptions): Promise<string>
   // Validate the project shell. Timing and storyboard are intentionally absent
   // at this point; only the project config and state are checked.
   await readFile(join(projectDir, 'project.yaml'), 'utf8');
+
+  // Large media (assets/, renders/) lives outside the repository when
+  // CORESLOPPER_MEDIA_DIR is set; the project folders become symlinks.
+  if (mediaDirFor(slug)) {
+    for (const link of await linkProjectMedia(projectDir)) {
+      console.log(`Media: ${relativeToRoot(link.dir, root)} → ${link.target}`);
+    }
+  }
 
   console.log(`Created project ${config.title} (${slug}) at ${projectDir}`);
   console.log(`Budget: $${config.budget_usd.toFixed(2)} · providers: image=${config.providers.image}, video=${config.providers.video}`);
