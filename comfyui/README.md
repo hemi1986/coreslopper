@@ -15,6 +15,9 @@ The repository ships no graphs: node names change between ComfyUI and model rele
 | `ltx-t2v.json` | `textToVideo` | `video.text_to_video` | LTX 2.5 text-to-video |
 | `ltx-flf2v.json` | `firstLastFrameToVideo` | `video.first_last_frame` | LTX 2.5 first/last frame |
 | `music-minimax.json` | `generateAudio` | `audio.music` | Template *MiniMax Music 3* |
+| `music-ace.json` | `generateAudio` | (set `models.audio.music.model: music-ace`) | Template *ACE-Step 1.5 XL Turbo* |
+| `voxcpm-clone.json` | `generateAudio` (reference voice + transcript) | `audio.voice` | A VoxCPM2 voice-cloning graph (ComfyUI-VoxCPM nodes); default for all speech |
+| `voxcpm-design.json` | `generateAudio` | `audio.voice_design` | A VoxCPM2 TTS graph; voice from a description |
 | `audio-stable.json` | `generateAudio` | `audio.sfx` | Template *Stable Audio 3 Medium* |
 
 How they were tagged:
@@ -23,6 +26,8 @@ How they were tagged:
 - **Qwen background removal:** `LoadImage` `cs_start_image`, the text encoder `cs_prompt cs_negative`, the `KSampler` `cs_seed`, the save node `cs_output`.
 - **LTX audio-video:** `LoadImage` `cs_start_image`, `LoadAudio` `cs_audio`, the positive/negative prompt primitives `cs_prompt`/`cs_negative`, the fps and duration-in-seconds primitives `cs_fps`/`cs_duration`, both `RandomNoise` nodes `cs_seed`, the half-size `EmptyLTXVLatentVideo` `cs_width cs_height` (with `size_scale: 0.5`), every boolean that turns custom audio on `cs_use_audio`, `TrimAudioDuration` `cs_audio_start`, and the video save node `cs_output`.
 - **MiniMax Music 3:** the text encoder `cs_prompt cs_lyrics cs_duration`, the seed node `cs_seed`, the audio save node `cs_output`.
+- **ACE-Step 1.5:** the `TextEncodeAceStepAudio1.5` node `cs_prompt cs_lyrics cs_duration` (prompt goes into `tags`), the `EmptyAceStep1.5LatentAudio` node `cs_duration`, the seed `PrimitiveInt` `cs_seed`, the audio save node `cs_output`.
+- **VoxCPM clone:** the `VoxCPM_TTS` node `cs_prompt cs_seed`, the `LoadAudio` with the reference voice `cs_audio`, the `VoxCPM_VoiceCloning` node `cs_transcript`, the save node `cs_output`. Design: the same without `cs_audio` and `cs_transcript`.
 - **Stable Audio 3:** the user-description primitive `cs_prompt`, the negative encoder `cs_negative`, the duration primitive `cs_duration`, the `KSampler` `cs_seed`, the audio save node `cs_output`.
 
 Notes from test runs on a 16 GB GPU:
@@ -30,7 +35,12 @@ Notes from test runs on a 16 GB GPU:
 - `qwen-t2i` and `qwen-edit` take about 10–20 s per image. Put the image to edit first (`references[0]` sets the output size), then the other references.
 - `qwen-bg-remove` works on a clear subject. On dark, low-contrast scenes it can return a fully transparent image, so generate cutouts on a plain background.
 - `ltx-av` takes about 65 s for a 3 s clip at 1088×1920. In `lipSync` mode the clip length follows the vocal segment. Prompt the singing explicitly, for example "sings the supplied vocal audio with accurate lip sync: lips, jaw and facial muscles move precisely with every syllable".
-- `generateAudio` is for teasers, stingers, and SFX. It never replaces the song a video is made for.
+- `generateAudio` is for teasers, stingers, SFX, and voice-overs. It never replaces the song a video is made for.
+- `music-ace` makes 30 s in about 11 s. Set `bpm`, `keyscale`, `language`, or `timesignature` with `node_inputs`, e.g. `{"cs_prompt.bpm": 110, "cs_prompt.language": "de"}`.
+- `voxcpm-clone` takes about 10 s per sentence. Give the reference WAV as the batch item's `audio` and its exact words as `params.transcript`. Use the VoxCPM2 model, not 0.5B; the language follows the text.
+- Write every number, year, time, abbreviation, and symbol out in words before TTS, e.g. in German "2077" → "zweitausendsiebenundsiebzig", "23:15" → "dreiundzwanzig Uhr fünfzehn", "z. B." → "zum Beispiel". `generate` rejects `audio.voice*` prompts with digits, symbols, or common abbreviations.
+- Generate long texts one sentence or paragraph at a time and join them; short sections are more stable. On a slip or wrong stress, try up to 3 seeds. In a test, one seed dropped the first two words and two others were correct.
+- `voxcpm-design` invents a voice: put the description in brackets right before the text, `(deep, calm male voice)Text`. Use it only to find a voice, then keep a good take as the reference WAV for `voxcpm-clone`.
 
 ## Select the backend
 
@@ -56,12 +66,13 @@ A single batch can also run on ComfyUI with `npm run cli -- generate <project> -
 
 | Tag | Node to tag | Input set |
 |---|---|---|
-| `cs_prompt` | Positive text node (`CLIPTextEncode`, a string primitive, a music caption) | `text` / `prompt` / `caption` / `value`. **Required.** |
+| `cs_prompt` | Positive text node (`CLIPTextEncode`, a string primitive, a music caption, a TTS node) | `text` / `prompt` / `caption` / `tags` / `value`. **Required.** |
 | `cs_negative` | Negative text node | `negative_prompt` / `text` / `value` |
 | `cs_start_image` | `LoadImage` for the start frame or the image to edit | `image` (uploaded by the adapter) |
 | `cs_end_image` | `LoadImage` for the end frame | `image` |
 | `cs_references` | A node with an autogrow image input (Qwen `images.image_N`) | The adapter adds a `LoadImage` per extra reference and links it to the next free slot |
-| `cs_audio` | `LoadAudio` for the driving vocals | `audio` (uploaded by the adapter) |
+| `cs_audio` | `LoadAudio` for the driving vocals, or the reference voice in a voice-clone workflow | `audio` (uploaded by the adapter) |
+| `cs_transcript` | Voice-clone node with the reference transcript | `prompt_text` / `transcript` / `reference_text`, set to the `transcript` param (required) |
 | `cs_use_audio` | Boolean switches that turn the custom-audio branch on | `boolean` / `value`: `true` for `lipSync`, `false` otherwise |
 | `cs_audio_start` | `TrimAudioDuration` | `start_index`, set to `audio_offset` (default 0) |
 | `cs_seed` | Sampler, `RandomNoise`, or a seed node | `seed` / `noise_seed` |
@@ -82,7 +93,7 @@ The output kind and the input tags decide which operations a workflow fits:
 |---|---|---|
 | image | none | `generateImage` |
 | image | `cs_start_image` | `editImage` |
-| audio | — | `generateAudio` |
+| audio | none, or `cs_audio` (+ `cs_transcript`) as reference voice | `generateAudio` |
 | video | none | `textToVideo` |
 | video | `cs_start_image` | `imageToVideo` |
 | video | `cs_start_image`, `cs_end_image` | `firstLastFrameToVideo` |
@@ -104,6 +115,7 @@ Set these under `params` in `config/models.yaml`, or in a project override (`mod
 | `width`, `height` | Override the project's master size, e.g. render at 1280×704 for drafts. |
 | `audio_offset` | Start of the driving audio in seconds (`cs_audio_start`). Default 0, since `audio-segment` already cuts the line. |
 | `lyrics` | Lyrics for `cs_lyrics` (music workflows). |
+| `transcript` | Exact text of the reference voice for `cs_transcript` (voice clone). |
 | `node_inputs` | Set any other value: `{"cs_sampler.steps": 30, "12.cfg": 3.5}`. Keys are `<node title tag or node id>.<input>`. |
 
 Any other param is an error, so typos do not pass silently.
