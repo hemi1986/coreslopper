@@ -29,6 +29,7 @@ license: MIT
    - Source-specific fields: `motion.component`, `prompts.keyframe`/`prompts.video`, `asset`, or `layers` for mixed shots.
    - Lip-sync shots: `source: ai-clip` plus `lipSync: { character: <id> }`. Anchor start/end tightly to the sung line (word timestamps), keep each ≤ 30 s, and write `prompts.keyframe` for a frontal face shot.
    - Text, highlights, transition, style refs, character refs, and chaining when relevant.
+   - `focus: { x, y }` (0–1) when the essential subject sits off-centre, such as a mirror reflection or a face at the edge, so that 9:16 and 1:1 crops keep it in view. It applies only to formats narrower than 16:9.
    - AI shots follow the composition rules below.
 4. Run `npm run cli -- validate projects/<slug>`. Fix schema errors, unresolved anchors, gaps, overlaps, missing references, and source-rule violations.
 5. Run `npm run cli -- contact-sheet projects/<slug>`.

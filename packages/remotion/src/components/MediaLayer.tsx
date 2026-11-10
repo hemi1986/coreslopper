@@ -16,14 +16,23 @@ export function MediaLayer({
   width,
   height,
   description,
+  focus,
 }: {
   asset?: string;
   style: StyleBible;
   width: number;
   height: number;
   description: string;
+  /** Focus point (0–1) kept in view when the format crops the media. */
+  focus?: { x: number; y: number };
 }) {
   const frame = useCurrentFrame();
+  // Focus applies only to formats narrower than the 16:9 sources (9:16, 1:1,
+  // 4:5). In the master nothing is cropped, and the zoom keeps its centre.
+  const cropped = width / height < 1.7;
+  const fx = cropped ? (focus?.x ?? 0.5) : 0.5;
+  const fy = cropped ? (focus?.y ?? 0.5) : 0.5;
+  const position = `${(fx * 100).toFixed(2)}% ${(fy * 100).toFixed(2)}%`;
   const { durationInFrames } = useVideoConfig();
   const zoom = interpolate(frame, [0, Math.max(1, durationInFrames)], [1.02, 1.09], {
     extrapolateRight: 'clamp',
@@ -71,7 +80,9 @@ export function MediaLayer({
             width: '100%',
             height: '100%',
             objectFit: 'cover',
+            objectPosition: position,
             transform: `scale(${zoom})`,
+            transformOrigin: position,
           }}
         />
         <div
@@ -95,7 +106,9 @@ export function MediaLayer({
             width: '100%',
             height: '100%',
             objectFit: 'cover',
+            objectPosition: position,
             transform: `scale(${zoom})`,
+            transformOrigin: position,
           }}
         />
         <div

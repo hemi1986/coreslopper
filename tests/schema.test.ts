@@ -22,6 +22,21 @@ describe('schemas', () => {
     expect(brand.palette.primary).toBe('#ff2a6d');
   });
 
+  it('accepts a shot focus point and rejects values outside 0–1', () => {
+    const shot = {
+      id: 'shot-001',
+      section: 'intro',
+      start: { type: 'section', id: 'intro' },
+      end: { type: 'section', id: 'intro', edge: 'end' },
+      source: 'ai-clip',
+      description: 'mirror shot',
+    };
+    const parsed = StoryboardSchema.parse({ version: 1, shots: [{ ...shot, focus: { x: 0.2 } }] });
+    expect(parsed.shots[0]!.focus).toEqual({ x: 0.2, y: 0.5 });
+    expect(StoryboardSchema.parse({ version: 1, shots: [shot] }).shots[0]!.focus).toBeUndefined();
+    expect(() => StoryboardSchema.parse({ version: 1, shots: [{ ...shot, focus: { x: 1.5 } }] })).toThrow();
+  });
+
   it('generates a draft 2020-12 JSON Schema', () => {
     const json = z.toJSONSchema(StoryboardSchema, { target: 'draft-2020-12', io: 'input' });
     expect(json.$schema).toContain('2020-12');
