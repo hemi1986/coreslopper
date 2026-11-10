@@ -221,3 +221,63 @@ export function rmsEnvelope(samples: Float32Array, hop = 512, frame = 2048): num
   const peak = Math.max(0, ...values);
   return values.map((value) => (peak > 0 ? Math.round((value / peak) * 100_000) / 100_000 : 0));
 }
+
+export interface SubtitleCue {
+  /** The script line the cue belongs to. */
+  id: string;
+  start: number;
+  end: number;
+  text: string;
+}
+
+/** Break subtitle text into at most two balanced lines of about `width` characters. */
+function wrapSubtitle(text: string, width = 42): string {
+  const clean = text.replace(/\s+/g, ' ').trim();
+  if (clean.length <= width) return clean;
+  const words = clean.split(' ');
+  let best = clean;
+  let bestScore = Infinity;
+  for (let index = 1; index < words.length; index += 1) {
+    const first = words.slice(0, index).join(' ');
+    const second = words.slice(index).join(' ');
+    const score = Math.max(first.length, second.length);
+    if (score < bestScore) {
+      bestScore = score;
+      best = `${first}\n${second}`;
+    }
+  }
+  return best;
+}
+
+/**
+ * The English subtitles: one cue per dialogue, voice-over, announcement, and
+ * chat line, timed by the (effective) timing, in playing order.
+ */
+export function subtitleCues(script: Script, timing: Timing): SubtitleCue[] {
+  const cues: SubtitleCue[] = [];
+  for (const { line } of scriptLines(script)) {
+    if (!isSubtitledLine(line)) continue;
+    const timed = timing.lines.find((candidate) => candidate.id === line.id);
+    if (!timed) throw new ValidationError(`Script line "${line.id}" is not in the timing; re-run episode-track.`);
+    if (!line.text_en?.trim()) throw new ValidationError(`Script line "${line.id}" has no text_en.`);
+    cues.push({ id: line.id, start: timed.start, end: timed.end, text: wrapSubtitle(line.text_en) });
+  }
+  return cues.sort((a, b) => a.start - b.start);
+}
+
+function srtTime(seconds: number): string {
+  const total = Math.round(seconds * 1000);
+  const ms = total % 1000;
+  const s = Math.floor(total / 1000) % 60;
+  const m = Math.floor(total / 60_000) % 60;
+  const h = Math.floor(total / 3_600_000);
+  const pad = (value: number, size = 2) => String(value).padStart(size, '0');
+  return `${pad(h)}:${pad(m)}:${pad(s)},${pad(ms, 3)}`;
+}
+
+/** The English subtitles of an episode as an SRT file. */
+export function buildSrt(script: Script, timing: Timing): string {
+  return subtitleCues(script, timing)
+    .map((cue, index) => `${index + 1}\n${srtTime(cue.start)} --> ${srtTime(cue.end)}\n${cue.text}\n`)
+    .join('\n');
+}

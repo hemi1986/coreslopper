@@ -62,6 +62,26 @@ review/             report, contact sheet, small stills
 
 `timing.overrides.json` is never written by a script. The TypeScript loader merges it over `timing.json` on every load and writes `timing.effective.json` for the renderer.
 
+## Project kinds
+
+`project.yaml` has a `kind`: `music-video` (the default when it is missing) or `episode` ([ADR 0016](adr/0016-episode-projects.md)). `state.json` records the same kind; `migrateState` copies it from `project.yaml` into older state files, and `validate` fails when the two differ. `stagesFor(kind)` in `packages/core/src/state.ts` picks the stage list, and every state function walks that list.
+
+An episode belongs to a series. `series/<series>/` holds its **canon**: `series.yaml` (formats, provider defaults, episode plan, optional limits), `bible.md`, `style.yaml`, `characters.yaml`, `sets.yaml`, and references under `characters/` and `sets/` (gitignored). `loadProject` reads an episode's style, characters, and sets from there; an episode has no copies. `new --kind episode` copies formats, providers, and brand from `series.yaml` once; nothing is inherited at run time.
+
+An episode's data plane adds:
+
+```text
+script.yaml         scenes and script lines; replaces lyrics.txt
+takes.json          take registry: source, duration, text hash, file hash
+audio/lines/        one take per audible line, gitignored
+audio/ambience/     one ambience per scene with atmo, gitignored
+audio/episode.wav   the episode track, gitignored
+audio/stems/<character>.wav  speaker stems, gitignored
+renders/<slug>.en.srt  English subtitles
+```
+
+The timing is constructed, not measured. `voice-track` produces takes through the normal batch path (`runBatch`: estimate, budget, cache, manifest). `episode-track` places the lines one after another (`placeLines`), writes `timing.json` without `bpm` or beats, merges `timing.overrides.json`, and mixes `audio/episode.wav` and the speaker stems with ffmpeg **from the effective timing**, so an override moves sound and picture together. `energy` is the RMS envelope of the finished mix. Validation adds two rules: a shot's `refs.sets` must be the set of its scene, and a `ChatWindow` shot names chat lines of its scene.
+
 ## Stage isolation
 
 Each stage runs in a fresh `stage-runner` subagent or process. The runner reads the skill and the stage inputs, writes the stage outputs, and returns a compact summary:
@@ -155,7 +175,7 @@ The composition:
 - uses `@remotion/three` for 3D;
 - has no wall-clock, `Math.random`, `useFrame` clock, or time-based CSS animation.
 
-Formats are separate compositions (`16x9`, `9x16`, `1x1`, `4x5`) with safe-area-aware layouts. The master is 16:9 1080p30; derivatives are not naive crops.
+Formats are `16x9`, `9x16`, `1x1`, and `4x5`, with safe-area-aware layouts. The master is whatever `formats.master` says; render, QA, and stage outputs derive its ID from the master's aspect (`renders/16x9.mp4` for a 16:9 music video, `renders/9x16.mp4` for a vertical episode). Derivatives are not naive crops. The composition plays `audio/song.wav` or `audio/episode.wav` by kind. For episodes it also gets the chat lines for the `ChatWindow` component and, with `render --subtitles en`, burns in the English subtitles inside the format's safe area.
 
 ## Claude Code layer
 

@@ -4,6 +4,7 @@ import { AbsoluteFill, Audio, Sequence, staticFile } from 'remotion';
 import { ensureFonts } from './fonts';
 import { Grain } from './components/Grain';
 import { ShotRenderer } from './components/ShotRenderer';
+import { Subtitles } from './components/Subtitles';
 import type { VideoProps } from './types';
 
 export function MusicVideo(input: VideoProps) {
@@ -28,6 +29,7 @@ export function MusicVideo(input: VideoProps) {
             style={props.style}
             width={props.width}
             height={props.height}
+            chat={props.chat}
           />
         </Sequence>
       ))}
@@ -39,6 +41,9 @@ export function MusicVideo(input: VideoProps) {
         }}
       />
       <Grain opacity={props.style.motion.grain} />
+      {props.subtitles?.length ? (
+        <Subtitles cues={props.subtitles} style={props.style} width={props.width} height={props.height} />
+      ) : null}
       <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
         <div
           style={{

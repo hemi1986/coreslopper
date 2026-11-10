@@ -69,6 +69,18 @@ jobs:
           npm run cli -- render projects/demo --still 130 --still-scale 0.25
           test -s projects/demo/renders/still-130.png
 
+      - name: Demo episode (mock provider)
+        run: |
+          npm run demo:episode
+          npm run cli -- validate projects/demo-episode
+          npm run cli -- voice-track projects/demo-episode
+          npm run cli -- episode-track projects/demo-episode
+          git diff --exit-code projects/demo-episode/timing.json
+          npm run cli -- subtitles projects/demo-episode
+          test -s projects/demo-episode/renders/demo-episode.en.srt
+          npm run cli -- render projects/demo-episode --still 160 --still-scale 0.25 --subtitles en
+          test -s projects/demo-episode/renders/still-160.png
+
       - name: Build npm package and npx bundle
         run: npm run build
 

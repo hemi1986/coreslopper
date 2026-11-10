@@ -30,6 +30,7 @@ import { runQa } from './qa.js';
 import { importFootage, importSong, importTakes, normalizeAudio, extractFrame, extractAudioSegment } from './media.js';
 import { voiceTrack } from './voice-track.js';
 import { episodeTrack } from './episode-track.js';
+import { writeSubtitles } from './subtitles.js';
 import { runDoctor } from './doctor.js';
 import { runInitCommand, validateChoice, type InitCommandOptions } from './init-command.js';
 import { printStatus } from './status.js';
@@ -108,18 +109,20 @@ function parseFrameRange(value: string | undefined): [number, number] | undefine
 program
   .command('render [project]')
   .description('Render a format with Remotion.')
-  .option('--format <format>', '16x9 | 9x16 | 1x1 | 4x5', '16x9')
+  .option('--format <format>', '16x9 | 9x16 | 1x1 | 4x5 (default: the master format)')
   .option('--preview', 'Render a half-scale preview')
   .option('--still <frame>', 'Render a single still at this frame', (value) => Number(value))
   .option('--still-scale <scale>', 'Scale for --still (default 1)', (value) => Number(value))
   .option('--out <path>', 'Override the output path')
-  .option('--require-audio', 'Fail if audio/song.wav is missing')
+  .option('--require-audio', 'Fail if the song (audio/song.wav) or episode track (audio/episode.wav) is missing')
+  .option('--subtitles <language>', 'Burn in episode subtitles (en); writes renders/<format>.en.mp4')
   .option('--frames <range>', 'Render only frames <start>-<end> (inclusive), for test renders')
   .action(
     (
       project: string | undefined,
       options: {
-        format: string;
+        format?: string;
+        subtitles?: string;
         preview?: boolean;
         still?: number;
         stillScale?: number;
@@ -131,9 +134,12 @@ program
       run(async () => {
         const projectDir = projectDirFromArg(project);
         const frames = parseFrameRange(options.frames);
-        const format = options.format as FormatId;
-        if (!['16x9', '9x16', '1x1', '4x5'].includes(format)) {
+        const format = options.format as FormatId | undefined;
+        if (format && !['16x9', '9x16', '1x1', '4x5'].includes(format)) {
           throw new ValidationError(`Unknown format "${options.format}". Use 16x9, 9x16, 1x1, or 4x5.`);
+        }
+        if (options.subtitles && options.subtitles !== 'en') {
+          throw new ValidationError(`Unknown subtitle language "${options.subtitles}". Episodes have English subtitles (en).`);
         }
         await renderProject({
           projectDir,
@@ -144,6 +150,7 @@ program
           out: options.out,
           requireAudio: options.requireAudio,
           frames,
+          subtitles: options.subtitles as 'en' | undefined,
         });
       }),
   );
@@ -442,6 +449,15 @@ program
   .action((project: string | undefined) =>
     run(async () => {
       await episodeTrack(projectDirFromArg(project));
+    }),
+  );
+
+program
+  .command('subtitles [project]')
+  .description('Episode: write the English subtitles to renders/<slug>.en.srt from the script and effective timing.')
+  .action((project: string | undefined) =>
+    run(async () => {
+      await writeSubtitles(projectDirFromArg(project));
     }),
   );
 

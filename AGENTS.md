@@ -1,6 +1,6 @@
 # coreslopper
 
-An open-source, Claude Code-native workflow for producing music videos for an existing song, from a brief to final renders. Creative work is done by agent skills; mechanical work is done by tested TypeScript and Python scripts. The repository is both the workflow and the home of its video projects.
+An open-source, Claude Code-native workflow for producing music videos for an existing song, and episodes of a series from a script, from setup to final renders. Creative work is done by agent skills; mechanical work is done by tested TypeScript and Python scripts. The repository is both the workflow and the home of its video projects.
 
 ## Principles
 
@@ -35,7 +35,7 @@ npm run cli -- contact-sheet projects/demo
 npm run cli -- render projects/demo --format 16x9
 ```
 
-The demo is a 12-second motion-only project. It needs no API keys.
+The demo is a 12-second motion-only project. It needs no API keys. `projects/demo-episode` is a 9:16 demo episode of `series/demo-series` on the mock provider: `npm run demo:episode`, then `voice-track`, `episode-track`, and `render` (see `docs/pipeline.md`).
 
 Create a real project:
 
@@ -68,8 +68,10 @@ packages/
 schema/            Generated JSON Schema for cross-language validation
 scripts/           Audio analysis (Python/uv), fixture generators, runtime build
 templates/project/ Project template used by the new-video skill
+templates/episode/ Episode template used by the new-episode skill
 brand/example/     Neutral synthwave/cyberpunk brand kit with OFL fonts
-projects/          Video projects (media gitignored)
+projects/          Video projects and episodes (media gitignored)
+series/            Series canons: series.yaml, bible, style, characters, sets (references gitignored)
 runtime/           Generated npm runtime snapshot (gitignored)
 dist/              Generated npx bundle (gitignored)
 ```
@@ -90,7 +92,19 @@ dist/              Generated npx bundle (gitignored)
 
 The song always exists already; the workflow never writes lyrics or generates music. ✋ marks the **interactive stages**: the `new-video` skill runs them in the main session with the user (project data, lyrics, song import, grilling). `/video-next` refuses to start while one is open.
 
-From `audio-analysis` on, no stage waits for a human. A stage can stop the pipeline only on a hard stop: budget exceeded, missing credentials, or a validation/QA failure that cannot be fixed after its retries.
+### Episodes
+
+A project with `kind: episode` is one episode of a series ([ADR 0016](docs/adr/0016-episode-projects.md)). Its style, characters, and sets come from the canon in `series/<series>/`, and its audio is built from `script.yaml` instead of a song.
+
+| # | Stage ID | Skill(s) | Output |
+|---|---|---|---|
+| 1 | `setup` ✋ | `new-episode` | `project.yaml` (copies formats, providers, brand from `series.yaml`) |
+| 2 | `script` ✋ | `grilling`, `new-episode` | `script.yaml` |
+| 3 | `voice-track` | `voice-track` | `takes.json`, `audio/lines/`, `audio/ambience/` |
+| 4 | `episode-track` | `episode-track` | `timing.json`, `audio/episode.wav`, `audio/stems/<character>.wav` |
+| 5–8 | `storyboard`, `assets`, `assembly`, `qa-export` | as above | renders in the master format, `renders/<slug>.en.srt` |
+
+From `audio-analysis` (or `voice-track`) on, no stage waits for a human. A stage can stop the pipeline only on a hard stop: budget exceeded, missing credentials, or a validation/QA failure that cannot be fixed after its retries.
 
 ## Context discipline
 
@@ -121,9 +135,14 @@ npm run schema
 | `npm run cli -- validate <project>` | Validate timing, style, characters, and storyboard coverage. |
 | `npm run cli -- status <project>` | Show stage state and budget. |
 | `npm run cli -- contact-sheet <project>` | Write `review/contact-sheet.svg`. |
-| `npm run cli -- render <project> --format 16x9` | Render with Remotion in segments; `--frames <a>-<b>` renders a test range. |
+| `npm run cli -- render <project> [--format <id>]` | Render with Remotion in segments; the default is the master format. `--frames <a>-<b>` renders a test range; `--subtitles en` burns in episode subtitles. |
 | `npm run cli -- media-link <project> [--move]` | Move `assets/` and `renders/` to `CORESLOPPER_MEDIA_DIR` and symlink them. |
 | `npm run cli -- new <slug> --budget <usd>` | Create a project from the template. |
+| `npm run cli -- new <slug> --kind episode --series <s> --episode <n> --budget <usd>` | Create an episode of a series. |
+| `npm run cli -- voice-track <project> [--dry-run]` | Episode: generate missing or stale takes and scene ambience. |
+| `npm run cli -- import-takes <project> [--lines <ids>]` | Episode: register recordings in `audio/lines/` as takes. |
+| `npm run cli -- episode-track <project>` | Episode: place takes, write `timing.json`, mix the episode track and speaker stems. |
+| `npm run cli -- subtitles <project>` | Episode: write `renders/<slug>.en.srt`. |
 | `npm run cli -- generate <project> --batch <file> [--provider <p>]` | Run a cached, budget-checked generation batch; `--provider` overrides the project provider for one batch (lip-sync keeps its own). |
 | `npm run cli -- qa <project> [--determinism <frame>]` | Write `review/report.md`; optionally check frame hashes. |
 | `npm run cli -- import-song <project>` | Register `audio/song.wav` and `audio/stems/vocals.wav` in `song.json`; converts other formats. |
@@ -142,7 +161,7 @@ npm run schema
 | `npm run build` | Build `runtime/` and the npx bundle in `dist/`. |
 | `npm run pack:check` | Build and inspect the npm tarball. |
 
-In Claude Code: `/new-video` (skill), `/video-next`, `/video-status`.
+In Claude Code: `/new-video` and `/new-episode` (skills), `/video-next`, `/video-status`.
 
 ## Distribution
 
@@ -150,7 +169,7 @@ The root package is published as `coreslopper`. `npm run build` copies the track
 
 ## Skills
 
-Own skills: `new-video`, `video-brief`, `video-treatment`, `audio-analysis`, `style-bible`, `character-bible`, `storyboard`, `remotion-motion`, `ai-clips`, `footage`, `assembly-render`, `video-qa`.
+Own skills: `new-video`, `video-brief`, `video-treatment`, `audio-analysis`, `style-bible`, `character-bible`, `storyboard`, `remotion-motion`, `ai-clips`, `footage`, `assembly-render`, `video-qa`, and for episodes `new-episode`, `voice-track`, `episode-track`.
 
 Vendored from Matt Pocock (MIT, see `docs/THIRD_PARTY.md`): `grill-me`, `grilling`, `writing-for-agents`, `domain-modeling`.
 

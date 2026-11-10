@@ -16,7 +16,7 @@ The wizard installs dependencies and stores optional `FAL_KEY` and Higgsfield cr
 
 ## Stage IDs
 
-`setup`, `brief`, `treatment`, `audio-analysis`, `style-character`, `storyboard`, `assets`, `assembly`, `qa-export`.
+`setup`, `brief`, `treatment`, `audio-analysis`, `style-character`, `storyboard`, `assets`, `assembly`, `qa-export`. An episode has its own list; see [Episodes](#episodes).
 
 The first three are **interactive**: the `new-video` skill runs them in the main session with the user. `/video-next` refuses to start while one of them is open and points back to `/new-video <slug>`. Every later stage runs autonomously in a fresh `stage-runner`.
 
@@ -113,7 +113,7 @@ Completion: every shot has its source asset or a documented reason; every charac
 
 - Skill: `assembly-render`
 - Input: validated storyboard, assets, audio
-- Output: `renders/preview-16x9.mp4`, then master/derivatives
+- Output: `renders/preview-<master>.mp4` (`16x9` for a 16:9 master), then master/derivatives
 
 ```bash
 npm run cli -- render projects/my-video --format 16x9 --preview
@@ -149,6 +149,50 @@ npm run demo:analyze
 ```
 
 The demo is motion-only and uses no paid provider. It is the fastest way to check the pipeline and the renderer.
+
+## Episodes
+
+An episode of a series is a project with `kind: episode` (see [ADR 0016](adr/0016-episode-projects.md)). Its canon (style, characters, sets) lives in `series/<series>/`; its audio is built from `script.yaml` instead of a song. The stages:
+
+`setup` ✋, `script` ✋, `voice-track`, `episode-track`, `storyboard`, `assets`, `assembly`, `qa-export`.
+
+The `new-episode` skill runs the two interactive stages: it creates the project and grills the user into `script.yaml`.
+
+```bash
+# setup: formats, providers, and brand are copied from series.yaml
+npm run cli -- new night-desk-02 --kind episode --series demo-series --episode 2 --budget 20
+# script: the skill writes script.yaml; check it at any time
+npm run cli -- validate-file projects/night-desk-02/script.yaml
+
+# voice-track: takes for audible lines, ambience per scene
+npm run cli -- import-takes projects/night-desk-02     # optional: own recordings in audio/lines/<line-id>.*
+npm run cli -- voice-track projects/night-desk-02 --dry-run
+npm run cli -- voice-track projects/night-desk-02
+
+# episode-track: placement, timing.json, audio/episode.wav, speaker stems
+npm run cli -- episode-track projects/night-desk-02
+npm run cli -- validate projects/night-desk-02
+
+# storyboard and assets as for a music video, then:
+npm run cli -- render projects/night-desk-02 --preview          # master format, e.g. renders/preview-9x16.mp4
+npm run cli -- render projects/night-desk-02                    # renders/9x16.mp4
+npm run cli -- render projects/night-desk-02 --subtitles en     # renders/9x16.en.mp4
+npm run cli -- subtitles projects/night-desk-02                 # renders/night-desk-02.en.srt
+npm run cli -- qa projects/night-desk-02
+```
+
+- **Takes.** `takes.json` (tracked) records each take's source, duration, text hash, and file hash. `voice-track` generates only missing or stale generated takes; a recording the user swapped in, or an imported take whose text changed, stops the stage until the user runs `import-takes` or deletes the file.
+- **Re-timing.** Change `pause_after` in the script or add a line or section to `timing.overrides.json`, then run `episode-track` again. The mix follows the effective timing, so sound and picture move together.
+- **QA** adds the episode checks: complete `text_en`, canon references, `limits.episode_seconds` of the series, and the SRT.
+
+The demo episode runs on the mock provider:
+
+```bash
+npm run demo:episode            # placeholder reference voices for series/demo-series
+npm run cli -- voice-track projects/demo-episode
+npm run cli -- episode-track projects/demo-episode
+npm run cli -- render projects/demo-episode
+```
 
 ## Hard stops and resume
 

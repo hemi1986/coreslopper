@@ -76,7 +76,7 @@ export const MUSIC_VIDEO_STAGES: StageDefinition[] = [
     id: 'assembly',
     label: 'Assembly',
     skills: ['assembly-render'],
-    outputs: ['renders/preview-16x9.mp4'],
+    outputs: ['renders/preview-{master}.mp4'],
     mechanical: true,
     interactive: false,
   },
@@ -84,7 +84,7 @@ export const MUSIC_VIDEO_STAGES: StageDefinition[] = [
     id: 'qa-export',
     label: 'QA & export',
     skills: ['video-qa'],
-    outputs: ['review/report.md', 'renders/16x9.mp4'],
+    outputs: ['review/report.md', 'renders/{master}.mp4'],
     mechanical: true,
     interactive: false,
   },
@@ -137,8 +137,7 @@ export const EPISODE_STAGES: StageDefinition[] = [
     id: 'assembly',
     label: 'Assembly',
     skills: ['assembly-render'],
-    // The render file is named after the master format (renders/preview-<format>.mp4).
-    outputs: [],
+    outputs: ['renders/preview-{master}.mp4'],
     mechanical: true,
     interactive: false,
   },
@@ -146,11 +145,23 @@ export const EPISODE_STAGES: StageDefinition[] = [
     id: 'qa-export',
     label: 'QA & export',
     skills: ['video-qa'],
-    outputs: ['review/report.md'],
+    outputs: ['review/report.md', 'renders/{master}.mp4', 'renders/{slug}.en.srt'],
     mechanical: true,
     interactive: false,
   },
 ];
+
+/**
+ * A stage's outputs for a project: `{master}` becomes the master format ID
+ * (`renders/16x9.mp4` for a 16:9 master) and `{slug}` the project slug.
+ */
+export function stageOutputs(
+  stage: StageDefinition,
+  config: Pick<ProjectConfig, 'slug' | 'formats'>,
+): string[] {
+  const master = config.formats.master.aspect.replace(':', 'x');
+  return stage.outputs.map((output) => output.replaceAll('{master}', master).replaceAll('{slug}', config.slug));
+}
 
 /** The stage list of a project kind. A missing kind means `music-video`. */
 export function stagesFor(kind: ProjectKind | undefined): StageDefinition[] {

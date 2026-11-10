@@ -23,6 +23,7 @@ export const MOTION_COMPONENTS = new Set([
   'Grid',
   'Scanlines',
   'NeonTorus',
+  'ChatWindow',
 ]);
 
 export interface ResolvedShot extends Shot {
@@ -270,6 +271,32 @@ function validateSets(shot: Shot, episode: EpisodeContext | undefined): void {
   }
 }
 
+/**
+ * A ChatWindow shows chat lines of the episode script: `motion.props.lines`
+ * names them, and each must be a chat line of the shot's scene.
+ */
+function validateChatWindow(shot: Shot, episode: EpisodeContext | undefined): void {
+  const uses =
+    shot.motion?.component === 'ChatWindow' || shot.layers?.some((layer) => layer.component === 'ChatWindow');
+  if (!uses) return;
+  if (!episode) throw new ValidationError(`Shot "${shot.id}" uses ChatWindow, which shows chat lines of an episode script.`);
+  const lines = shot.motion?.props.lines;
+  if (!Array.isArray(lines) || lines.length === 0 || !lines.every((line) => typeof line === 'string')) {
+    throw new ValidationError(`ChatWindow shot "${shot.id}" must name its chat lines in motion.props.lines.`);
+  }
+  const scene = episode.script.scenes.find((candidate) => candidate.id === shot.section);
+  for (const id of lines as string[]) {
+    const line = episode.script.scenes.flatMap((candidate) => candidate.lines).find((candidate) => candidate.id === id);
+    if (!line) throw new ValidationError(`ChatWindow shot "${shot.id}" names unknown script line "${id}".`);
+    if (line.kind !== 'chat') {
+      throw new ValidationError(`ChatWindow shot "${shot.id}" names "${id}", a ${line.kind} line; it shows chat lines only.`);
+    }
+    if (!scene?.lines.some((candidate) => candidate.id === id)) {
+      throw new ValidationError(`ChatWindow shot "${shot.id}" names "${id}", which is not in its scene "${shot.section}".`);
+    }
+  }
+}
+
 function validateSource(shot: Shot): void {
   if (shot.source === 'motion') {
     if (!shot.motion?.component) {
@@ -369,6 +396,7 @@ export function resolveStoryboard(
     validateRefs(shot, style, characters);
     validateSets(shot, episode);
     validateSource(shot);
+    validateChatWindow(shot, episode);
     validateText(shot);
 
     resolved.push({

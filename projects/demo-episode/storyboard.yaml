@@ -21,16 +21,13 @@ shots:
     start: { type: line, id: l02, edge: start }
     end: { type: line, id: l04, edge: start }
     source: motion
-    # Chat shot. Uses LyricCard until the ChatWindow component exists (plan step 2c).
     description: The chat window on Mara's monitor; a message from an unknown contact types itself out.
     camera: static
-    text: Bist du noch da?
-    highlights: [da]
     refs:
       style: [palette.surface, palette.text, typography.mono]
       characters: [contact]
     motion:
-      component: LyricCard
+      component: ChatWindow
       props: { lines: [l02] }
   - id: shot-003
     section: s01_office
