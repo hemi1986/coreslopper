@@ -46,6 +46,7 @@ export const COMFYUI_TITLES = {
   useAudio: 'cs_use_audio',
   references: 'cs_references',
   lyrics: 'cs_lyrics',
+  transcript: 'cs_transcript',
   output: 'cs_output',
 } as const;
 
@@ -53,7 +54,7 @@ export type ComfyTag = keyof typeof COMFYUI_TITLES;
 
 /** Input names tried in order on a titled node. */
 const INPUT_CANDIDATES: Record<ComfyTag, string[]> = {
-  prompt: ['text', 'prompt', 'caption', 'string', 'value'],
+  prompt: ['text', 'prompt', 'caption', 'tags', 'string', 'value'],
   negative: ['negative_prompt', 'text', 'prompt', 'string', 'value'],
   startImage: ['image'],
   endImage: ['image'],
@@ -68,6 +69,7 @@ const INPUT_CANDIDATES: Record<ComfyTag, string[]> = {
   useAudio: ['boolean', 'value'],
   references: [],
   lyrics: ['lyrics', 'text', 'value'],
+  transcript: ['prompt_text', 'transcript', 'reference_text', 'text', 'value'],
   output: [],
 };
 
@@ -82,6 +84,7 @@ const ADAPTER_PARAMS = new Set([
   'height',
   'audio_offset',
   'lyrics',
+  'transcript',
   'node_inputs',
 ]);
 
@@ -222,8 +225,8 @@ export function inspectWorkflow(workflow: ComfyWorkflow): WorkflowInspection {
       `no node titled ${COMFYUI_TITLES.frames} or ${COMFYUI_TITLES.duration}; clip length cannot follow the shot`,
     );
   }
-  if (kind === 'audio' && !titles.duration) {
-    warnings.push(`no node titled ${COMFYUI_TITLES.duration}; every run uses the workflow's length`);
+  if (kind === 'audio' && titles.audio && !titles.transcript) {
+    warnings.push(`${COMFYUI_TITLES.audio} without ${COMFYUI_TITLES.transcript}; a voice clone usually needs the reference transcript`);
   }
   return { titles, kind, operations, warnings };
 }
@@ -459,7 +462,7 @@ export class ComfyUIProvider implements Provider {
     if (uploads.end) setTitled(workflow, 'endImage', uploads.end, label);
     addReferenceImages(workflow, uploads.references ?? [], label);
     if (uploads.audio) setTitled(workflow, 'audio', uploads.audio, label);
-    if (inspection.titles.audio) {
+    if (inspection.titles.audio && inspection.kind === 'video') {
       setTitled(workflow, 'useAudio', operation === 'lipSync', label);
       setTitled(workflow, 'audioStart', Number(params.audio_offset ?? 0), label);
     }
@@ -469,6 +472,15 @@ export class ComfyUIProvider implements Provider {
       }
       // Never let the workflow's demo lyrics leak into a generation.
       setTitled(workflow, 'lyrics', params.lyrics ?? '', label);
+    }
+    if (inspection.titles.transcript) {
+      // A voice clone needs the exact words of its reference recording.
+      if (typeof params.transcript !== 'string' || params.transcript.trim() === '') {
+        throw new ConfigError(
+          `ComfyUI workflow ${label} clones a voice: set params.transcript to the exact text of the reference audio.`,
+        );
+      }
+      setTitled(workflow, 'transcript', params.transcript, label);
     }
     setTitled(workflow, 'seed', input.seed, label);
 
@@ -544,7 +556,13 @@ export class ComfyUIProvider implements Provider {
       end: operation === 'firstLastFrameToVideo' && endPath ? await this.upload(endPath) : undefined,
       references: await Promise.all(extra.map((path) => this.upload(path))),
     };
-    if (inspection.titles.audio) {
+    if (inspection.titles.audio && inspection.kind === 'audio') {
+      // A voice-clone workflow: the batch item's audio is the reference voice.
+      if (!input.audio) {
+        throw new ConfigError(`ComfyUI workflow ${basename(this.workflowPath(input.model))} needs "audio": a reference voice recording.`);
+      }
+      uploads.audio = await this.upload(input.audio);
+    } else if (inspection.titles.audio) {
       // Without lip-sync the audio branch is switched off, but ComfyUI still
       // validates the LoadAudio node, so it gets a short silent file.
       uploads.audio =

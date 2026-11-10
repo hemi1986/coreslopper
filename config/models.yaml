@@ -416,6 +416,8 @@ roles:
       generateAudio: a full track with vocals from a caption (prompt) and
       params.lyrics; durationSeconds is the maximum length. For teasers,
       intros, or demo tracks only; a video's song is always supplied by the user.
+      Set models.audio.music.model to music-ace for ACE-Step 1.5 XL Turbo (faster;
+      bpm, keyscale, and language via node_inputs, e.g. "cs_prompt.bpm": 120).
     alternatives: {}
   audio.sfx:
     provider: comfyui
@@ -424,4 +426,24 @@ roles:
     notes: >-
       generateAudio: instrumentals, risers, stingers, and sound effects (Stable
       Audio 3 Medium). The workflow rewrites the prompt with its own LLM first.
+    alternatives: {}
+  audio.voice:
+    provider: comfyui
+    model: voxcpm-clone
+    notes: >-
+      generateAudio: speech in a cloned voice (VoxCPM2). The default for every
+      voice-over. The batch item's audio is the reference WAV and
+      params.transcript its exact text; the prompt is the text to speak, with all
+      numbers, years, times, abbreviations, and symbols spelled out in German
+      ("2077" -> "zweitausendsiebenundsiebzig"; generate rejects digits). Generate
+      long texts sentence by sentence and join them; try up to 3 seeds on a
+      misspoken or wrongly stressed take.
+    alternatives: {}
+  audio.voice_design:
+    provider: comfyui
+    model: voxcpm-design
+    notes: >-
+      generateAudio: a new voice from a description, written in brackets before
+      the text: "(warm, low female voice)Text". Only for finding a voice; save a
+      good take as the reference WAV for audio.voice.
     alternatives: {}

@@ -46,7 +46,10 @@ export const BatchItemSchema = z
     role: z.string().min(1),
     prompt: z.string().min(1),
     references: z.array(z.string()).default([]),
-    /** Vocal segment for lipSync, relative to the project (see `audio-segment`). */
+    /**
+     * Vocal segment for lipSync (see `audio-segment`), or the reference voice for a
+     * voice-clone generateAudio; relative to the project.
+     */
     audio: z.string().optional(),
     seed: z.number().int().optional(),
     width: z.number().int().positive().optional(),
@@ -97,6 +100,25 @@ function roleOverride(config: ProjectConfig, role: string): Record<string, unkno
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
+/**
+ * TTS reads digits, abbreviations, and symbols unreliably, so speech text must
+ * spell them out ("2077" -> "zweitausendsiebenundsiebzig"). A leading voice
+ * description in brackets is not spoken and is not checked.
+ */
+export function checkSpokenText(prompt: string): void {
+  const spoken = prompt.replace(/^\s*\([^)]*\)/, '');
+  const digits = spoken.match(/\d+/g);
+  const symbols = spoken.match(/[%§&€$£@#+=*\/<>~^|_]/g);
+  const abbreviations = spoken.match(/\b(?:z\.\s?B|d\.\s?h|u\.\s?a|bzw|usw|ca|evtl|ggf|Nr|Dr|St|etc)\./gi);
+  const found = [...(digits ?? []), ...(symbols ?? []), ...(abbreviations ?? [])];
+  if (found.length > 0) {
+    throw new ValidationError(
+      `Speech text contains ${[...new Set(found)].join(', ')}. Spell out numbers, years, times, abbreviations, ` +
+        'and symbols in words before TTS, e.g. "2077" -> "zweitausendsiebenundsiebzig", "z. B." -> "zum Beispiel".',
+    );
+  }
+}
+
 function resolveItem(
   item: z.infer<typeof BatchItemSchema>,
   config: ProjectConfig,
@@ -117,6 +139,7 @@ function resolveItem(
   if (item.operation === 'generateAudio' && provider !== 'comfyui' && provider !== 'mock') {
     throw new ConfigError(`Only the ComfyUI backend generates audio, but role "${item.role}" resolved to ${provider}.`);
   }
+  if (item.operation === 'generateAudio' && item.role.startsWith('audio.voice')) checkSpokenText(item.prompt);
   const resolved = resolveModelRole(role, provider, override, item.role);
   const params = { ...resolved.params, ...item.params };
   const pricing =
@@ -138,7 +161,13 @@ function resolveItem(
   // A lip-sync clip is billed by the length of its driving audio.
   const exactAudioSeconds = audio ? probeDuration(audio) : undefined;
   const audioSeconds = exactAudioSeconds === undefined ? undefined : Math.ceil(exactAudioSeconds);
-  if (audioSeconds !== undefined && resolved.maxDuration && audioSeconds > resolved.maxDuration) {
+  // For generateAudio the audio is a reference voice, not the output length.
+  if (
+    item.operation === 'lipSync' &&
+    audioSeconds !== undefined &&
+    resolved.maxDuration &&
+    audioSeconds > resolved.maxDuration
+  ) {
     throw new ValidationError(
       `Audio ${item.audio} is ${audioSeconds}s; role "${item.role}" allows at most ${resolved.maxDuration}s.`,
     );
@@ -146,7 +175,7 @@ function resolveItem(
 
   const units =
     pricing.unit === 'second'
-      ? audioSeconds ?? clipDurationSeconds(item.durationSeconds, params)
+      ? (item.operation === 'lipSync' ? audioSeconds : undefined) ?? clipDurationSeconds(item.durationSeconds, params)
       : pricing.unit === 'image'
         ? Number(params.num_images ?? params.batch_size ?? 1)
         : 1;

@@ -503,4 +503,69 @@ describe('ComfyUI images, lip-sync, and audio', () => {
     expect(server.uploads).toHaveLength(0);
     expect(result.files[0]!.endsWith('.mp3')).toBe(true);
   });
+
+  it('clones a voice from the reference audio and its transcript', async () => {
+    const clone: ComfyWorkflow = {
+      '1': { class_type: 'SaveAudio', inputs: { filename_prefix: 'v', audio: ['24', 0] }, _meta: { title: 'cs_output' } },
+      '2': { class_type: 'LoadAudio', inputs: { audio: 'demo.wav' }, _meta: { title: 'cs_audio' } },
+      '22': {
+        class_type: 'VoxCPM_VoiceCloning',
+        inputs: { prompt_text: 'demo transcript', prompt_audio: ['2', 0], reference_audio: ['2', 0] },
+        _meta: { title: 'cs_transcript' },
+      },
+      '24': {
+        class_type: 'VoxCPM_TTS',
+        inputs: { text: 'demo', seed: 1, voice_config: ['22', 0] },
+        _meta: { title: 'VoxCPM TTS cs_prompt cs_seed' },
+      },
+    };
+    expect(inspectWorkflow(clone)).toMatchObject({ kind: 'audio', operations: ['generateAudio'], warnings: [] });
+    const { dir, root } = await setup({ 'voxcpm-clone': clone });
+    const voice = join(root, 'voice.wav');
+    await writeFile(voice, 'reference-voice');
+    const request = { model: 'voxcpm-clone', prompt: 'Hallo Welt.', seed: 3, outputDir: join(root, 'out') };
+
+    const quiet = fakeServer();
+    await expect(provider(dir, quiet).generateAudio({ ...request, params: { transcript: 'Ich bin es.' } })).rejects.toThrow(
+      /reference voice/,
+    );
+    await expect(provider(dir, quiet).generateAudio({ ...request, audio: voice })).rejects.toThrow(/params.transcript/);
+    expect(quiet.calls).toHaveLength(0);
+
+    const server = outputsServer({ '1': { audio: [{ filename: 'v_00001_.flac', subfolder: '', type: 'output' }] } });
+    const result = await provider(dir, server).generateAudio({ ...request, audio: voice, params: { transcript: 'Ich bin es.' } });
+    const prompt = server.submitted();
+    expect(server.uploads).toHaveLength(1);
+    expect(prompt['2']!.inputs.audio).toBe(`coreslopper/${server.uploads[0]}`);
+    expect(prompt['22']!.inputs.prompt_text).toBe('Ich bin es.');
+    expect(prompt['24']!.inputs).toMatchObject({ text: 'Hallo Welt.', seed: 3 });
+    expect(result.files[0]!.endsWith('.flac')).toBe(true);
+  });
+
+  it('fills an ACE-Step encoder through its tags input', async () => {
+    const ace: ComfyWorkflow = {
+      '94': {
+        class_type: 'TextEncodeAceStepAudio1.5',
+        inputs: { tags: 'demo', lyrics: '[Verse] demo', duration: 120, seed: ['109', 0], bpm: 95 },
+        _meta: { title: 'cs_prompt cs_lyrics cs_duration' },
+      },
+      '98': { class_type: 'EmptyAceStep1.5LatentAudio', inputs: { seconds: 120 }, _meta: { title: 'cs_duration' } },
+      '109': { class_type: 'PrimitiveInt', inputs: { value: 0 }, _meta: { title: 'cs_seed' } },
+      '111': { class_type: 'SaveAudioAdvanced', inputs: { filename_prefix: 'a' }, _meta: { title: 'cs_output' } },
+    };
+    const { dir, root } = await setup({ 'music-ace': ace });
+    const server = outputsServer({ '111': { audio: [{ filename: 'a_00001_.mp3', subfolder: '', type: 'output' }] } });
+    await provider(dir, server).generateAudio({
+      model: 'music-ace',
+      prompt: 'synthwave, 120 BPM',
+      seed: 5,
+      durationSeconds: 40,
+      params: { lyrics: '[Chorus] la la', node_inputs: { 'cs_prompt.bpm': 120 } },
+      outputDir: join(root, 'out'),
+    });
+    const prompt = server.submitted();
+    expect(prompt['94']!.inputs).toMatchObject({ tags: 'synthwave, 120 BPM', lyrics: '[Chorus] la la', duration: 40, bpm: 120 });
+    expect(prompt['98']!.inputs.seconds).toBe(40);
+    expect(prompt['109']!.inputs.value).toBe(5);
+  });
 });
