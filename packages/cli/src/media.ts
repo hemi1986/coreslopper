@@ -44,6 +44,24 @@ export function probeDuration(path: string): number {
 }
 
 /**
+ * The audio a lip-sync segment is cut from: an explicit source, else the
+ * speaker stem of an episode character, else the vocal stem of a music video.
+ */
+export function segmentSource(
+  kind: 'music-video' | 'episode',
+  options: { source?: string; character?: string },
+): string {
+  if (options.source) return options.source;
+  if (kind === 'episode') {
+    if (!options.character) {
+      throw new ValidationError('An episode cuts lip-sync audio from a speaker stem. Pass --character <id> or --source <path>.');
+    }
+    return `audio/stems/${options.character}.wav`;
+  }
+  return 'audio/stems/vocals.wav';
+}
+
+/**
  * Cut a time range from the vocal stem (or the mix) for a lip-sync shot.
  * Output is a small mono MP3 under assets/audio-segments/<name>.mp3, so the
  * generated clip lines up exactly with the song at the shot's start time.
@@ -53,10 +71,11 @@ export async function extractAudioSegment(
   start: number,
   end: number,
   name: string,
-  source = 'audio/stems/vocals.wav',
+  options: { source?: string; character?: string } = {},
 ): Promise<string> {
   const ffmpeg = resolveBinary('ffmpeg');
   const project = await loadProject(projectDir);
+  const source = segmentSource(project.config.kind, options);
   if (!(Number.isFinite(start) && Number.isFinite(end)) || start < 0 || end <= start) {
     throw new ValidationError(`Invalid segment ${start}s–${end}s.`);
   }

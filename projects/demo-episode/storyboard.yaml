@@ -42,7 +42,8 @@ shots:
       sets: [office]
     prompts:
       keyframe: close-up of a woman with short dark hair lit by blue monitor light, frowning at a screen, dark office behind her, vertical framing
-      video: she leans closer to the screen, eyes moving as she reads
+      video: she leans closer to the screen and whispers the line to herself
+    lipSync: { character: mara }
     focus: { x: 0.5, y: 0.4 }
   - id: shot-004
     section: s02_elevator

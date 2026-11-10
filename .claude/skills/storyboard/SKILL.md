@@ -47,6 +47,7 @@ For a project with `kind: episode` the storyboard covers the episode track inste
 - Show chat lines with `motion.component: ChatWindow` and `motion.props.lines: [<chat line ids>]`, chat lines of the shot's own scene. The window types each message at the script's typing speed.
 - Prompts name the set's prompt anchor from `sets.yaml`, so keyframes of one set match across episodes.
 - Keep text overlays out of the lower fifth of a 9:16 frame: burned-in subtitles sit there.
+- A lip-sync shot (`lipSync: { character: <id> }`) is driven by that character's speaker stem. Only characters with the display rule `full` or `screen-only` can have one. `validate` rejects a shot longer than `maxDuration` of `video.lipsync` for the selected provider or than `limits.lipsync_seconds_max` of the series; anchor it to the line's `start` and `end`.
 
 ## Composition rules for AI shots
 

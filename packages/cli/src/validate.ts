@@ -2,6 +2,8 @@ import {
   ValidationError,
   assertTimingMatchesScript,
   loadModelsConfig,
+  providerForRole,
+  resolveModelRole,
   loadProject,
   resolveStoryboard,
   validateScript,
@@ -28,7 +30,7 @@ export function assertKindMatches(state: Pick<State, 'kind'>, config: Pick<Proje
  * The episode checks: the canon is complete and belongs to the series named in
  * project.yaml, the script is valid against it, and timing was built from it.
  */
-function validateEpisode(project: LoadedProject): EpisodeContext {
+function validateEpisode(project: LoadedProject, lipsyncMaxDuration?: number): EpisodeContext {
   const { config, paths, series, sets, script, characters, effectiveTiming } = project;
   if (series && series.slug !== config.series) {
     throw new ValidationError(
@@ -40,12 +42,25 @@ function validateEpisode(project: LoadedProject): EpisodeContext {
   if (!script) throw new ValidationError(`script.yaml is missing in ${paths.root}. Finish the script stage first.`);
   validateScript(script, { characters, sets });
   if (effectiveTiming) assertTimingMatchesScript(script, effectiveTiming);
-  return { script, sets };
+  return { script, sets, lipsyncMaxDuration, lipsyncSecondsMax: series?.limits.lipsync_seconds_max };
 }
 
 export interface ValidatedProject {
   project: LoadedProject;
   resolved: ResolvedStoryboard;
+}
+
+/** `maxDuration` of `video.lipsync` for the project's lip-sync provider, from config/models.yaml. */
+async function lipsyncMaxDuration(config: ProjectConfig): Promise<number | undefined> {
+  const role = (await loadModelsConfig()).roles['video.lipsync'];
+  if (!role) return undefined;
+  const override = config.models['video.lipsync'];
+  return resolveModelRole(
+    role,
+    providerForRole(config, 'video.lipsync'),
+    override && typeof override === 'object' && !Array.isArray(override) ? (override as Record<string, unknown>) : {},
+    'video.lipsync',
+  ).maxDuration;
 }
 
 export async function validateProject(projectDir: string, options: { write?: boolean } = {}): Promise<ValidatedProject> {
@@ -55,7 +70,7 @@ export async function validateProject(projectDir: string, options: { write?: boo
   const canon = episode ? `the series canon ${paths.series}` : paths.root;
 
   assertKindMatches(project.state, config);
-  const episodeContext = episode ? validateEpisode(project) : undefined;
+  const episodeContext = episode ? validateEpisode(project, await lipsyncMaxDuration(config)) : undefined;
 
   if (!effectiveTiming) {
     throw new ValidationError(

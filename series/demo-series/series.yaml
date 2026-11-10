@@ -28,3 +28,4 @@ limits:
   episode_seconds:
     min: 15
     max: 30
+  lipsync_seconds_max: 8

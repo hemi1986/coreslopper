@@ -469,8 +469,8 @@
                 "minLength": 1
               },
               "source": {
-                "default": "audio/stems/vocals.wav",
-                "type": "string"
+                "type": "string",
+                "minLength": 1
               }
             },
             "required": [

@@ -274,11 +274,13 @@ export const ShotSchema = z.object({
   /**
    * Lip-sync shot: a frontal face keyframe (prompts.keyframe) is animated by the
    * vocal segment between the shot's start and end (operation lipSync).
+   * `source` defaults to `audio/stems/vocals.wav` for a music video and to the
+   * speaker stem `audio/stems/<character>.wav` for an episode (see lipSyncSource).
    */
   lipSync: z
     .object({
       character: z.string().min(1),
-      source: z.string().default('audio/stems/vocals.wav'),
+      source: z.string().min(1).optional(),
     })
     .optional(),
   layers: z.array(LayerSchema).optional(),

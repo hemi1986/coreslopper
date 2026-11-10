@@ -493,15 +493,16 @@ program
   .requiredOption('--start <seconds>', 'Segment start in song seconds')
   .requiredOption('--end <seconds>', 'Segment end in song seconds')
   .requiredOption('--name <name>', 'Output name (lowercase, dashes), e.g. shot-012')
-  .option('--source <path>', 'Audio source relative to the project', 'audio/stems/vocals.wav')
-  .action((project: string | undefined, options: { start: string; end: string; name: string; source: string }) =>
+  .option('--source <path>', 'Audio source relative to the project (default: audio/stems/vocals.wav, or the speaker stem of --character for an episode)')
+  .option('--character <id>', 'Episode: cut from the speaker stem audio/stems/<id>.wav')
+  .action((project: string | undefined, options: { start: string; end: string; name: string; source?: string; character?: string }) =>
     run(async () => {
       await extractAudioSegment(
         projectDirFromArg(project),
         Number(options.start),
         Number(options.end),
         options.name,
-        options.source,
+        { source: options.source, character: options.character },
       );
     }),
   );

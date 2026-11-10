@@ -238,10 +238,55 @@ function validateRefs(shot: Shot, style: StyleBible, characters: CharacterBible)
   }
 }
 
-/** What an episode adds to storyboard validation: its script and the series' sets. */
+/** What an episode adds to storyboard validation: its script, the series' sets, and the lip-sync limits. */
 export interface EpisodeContext {
   script: Script;
   sets: SetBible;
+  /** Technical limit: `maxDuration` of `video.lipsync` for the selected provider. */
+  lipsyncMaxDuration?: number;
+  /** Creative limit: `limits.lipsync_seconds_max` of the series. */
+  lipsyncSecondsMax?: number;
+}
+
+/** Display rules that hide the face; such a character cannot have a lip-sync shot. */
+export const FACELESS_DISPLAY_RULES = ['silhouette', 'voice-only'] as const;
+
+/**
+ * The audio that drives a lip-sync shot: its `source`, or by default the vocal
+ * stem of a music video or the speaker stem of an episode.
+ */
+export function lipSyncSource(shot: Pick<Shot, 'lipSync'>, kind: 'music-video' | 'episode' | undefined): string | undefined {
+  if (!shot.lipSync) return undefined;
+  if (shot.lipSync.source) return shot.lipSync.source;
+  return kind === 'episode' ? `audio/stems/${shot.lipSync.character}.wav` : 'audio/stems/vocals.wav';
+}
+
+/**
+ * Episode lip-sync shots: the character exists and shows a face, and the shot
+ * fits the provider's maximum and the series' creative limit.
+ */
+function validateLipSync(shot: Shot, seconds: number, characters: CharacterBible, episode: EpisodeContext | undefined): void {
+  if (!shot.lipSync || !episode) return;
+  const character = characters.characters.find((candidate) => candidate.id === shot.lipSync!.character);
+  if (!character) {
+    throw new ValidationError(`Lip-sync shot "${shot.id}" names missing character "${shot.lipSync.character}".`);
+  }
+  if ((FACELESS_DISPLAY_RULES as readonly string[]).includes(character.face)) {
+    throw new ValidationError(
+      `Lip-sync shot "${shot.id}": character "${character.id}" has the display rule "${character.face}", which shows no face to lip-sync.`,
+    );
+  }
+  const length = seconds.toFixed(2);
+  if (episode.lipsyncMaxDuration !== undefined && seconds > episode.lipsyncMaxDuration + TIMING_TOLERANCE_SECONDS) {
+    throw new ValidationError(
+      `Lip-sync shot "${shot.id}" is ${length}s; video.lipsync allows at most ${episode.lipsyncMaxDuration}s on the selected provider. Split the shot.`,
+    );
+  }
+  if (episode.lipsyncSecondsMax !== undefined && seconds > episode.lipsyncSecondsMax + TIMING_TOLERANCE_SECONDS) {
+    throw new ValidationError(
+      `Lip-sync shot "${shot.id}" is ${length}s; the series allows lip-sync shots of at most ${episode.lipsyncSecondsMax}s.`,
+    );
+  }
 }
 
 /**
@@ -397,6 +442,7 @@ export function resolveStoryboard(
     validateSets(shot, episode);
     validateSource(shot);
     validateChatWindow(shot, episode);
+    validateLipSync(shot, endSeconds - startSeconds, characters, episode);
     validateText(shot);
 
     resolved.push({
