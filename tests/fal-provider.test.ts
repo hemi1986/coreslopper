@@ -67,6 +67,16 @@ async function runImageToVideo(model: string, params: Record<string, unknown>): 
 }
 
 describe('fal provider', () => {
+  it('sends the requested clip length instead of the role default duration', async () => {
+    const body = await runImageToVideo('kling/v4/image-to-video', {
+      duration: 10,
+      min_duration: 3,
+      reference_field: 'start_image_url',
+    });
+    expect(body.duration).toBe(5);
+    expect(body).not.toHaveProperty('min_duration');
+  });
+
   it('sends the start frame as start_image_url for Kling v4 and keeps adapter options out', async () => {
     const body = await runImageToVideo('kling/v4/image-to-video', {
       resolution: '1080p',

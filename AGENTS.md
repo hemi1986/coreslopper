@@ -124,7 +124,7 @@ npm run schema
 | `npm run cli -- render <project> --format 16x9` | Render with Remotion in segments; `--frames <a>-<b>` renders a test range. |
 | `npm run cli -- media-link <project> [--move]` | Move `assets/` and `renders/` to `CORESLOPPER_MEDIA_DIR` and symlink them. |
 | `npm run cli -- new <slug> --budget <usd>` | Create a project from the template. |
-| `npm run cli -- generate <project> --batch <file>` | Run a cached, budget-checked generation batch. |
+| `npm run cli -- generate <project> --batch <file> [--provider <p>]` | Run a cached, budget-checked generation batch; `--provider` overrides the project provider for one batch (lip-sync keeps its own). |
 | `npm run cli -- qa <project> [--determinism <frame>]` | Write `review/report.md`; optionally check frame hashes. |
 | `npm run cli -- import-song <project>` | Register `audio/song.wav` and `audio/stems/vocals.wav` in `song.json`; converts other formats. |
 | `npm run cli -- normalize-audio <project> --input <file>` | Normalize audio to −14 LUFS / −1 dBTP. |

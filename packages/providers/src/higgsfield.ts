@@ -9,6 +9,7 @@ import {
   type FetchLike,
 } from './http.js';
 import type { Provider, ProviderInput, ProviderOutput } from './types.js';
+import { clipDurationSeconds, withoutDurationOptions } from './duration.js';
 
 export interface HiggsfieldProviderOptions {
   /** Complete credential, usually `key_id:key_secret`. */
@@ -156,10 +157,10 @@ export class HiggsfieldProvider implements Provider {
     const [sendNegative, params] = takeSwitch(afterSeedSwitch, 'send_negative_prompt');
     return this.runModel(input, {
       prompt: input.prompt,
-      duration: input.durationSeconds ?? 5,
       ...(sendSeed ? { seed: normalizeSeed(input.seed) } : {}),
       ...(sendNegative && input.negativePrompt ? { negative_prompt: input.negativePrompt } : {}),
-      ...params,
+      ...withoutDurationOptions(params),
+      duration: clipDurationSeconds(input.durationSeconds, input.params),
     });
   }
 
@@ -181,10 +182,10 @@ export class HiggsfieldProvider implements Provider {
       prompt: input.prompt,
       [field]: await this.uploadReference(start),
       [endField]: await this.uploadReference(end),
-      duration: input.durationSeconds ?? 5,
       ...(sendSeed ? { seed: normalizeSeed(input.seed) } : {}),
       ...(sendNegative && input.negativePrompt ? { negative_prompt: input.negativePrompt } : {}),
-      ...params,
+      ...withoutDurationOptions(params),
+      duration: clipDurationSeconds(input.durationSeconds, input.params),
     });
   }
 
@@ -200,10 +201,10 @@ export class HiggsfieldProvider implements Provider {
     return this.runModel(input, {
       prompt: input.prompt,
       [field]: imageUrl,
-      duration: input.durationSeconds ?? 5,
       ...(sendSeed ? { seed: normalizeSeed(input.seed) } : {}),
       ...(sendNegative && input.negativePrompt ? { negative_prompt: input.negativePrompt } : {}),
-      ...params,
+      ...withoutDurationOptions(params),
+      duration: clipDurationSeconds(input.durationSeconds, input.params),
     });
   }
 

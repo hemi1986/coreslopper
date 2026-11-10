@@ -11,6 +11,7 @@ export * from './fal.js';
 export * from './higgsfield.js';
 export * from './comfyui.js';
 export * from './runner.js';
+export * from './duration.js';
 
 export type ProviderKind = 'mock' | 'fal' | 'higgsfield' | 'comfyui';
 

@@ -199,9 +199,9 @@ describe('Higgsfield provider', () => {
       model: 'kling-video/v3.0/std/image-to-video',
       prompt: 'slow push in',
       references: [reference],
-      durationSeconds: 5,
+      durationSeconds: 3.4,
       seed: 7,
-      params: { sound: 'off' },
+      params: { duration: 5, min_duration: 3, sound: 'off' },
       outputDir: join(directory, 'out'),
     });
 
@@ -209,7 +209,7 @@ describe('Higgsfield provider', () => {
     expect(submitted).toEqual({
       prompt: 'slow push in',
       image_url: 'https://cdn.example.com/first-frame.png',
-      duration: 5,
+      duration: 4,
       sound: 'off',
     });
   });

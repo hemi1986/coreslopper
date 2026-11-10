@@ -355,12 +355,16 @@ program
   .description('Run a paid or mock generation batch with cache, manifest, and budget checks.')
   .requiredOption('--batch <path>', 'Batch JSON/YAML file')
   .option('--dry-run', 'Estimate and print the batch without generating')
-  .action((project: string | undefined, options: { batch: string; dryRun?: boolean }) =>
+  .option('--provider <provider>', 'Provider override for this batch: fal | higgsfield | comfyui | mock (lip-sync keeps its own provider)')
+  .action((project: string | undefined, options: { batch: string; dryRun?: boolean; provider?: string }) =>
     run(async () => {
       await generateBatch({
         projectDir: projectDirFromArg(project),
         batchPath: options.batch,
         dryRun: options.dryRun,
+        provider: options.provider
+          ? validateChoice(options.provider, ['fal', 'higgsfield', 'comfyui', 'mock'] as const, 'provider')
+          : undefined,
       });
     }),
   );
