@@ -106,7 +106,7 @@ Your projects, `.env`, and your own edits to workflow files are kept. If a file 
 | Optional MCP servers | [docs/mcp.md](docs/mcp.md) |
 | How it works inside | [docs/architecture.md](docs/architecture.md), [docs/adr/](docs/adr/) |
 | Terms used everywhere | [docs/glossary.md](docs/glossary.md) |
-| Why it is built this way | [docs/PLAN.md](docs/PLAN.md) |
+| Why it is built this way | [docs/adr/](docs/adr/) |
 
 ## License
 

@@ -52,4 +52,4 @@ The main session is the orchestrator. It should:
 4. Stop on budget, credential, or unrecoverable validation failures.
 5. Never paste raw assets or full transcriptions into the main context.
 
-See `AGENTS.md` for the full pipeline and `docs/PLAN.md` for the rationale.
+See `AGENTS.md` for the full pipeline and `docs/adr/` for the rationale.
