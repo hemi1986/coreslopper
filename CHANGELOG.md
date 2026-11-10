@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.6.0](https://github.com/hemi1986/coreslopper/compare/v0.5.0...v0.6.0) (2026-11-10)
+
+
+### Features
+
+* /video-next by project kind and /series-status ([05e48b1](https://github.com/hemi1986/coreslopper/commit/05e48b15ab35f7b862708ae7e99b91d02ba7dc7c))
+* **cli:** voice-track, import-takes, and episode-track for episodes ([c07f44c](https://github.com/hemi1986/coreslopper/commit/c07f44cf84b1f5502965bf144416e56df3e5c688))
+* **core:** episode schemas, kind-aware state, canon loader, demo episode ([2ad85b5](https://github.com/hemi1986/coreslopper/commit/2ad85b5b6e4e333efeafc5f29172b981a2cdadb5))
+* episode lip-sync from speaker stems, display rules, and limits ([7010ef8](https://github.com/hemi1986/coreslopper/commit/7010ef89bf1b21e9fcf251a0cf7520521e870167))
+* episode projects for series (ADR 0016) ([67d18d5](https://github.com/hemi1986/coreslopper/commit/67d18d506b8255abdceb0047f640f75bd397fed6))
+* master-format render, ChatWindow, subtitles, and episode QA ([d111de2](https://github.com/hemi1986/coreslopper/commit/d111de2a0433f9588030dc6dd8ab82e0be26cdcd))
+* series budget, canon state and manifest, and new-series ([628dc4a](https://github.com/hemi1986/coreslopper/commit/628dc4a94abfc02661437ec0e96da3962e54b340))
+
+
+### Bug Fixes
+
+* **cli:** pass the probed lip-sync length to local generations ([eb2b49a](https://github.com/hemi1986/coreslopper/commit/eb2b49a83face05dcfd5d029acd561226a27e21f))
+* **cli:** pass the probed lip-sync length to local generations ([30acae6](https://github.com/hemi1986/coreslopper/commit/30acae6f27b960acf589f318e2ffb0375f823144))
+
+
+### Documentation
+
+* accept ADR 0016 and add the episode-projects plan ([f9b8581](https://github.com/hemi1986/coreslopper/commit/f9b85810d2323974df5d854036b448d81eb374f5))
+* ADR 0016 and glossary for episode projects ([945957e](https://github.com/hemi1986/coreslopper/commit/945957ebae81125f4896ccf72f53be7dfc842596))
+* remove the finished episode-projects plan ([bdc1ae4](https://github.com/hemi1986/coreslopper/commit/bdc1ae44e869482715f283e55dd193b24d072988))
+
 ## [0.5.0](https://github.com/hemi1986/coreslopper/compare/v0.4.1...v0.5.0) (2026-11-10)
 
 
