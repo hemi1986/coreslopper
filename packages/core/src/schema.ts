@@ -509,12 +509,19 @@ export const TakeSchema = z.object({
   duration: z.number().positive(),
   /** Hash of the text or prompt the take was made from; a different hash makes the take stale. */
   text_hash: z.string().min(1),
+  /** SHA-256 of the WAV as registered; a different file means someone replaced it. */
+  file_hash: z.string().min(1).optional(),
 });
 
-/** `takes.json`: one take per audible script line, keyed by line ID. */
+/**
+ * `takes.json`: one take per audible script line (`audio/lines/<line-id>.wav`),
+ * keyed by line ID, and one ambience per scene with an `atmo` prompt
+ * (`audio/ambience/<scene-id>.wav`), keyed by scene ID.
+ */
 export const TakesSchema = z.object({
   version: z.literal(1).default(1),
   takes: z.record(ScriptIdSchema, TakeSchema).default({}),
+  ambience: z.record(ScriptIdSchema, TakeSchema).default({}),
 });
 
 export const BrandKitSchema = z.object({

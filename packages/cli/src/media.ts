@@ -2,7 +2,18 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { basename, dirname, extname, join, resolve } from 'node:path';
-import { ensureDir, loadProject, repoRoot, ValidationError, writeJsonAtomic } from '@coreslopper/core';
+import {
+  ensureDir,
+  hashFile,
+  isAudibleLine,
+  loadProject,
+  repoRoot,
+  scriptLines,
+  takeSource,
+  ValidationError,
+  writeJsonAtomic,
+} from '@coreslopper/core';
+import { lineTakePath, loadTakes, requireEpisode, saveTakes, textHash } from './takes.js';
 
 export function resolveBinary(name: 'ffmpeg' | 'ffprobe'): string {
   const local = join(repoRoot(), '.tools', 'ffmpeg', name);
@@ -132,6 +143,19 @@ export function findSourceAudio(dir: string, stem: 'song' | 'vocals'): string | 
 export interface ImportSongOptions {
   song?: string;
   vocals?: string;
+}
+
+/** Convert an audio file to a 48 kHz WAV with the given channel count. */
+export function convertAudio(source: string, destination: string, channels: 1 | 2): void {
+  if (resolve(source) === resolve(destination)) {
+    throw new ValidationError(`Cannot convert ${source} onto itself.`);
+  }
+  const ffmpeg = resolveBinary('ffmpeg');
+  execFileSync(
+    ffmpeg,
+    ['-y', '-loglevel', 'error', '-i', source, '-ar', '48000', '-ac', String(channels), '-c:a', 'pcm_s16le', '-bitexact', destination],
+    { stdio: 'inherit' },
+  );
 }
 
 /** Bring an audio file to `destination` as 48 kHz stereo WAV; a file already there is left untouched. */
@@ -280,4 +304,81 @@ export async function extractFrame(
   );
   console.log(`Frame written to ${destination}`);
   return destination;
+}
+
+export interface ImportTakesOptions {
+  /** Only these line IDs; default: every take file in audio/lines/. */
+  lines?: string[];
+}
+
+/**
+ * Register the user's recordings as takes. A recording goes to
+ * audio/lines/<line-id>.wav (or <line-id>.mp3/.flac/..., converted to a 48 kHz
+ * mono WAV next to it); a WAV is used as is. Files already registered with the
+ * same content are skipped. takes.json records each as `imported`, with the
+ * duration and the hash of the line's current text.
+ */
+export async function importTakes(projectDir: string, options: ImportTakesOptions = {}): Promise<void> {
+  const project = requireEpisode(await loadProject(projectDir), 'import-takes');
+  const linesDir = join(project.paths.root, 'audio', 'lines');
+  const lines = new Map(scriptLines(project.script).map(({ line }) => [line.id, line]));
+  const takes = loadTakes(project);
+
+  const stems = new Map<string, string[]>();
+  if (existsSync(linesDir)) {
+    for (const file of readdirSync(linesDir)) {
+      const extension = extname(file).toLowerCase();
+      if (!AUDIO_EXTENSIONS.has(extension)) continue;
+      const stem = basename(file, extname(file));
+      stems.set(stem, [...(stems.get(stem) ?? []), file]);
+    }
+  }
+
+  const wanted = options.lines?.length ? options.lines : [...stems.keys()].sort();
+  const issues: string[] = [];
+  let imported = 0;
+  let unchanged = 0;
+  for (const id of wanted) {
+    const line = lines.get(id);
+    const files = stems.get(id) ?? [];
+    if (!line) {
+      issues.push(`${id}: no script line with this id`);
+      continue;
+    }
+    if (!isAudibleLine(line)) {
+      issues.push(`${id}: a ${line.kind} line has no take`);
+      continue;
+    }
+    if (files.length === 0) {
+      issues.push(`${id}: no recording in ${linesDir}`);
+      continue;
+    }
+    const destination = lineTakePath(project, id);
+    const others = files.filter((file) => file !== `${id}.wav`);
+    if (others.length > 1) {
+      issues.push(`${id}: more than one recording (${others.join(', ')}); keep exactly one`);
+      continue;
+    }
+    // A recording in another format is new; it replaces the WAV.
+    if (others[0]) {
+      convertAudio(join(linesDir, others[0]), destination, 1);
+      console.log(`Converted ${others[0]} to ${basename(destination)}`);
+    }
+    const fileHash = await hashFile(destination);
+    const existing = takes.takes[id];
+    if (!others[0] && existing?.file_hash === fileHash) {
+      unchanged += 1;
+      continue;
+    }
+    takes.takes[id] = {
+      source: 'imported',
+      duration: Number(probeDuration(destination).toFixed(3)),
+      text_hash: textHash(takeSource(line)),
+      file_hash: fileHash,
+    };
+    imported += 1;
+  }
+  if (issues.length > 0) throw new ValidationError('import-takes cannot register every take', issues);
+  await saveTakes(project, takes);
+  console.log(`✔ Imported ${imported} take(s); ${unchanged} already registered. takes.json updated.`);
 }

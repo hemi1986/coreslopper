@@ -27,7 +27,9 @@ import { createProject } from './new-project.js';
 import { linkProjectMedia } from './media-dir.js';
 import { generateBatch } from './generate.js';
 import { runQa } from './qa.js';
-import { importFootage, importSong, normalizeAudio, extractFrame, extractAudioSegment } from './media.js';
+import { importFootage, importSong, importTakes, normalizeAudio, extractFrame, extractAudioSegment } from './media.js';
+import { voiceTrack } from './voice-track.js';
+import { episodeTrack } from './episode-track.js';
 import { runDoctor } from './doctor.js';
 import { runInitCommand, validateChoice, type InitCommandOptions } from './init-command.js';
 import { printStatus } from './status.js';
@@ -411,6 +413,35 @@ program
   .action((project: string | undefined, options: { song?: string; vocals?: string }) =>
     run(async () => {
       await importSong(projectDirFromArg(project), options);
+    }),
+  );
+
+program
+  .command('voice-track [project]')
+  .description('Episode: generate a take for every audible script line without a current one, then the scene ambience.')
+  .option('--dry-run', 'Estimate the takes without generating')
+  .action((project: string | undefined, options: { dryRun?: boolean }) =>
+    run(async () => {
+      await voiceTrack(projectDirFromArg(project), { dryRun: options.dryRun });
+    }),
+  );
+
+program
+  .command('import-takes [project]')
+  .description('Episode: register recordings at audio/lines/<line-id>.wav (other formats are converted) in takes.json.')
+  .option('--lines <ids>', 'Comma-separated line IDs (default: every file in audio/lines/)')
+  .action((project: string | undefined, options: { lines?: string }) =>
+    run(async () => {
+      await importTakes(projectDirFromArg(project), { lines: parseCsv(options.lines) });
+    }),
+  );
+
+program
+  .command('episode-track [project]')
+  .description('Episode: place the takes, write timing.json, and mix audio/episode.wav and the speaker stems.')
+  .action((project: string | undefined) =>
+    run(async () => {
+      await episodeTrack(projectDirFromArg(project));
     }),
   );
 

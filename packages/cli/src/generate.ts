@@ -20,6 +20,7 @@ import {
   repoRoot,
   resolveModelRole,
   saveState,
+  type LoadedProject,
   type ModelPricing,
   type ProjectConfig,
   type ProviderKind,
@@ -29,6 +30,7 @@ import {
   clipDurationSeconds,
   createProvider,
   type GenerationRequest,
+  type GenerationResult,
   type Operation,
 } from '@coreslopper/providers';
 import { probeDuration } from './media.js';
@@ -222,16 +224,30 @@ export function toRequest(
   };
 }
 
-export async function generateBatch(options: GenerateOptions): Promise<void> {
-  const project = await loadProject(options.projectDir);
-  const batchRaw = await readFile(resolve(options.batchPath), 'utf8');
-  let batchData: unknown;
-  try {
-    batchData = JSON.parse(batchRaw);
-  } catch {
-    batchData = parseYaml(batchRaw);
-  }
-  const batch = BatchSchema.parse(batchData);
+export type BatchItem = z.infer<typeof BatchItemSchema>;
+
+export interface BatchRunOptions {
+  dryRun?: boolean;
+  /** Override the project provider for this batch (lip-sync keeps its own provider). */
+  provider?: ProviderKind;
+}
+
+export interface BatchRunResult {
+  resolved: ResolvedItem;
+  /** Undefined on a dry run. */
+  result?: GenerationResult;
+}
+
+/**
+ * Run batch items through estimate, budget, cache, and manifest. Every
+ * command that generates media goes through here. Returns one entry per item,
+ * in order; a dry run only estimates.
+ */
+export async function runBatch(
+  project: LoadedProject,
+  batch: BatchItem[],
+  options: BatchRunOptions = {},
+): Promise<BatchRunResult[]> {
   const models = await loadModelsConfig();
   const resolved = batch.map((item) => {
     const value = resolveItem(item, project.config, models, project.paths.root, options.provider);
@@ -252,7 +268,7 @@ export async function generateBatch(options: GenerateOptions): Promise<void> {
         `  ${item.item.operation} ${item.item.role} -> ${item.provider}/${item.model} (${formatUsd(item.cost)})`,
       );
     }
-    return;
+    return resolved.map((item) => ({ resolved: item }));
   }
 
   const cacheDir = join(repoRoot(), '.cache', 'generations');
@@ -268,6 +284,7 @@ export async function generateBatch(options: GenerateOptions): Promise<void> {
     );
   }
 
+  const results: BatchRunResult[] = [];
   let actualSpend = 0;
   let cacheHits = 0;
   for (const [index, item] of resolved.entries()) {
@@ -277,6 +294,7 @@ export async function generateBatch(options: GenerateOptions): Promise<void> {
     await ensureDir(outputDir);
     const request = toRequest(item, project.config.formats.master, outputDir, project.paths.root);
     const result = await runner.run(request);
+    results.push({ resolved: item, result });
     if (result.cached) {
       cacheHits += 1;
       console.log(`[${index + 1}/${resolved.length}] ${item.item.role}: cache hit ${result.hash.slice(0, 12)}`);
@@ -295,4 +313,18 @@ export async function generateBatch(options: GenerateOptions): Promise<void> {
       remainingBudget(project.state),
     )}`,
   );
+  return results;
+}
+
+export async function generateBatch(options: GenerateOptions): Promise<void> {
+  const project = await loadProject(options.projectDir);
+  const batchRaw = await readFile(resolve(options.batchPath), 'utf8');
+  let batchData: unknown;
+  try {
+    batchData = JSON.parse(batchRaw);
+  } catch {
+    batchData = parseYaml(batchRaw);
+  }
+  const batch = BatchSchema.parse(batchData);
+  await runBatch(project, batch, { dryRun: options.dryRun, provider: options.provider });
 }

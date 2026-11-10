@@ -3,7 +3,7 @@
  * text of an episode; these checks run before any take is generated.
  */
 import { ValidationError } from './errors.js';
-import type { CharacterBible, Script, ScriptLine, SetBible, Timing } from './schema.js';
+import type { CharacterBible, Line, Script, ScriptLine, Section, SetBible, Timing } from './schema.js';
 
 /** Script line kinds that are spoken and therefore follow the TTS text rule. */
 export const SPOKEN_LINE_KINDS = ['dialogue', 'voiceover', 'announcement'] as const;
@@ -130,4 +130,94 @@ export function assertTimingMatchesScript(script: Script, timing: Timing): void 
   if (issues.length > 0) {
     throw new ValidationError('timing.json does not match script.yaml; re-run episode-track', issues);
   }
+}
+
+/** Script line kinds that have a take: speech and sound effects. Chat and pause lines are silent. */
+export function isAudibleLine(line: ScriptLine): boolean {
+  return isSpokenLine(line) || line.kind === 'sfx';
+}
+
+/**
+ * What a take is made from. Its canonical hash is the take's text hash: a
+ * different text, speaker, prompt, or effect length makes the take stale.
+ */
+export function takeSource(line: ScriptLine): Record<string, unknown> {
+  if (isSpokenLine(line)) return { kind: line.kind, speaker: line.speaker, text: line.text_de };
+  if (line.kind === 'sfx') return { kind: 'sfx', prompt: line.prompt, duration: line.duration };
+  throw new ValidationError(`Script line "${line.id}" (${line.kind}) has no take.`);
+}
+
+/** What a scene's ambience is made from; it is looped or trimmed to the scene, so its length is not part of it. */
+export function ambienceSource(prompt: string): Record<string, unknown> {
+  return { kind: 'ambience', prompt };
+}
+
+/** How long a chat line stays on screen: its characters at the typing speed, plus the hold. */
+export function chatSeconds(text: string, chat: NonNullable<Script['chat']>): number {
+  return [...text].length / chat.cps + chat.hold;
+}
+
+export interface Placement {
+  duration: number;
+  sections: Section[];
+  lines: Line[];
+}
+
+/**
+ * Place the script lines strictly one after another. A spoken line lasts as
+ * long as its take, an effect or pause as long as its `duration`, a chat line
+ * as long as `chatSeconds`; `pause_after` is silence before the next line.
+ * Scenes become sections that start at 0 and cover the episode without gaps;
+ * the last one ends after the last line's pause. Times are rounded to
+ * milliseconds without drift.
+ */
+export function placeLines(script: Script, takeDurations: Record<string, number>): Placement {
+  const ms = (seconds: number) => Math.round(seconds * 1000);
+  const sections: Section[] = [];
+  const lines: Line[] = [];
+  let cursor = 0;
+
+  for (const scene of script.scenes) {
+    const sceneStart = cursor;
+    for (const line of scene.lines) {
+      let length: number;
+      if (isSpokenLine(line)) {
+        const take = takeDurations[line.id];
+        if (take === undefined) throw new ValidationError(`Script line "${line.id}" has no take duration.`);
+        length = ms(take);
+      } else if (line.kind === 'chat') {
+        if (!script.chat) throw new ValidationError('The script has chat lines but no "chat: { cps, hold }" typing speed.');
+        length = ms(chatSeconds(line.text_de, script.chat));
+      } else {
+        length = ms(line.duration);
+      }
+      const text = isSubtitledLine(line) ? line.text_de : '';
+      lines.push({ id: line.id, section: scene.id, start: cursor / 1000, end: (cursor + length) / 1000, text, words: [] });
+      cursor += length + (line.kind === 'pause' ? 0 : ms(line.pause_after));
+    }
+    sections.push({ id: scene.id, label: scene.id, start: sceneStart / 1000, end: cursor / 1000, confidence: 1, sources: ['script'] });
+  }
+
+  return { duration: cursor / 1000, sections, lines };
+}
+
+/**
+ * RMS envelope of mono PCM samples (-1..1), peak-normalized to 0..1, with
+ * centered frames like the music-video audio analysis.
+ */
+export function rmsEnvelope(samples: Float32Array, hop = 512, frame = 2048): number[] {
+  const count = Math.floor(samples.length / hop) + 1;
+  const half = Math.floor(frame / 2);
+  const values: number[] = [];
+  for (let index = 0; index < count; index += 1) {
+    const center = index * hop;
+    let sum = 0;
+    for (let offset = -half; offset < frame - half; offset += 1) {
+      const sample = samples[center + offset] ?? 0;
+      sum += sample * sample;
+    }
+    values.push(Math.sqrt(sum / frame));
+  }
+  const peak = Math.max(0, ...values);
+  return values.map((value) => (peak > 0 ? Math.round((value / peak) * 100_000) / 100_000 : 0));
 }
