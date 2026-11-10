@@ -83,7 +83,7 @@ export interface GenerateOptions {
   provider?: ProviderKind;
 }
 
-interface ResolvedItem {
+export interface ResolvedItem {
   item: z.infer<typeof BatchItemSchema>;
   provider: ProviderKind;
   model: string;
@@ -208,6 +208,35 @@ function resolveItem(
   };
 }
 
+/**
+ * The provider request for a resolved batch item. Values come from the resolved
+ * item, not the raw batch entry: a local lip-sync item gets its length from the
+ * probed vocal segment there.
+ */
+export function toRequest(
+  item: ResolvedItem,
+  master: { width: number; height: number },
+  outputDir: string,
+  projectDir: string,
+): GenerationRequest {
+  return {
+    operation: item.item.operation as Operation,
+    role: item.item.role,
+    model: item.model,
+    prompt: item.item.prompt,
+    seed: item.item.seed,
+    references: item.references,
+    audio: item.audio,
+    width: item.item.width ?? master.width,
+    height: item.item.height ?? master.height,
+    durationSeconds: item.durationSeconds,
+    params: item.params,
+    outputDir,
+    projectDir,
+    estimatedCostUsd: item.cost,
+  };
+}
+
 export async function generateBatch(options: GenerateOptions): Promise<void> {
   const project = await loadProject(options.projectDir);
   const batchRaw = await readFile(resolve(options.batchPath), 'utf8');
@@ -261,22 +290,7 @@ export async function generateBatch(options: GenerateOptions): Promise<void> {
     if (!runner) throw new ConfigError(`No generation runner for provider "${item.provider}".`);
     const outputDir = join(project.paths.assets, item.item.role.replaceAll('.', '/'));
     await ensureDir(outputDir);
-    const request: GenerationRequest = {
-      operation: item.item.operation as Operation,
-      role: item.item.role,
-      model: item.model,
-      prompt: item.item.prompt,
-      seed: item.item.seed,
-      references: item.references,
-      audio: item.audio,
-      width: item.item.width ?? project.config.formats.master.width,
-      height: item.item.height ?? project.config.formats.master.height,
-      durationSeconds: item.item.durationSeconds,
-      params: item.params,
-      outputDir,
-      projectDir: project.paths.root,
-      estimatedCostUsd: item.cost,
-    };
+    const request = toRequest(item, project.config.formats.master, outputDir, project.paths.root);
     const result = await runner.run(request);
     if (result.cached) {
       cacheHits += 1;
