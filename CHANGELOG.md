@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.5.0](https://github.com/hemi1986/coreslopper/compare/v0.4.1...v0.5.0) (2026-11-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* **providers:** the comfyui alternative of the video.image_to_video.* and video.premium.veo roles now uses the ltx-av workflow instead of ltx-i2v. Set models.<role>.model to ltx-i2v in project.yaml to keep the old workflow.
+
+### Features
+
+* **providers:** clone voices and run ACE-Step music on ComfyUI ([bc13eb9](https://github.com/hemi1986/coreslopper/commit/bc13eb9ba2ac9bef82015ace9c22dda81bf64ed4))
+* **providers:** clone voices and run ACE-Step music on ComfyUI ([6b98a00](https://github.com/hemi1986/coreslopper/commit/6b98a00877f74eab0cf05c028552e658ea7f357a))
+* **providers:** run stills, edits, lip-sync, and audio on ComfyUI ([0c34c20](https://github.com/hemi1986/coreslopper/commit/0c34c20195b2cc6464445017467ae255687f2ebe))
+* **storyboard:** per-shot focus point for cropped formats ([4e18241](https://github.com/hemi1986/coreslopper/commit/4e18241c23702bca8da187a09cd285ae87338d03))
+* **storyboard:** per-shot focus point for cropped formats ([26c7751](https://github.com/hemi1986/coreslopper/commit/26c7751fd2f75bd4a32479ffc203ef543fefdd18))
+
+
+### Bug Fixes
+
+* **providers:** honour requested clip length; add generate --provider ([c3e29f9](https://github.com/hemi1986/coreslopper/commit/c3e29f9c549ae93a6398bf7259793d8d2f28b41c))
+* **providers:** honour requested clip length; add generate --provider ([2587264](https://github.com/hemi1986/coreslopper/commit/25872643e71ea4e307166d2a10f6ae29a581c18a))
+* **remotion:** apply shot focus only to formats narrower than 16:9 ([f0110aa](https://github.com/hemi1986/coreslopper/commit/f0110aae352ab02b32ab3a5685203b6a1a3761ef))
+* **remotion:** gate shot focus on the composition aspect ([9674243](https://github.com/hemi1986/coreslopper/commit/96742431b8c00faa92543b1372ebaba2d161716f))
+
+
+### Documentation
+
+* remove outdated PLAN.md ([5dcaf7c](https://github.com/hemi1986/coreslopper/commit/5dcaf7cc2b6e7100c8c0a4a549b14b86e79f7d59))
+* remove outdated PLAN.md ([6d4c505](https://github.com/hemi1986/coreslopper/commit/6d4c5051500d74c5d2134b9066c2e1c4609c0755))
+
 ## [0.4.1](https://github.com/hemi1986/coreslopper/compare/v0.4.0...v0.4.1) (2026-11-09)
 
 
