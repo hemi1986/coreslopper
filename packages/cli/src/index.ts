@@ -34,6 +34,7 @@ import { writeSubtitles } from './subtitles.js';
 import { runDoctor } from './doctor.js';
 import { runInitCommand, validateChoice, type InitCommandOptions } from './init-command.js';
 import { printStatus } from './status.js';
+import { printSeriesStatus } from './series.js';
 import { formatSeconds, parseCsv, projectDirFromArg, run } from './utils.js';
 import { findWorkspaceRoot, loadWorkspaceEnv, ownVersion } from './workspace.js';
 import type { FormatId } from '../../remotion/src/types.js';
@@ -75,6 +76,15 @@ program
   .action((project: string | undefined) =>
     run(async () => {
       await printStatus(projectDirFromArg(project));
+    }),
+  );
+
+program
+  .command('series-status <series>')
+  .description('Show a series: canon, planned and created episodes, their stages, spend, and length.')
+  .action((series: string) =>
+    run(async () => {
+      await printSeriesStatus(series);
     }),
   );
 

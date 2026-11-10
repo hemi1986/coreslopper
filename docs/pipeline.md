@@ -156,7 +156,7 @@ An episode of a series is a project with `kind: episode` (see [ADR 0016](adr/001
 
 `setup` ✋, `script` ✋, `voice-track`, `episode-track`, `storyboard`, `assets`, `assembly`, `qa-export`.
 
-The `new-episode` skill runs the two interactive stages: it creates the project and grills the user into `script.yaml`.
+The `new-episode` skill runs the two interactive stages: it creates the project and grills the user into `script.yaml`. `/video-next <slug>` then runs the autonomous stages, and `/series-status <series>` (`npm run cli -- series-status <series>`) shows every episode of the series.
 
 ```bash
 # setup: formats, providers, and brand are copied from series.yaml

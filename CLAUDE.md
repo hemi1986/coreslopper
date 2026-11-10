@@ -6,8 +6,9 @@
 
 - `/new-video [slug]` — skill that creates a project for an existing song (or resumes one): asks for project data and lyrics, imports the song and vocal stem, then grills the user into the brief and treatment. Runs in the main session, not in a stage runner.
 - `/new-episode [slug]` — skill that creates an episode of a series (or resumes one) and grills the user into `script.yaml`. Runs in the main session.
-- `/video-next <slug>` — run all open autonomous stages (from `audio-analysis` on). Add `--stage <stage>` to run one stage, or `--dry-run` to inspect the next stage.
+- `/video-next <slug>` — run all open autonomous stages of a music video (from `audio-analysis` on) or an episode (from `voice-track` on); the kind comes from `status`. Add `--stage <stage>` to run one stage, or `--dry-run` to inspect the next stage.
 - `/video-status [slug]` — read-only stage and budget report.
+- `/series-status <series>` — read-only series overview: canon, episodes, stages, spend, length.
 
 `/video-next` dispatches one `stage-runner` subagent per stage. Do not inline a whole stage into the main context.
 

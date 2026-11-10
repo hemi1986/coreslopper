@@ -6,28 +6,28 @@ allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Task
 
 # /video-next
 
-Run the autonomous pipeline for one project. The default is to run **all** open stages until the project is done. Do not ask for creative approval; the project uses `review_mode: auto` unless configured otherwise.
+Run the autonomous pipeline for one project: a music video or an episode of a series. The default is to run **all** open stages until the project is done. Do not ask for creative approval; the project uses `review_mode: auto` unless configured otherwise.
 
 ## Setup
 
 1. Parse `$ARGUMENTS`: the first token is the project slug. Flags: `--stage <stage>` to run exactly one stage; `--dry-run` to show the next stage and cost without running it.
-2. Run `npm run cli -- status projects/<slug>`. Read the project title, stage table, budget, and next stage.
-3. If `--dry-run`, stop after printing the next stage, its skills, and the remaining budget.
+2. Run `npm run cli -- status projects/<slug>`. Read the project title, the `Kind:` line, the stage table, budget, and the `Next:` line. The kind decides the stage list; `status` already walks the right one.
+3. If `--dry-run`, stop after printing the kind, the next stage, its skills, and the remaining budget.
 4. If the next stage is missing because everything is done, report success and stop.
-5. If the next stage is `setup`, `brief`, or `treatment`, stop: these are interactive. Tell the user to run `/new-video <slug>`, which resumes where the project stands. Never dispatch them to a stage runner.
+5. If the `Next:` line says `interactive`, stop: the stage needs the user. Tell them to run the setup skill of the kind, which resumes where the project stands: `/new-video <slug>` for a music video (`setup`, `brief`, `treatment`), `/new-episode <slug>` for an episode (`setup`, `script`). Never dispatch an interactive stage to a stage runner.
 
 ## Stage loop
 
 Repeat until the project is done or a hard stop occurs:
 
-1. Determine the next stage from `status`. The stage IDs are:
-   `audio-analysis`, `style-character`, `storyboard`, `assets`, `assembly`, `qa-export`.
-   (`setup`, `brief`, and `treatment` come first and are done by `/new-video`.)
+1. Determine the next stage and its skills from the `Next:` line of `status`. The autonomous stage IDs are:
+   - music video: `audio-analysis`, `style-character`, `storyboard`, `assets`, `assembly`, `qa-export`;
+   - episode: `voice-track`, `episode-track`, `storyboard`, `assets`, `assembly`, `qa-export`. An episode has no style stage: its style, characters, and sets are the series canon in `series/<series>/`, which a stage runner reads and never writes.
 2. Mark it running: `npm run cli -- stage-start projects/<slug> <stage>`.
 3. Dispatch **one** `stage-runner` subagent with a fresh context. The prompt must include:
    - the project path,
-   - the stage ID,
-   - the skill(s) for that stage,
+   - the stage ID and the project kind,
+   - the skill(s) for that stage, from the `Next:` line,
    - the instruction to read `.claude/skills/<skill>/SKILL.md`,
    - the instruction to write only the stage outputs,
    - the instruction to return a compact summary with `STATUS: ok` or `STATUS: blocked`, the output paths, warnings, and spend.
@@ -52,6 +52,6 @@ Repeat until the project is done or a hard stop occurs:
 - Budget exceeded or batch cap exceeded.
 - Missing credentials when a real provider is configured.
 - Validation failure that the stage cannot fix after its bounded retries.
-- A required user-owned file would be overwritten (`timing.overrides.json`, `project.yaml`).
+- A required user-owned file would be overwritten (`timing.overrides.json`, `project.yaml`, an imported take, or the series canon).
 
 Report the hard stop with the exact command the user can run to continue.

@@ -180,7 +180,7 @@ Formats are `16x9`, `9x16`, `1x1`, and `4x5`, with safe-area-aware layouts. The 
 ## Claude Code layer
 
 - `.claude/skills/<name>/SKILL.md` — the stage skills.
-- `.claude/commands/` — `/video-next`, `/video-status`. `/new-video` is a skill in `.claude/skills/new-video/`.
+- `.claude/commands/` — `/video-next`, `/video-status`, `/series-status`. `/new-video` and `/new-episode` are skills. `/video-next` reads the project kind from `status` and walks that kind's stages.
 - `.claude/agents/` — `stage-runner`, `art-director`, `qa-checker`.
 - `.claude/hooks/validate-artifacts.mjs` — validates project artifacts after `Write|Edit`.
 - `.claude/settings.json` — registers the hook.

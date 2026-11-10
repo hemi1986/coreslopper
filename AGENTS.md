@@ -50,7 +50,7 @@ Or open Claude Code and run `/new-video`, which asks for the project data itself
 ```text
 .claude/
   skills/          Own stage skills + vendored Matt Pocock skills
-  commands/        /video-next, /video-status
+  commands/        /video-next, /video-status, /series-status
   agents/          art-director, qa-checker, stage-runner
   hooks/           PostToolUse validation for project artifacts
   settings.json    Hook registration
@@ -143,6 +143,7 @@ npm run schema
 | `npm run cli -- import-takes <project> [--lines <ids>]` | Episode: register recordings in `audio/lines/` as takes. |
 | `npm run cli -- episode-track <project>` | Episode: place takes, write `timing.json`, mix the episode track and speaker stems. |
 | `npm run cli -- subtitles <project>` | Episode: write `renders/<slug>.en.srt`. |
+| `npm run cli -- series-status <series>` | Series canon, planned and created episodes, stages, spend, length. |
 | `npm run cli -- generate <project> --batch <file> [--provider <p>]` | Run a cached, budget-checked generation batch; `--provider` overrides the project provider for one batch (lip-sync keeps its own). |
 | `npm run cli -- qa <project> [--determinism <frame>]` | Write `review/report.md`; optionally check frame hashes. |
 | `npm run cli -- import-song <project>` | Register `audio/song.wav` and `audio/stems/vocals.wav` in `song.json`; converts other formats. |
@@ -161,7 +162,7 @@ npm run schema
 | `npm run build` | Build `runtime/` and the npx bundle in `dist/`. |
 | `npm run pack:check` | Build and inspect the npm tarball. |
 
-In Claude Code: `/new-video` and `/new-episode` (skills), `/video-next`, `/video-status`.
+In Claude Code: `/new-video` and `/new-episode` (skills), `/video-next`, `/video-status`, `/series-status`.
 
 ## Distribution
 
