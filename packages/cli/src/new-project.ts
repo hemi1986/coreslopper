@@ -21,6 +21,7 @@ import {
 } from '@coreslopper/core';
 import { stringify } from 'yaml';
 import { linkProjectMedia, mediaDirFor } from './media-dir.js';
+import { seriesBudget } from './series.js';
 
 export interface NewProjectOptions {
   slug: string;
@@ -204,7 +205,17 @@ async function loadEpisodeSeries(projectDir: string, options: NewProjectOptions)
   }
   const path = join(seriesDir(projectDir, options.series), 'series.yaml');
   if (!existsSync(path)) throw new ConfigError(`Series "${options.series}" not found: ${path} does not exist.`);
-  return readYamlFile(path, SeriesSchema);
+  const series = await readYamlFile(path, SeriesSchema);
+  // The series budget is an umbrella: canon spend plus every episode budget must fit.
+  const budget = await seriesBudget(seriesDir(projectDir, options.series));
+  if (budget.remainingUsd !== undefined && options.budget! > budget.remainingUsd + 1e-9) {
+    throw new ConfigError(
+      `Episode budget $${options.budget!.toFixed(2)} exceeds the uncommitted series budget $${budget.remainingUsd.toFixed(2)} ` +
+        `(series $${budget.totalUsd!.toFixed(2)}, canon spent $${budget.canonSpentUsd.toFixed(2)}, episode budgets $${budget.episodeBudgetsUsd.toFixed(2)}). ` +
+        'Lower the episode budget or raise budget_usd in series.yaml.',
+    );
+  }
+  return series;
 }
 
 function relativeToRoot(path: string, root: string): string {

@@ -23,7 +23,7 @@ The first real series is "Restlaufzeit" (10 episodes of 60–120 s, 9:16, German
 - [x] Step 2c — master format and 9:16 render, `ChatWindow`, subtitles, QA, `new-episode`, docs
 - [x] Step 3a — lip-sync from speaker stems, display rules, lip-sync limits, art director with canon references
 - [x] Step 3b — `/video-next` by kind, `/series-status`
-- [ ] Step 3c — series budget, state, and manifest; `new-series`
+- [x] Step 3c — series budget, state, and manifest; `new-series`
 
 Step 3 is cut into 3a–3c (decided 2026-11-10). The series budget is an umbrella: `series.yaml` gets `budget_usd`; `series/<slug>/state.json` and its manifest book only canon generations; an episode keeps its own budget, and `new --kind episode` refuses when canon spend plus the sum of episode budgets would exceed the series budget. Forced alignment is deferred.
 

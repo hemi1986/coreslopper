@@ -14,13 +14,16 @@ import {
   formatUsd,
   loadModelsConfig,
   loadProject,
+  loadSeries,
   providerForRole,
   recordSpend,
   remainingBudget,
   repoRoot,
   resolveModelRole,
   saveState,
+  writeJsonAtomic,
   type LoadedProject,
+  type LoadedSeries,
   type ModelPricing,
   type ProjectConfig,
   type ProviderKind,
@@ -80,6 +83,8 @@ export const BatchSchema = z.array(BatchItemSchema).min(1);
 
 export interface GenerateOptions {
   projectDir: string;
+  /** Run the batch for this series canon instead of a project. */
+  seriesDir?: string;
   batchPath: string;
   dryRun?: boolean;
   /** Override the project provider for this batch (lip-sync keeps its own provider). */
@@ -98,7 +103,52 @@ export interface ResolvedItem {
   durationSeconds?: number;
 }
 
-function roleOverride(config: ProjectConfig, role: string): Record<string, unknown> {
+/** The configuration a batch needs: providers, model overrides, master size, and the batch cap. */
+export type BatchConfig = Pick<ProjectConfig, 'providers' | 'models' | 'formats' | 'batch_cap_usd'>;
+
+/**
+ * Where a batch runs: a project, or a series canon. It owns the budget the
+ * batch is checked against, the asset folder and manifest, and how spend is saved.
+ */
+export interface BatchTarget {
+  label: string;
+  config: BatchConfig;
+  state: { budget: { totalUsd: number; spentUsd: number; reservedUsd: number }; updatedAt: string };
+  paths: { root: string; assets: string; manifest: string };
+  saveState(): Promise<void>;
+}
+
+export function projectTarget(project: LoadedProject): BatchTarget {
+  return {
+    label: 'project',
+    config: project.config,
+    state: project.state,
+    paths: project.paths,
+    saveState: () => saveState(project.paths.state, project.state),
+  };
+}
+
+/** A series canon as a batch target; canon generations need a series budget. */
+export function seriesTarget(loaded: LoadedSeries): BatchTarget {
+  const { series, state, paths } = loaded;
+  if (series.budget_usd === undefined) {
+    throw new ConfigError(`series.yaml of "${series.slug}" has no budget_usd; canon generations need a series budget.`);
+  }
+  if (Math.abs(state.budget.totalUsd - series.budget_usd) > 1e-9) {
+    throw new ValidationError(
+      `${paths.state} budget (${state.budget.totalUsd}) does not match series.yaml budget_usd (${series.budget_usd}).`,
+    );
+  }
+  return {
+    label: 'series',
+    config: { providers: series.providers, models: {}, formats: series.formats, batch_cap_usd: series.batch_cap_usd },
+    state,
+    paths,
+    saveState: () => writeJsonAtomic(paths.state, state),
+  };
+}
+
+function roleOverride(config: BatchConfig, role: string): Record<string, unknown> {
   const value = config.models[role];
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
@@ -108,7 +158,7 @@ export { checkSpokenText };
 
 function resolveItem(
   item: z.infer<typeof BatchItemSchema>,
-  config: ProjectConfig,
+  config: BatchConfig,
   models: Awaited<ReturnType<typeof loadModelsConfig>>,
   projectRoot: string,
   providerOverride?: ProviderKind,
@@ -244,7 +294,7 @@ export interface BatchRunResult {
  * in order; a dry run only estimates.
  */
 export async function runBatch(
-  project: LoadedProject,
+  project: BatchTarget,
   batch: BatchItem[],
   options: BatchRunOptions = {},
 ): Promise<BatchRunResult[]> {
@@ -261,7 +311,7 @@ export async function runBatch(
       effectiveBatchCap(project.config, project.state),
     )}`,
   );
-  assertAffordable(project.config, project.state, totalEstimate, 'generation batch');
+  assertAffordable(project.config, project.state, totalEstimate, `${project.label} generation batch`);
   if (options.dryRun) {
     for (const item of resolved) {
       console.log(
@@ -301,7 +351,7 @@ export async function runBatch(
     } else {
       actualSpend += result.costUsd;
       recordSpend(project.state, result.costUsd);
-      await saveState(project.paths.state, project.state);
+      await project.saveState();
       console.log(
         `[${index + 1}/${resolved.length}] ${item.item.role}: ${result.files.length} file(s), ${formatUsd(result.costUsd)}`,
       );
@@ -317,7 +367,9 @@ export async function runBatch(
 }
 
 export async function generateBatch(options: GenerateOptions): Promise<void> {
-  const project = await loadProject(options.projectDir);
+  const project = options.seriesDir
+    ? seriesTarget(await loadSeries(options.seriesDir))
+    : projectTarget(await loadProject(options.projectDir));
   const batchRaw = await readFile(resolve(options.batchPath), 'utf8');
   let batchData: unknown;
   try {

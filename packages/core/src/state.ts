@@ -323,11 +323,11 @@ export function resetStage(state: State, stageId: string): State {
   return state;
 }
 
-export function remainingBudget(state: State): number {
+export function remainingBudget(state: Pick<State, 'budget'>): number {
   return Math.max(0, state.budget.totalUsd - state.budget.spentUsd - state.budget.reservedUsd);
 }
 
-export function recordSpend(state: State, usd: number): State {
+export function recordSpend<T extends Pick<State, 'budget' | 'updatedAt'>>(state: T, usd: number): T {
   if (usd < 0) throw new BudgetError('Spend must not be negative.');
   const next = state.budget.spentUsd + usd;
   if (next > state.budget.totalUsd + 1e-9) {

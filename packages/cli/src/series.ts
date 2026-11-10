@@ -8,9 +8,11 @@ import {
   ValidationError,
   formatUsd,
   loadProject,
+  loadSeries,
   nextStage,
   readYamlFile,
   repoRoot,
+  type ProjectConfig,
   type Series,
 } from '@coreslopper/core';
 import { formatSeconds } from './utils.js';
@@ -28,8 +30,52 @@ export interface EpisodeStatus {
   error?: string;
 }
 
+/** How much of a series budget is committed: canon spend plus every episode's budget. */
+export interface SeriesBudget {
+  totalUsd?: number;
+  canonSpentUsd: number;
+  episodeBudgetsUsd: number;
+  /** Undefined without a series budget. */
+  remainingUsd?: number;
+}
+
+/** The episode projects of a series, from `projects/` next to `series/`. */
+async function episodeConfigs(seriesDir: string, slug: string) {
+  const projectsDir = join(seriesDir, '..', '..', 'projects');
+  const configs: Array<{ dir: string; config: ProjectConfig }> = [];
+  for (const entry of existsSync(projectsDir) ? readdirSync(projectsDir, { withFileTypes: true }) : []) {
+    if (!entry.isDirectory()) continue;
+    const dir = join(projectsDir, entry.name);
+    if (!existsSync(join(dir, 'project.yaml'))) continue;
+    try {
+      const config = await readYamlFile(join(dir, 'project.yaml'), ProjectConfigSchema);
+      if (config.kind === 'episode' && config.series === slug && config.episode !== undefined) configs.push({ dir, config });
+    } catch {
+      // A broken project.yaml belongs to that project's validation.
+    }
+  }
+  return configs;
+}
+
+export async function seriesBudget(seriesDir: string): Promise<SeriesBudget> {
+  const { series, state } = await loadSeries(seriesDir);
+  const episodeBudgetsUsd = (await episodeConfigs(seriesDir, series.slug)).reduce(
+    (sum, { config }) => sum + config.budget_usd,
+    0,
+  );
+  const canonSpentUsd = state.budget.spentUsd;
+  return {
+    totalUsd: series.budget_usd,
+    canonSpentUsd,
+    episodeBudgetsUsd,
+    remainingUsd:
+      series.budget_usd === undefined ? undefined : Number((series.budget_usd - canonSpentUsd - episodeBudgetsUsd).toFixed(6)),
+  };
+}
+
 export interface SeriesStatus {
   series: Series;
+  budget: SeriesBudget;
   dir: string;
   characters: { id: string; face: string; voice: 'ok' | 'missing' | 'none'; refs: number }[];
   sets: { id: string; refs: number }[];
@@ -74,19 +120,9 @@ export async function collectSeriesStatus(seriesDir: string): Promise<SeriesStat
       }))
     : [];
 
-  const projectsDir = join(seriesDir, '..', '..', 'projects');
   const found = new Map<number, EpisodeStatus>();
-  for (const entry of existsSync(projectsDir) ? readdirSync(projectsDir, { withFileTypes: true }) : []) {
-    if (!entry.isDirectory()) continue;
-    const dir = join(projectsDir, entry.name);
-    if (!existsSync(join(dir, 'project.yaml'))) continue;
-    let config;
-    try {
-      config = await readYamlFile(join(dir, 'project.yaml'), ProjectConfigSchema);
-    } catch {
-      continue;
-    }
-    if (config.kind !== 'episode' || config.series !== series.slug || config.episode === undefined) continue;
+  for (const { dir, config } of await episodeConfigs(seriesDir, series.slug)) {
+    if (config.episode === undefined) continue;
     const status: EpisodeStatus = { episode: config.episode, title: config.title, slug: config.slug, budgetUsd: config.budget_usd };
     try {
       const project = await loadProject(dir);
@@ -111,7 +147,7 @@ export async function collectSeriesStatus(seriesDir: string): Promise<SeriesStat
     if (!series.episodes.some((planned) => planned.episode === episode)) episodes.push(status);
   }
   episodes.sort((a, b) => a.episode - b.episode);
-  return { series, dir: seriesDir, characters, sets, episodes };
+  return { series, budget: await seriesBudget(seriesDir), dir: seriesDir, characters, sets, episodes };
 }
 
 export async function printSeriesStatus(seriesArg: string): Promise<void> {
@@ -132,6 +168,12 @@ export async function printSeriesStatus(seriesArg: string): Promise<void> {
         : ''),
   );
   if (status.sets.length) console.log(`Sets: ${status.sets.map((set) => `${set.id} [${set.refs} ref(s)]`).join('; ')}`);
+  const budget = status.budget;
+  console.log(
+    budget.totalUsd === undefined
+      ? `Series budget: none · canon spent ${formatUsd(budget.canonSpentUsd)}`
+      : `Series budget: ${formatUsd(budget.totalUsd)} · canon spent ${formatUsd(budget.canonSpentUsd)} · episode budgets ${formatUsd(budget.episodeBudgetsUsd)} · uncommitted ${formatUsd(budget.remainingUsd!)}`,
+  );
 
   console.log('Ep  Slug                  Stage           Status    Spent / Budget     Length   Next');
   for (const episode of status.episodes) {
@@ -152,8 +194,8 @@ export async function printSeriesStatus(seriesArg: string): Promise<void> {
   }
   const created = status.episodes.filter((episode) => episode.slug && !episode.error);
   const spent = created.reduce((sum, episode) => sum + (episode.spentUsd ?? 0), 0);
-  const budget = created.reduce((sum, episode) => sum + (episode.budgetUsd ?? 0), 0);
+  const budgeted = created.reduce((sum, episode) => sum + (episode.budgetUsd ?? 0), 0);
   console.log(
-    `Episodes: ${created.length} created of ${status.episodes.length} · ${formatUsd(spent)} spent / ${formatUsd(budget)} budgeted`,
+    `Episodes: ${created.length} created of ${status.episodes.length} · ${formatUsd(spent)} spent / ${formatUsd(budgeted)} budgeted`,
   );
 }

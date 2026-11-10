@@ -226,6 +226,10 @@ _Avoid_: show, season
 What every episode of a series shares and none may change: the series bible, style bible, character bible, sets, and their references.
 _Avoid_: lore, shared assets
 
+**Series Budget**:
+The umbrella budget of a series: the canon's generations plus every episode's own budget must fit in it.
+_Avoid_: season budget, pooled budget
+
 **Series Bible**:
 The written premise, tone, world rules, and episode plan of a series.
 _Avoid_: brief, treatment

@@ -140,6 +140,14 @@
       "type": "string",
       "minLength": 1
     },
+    "budget_usd": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "batch_cap_usd": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
     "episodes": {
       "default": [],
       "type": "array",

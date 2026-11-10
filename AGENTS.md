@@ -69,6 +69,7 @@ schema/            Generated JSON Schema for cross-language validation
 scripts/           Audio analysis (Python/uv), fixture generators, runtime build
 templates/project/ Project template used by the new-video skill
 templates/episode/ Episode template used by the new-episode skill
+templates/series/  Series canon template used by the new-series skill
 brand/example/     Neutral synthwave/cyberpunk brand kit with OFL fonts
 projects/          Video projects and episodes (media gitignored)
 series/            Series canons: series.yaml, bible, style, characters, sets (references gitignored)
@@ -143,7 +144,9 @@ npm run schema
 | `npm run cli -- import-takes <project> [--lines <ids>]` | Episode: register recordings in `audio/lines/` as takes. |
 | `npm run cli -- episode-track <project>` | Episode: place takes, write `timing.json`, mix the episode track and speaker stems. |
 | `npm run cli -- subtitles <project>` | Episode: write `renders/<slug>.en.srt`. |
-| `npm run cli -- series-status <series>` | Series canon, planned and created episodes, stages, spend, length. |
+| `npm run cli -- series-status <series>` | Series canon, budget, planned and created episodes, stages, spend, length. |
+| `npm run cli -- new-series <slug> --budget <usd> [--format <id>]` | Create a series canon in `series/<slug>/`. |
+| `npm run cli -- generate --series <series> --batch <file>` | Run a canon generation batch against the series budget. |
 | `npm run cli -- generate <project> --batch <file> [--provider <p>]` | Run a cached, budget-checked generation batch; `--provider` overrides the project provider for one batch (lip-sync keeps its own). |
 | `npm run cli -- qa <project> [--determinism <frame>]` | Write `review/report.md`; optionally check frame hashes. |
 | `npm run cli -- import-song <project>` | Register `audio/song.wav` and `audio/stems/vocals.wav` in `song.json`; converts other formats. |
@@ -162,7 +165,7 @@ npm run schema
 | `npm run build` | Build `runtime/` and the npx bundle in `dist/`. |
 | `npm run pack:check` | Build and inspect the npm tarball. |
 
-In Claude Code: `/new-video` and `/new-episode` (skills), `/video-next`, `/video-status`, `/series-status`.
+In Claude Code: `/new-video`, `/new-series`, and `/new-episode` (skills), `/video-next`, `/video-status`, `/series-status`.
 
 ## Distribution
 
@@ -170,7 +173,7 @@ The root package is published as `coreslopper`. `npm run build` copies the track
 
 ## Skills
 
-Own skills: `new-video`, `video-brief`, `video-treatment`, `audio-analysis`, `style-bible`, `character-bible`, `storyboard`, `remotion-motion`, `ai-clips`, `footage`, `assembly-render`, `video-qa`, and for episodes `new-episode`, `voice-track`, `episode-track`.
+Own skills: `new-video`, `video-brief`, `video-treatment`, `audio-analysis`, `style-bible`, `character-bible`, `storyboard`, `remotion-motion`, `ai-clips`, `footage`, `assembly-render`, `video-qa`, and for series and episodes `new-series`, `new-episode`, `voice-track`, `episode-track`.
 
 Vendored from Matt Pocock (MIT, see `docs/THIRD_PARTY.md`): `grill-me`, `grilling`, `writing-for-agents`, `domain-modeling`.
 

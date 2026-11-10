@@ -412,6 +412,13 @@ export const SeriesSchema = z.object({
   }),
   providers: ProvidersSchema,
   brand: z.string().min(1).default('example'),
+  /**
+   * Series budget: canon generations plus every episode budget must fit in it.
+   * Without it, episodes are unchecked and the canon cannot be generated.
+   */
+  budget_usd: z.number().positive().optional(),
+  /** Batch cap for canon generations; defaults to 30 % of the remaining series budget. */
+  batch_cap_usd: z.number().positive().optional(),
   /** The planned episodes. */
   episodes: z
     .array(
@@ -506,6 +513,14 @@ export const ScriptSchema = z.object({
   scenes: z.array(SceneSchema).min(1),
 });
 
+/** `series/<slug>/state.json`: the spend of canon generations against the series budget. */
+export const SeriesStateSchema = z.object({
+  version: z.literal(1),
+  series: SlugSchema,
+  budget: BudgetSchema,
+  updatedAt: z.string().min(1),
+});
+
 export const TakeSchema = z.object({
   source: z.enum(['generated', 'imported']),
   duration: z.number().positive(),
@@ -595,6 +610,7 @@ export type ScriptLine = z.infer<typeof ScriptLineSchema>;
 export type Scene = z.infer<typeof SceneSchema>;
 export type Script = z.infer<typeof ScriptSchema>;
 export type Take = z.infer<typeof TakeSchema>;
+export type SeriesState = z.infer<typeof SeriesStateSchema>;
 export type Takes = z.infer<typeof TakesSchema>;
 export type Format = z.infer<typeof FormatSchema>;
 export type StageStatus = z.infer<typeof StageStatusSchema>;

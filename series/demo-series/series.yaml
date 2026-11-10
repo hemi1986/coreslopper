@@ -17,6 +17,7 @@ providers:
   video: mock
   audio: mock
 brand: example
+budget_usd: 50
 episodes:
   - episode: 1
     title: After Midnight

@@ -44,6 +44,8 @@ series/*/characters/*
 !series/*/characters/.gitkeep
 series/*/sets/*
 !series/*/sets/.gitkeep
+series/*/assets/*
+!series/*/assets/.gitkeep
 
 # Python
 .venv/

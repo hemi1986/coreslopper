@@ -68,6 +68,8 @@ review/             report, contact sheet, small stills
 
 An episode belongs to a series. `series/<series>/` holds its **canon**: `series.yaml` (formats, provider defaults, episode plan, optional limits), `bible.md`, `style.yaml`, `characters.yaml`, `sets.yaml`, and references under `characters/` and `sets/` (gitignored). `loadProject` reads an episode's style, characters, and sets from there; an episode has no copies. `new --kind episode` copies formats, providers, and brand from `series.yaml` once; nothing is inherited at run time.
 
+The series budget is an umbrella over the canon and the episodes. `series/<series>/state.json` books only canon generations (`generate --series` runs them through the same `runBatch` path as a project, with the series manifest in `series/<series>/assets/manifest.jsonl`). Each episode keeps its own budget in its own state; `new --kind episode` refuses an episode when canon spend plus all episode budgets would exceed `budget_usd`.
+
 An episode's data plane adds:
 
 ```text

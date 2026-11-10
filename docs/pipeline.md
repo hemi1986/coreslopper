@@ -186,6 +186,17 @@ npm run cli -- qa projects/night-desk-02
 - **Lip-sync.** A lip-sync shot is driven by the character's speaker stem; cut its segment with `npm run cli -- audio-segment <project> --start <s> --end <s> --name <shot-id> --character <id>`. Characters with the display rule `silhouette` or `voice-only` cannot have one, and `validate` rejects a shot longer than `maxDuration` of `video.lipsync` for the selected provider or `limits.lipsync_seconds_max` of the series.
 - **QA** adds the episode checks: complete `text_en`, canon references, `limits.episode_seconds` of the series, and the SRT.
 
+A series starts with the `new-series` skill. It creates the canon and generates its references through the series budget:
+
+```bash
+npm run cli -- new-series night-desk --budget 200 --format 9x16 --audio-provider comfyui
+npm run cli -- generate --series night-desk --batch canon-batch.json --dry-run
+npm run cli -- generate --series night-desk --batch canon-batch.json
+npm run cli -- series-status night-desk
+```
+
+`series.yaml` `budget_usd` is an umbrella: canon generations are booked in `series/<slug>/state.json` and `series/<slug>/assets/manifest.jsonl`, each episode keeps its own budget, and `new --kind episode` refuses an episode whose budget does not fit in what is left.
+
 The demo episode runs on the mock provider:
 
 ```bash

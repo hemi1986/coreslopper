@@ -3,6 +3,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import {
   ProjectConfigSchema,
   SeriesSchema,
+  SeriesStateSchema,
   SetBibleSchema,
   StateSchema,
   StyleBibleSchema,
@@ -36,7 +37,23 @@ function findArtifactRoot(file: string): ArtifactRoot {
   }
 }
 
-/** Canon files of a series: series.yaml, sets.yaml, style.yaml, characters.yaml. */
+/** series.yaml budget_usd and state.json must agree, like a project's budget and state. */
+async function checkSeriesBudget(seriesRoot: string): Promise<void> {
+  const statePath = join(seriesRoot, 'state.json');
+  if (!existsSync(statePath)) return;
+  const series = await readYamlFile(join(seriesRoot, 'series.yaml'), SeriesSchema);
+  const state = await readJsonFile(statePath, SeriesStateSchema);
+  if (state.series !== series.slug) {
+    throw new ValidationError(`state.json is for series "${state.series}", but series.yaml says "${series.slug}".`);
+  }
+  if (Math.abs(state.budget.totalUsd - (series.budget_usd ?? 0)) > 1e-9) {
+    throw new ValidationError(
+      `state.json budget (${state.budget.totalUsd}) does not match series.yaml budget_usd (${series.budget_usd ?? 'none'}). Update both together.`,
+    );
+  }
+}
+
+/** Canon files of a series: series.yaml, state.json, sets.yaml, style.yaml, characters.yaml. */
 async function validateSeriesFile(seriesRoot: string, name: string): Promise<string | undefined> {
   if (name === 'series.yaml') {
     const series = await readYamlFile(join(seriesRoot, 'series.yaml'), SeriesSchema);
@@ -45,7 +62,13 @@ async function validateSeriesFile(seriesRoot: string, name: string): Promise<str
         `series.yaml slug "${series.slug}" does not match the series folder "${basename(seriesRoot)}".`,
       );
     }
+    await checkSeriesBudget(seriesRoot);
     return 'series';
+  }
+  if (name === 'state.json') {
+    await readJsonFile(join(seriesRoot, 'state.json'), SeriesStateSchema);
+    await checkSeriesBudget(seriesRoot);
+    return 'series state';
   }
   if (name === 'sets.yaml') {
     await readYamlFile(join(seriesRoot, 'sets.yaml'), SetBibleSchema);

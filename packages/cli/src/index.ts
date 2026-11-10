@@ -34,7 +34,8 @@ import { writeSubtitles } from './subtitles.js';
 import { runDoctor } from './doctor.js';
 import { runInitCommand, validateChoice, type InitCommandOptions } from './init-command.js';
 import { printStatus } from './status.js';
-import { printSeriesStatus } from './series.js';
+import { printSeriesStatus, seriesDirFromArg } from './series.js';
+import { createSeries } from './new-series.js';
 import { formatSeconds, parseCsv, projectDirFromArg, run } from './utils.js';
 import { findWorkspaceRoot, loadWorkspaceEnv, ownVersion } from './workspace.js';
 import type { FormatId } from '../../remotion/src/types.js';
@@ -77,6 +78,48 @@ program
     run(async () => {
       await printStatus(projectDirFromArg(project));
     }),
+  );
+
+program
+  .command('new-series <slug>')
+  .description('Create a series canon in series/<slug>/ from templates/series.')
+  .requiredOption('--budget <usd>', 'Series budget in USD: canon generations plus every episode budget', (value) => Number(value))
+  .option('--title <title>')
+  .option('--format <id>', 'Master format: 16x9 | 9x16 | 1x1 | 4x5 (default: config/defaults.yaml)')
+  .option('--brand <kit>', 'Brand kit', 'example')
+  .option('--image-provider <provider>', 'mock | fal | higgsfield | comfyui', 'mock')
+  .option('--video-provider <provider>', 'mock | fal | higgsfield | comfyui', 'mock')
+  .option('--audio-provider <provider>', 'mock | comfyui', 'mock')
+  .action(
+    (
+      slug: string,
+      options: {
+        budget: number;
+        title?: string;
+        format?: string;
+        brand: string;
+        imageProvider: string;
+        videoProvider: string;
+        audioProvider: string;
+      },
+    ) =>
+      run(async () => {
+        const visual = ['mock', 'fal', 'higgsfield', 'comfyui'] as const;
+        await createSeries({
+          slug,
+          title: options.title,
+          budget: options.budget,
+          format: options.format
+            ? validateChoice(options.format, ['16x9', '9x16', '1x1', '4x5'] as const, 'format')
+            : undefined,
+          brand: options.brand,
+          providers: {
+            image: validateChoice(options.imageProvider, visual, 'image provider'),
+            video: validateChoice(options.videoProvider, visual, 'video provider'),
+            audio: validateChoice(options.audioProvider, ['mock', 'comfyui'] as const, 'audio provider'),
+          },
+        });
+      }),
   );
 
 program
@@ -383,12 +426,14 @@ program
   .command('generate [project]')
   .description('Run a paid or mock generation batch with cache, manifest, and budget checks.')
   .requiredOption('--batch <path>', 'Batch JSON/YAML file')
+  .option('--series <series>', 'Run the batch for a series canon (budget and manifest of series/<series>/) instead of a project')
   .option('--dry-run', 'Estimate and print the batch without generating')
   .option('--provider <provider>', 'Provider override for this batch: fal | higgsfield | comfyui | mock (lip-sync keeps its own provider)')
-  .action((project: string | undefined, options: { batch: string; dryRun?: boolean; provider?: string }) =>
+  .action((project: string | undefined, options: { batch: string; series?: string; dryRun?: boolean; provider?: string }) =>
     run(async () => {
       await generateBatch({
         projectDir: projectDirFromArg(project),
+        seriesDir: options.series ? seriesDirFromArg(options.series) : undefined,
         batchPath: options.batch,
         dryRun: options.dryRun,
         provider: options.provider

@@ -10,7 +10,7 @@ export function estimateCost(units: number, pricing: ModelPricing): number {
   return Number((units * pricing.usd).toFixed(6));
 }
 
-export function effectiveBatchCap(config: ProjectConfig, state: State): number {
+export function effectiveBatchCap(config: Pick<ProjectConfig, 'batch_cap_usd'>, state: Pick<State, 'budget'>): number {
   const remaining = remainingBudget(state);
   const ratioCap = remaining * 0.3;
   const configured = config.batch_cap_usd ?? ratioCap;
@@ -18,8 +18,8 @@ export function effectiveBatchCap(config: ProjectConfig, state: State): number {
 }
 
 export function assertAffordable(
-  config: ProjectConfig,
-  state: State,
+  config: Pick<ProjectConfig, 'batch_cap_usd'>,
+  state: Pick<State, 'budget'>,
   estimatedUsd: number,
   label = 'batch',
 ): void {

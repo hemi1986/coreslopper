@@ -17,7 +17,7 @@ import {
   type ScriptLine,
   type Take,
 } from '@coreslopper/core';
-import { runBatch, type BatchItem } from './generate.js';
+import { projectTarget, runBatch, type BatchItem } from './generate.js';
 import { convertAudio, probeDuration } from './media.js';
 import {
   ambiencePath,
@@ -134,7 +134,7 @@ export async function voiceTrack(projectDir: string, options: VoiceTrackOptions 
 
   console.log(`Takes: ${current} current, ${pending.length} to generate.`);
   if (pending.length > 0) {
-    const results = await runBatch(project, pending.map((entry) => entry.item), { dryRun: options.dryRun });
+    const results = await runBatch(projectTarget(project), pending.map((entry) => entry.item), { dryRun: options.dryRun });
     if (!options.dryRun) {
       for (const [index, { line, hash }] of pending.entries()) {
         const file = results[index]?.result?.files[0];
@@ -188,7 +188,7 @@ export async function voiceTrack(projectDir: string, options: VoiceTrackOptions 
 
   if (ambience.length > 0) {
     console.log(`Ambience: ${ambience.length} scene(s) to generate.`);
-    const results = await runBatch(project, ambience.map((entry) => entry.item));
+    const results = await runBatch(projectTarget(project), ambience.map((entry) => entry.item));
     for (const [index, { scene, hash }] of ambience.entries()) {
       const file = results[index]?.result?.files[0];
       if (!file) throw new ValidationError(`The ambience generation for scene "${scene}" returned no file.`);

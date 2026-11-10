@@ -12,6 +12,7 @@ import {
   ProjectConfigSchema,
   ScriptSchema,
   SeriesSchema,
+  SeriesStateSchema,
   SetBibleSchema,
   StateSchema,
   StoryboardSchema,
@@ -26,6 +27,7 @@ import {
   type ProjectConfig,
   type Script,
   type Series,
+  type SeriesState,
   type SetBible,
   type State,
   type Storyboard,
@@ -360,4 +362,55 @@ export async function loadBrand(projectDir: string, brandId?: string, root = rep
     }
   }
   return undefined;
+}
+
+export interface SeriesPaths {
+  root: string;
+  config: string;
+  state: string;
+  bible: string;
+  style: string;
+  characters: string;
+  sets: string;
+  /** Canon generations land here before the skill files them under characters/ and sets/; gitignored. */
+  assets: string;
+  manifest: string;
+}
+
+export function seriesPaths(seriesRoot: string): SeriesPaths {
+  const root = resolve(seriesRoot);
+  return {
+    root,
+    config: join(root, 'series.yaml'),
+    state: join(root, 'state.json'),
+    bible: join(root, 'bible.md'),
+    style: join(root, 'style.yaml'),
+    characters: join(root, 'characters.yaml'),
+    sets: join(root, 'sets.yaml'),
+    assets: join(root, 'assets'),
+    manifest: join(root, 'assets', 'manifest.jsonl'),
+  };
+}
+
+export function createSeriesState(series: Pick<Series, 'slug' | 'budget_usd'>): SeriesState {
+  return {
+    version: 1,
+    series: series.slug,
+    budget: { totalUsd: series.budget_usd ?? 0, spentUsd: 0, reservedUsd: 0 },
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+export interface LoadedSeries {
+  series: Series;
+  /** The canon spend; an initial state when state.json does not exist yet. */
+  state: SeriesState;
+  paths: SeriesPaths;
+}
+
+export async function loadSeries(seriesRoot: string): Promise<LoadedSeries> {
+  const paths = seriesPaths(seriesRoot);
+  const series = await readYamlFile(paths.config, SeriesSchema);
+  const state = pathExists(paths.state) ? await readJsonFile(paths.state, SeriesStateSchema) : createSeriesState(series);
+  return { series, state, paths };
 }
