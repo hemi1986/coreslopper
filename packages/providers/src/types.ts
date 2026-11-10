@@ -4,7 +4,8 @@ export type Operation =
   | 'textToVideo'
   | 'imageToVideo'
   | 'firstLastFrameToVideo'
-  | 'lipSync';
+  | 'lipSync'
+  | 'generateAudio';
 
 export interface ProviderInput {
   model: string;
@@ -40,6 +41,11 @@ export interface Provider {
   firstLastFrameToVideo(input: ProviderInput): Promise<ProviderOutput>;
   /** Animate a still face image so it sings or speaks the given audio. */
   lipSync(input: ProviderInput): Promise<ProviderOutput>;
+  /**
+   * Generate music, a stinger, or a sound effect from the prompt. Optional: only
+   * local backends implement it. It never replaces the song a video is made for.
+   */
+  generateAudio?(input: ProviderInput): Promise<ProviderOutput>;
   /**
    * Extra cache-key material that is not in the request, such as the content of
    * a local workflow file. Return undefined when the model name is enough.

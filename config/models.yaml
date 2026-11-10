@@ -21,13 +21,18 @@
 #   min_duration: 3            raise shorter requests to the model's minimum
 #   durations: [5, 10]         snap to the next allowed length
 #
-# ComfyUI (local, providers.video: comfyui): `model` is the name of a workflow
-# exported with "Export (API)" into comfyui/workflows/<model>.json. Local runs
-# cost nothing, so comfyui entries need no pricing. Adapter params:
+# ComfyUI (local; providers.image / video / lipsync / audio: comfyui): `model`
+# is the name of a workflow exported with "Export (API)" into
+# comfyui/workflows/<model>.json. Local runs cost nothing, so comfyui entries
+# need no pricing. Adapter params:
 #   fps: 24            frame rate the workflow renders at (sets cs_fps if present)
 #   frame_step: 8      round frame counts to step*n+1 (LTX needs 8n+1)
 #   size_multiple: 32  round width/height to a multiple (LTX needs 32)
+#   size_scale: 0.5    fraction of the output size for workflows that upscale the latent
+#   megapixels: 1      scale the target size to this many megapixels, keeping the aspect
 #   width/height       override the project's master size
+#   audio_offset: 0    start of the driving audio in seconds (cs_audio_start)
+#   lyrics: "..."      lyrics for music workflows (cs_lyrics); empty means none
 #   node_inputs        {"<node title or id>.<input>": value} for anything else
 # See comfyui/README.md for the node titles.
 version: 1
@@ -58,6 +63,9 @@ roles:
           unit: image
           usd: 0.03
         notes: One to three reference images. Verify the current Qwen edit price.
+      comfyui:
+        model: qwen-edit
+        notes: Local Qwen Image 2.1 Turbo edit. The first reference sets the output size; up to 16 references.
   image.keyframe:
     provider: fal
     model: fal-ai/flux-2-pro
@@ -83,6 +91,12 @@ roles:
           unit: image
           usd: 0.006
         notes: Soul 2 text-to-image. Planning estimate for 1080p.
+      comfyui:
+        model: qwen-t2i
+        params:
+          megapixels: 1.5
+          size_multiple: 16
+        notes: Local Qwen Image 2.1 Turbo, about 1.5 MP in the master aspect.
   image.edit:
     provider: fal
     model: fal-ai/flux-2-pro/edit
@@ -107,6 +121,9 @@ roles:
           unit: image
           usd: 0.03
         notes: Up to three reference images. Verify the current Qwen edit price.
+      comfyui:
+        model: qwen-edit
+        notes: Local Qwen Image 2.1 Turbo edit. The first reference is the image to edit.
   image.keyframe.budget:
     provider: fal
     model: fal-ai/flux-2
@@ -131,6 +148,20 @@ roles:
           unit: image
           usd: 0.0032
         notes: Soul 2 at 720p. Planning estimate.
+      comfyui:
+        model: qwen-t2i
+        params:
+          megapixels: 1
+          size_multiple: 16
+        notes: Local Qwen Image 2.1 Turbo at about 1 MP.
+  image.background_removal:
+    provider: comfyui
+    model: qwen-bg-remove
+    notes: >-
+      editImage with one reference: cut a character or prop out for layering in
+      Remotion. Prompt e.g. "Remove the background, and output a PNG image".
+      Local Qwen workflow only.
+    alternatives: {}
 
   video.image_to_video.quality:
     provider: fal
@@ -161,13 +192,17 @@ roles:
           upscaled in a 1080p master; use the Pro variant for native 1080p. Verify the
           current price and duration limit.
       comfyui:
-        model: ltx-i2v
+        model: ltx-av
         params:
           fps: 24
           frame_step: 8
           size_multiple: 32
+          size_scale: 0.5
         maxDuration: 10
-        notes: Local LTX image-to-video workflow. Duration limit depends on the workflow and VRAM.
+        notes: >-
+          Local LTX 2.5 audio-video workflow in image-to-video mode (custom audio
+          off). Set models.<role>.model to ltx-i2v to keep a plain LTX i2v
+          workflow. Duration limit depends on VRAM.
   video.image_to_video.fast:
     provider: fal
     model: kling/v4/flash/image-to-video
@@ -192,13 +227,17 @@ roles:
         maxDuration: 10
         notes: Kling 2.5 Turbo Standard. 5 s or 10 s only.
       comfyui:
-        model: ltx-i2v
+        model: ltx-av
         params:
           fps: 24
           frame_step: 8
           size_multiple: 32
+          size_scale: 0.5
         maxDuration: 10
-        notes: Local LTX image-to-video workflow. Duration limit depends on the workflow and VRAM.
+        notes: >-
+          Local LTX 2.5 audio-video workflow in image-to-video mode (custom audio
+          off). Set models.<role>.model to ltx-i2v to keep a plain LTX i2v
+          workflow. Duration limit depends on VRAM.
   video.image_to_video.premium:
     provider: fal
     model: bytedance/seedance-2.5/us/image-to-video
@@ -224,13 +263,17 @@ roles:
         maxDuration: 30
         notes: Seedance 2.5 list price at 1080p; discounts may lower it.
       comfyui:
-        model: ltx-i2v
+        model: ltx-av
         params:
           fps: 24
           frame_step: 8
           size_multiple: 32
+          size_scale: 0.5
         maxDuration: 10
-        notes: Local LTX image-to-video workflow. Duration limit depends on the workflow and VRAM.
+        notes: >-
+          Local LTX 2.5 audio-video workflow in image-to-video mode (custom audio
+          off). Set models.<role>.model to ltx-i2v to keep a plain LTX i2v
+          workflow. Duration limit depends on VRAM.
   video.image_to_video.budget:
     provider: fal
     model: alibaba/wan-3.0/image-to-video
@@ -257,13 +300,17 @@ roles:
         maxDuration: 30
         notes: Wan 3.0 at 720p. Planning estimate.
       comfyui:
-        model: ltx-i2v
+        model: ltx-av
         params:
           fps: 24
           frame_step: 8
           size_multiple: 32
+          size_scale: 0.5
         maxDuration: 10
-        notes: Local LTX image-to-video workflow. Duration limit depends on the workflow and VRAM.
+        notes: >-
+          Local LTX 2.5 audio-video workflow in image-to-video mode (custom audio
+          off). Set models.<role>.model to ltx-i2v to keep a plain LTX i2v
+          workflow. Duration limit depends on VRAM.
 
   video.premium.veo:
     provider: fal
@@ -292,13 +339,17 @@ roles:
         maxDuration: 8
         notes: Veo 3.1 Fast supports 4, 6, or 8 second clips.
       comfyui:
-        model: ltx-i2v
+        model: ltx-av
         params:
           fps: 24
           frame_step: 8
           size_multiple: 32
+          size_scale: 0.5
         maxDuration: 10
-        notes: Local LTX image-to-video workflow. Duration limit depends on the workflow and VRAM.
+        notes: >-
+          Local LTX 2.5 audio-video workflow in image-to-video mode (custom audio
+          off). Set models.<role>.model to ltx-i2v to keep a plain LTX i2v
+          workflow. Duration limit depends on VRAM.
 
   video.text_to_video:
     provider: comfyui
@@ -342,3 +393,35 @@ roles:
       driving audio. fal docs list $0.14/s (2026-11-08); third-party pages say
       $0.16/s, so the estimate is conservative. Audio max 30 s at 1080p.
       Higgsfield has no lip-sync adapter yet; set providers.lipsync to fal.
+    alternatives:
+      comfyui:
+        model: ltx-av
+        params:
+          fps: 24
+          frame_step: 8
+          size_multiple: 32
+          size_scale: 0.5
+        maxDuration: 10
+        notes: >-
+          Local LTX 2.5 with custom audio on (providers.lipsync: comfyui). The
+          clip length follows the vocal segment; split longer lines. Prompt the
+          singing explicitly ("sings the supplied vocal audio with accurate lip
+          sync").
+
+  audio.music:
+    provider: comfyui
+    model: music-minimax
+    maxDuration: 360
+    notes: >-
+      generateAudio: a full track with vocals from a caption (prompt) and
+      params.lyrics; durationSeconds is the maximum length. For teasers,
+      intros, or demo tracks only; a video's song is always supplied by the user.
+    alternatives: {}
+  audio.sfx:
+    provider: comfyui
+    model: audio-stable
+    maxDuration: 180
+    notes: >-
+      generateAudio: instrumentals, risers, stingers, and sound effects (Stable
+      Audio 3 Medium). The workflow rewrites the prompt with its own LLM first.
+    alternatives: {}

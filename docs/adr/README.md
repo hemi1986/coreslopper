@@ -18,5 +18,6 @@ Short records of decisions that are hard to reverse, surprising without context,
 | [0012](0012-workspace-update.md) | `coreslopper update` merges a new runtime against a recorded baseline. |
 | [0013](0013-existing-song-interactive-setup.md) | Every project starts from an existing song; `new-video` runs setup, brief, and treatment interactively. |
 | [0014](0014-comfyui-local-video.md) | ComfyUI as a local video backend driven by tagged API workflow exports. |
+| [0015](0015-comfyui-images-lipsync-audio.md) | ComfyUI also for stills, edits, lip-sync, and audio; output kind from the `cs_output` node. |
 
 Status values: `Accepted`, `Deprecated`, `Superseded by ADR-NNNN`.

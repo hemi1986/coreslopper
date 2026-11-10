@@ -87,9 +87,10 @@ export function resolveModelRole(
 export function providerForRole(config: ProjectConfig, role: string): ProviderKind {
   if (role === 'video.lipsync') {
     if (config.providers.lipsync) return config.providers.lipsync;
-    // The local ComfyUI backend renders standard clips only; lip-sync stays in the cloud.
+    // Projects that render clips in ComfyUI keep lip-sync on fal unless they opt in.
     return config.providers.video === 'comfyui' ? 'fal' : config.providers.video;
   }
+  if (role.startsWith('audio.')) return config.providers.audio ?? 'comfyui';
   if (role.startsWith('video.')) return config.providers.video;
   return config.providers.image;
 }

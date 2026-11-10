@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { silentWav } from './http.js';
 import type { Provider, ProviderInput, ProviderOutput } from './types.js';
 
 function escapeXml(value: string): string {
@@ -78,5 +79,12 @@ export class MockProvider implements Provider {
     if (!input.references?.[0]) throw new Error('lipSync requires a face reference image.');
     if (!input.audio) throw new Error('lipSync requires an audio file.');
     return writePlaceholder(input, `MOCK LIPSYNC ${input.durationSeconds ?? '?'}s`, 'lipsync');
+  }
+
+  async generateAudio(input: ProviderInput): Promise<ProviderOutput> {
+    await mkdir(input.outputDir, { recursive: true });
+    const path = join(input.outputDir, `mock-${input.seed}-audio.wav`);
+    await writeFile(path, silentWav(input.durationSeconds ?? 5));
+    return { files: [path], raw: { mock: true, model: input.model } };
   }
 }

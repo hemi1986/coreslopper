@@ -41,6 +41,7 @@ export const BatchItemSchema = z
       'imageToVideo',
       'firstLastFrameToVideo',
       'lipSync',
+      'generateAudio',
     ]),
     role: z.string().min(1),
     prompt: z.string().min(1),
@@ -55,6 +56,9 @@ export const BatchItemSchema = z
   })
   .refine((item) => item.operation !== 'lipSync' || (item.audio && item.references.length > 0), {
     message: 'lipSync needs "audio" (a vocal segment) and a face image as the first reference.',
+  })
+  .refine((item) => item.operation !== 'generateAudio' || item.references.length === 0, {
+    message: 'generateAudio takes no references.',
   })
   .refine((item) => item.operation !== 'textToVideo' || item.references.length === 0, {
     message: 'textToVideo takes no references; use imageToVideo for a start frame.',
@@ -85,6 +89,7 @@ interface ResolvedItem {
   cost: number;
   references: string[];
   audio?: string;
+  durationSeconds?: number;
 }
 
 function roleOverride(config: ProjectConfig, role: string): Record<string, unknown> {
@@ -109,11 +114,8 @@ function resolveItem(
       'The Higgsfield adapter does not support lip-sync. Set providers.lipsync to "fal" and provide FAL_KEY, or keep providers.video on fal.',
     );
   }
-  if (provider === 'comfyui' && (item.operation === 'generateImage' || item.operation === 'editImage' || item.operation === 'lipSync')) {
-    throw new ConfigError(
-      `The ComfyUI backend renders video clips only, but role "${item.role}" (${item.operation}) resolved to it. ` +
-        'Images use providers.image; lip-sync uses providers.lipsync (fal by default).',
-    );
+  if (item.operation === 'generateAudio' && provider !== 'comfyui' && provider !== 'mock') {
+    throw new ConfigError(`Only the ComfyUI backend generates audio, but role "${item.role}" resolved to ${provider}.`);
   }
   const resolved = resolveModelRole(role, provider, override, item.role);
   const params = { ...resolved.params, ...item.params };
@@ -134,7 +136,8 @@ function resolveItem(
     throw new ValidationError(`Missing audio input: ${audio}`);
   }
   // A lip-sync clip is billed by the length of its driving audio.
-  const audioSeconds = audio ? Math.ceil(probeDuration(audio)) : undefined;
+  const exactAudioSeconds = audio ? probeDuration(audio) : undefined;
+  const audioSeconds = exactAudioSeconds === undefined ? undefined : Math.ceil(exactAudioSeconds);
   if (audioSeconds !== undefined && resolved.maxDuration && audioSeconds > resolved.maxDuration) {
     throw new ValidationError(
       `Audio ${item.audio} is ${audioSeconds}s; role "${item.role}" allows at most ${resolved.maxDuration}s.`,
@@ -167,6 +170,12 @@ function resolveItem(
     cost,
     references,
     audio,
+    // A local lip-sync workflow sets its clip length from the driving audio.
+    durationSeconds:
+      item.durationSeconds ??
+      (provider === 'comfyui' && item.operation === 'lipSync' && exactAudioSeconds !== undefined
+        ? Number(exactAudioSeconds.toFixed(3))
+        : undefined),
   };
 }
 

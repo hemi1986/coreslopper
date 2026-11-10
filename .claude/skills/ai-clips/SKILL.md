@@ -17,7 +17,7 @@ license: MIT
 - `storyboard.yaml`, `style.yaml`, `characters.yaml`
 - `assets/references/` for user-provided moodboards and composition references
 - `config/models.yaml` and `project.yaml`
-- `comfyui/README.md` when `providers.video` is `comfyui`
+- `comfyui/README.md` when any provider is `comfyui`
 - `packages/providers` and the `npm run cli -- generate` command
 - `docs/glossary.md`
 
@@ -31,7 +31,10 @@ license: MIT
    | `firstLastFrameToVideo` | start frame, end frame | `video.first_last_frame` | A move or morph between two keyframes. |
    | `textToVideo` | none | `video.text_to_video` | Abstract B-roll and atmospheres without a character. |
 
-   With `providers.video: comfyui` the clip renders locally from the workflow the role names (`comfyui/workflows/<model>.json`). It costs $0 but takes minutes per clip, so keep batches small. Run `npm run cli -- doctor` first; if ComfyUI is unreachable or the workflow is missing, stop with a credential-class hard stop.
+   With a `comfyui` provider the generation runs locally from the workflow the role names (`comfyui/workflows/<model>.json`). It costs $0; stills take seconds, clips about a minute per 3 s, so keep clip batches small. Run `npm run cli -- doctor` first; if ComfyUI is unreachable or the workflow is missing, stop with a credential-class hard stop. Local specifics:
+   - `editImage` on `qwen-edit` takes up to 16 references; `references[0]` is the image that is edited and sets the output size.
+   - `image.background_removal` (`editImage`, one reference, prompt "Remove the background, and output a PNG image") cuts a subject out as a transparent PNG for Remotion layers. It needs a clear subject; check that the result is not empty.
+   - Local `lipSync` (`providers.lipsync: comfyui`, workflow `ltx-av`) takes its length from the vocal segment; keep segments at 10 s or less. Write the prompt as "Preserve the exact person from the input image … sings the supplied vocal audio with accurate lip sync".
 3. Write a batch JSON file outside the repo or under `projects/<slug>/assets/batches/`. Shape:
    ```json
    [

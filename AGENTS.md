@@ -8,7 +8,7 @@ An open-source, Claude Code-native workflow for producing music videos for an ex
 - **Creative vs. mechanical.** Ideas, treatments, storyboards, and prompts are agent work. Song import, audio analysis, validation, caching, budget checks, rendering, and export are scripts.
 - **Flexible image source.** A shot can be motion graphics, an AI clip, real footage, or mixed. The decision is made per shot in the storyboard.
 - **Interactive setup, autonomous pipeline.** The `new-video` skill collects project data, lyrics, and the song, then grills the user into brief and treatment. After that there are no creative approval gates: `review_mode: auto` runs the pipeline; it stops only for budget, missing credentials, or an unrecoverable validation failure. Quality comes from upfront grilling, automated critics, schema validation, and deterministic rendering.
-- **Local or cloud clips.** `providers.video: comfyui` renders clips from tagged workflow exports in `comfyui/workflows/`; stills and lip-sync stay in the cloud.
+- **Local or cloud generation.** `comfyui` renders from tagged workflow exports in `comfyui/workflows/`: stills and edits (`providers.image`), clips (`providers.video`), lip-sync (`providers.lipsync`), and stingers/SFX (`audio.*` roles). Each provider is chosen separately.
 - **Resumable and thrifty.** `state.json` tracks stages, hashes, attempts, and spend. Generated assets are cached by a hash of model, prompt, seed, references, and params.
 - **No secrets.** API keys live in environment variables; `.env.example` documents them. Generated media and copyrighted material are gitignored.
 - **Open source.** MIT for our code and docs. Remotion is source-available and documented separately.
@@ -57,11 +57,11 @@ Or open Claude Code and run `/new-video`, which asks for the project data itself
 AGENTS.md          This file: the project description agents read
 CLAUDE.md          @AGENTS.md + Claude Code specifics
 config/            models.yaml and defaults.yaml
-comfyui/           README + workflows/ for local ComfyUI video (API exports)
+comfyui/           README + workflows/ for local ComfyUI generation (tagged API exports)
 docs/              glossary.md, architecture.md, pipeline.md, ADRs, third-party notices
 packages/
   core/            Zod schemas, state, timing resolver, hash, cost, project loader
-  providers/       image, video, and lip-sync operations; fal.ai + Higgsfield + ComfyUI + mock; cache/manifest runner
+  providers/       image, video, lip-sync, and audio operations; fal.ai + Higgsfield + ComfyUI + mock; cache/manifest runner
   cli/             validate, status, new, render, contact-sheet, stage-*, estimate, doctor
                    npx entry, onboarding, tool checks, workspace init
   remotion/        MusicVideo composition, motion components, effects, 3D

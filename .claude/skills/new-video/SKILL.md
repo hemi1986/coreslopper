@@ -25,7 +25,7 @@ Ask in one round, with a recommended answer for each:
 - **Slug** (lowercase, digits, dashes; recommend one derived from the title).
 - **Budget in USD**. Mandatory. Never invent it; motion-only videos can run on a small budget, AI clips cost real money (`config/models.yaml` has prices).
 - **Visual provider**: `mock` (motion graphics only, no key), `fal`, or `higgsfield`. Check `npm run cli -- doctor` for which keys exist and recommend accordingly.
-- **Video clips**: the visual provider, or `comfyui` to render clips locally. Offer `comfyui` only when `doctor` shows ComfyUI reachable and at least one workflow; stills and lip-sync then stay on the visual provider and fal.ai.
+- **Video clips**: the visual provider, or `comfyui` to render clips locally. Offer `comfyui` only when `doctor` shows ComfyUI reachable and at least one workflow. Stills and lip-sync can also run locally: after `new`, set `providers.image: comfyui` and `providers.lipsync: comfyui` in `project.yaml` if the user wants a fully local run; otherwise lip-sync stays on fal.ai.
 - **Sung language** as an ISO code (`de`, `en`, …).
 - **Rights**: who owns the song, and its license (for example "own song, all rights").
 

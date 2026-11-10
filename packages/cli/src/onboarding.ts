@@ -320,7 +320,7 @@ export async function onboard(options: OnboardOptions = {}): Promise<InitResult>
                 {
                   value: 'comfyui',
                   label: 'ComfyUI (local)',
-                  hint: 'workflows from comfyui/workflows/, free; lip-sync stays on fal.ai',
+                  hint: 'workflows from comfyui/workflows/, free; set providers.lipsync: comfyui to lip-sync locally too',
                 },
               ],
               initialValue: visual,

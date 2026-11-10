@@ -134,9 +134,9 @@ describe('ComfyUI workflow parsing', () => {
   });
 
   it('derives the operation from the image tags', () => {
-    expect(inspectWorkflow(ltxWorkflow()).operation).toBe('textToVideo');
-    expect(inspectWorkflow(ltxWorkflow({ start: true })).operation).toBe('imageToVideo');
-    expect(inspectWorkflow(ltxWorkflow({ start: true, end: true })).operation).toBe('firstLastFrameToVideo');
+    expect(inspectWorkflow(ltxWorkflow()).operations).toEqual(['textToVideo']);
+    expect(inspectWorkflow(ltxWorkflow({ start: true })).operations).toEqual(['imageToVideo']);
+    expect(inspectWorkflow(ltxWorkflow({ start: true, end: true })).operations).toEqual(['firstLastFrameToVideo']);
   });
 
   it('rounds frames to 8n+1 for LTX', () => {
@@ -148,9 +148,9 @@ describe('ComfyUI workflow parsing', () => {
   it('reports every workflow in a folder for doctor', async () => {
     const { dir } = await setup({ 'ltx-i2v': ltxWorkflow({ start: true }), broken: { nodes: [], links: [] } });
     const reports = await inspectWorkflowDir(dir);
-    expect(reports.map((report) => [report.name, report.ok, report.operation])).toEqual([
+    expect(reports.map((report) => [report.name, report.ok, report.operations])).toEqual([
       ['broken', false, undefined],
-      ['ltx-i2v', true, 'imageToVideo'],
+      ['ltx-i2v', true, ['imageToVideo']],
     ]);
   });
 });
@@ -324,10 +324,183 @@ describe('ComfyUI provider selection', () => {
     expect(providerForRole(config, 'image.keyframe')).toBe('fal');
   });
 
-  it('does not accept ComfyUI for stills or lip-sync', () => {
-    expect(() => ProjectConfigSchema.parse({ ...base, providers: { image: 'comfyui', video: 'fal' } })).toThrow();
-    expect(() =>
-      ProjectConfigSchema.parse({ ...base, providers: { image: 'fal', video: 'comfyui', lipsync: 'comfyui' } }),
-    ).toThrow();
+  it('accepts ComfyUI for stills, lip-sync, and audio when selected', () => {
+    const config = ProjectConfigSchema.parse({
+      ...base,
+      providers: { image: 'comfyui', video: 'comfyui', lipsync: 'comfyui' },
+    });
+    expect(providerForRole(config, 'image.keyframe')).toBe('comfyui');
+    expect(providerForRole(config, 'video.lipsync')).toBe('comfyui');
+    expect(providerForRole(config, 'audio.music')).toBe('comfyui');
+    const mocked = ProjectConfigSchema.parse({ ...base, providers: { image: 'mock', video: 'mock', audio: 'mock' } });
+    expect(providerForRole(mocked, 'audio.sfx')).toBe('mock');
+  });
+});
+
+/** The LTX audio-video graph: start image, optional driving audio, seconds-based length. */
+function ltxAvWorkflow(): ComfyWorkflow {
+  return {
+    '1': { class_type: 'PrimitiveStringMultiline', inputs: { value: 'demo' }, _meta: { title: 'Prompt cs_prompt' } },
+    '2': { class_type: 'LoadImage', inputs: { image: 'demo.png' }, _meta: { title: 'Load Image cs_start_image' } },
+    '3': { class_type: 'LoadAudio', inputs: { audio: 'demo.mp3' }, _meta: { title: 'Load Audio cs_audio' } },
+    '4': { class_type: 'PrimitiveFloat', inputs: { value: 7 }, _meta: { title: 'duration cs_duration' } },
+    '5': { class_type: 'PrimitiveFloat', inputs: { value: 24 }, _meta: { title: 'fps cs_fps' } },
+    '6': {
+      class_type: 'EmptyLTXVLatentVideo',
+      inputs: { width: 544, height: 960, length: ['9', 0] },
+      _meta: { title: 'latent cs_width cs_height' },
+    },
+    '7': { class_type: 'Switch latent [Crystools]', inputs: { boolean: true }, _meta: { title: 'cs_use_audio' } },
+    '8': { class_type: 'BooleanBasic', inputs: { boolean: true }, _meta: { title: 'cs_use_audio' } },
+    '9': { class_type: 'TrimAudioDuration', inputs: { start_index: 17, duration: ['4', 0] }, _meta: { title: 'cs_audio_start' } },
+    '10': { class_type: 'RandomNoise', inputs: { noise_seed: 1 }, _meta: { title: 'cs_seed' } },
+    '11': { class_type: 'RandomNoise', inputs: { noise_seed: 1 }, _meta: { title: 'cs_seed' } },
+    '12': { class_type: 'VHS_VideoCombine', inputs: { frame_rate: ['5', 0] }, _meta: { title: 'cs_output' } },
+  };
+}
+
+function qwenEditWorkflow(): ComfyWorkflow {
+  return {
+    '1': { class_type: 'PrimitiveStringMultiline', inputs: { value: 'demo' }, _meta: { title: 'cs_prompt' } },
+    '2': { class_type: 'LoadImage', inputs: { image: 'demo.png' }, _meta: { title: 'cs_start_image' } },
+    '3': {
+      class_type: 'TextEncodeQwenImage21',
+      inputs: { prompt: ['1', 0], negative_prompt: '', 'images.image_1': ['2', 0] },
+      _meta: { title: 'encode cs_negative cs_references' },
+    },
+    '4': { class_type: 'RandomNoise', inputs: { noise_seed: 1 }, _meta: { title: 'cs_seed' } },
+    '5': { class_type: 'SaveImageAdvanced', inputs: { filename_prefix: 'q' }, _meta: { title: 'cs_output' } },
+  };
+}
+
+function musicWorkflow(): ComfyWorkflow {
+  return {
+    '1': {
+      class_type: 'MiniMaxMusic3TextEncode',
+      inputs: { caption: 'demo', lyrics: '[Verse] demo lyrics', max_duration: 60, seed: ['2', 0] },
+      _meta: { title: 'cs_prompt cs_lyrics cs_duration' },
+    },
+    '2': { class_type: 'SeedNode', inputs: { seed: 1 }, _meta: { title: 'cs_seed' } },
+    '3': { class_type: 'SaveAudioAdvanced', inputs: { filename_prefix: 'm' }, _meta: { title: 'cs_output' } },
+  };
+}
+
+function outputsServer(outputs: Record<string, unknown>): FakeServer {
+  return fakeServer({
+    history: { abc123def456ghi: { status: { status_str: 'success', completed: true, messages: [] }, outputs } },
+  });
+}
+
+describe('ComfyUI images, lip-sync, and audio', () => {
+  it('derives operations from the output node and the image/audio tags', () => {
+    expect(inspectWorkflow(ltxAvWorkflow()).operations).toEqual(['imageToVideo', 'lipSync']);
+    expect(inspectWorkflow(qwenEditWorkflow()).operations).toEqual(['editImage']);
+    const t2i = qwenEditWorkflow();
+    delete t2i['2'];
+    expect(inspectWorkflow(t2i).operations).toEqual(['generateImage']);
+    expect(inspectWorkflow(musicWorkflow())).toMatchObject({ kind: 'audio', operations: ['generateAudio'] });
+  });
+
+  it('lip-syncs with the uploaded vocal segment and a seconds-based length', async () => {
+    const { dir, root, start } = await setup({ 'ltx-av': ltxAvWorkflow() });
+    const vocals = join(root, 'vocals.wav');
+    await writeFile(vocals, 'vocal-segment');
+    const server = outputsServer({ '12': { gifs: [{ filename: 'ltx-av_00001.mp4', subfolder: '', type: 'output' }] } });
+    const result = await provider(dir, server).lipSync({
+      model: 'ltx-av',
+      prompt: 'she sings',
+      references: [start],
+      audio: vocals,
+      seed: 9,
+      width: 1920,
+      height: 1080,
+      durationSeconds: 3.2,
+      params: { fps: 24, frame_step: 8, size_multiple: 32, size_scale: 0.5 },
+      outputDir: join(root, 'out'),
+    });
+    const prompt = server.submitted();
+    expect(server.uploads).toHaveLength(2);
+    expect(prompt['2']!.inputs.image).toBe(`coreslopper/${server.uploads[0]}`);
+    expect(prompt['3']!.inputs.audio).toBe(`coreslopper/${server.uploads[1]}`);
+    expect(prompt['7']!.inputs.boolean).toBe(true);
+    expect(prompt['8']!.inputs.boolean).toBe(true);
+    expect(prompt['9']!.inputs.start_index).toBe(0);
+    expect(prompt['9']!.inputs.duration).toEqual(['4', 0]);
+    // 3.2 s at 24 fps -> 81 frames; the workflow computes 1 + floor(fps*s/8)*8 from the seconds.
+    const seconds = prompt['4']!.inputs.value as number;
+    expect(1 + Math.floor((24 * seconds) / 8) * 8).toBe(81);
+    expect(prompt['6']!.inputs).toMatchObject({ width: 960, height: 544 });
+    expect(prompt['10']!.inputs.noise_seed).toBe(9);
+    expect(prompt['11']!.inputs.noise_seed).toBe(9);
+    expect(result.files[0]!.endsWith('.mp4')).toBe(true);
+  });
+
+  it('runs the same workflow as image-to-video with audio off and a silent placeholder', async () => {
+    const { dir, root, start } = await setup({ 'ltx-av': ltxAvWorkflow() });
+    const server = outputsServer({ '12': { gifs: [{ filename: 'clip.mp4', subfolder: '', type: 'output' }] } });
+    await provider(dir, server).imageToVideo({
+      model: 'ltx-av',
+      prompt: 'slow push in',
+      references: [start],
+      seed: 2,
+      durationSeconds: 5,
+      params: { fps: 24, frame_step: 8 },
+      outputDir: join(root, 'out'),
+    });
+    const prompt = server.submitted();
+    expect(prompt['7']!.inputs.boolean).toBe(false);
+    expect(prompt['8']!.inputs.boolean).toBe(false);
+    expect(server.uploads[1]!.endsWith('.wav')).toBe(true);
+  });
+
+  it('edits with extra references linked into the autogrow input', async () => {
+    const { dir, root, start, end } = await setup({ 'qwen-edit': qwenEditWorkflow() });
+    const server = outputsServer({
+      '5': { images: [{ filename: 'q_00001_.png', subfolder: '', type: 'output' }] },
+    });
+    const result = await provider(dir, server).editImage({
+      model: 'qwen-edit',
+      prompt: 'put the character from image 2 into image 1',
+      negativePrompt: 'extra fingers',
+      references: [start, end],
+      seed: 4,
+      width: 1920,
+      height: 1080,
+      outputDir: join(root, 'out'),
+    });
+    const prompt = server.submitted();
+    expect(prompt['1']!.inputs.value).toBe('put the character from image 2 into image 1');
+    expect(prompt['3']!.inputs.negative_prompt).toBe('extra fingers');
+    expect(prompt['3']!.inputs['images.image_2']).toEqual(['cs_ref_2', 0]);
+    expect(prompt['cs_ref_2']!).toMatchObject({ class_type: 'LoadImage', inputs: { image: `coreslopper/${server.uploads[1]}` } });
+    expect(result.files[0]!.endsWith('.png')).toBe(true);
+  });
+
+  it('refuses extra references when the workflow takes one image', async () => {
+    const single = qwenEditWorkflow();
+    single['3']!._meta = { title: 'encode' };
+    const { dir, root, start, end } = await setup({ single });
+    const server = fakeServer();
+    await expect(
+      provider(dir, server).editImage({ model: 'single', prompt: 'x', references: [start, end], seed: 1, outputDir: root }),
+    ).rejects.toThrow(/cs_references/);
+    expect(server.calls).toHaveLength(0);
+  });
+
+  it('generates audio with lyrics and never keeps the demo lyrics', async () => {
+    const { dir, root } = await setup({ music: musicWorkflow() });
+    const server = outputsServer({ '3': { audio: [{ filename: 'm_00001_.mp3', subfolder: 'audio', type: 'output' }] } });
+    const result = await provider(dir, server).generateAudio({
+      model: 'music',
+      prompt: 'dark electroclash',
+      seed: 7,
+      durationSeconds: 30,
+      outputDir: join(root, 'out'),
+    });
+    const prompt = server.submitted();
+    expect(prompt['1']!.inputs).toMatchObject({ caption: 'dark electroclash', lyrics: '', max_duration: 30 });
+    expect(prompt['2']!.inputs.seed).toBe(7);
+    expect(server.uploads).toHaveLength(0);
+    expect(result.files[0]!.endsWith('.mp3')).toBe(true);
   });
 });

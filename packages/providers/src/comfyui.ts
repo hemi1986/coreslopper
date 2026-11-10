@@ -3,16 +3,27 @@ import { existsSync } from 'node:fs';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { basename, extname, isAbsolute, join, resolve } from 'node:path';
 import { ConfigError, repoRoot } from '@coreslopper/core';
-import { VIDEO_EXTENSIONS, delay, fetchJsonWithRetry, mimeForPath, type FetchLike } from './http.js';
+import {
+  AUDIO_EXTENSIONS,
+  IMAGE_EXTENSIONS,
+  VIDEO_EXTENSIONS,
+  delay,
+  fetchJsonWithRetry,
+  mimeForPath,
+  silentWav,
+  type FetchLike,
+} from './http.js';
 import type { Operation, Provider, ProviderInput, ProviderOutput } from './types.js';
 
 /**
- * Local video generation through a ComfyUI server.
+ * Local generation through a ComfyUI server: stills, image edits, video clips,
+ * lip-sync, and audio.
  *
  * A model is the name of a workflow exported with "Export (API)" and stored in
  * `comfyui/workflows/<name>.json`. The adapter finds the nodes it fills by
- * their title (`_meta.title`), uploads the frames, queues the prompt, waits for
- * the history entry, and downloads the video outputs.
+ * their title (`_meta.title`), uploads images and audio, queues the prompt,
+ * waits for the history entry, and downloads the outputs. The class of the
+ * `cs_output` node decides whether a workflow makes images, video, or audio.
  */
 
 /**
@@ -29,13 +40,21 @@ export const COMFYUI_TITLES = {
   height: 'cs_height',
   frames: 'cs_frames',
   fps: 'cs_fps',
+  duration: 'cs_duration',
+  audio: 'cs_audio',
+  audioStart: 'cs_audio_start',
+  useAudio: 'cs_use_audio',
+  references: 'cs_references',
+  lyrics: 'cs_lyrics',
   output: 'cs_output',
 } as const;
 
+export type ComfyTag = keyof typeof COMFYUI_TITLES;
+
 /** Input names tried in order on a titled node. */
-const INPUT_CANDIDATES: Record<keyof typeof COMFYUI_TITLES, string[]> = {
-  prompt: ['text', 'prompt', 'string', 'value'],
-  negative: ['text', 'prompt', 'string', 'value'],
+const INPUT_CANDIDATES: Record<ComfyTag, string[]> = {
+  prompt: ['text', 'prompt', 'caption', 'string', 'value'],
+  negative: ['negative_prompt', 'text', 'prompt', 'string', 'value'],
   startImage: ['image'],
   endImage: ['image'],
   seed: ['seed', 'noise_seed', 'value'],
@@ -43,11 +62,37 @@ const INPUT_CANDIDATES: Record<keyof typeof COMFYUI_TITLES, string[]> = {
   height: ['height', 'value'],
   frames: ['length', 'frames', 'num_frames', 'frame_count', 'value'],
   fps: ['frame_rate', 'fps', 'value'],
+  duration: ['seconds', 'duration', 'max_duration', 'value'],
+  audio: ['audio'],
+  audioStart: ['start_index', 'start', 'value'],
+  useAudio: ['boolean', 'value'],
+  references: [],
+  lyrics: ['lyrics', 'text', 'value'],
   output: [],
 };
 
 /** Params the adapter understands. Anything else is a configuration error. */
-const ADAPTER_PARAMS = new Set(['fps', 'frame_step', 'size_multiple', 'width', 'height', 'node_inputs']);
+const ADAPTER_PARAMS = new Set([
+  'fps',
+  'frame_step',
+  'size_multiple',
+  'size_scale',
+  'megapixels',
+  'width',
+  'height',
+  'audio_offset',
+  'lyrics',
+  'node_inputs',
+]);
+
+/** What a workflow produces, judged by the class of its cs_output node. */
+export type ComfyOutputKind = 'image' | 'video' | 'audio';
+
+const OUTPUT_EXTENSIONS: Record<ComfyOutputKind, Set<string>> = {
+  image: IMAGE_EXTENSIONS,
+  video: VIDEO_EXTENSIONS,
+  audio: AUDIO_EXTENSIONS,
+};
 
 export const COMFYUI_DEFAULT_URL = 'http://127.0.0.1:8188';
 
@@ -58,6 +103,14 @@ export interface ComfyNode {
 }
 
 export type ComfyWorkflow = Record<string, ComfyNode>;
+
+export interface ComfyUploads {
+  start?: string;
+  end?: string;
+  /** Extra edit references after the first, for cs_references. */
+  references?: string[];
+  audio?: string;
+}
 
 export interface ComfyUIProviderOptions {
   baseUrl?: string;
@@ -124,37 +177,60 @@ export function nodesWithTitle(workflow: ComfyWorkflow, title: string): string[]
 
 export interface WorkflowInspection {
   /** Titles from COMFYUI_TITLES that are present, with their node IDs. */
-  titles: Partial<Record<keyof typeof COMFYUI_TITLES, string[]>>;
-  /** Operation the workflow fits, judged by its image inputs. */
-  operation: 'textToVideo' | 'imageToVideo' | 'firstLastFrameToVideo';
+  titles: Partial<Record<ComfyTag, string[]>>;
+  /** What the workflow saves. */
+  kind: ComfyOutputKind;
+  /** Operations the workflow fits, judged by its output and its image/audio inputs. */
+  operations: Operation[];
   warnings: string[];
+}
+
+/** Output kind from the class of the cs_output node; video when untagged. */
+function outputKind(workflow: ComfyWorkflow, outputIds: string[] | undefined): ComfyOutputKind {
+  const classes = (outputIds ?? []).map((id) => workflow[id]!.class_type);
+  if (classes.length > 0 && classes.every((name) => /audio/i.test(name))) return 'audio';
+  if (classes.length > 0 && classes.every((name) => /image/i.test(name) && !/video|animated/i.test(name))) return 'image';
+  return 'video';
 }
 
 /** Describe what a workflow accepts; used by the adapter and by `doctor`. */
 export function inspectWorkflow(workflow: ComfyWorkflow): WorkflowInspection {
   const titles: WorkflowInspection['titles'] = {};
-  for (const [key, title] of Object.entries(COMFYUI_TITLES) as [keyof typeof COMFYUI_TITLES, string][]) {
+  for (const [key, title] of Object.entries(COMFYUI_TITLES) as [ComfyTag, string][]) {
     const ids = nodesWithTitle(workflow, title);
     if (ids.length > 0) titles[key] = ids;
   }
-  const operation = titles.endImage
-    ? 'firstLastFrameToVideo'
-    : titles.startImage
-      ? 'imageToVideo'
-      : 'textToVideo';
+  const kind = outputKind(workflow, titles.output);
+  const operations: Operation[] = [];
+  if (kind === 'audio') operations.push('generateAudio');
+  else if (kind === 'image') operations.push(titles.startImage ? 'editImage' : 'generateImage');
+  else if (titles.endImage) operations.push('firstLastFrameToVideo');
+  else if (titles.startImage) {
+    // A workflow with a cs_audio input lip-syncs; with cs_use_audio it can also run without audio.
+    if (!titles.audio || titles.useAudio) operations.push('imageToVideo');
+    if (titles.audio) operations.push('lipSync');
+  } else operations.push('textToVideo');
+
   const warnings: string[] = [];
   if (!titles.prompt) warnings.push(`no node titled ${COMFYUI_TITLES.prompt}; the prompt cannot be set`);
   if (titles.endImage && !titles.startImage) {
     warnings.push(`${COMFYUI_TITLES.endImage} without ${COMFYUI_TITLES.startImage}`);
   }
   if (!titles.seed) warnings.push(`no node titled ${COMFYUI_TITLES.seed}; every run uses the workflow's seed`);
-  if (!titles.frames) warnings.push(`no node titled ${COMFYUI_TITLES.frames}; clip length cannot follow the shot`);
-  return { titles, operation, warnings };
+  if (kind === 'video' && !titles.frames && !titles.duration) {
+    warnings.push(
+      `no node titled ${COMFYUI_TITLES.frames} or ${COMFYUI_TITLES.duration}; clip length cannot follow the shot`,
+    );
+  }
+  if (kind === 'audio' && !titles.duration) {
+    warnings.push(`no node titled ${COMFYUI_TITLES.duration}; every run uses the workflow's length`);
+  }
+  return { titles, kind, operations, warnings };
 }
 
 function setTitled(
   workflow: ComfyWorkflow,
-  key: keyof typeof COMFYUI_TITLES,
+  key: ComfyTag,
   value: unknown,
   label: string,
   inputNames = INPUT_CANDIDATES[key],
@@ -188,6 +264,45 @@ function setNodeInput(workflow: ComfyWorkflow, path: string, value: unknown, lab
       throw new ConfigError(`ComfyUI workflow ${label}: node ${id} has no input "${input}".`);
     }
     node.inputs[input] = value;
+  }
+}
+
+function positiveNumber(value: unknown, name: string, fallback: number): number {
+  if (value === undefined) return fallback;
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) throw new ConfigError(`ComfyUI param ${name} must be a positive number.`);
+  return number;
+}
+
+/**
+ * Link extra reference images into a node with an autogrow image input, e.g.
+ * Qwen's `images.image_1 … image_16`. New LoadImage nodes are added for them.
+ */
+function addReferenceImages(workflow: ComfyWorkflow, images: string[], label: string): void {
+  if (images.length === 0) return;
+  const ids = nodesWithTitle(workflow, COMFYUI_TITLES.references);
+  if (ids.length === 0) {
+    throw new ConfigError(
+      `ComfyUI workflow ${label} takes one input image, but the batch item has ${images.length + 1} references. ` +
+        `Tag a node with an autogrow image input ${COMFYUI_TITLES.references}, or pass one reference.`,
+    );
+  }
+  const loaders = images.map((image, index) => {
+    const id = `cs_ref_${index + 2}`;
+    workflow[id] = { class_type: 'LoadImage', inputs: { image }, _meta: { title: `Reference ${index + 2}` } };
+    return id;
+  });
+  for (const id of ids) {
+    const node = workflow[id]!;
+    const slots = Object.keys(node.inputs)
+      .map((name) => /^(.*?)(\d+)$/.exec(name))
+      .filter((match): match is RegExpExecArray => Boolean(match && /image/i.test(match[1]!)));
+    const prefix = slots[0]?.[1] ?? 'images.image_';
+    let next = Math.max(0, ...slots.filter((match) => match[1] === prefix).map((match) => Number(match[2]))) + 1;
+    for (const loader of loaders) {
+      node.inputs[`${prefix}${next}`] = [loader, 0];
+      next += 1;
+    }
   }
 }
 
@@ -260,18 +375,23 @@ export class ComfyUIProvider implements Provider {
     this.clientId = `coreslopper-${process.pid}`;
   }
 
-  async generateImage(): Promise<ProviderOutput> {
-    throw new ConfigError('The ComfyUI backend generates video clips only. Set providers.image to fal or higgsfield.');
+  async generateImage(input: ProviderInput): Promise<ProviderOutput> {
+    return this.run(input, 'generateImage');
   }
 
-  async editImage(): Promise<ProviderOutput> {
-    throw new ConfigError('The ComfyUI backend generates video clips only. Set providers.image to fal or higgsfield.');
+  async editImage(input: ProviderInput): Promise<ProviderOutput> {
+    if (!input.references?.[0]) throw new Error('editImage requires an input image.');
+    return this.run(input, 'editImage');
   }
 
-  async lipSync(): Promise<ProviderOutput> {
-    throw new ConfigError(
-      'The ComfyUI backend has no lip-sync. Leave providers.lipsync unset (it falls back to fal) or set it to fal.',
-    );
+  async lipSync(input: ProviderInput): Promise<ProviderOutput> {
+    if (!input.references?.[0]) throw new Error('lipSync requires a face reference image.');
+    if (!input.audio) throw new Error('lipSync requires an audio file.');
+    return this.run(input, 'lipSync');
+  }
+
+  async generateAudio(input: ProviderInput): Promise<ProviderOutput> {
+    return this.run(input, 'generateAudio');
   }
 
   async textToVideo(input: ProviderInput): Promise<ProviderOutput> {
@@ -309,8 +429,8 @@ export class ComfyUIProvider implements Provider {
   /** Fill a workflow for one request. Exposed for tests and dry runs. */
   async buildPrompt(
     input: ProviderInput,
-    operation: 'textToVideo' | 'imageToVideo' | 'firstLastFrameToVideo',
-    uploads: { start?: string; end?: string } = {},
+    operation: Operation,
+    uploads: ComfyUploads = {},
   ): Promise<ComfyWorkflow> {
     const path = this.workflowPath(input.model);
     const label = basename(path);
@@ -324,10 +444,10 @@ export class ComfyUIProvider implements Provider {
           `Allowed: ${[...ADAPTER_PARAMS].join(', ')}. Set other node values with node_inputs.`,
       );
     }
-    if (inspection.operation !== operation) {
+    if (!inspection.operations.includes(operation)) {
       throw new ConfigError(
-        `ComfyUI workflow ${label} fits ${inspection.operation} (by its ${COMFYUI_TITLES.startImage}/` +
-          `${COMFYUI_TITLES.endImage} nodes), but the batch item asks for ${operation}. Use another workflow or role.`,
+        `ComfyUI workflow ${label} fits ${inspection.operations.join(', ')} (by its ${COMFYUI_TITLES.output}, ` +
+          `image, and audio nodes), but the batch item asks for ${operation}. Use another workflow or role.`,
       );
     }
 
@@ -337,21 +457,40 @@ export class ComfyUIProvider implements Provider {
     if (input.negativePrompt) setTitled(workflow, 'negative', input.negativePrompt, label);
     if (uploads.start) setTitled(workflow, 'startImage', uploads.start, label);
     if (uploads.end) setTitled(workflow, 'endImage', uploads.end, label);
+    addReferenceImages(workflow, uploads.references ?? [], label);
+    if (uploads.audio) setTitled(workflow, 'audio', uploads.audio, label);
+    if (inspection.titles.audio) {
+      setTitled(workflow, 'useAudio', operation === 'lipSync', label);
+      setTitled(workflow, 'audioStart', Number(params.audio_offset ?? 0), label);
+    }
+    if (inspection.titles.lyrics) {
+      if (params.lyrics !== undefined && typeof params.lyrics !== 'string') {
+        throw new ConfigError('ComfyUI param lyrics must be a string.');
+      }
+      // Never let the workflow's demo lyrics leak into a generation.
+      setTitled(workflow, 'lyrics', params.lyrics ?? '', label);
+    }
     setTitled(workflow, 'seed', input.seed, label);
 
-    const multiple = positiveInt(params.size_multiple, 'size_multiple', 1);
-    const width = params.width ?? input.width;
-    const height = params.height ?? input.height;
-    if (width !== undefined) setTitled(workflow, 'width', roundTo(positiveInt(width, 'width', 1), multiple), label);
-    if (height !== undefined) setTitled(workflow, 'height', roundTo(positiveInt(height, 'height', 1), multiple), label);
+    const size = this.targetSize(input, params);
+    if (size.width !== undefined) setTitled(workflow, 'width', size.width, label);
+    if (size.height !== undefined) setTitled(workflow, 'height', size.height, label);
 
     const fps = positiveInt(params.fps, 'fps', 24);
     if (params.fps !== undefined) setTitled(workflow, 'fps', fps, label);
     if (input.durationSeconds !== undefined) {
-      const frames = framesFor(input.durationSeconds, fps, positiveInt(params.frame_step, 'frame_step', 1));
-      if (!setTitled(workflow, 'frames', frames, label)) {
+      const step = positiveInt(params.frame_step, 'frame_step', 1);
+      const frames = framesFor(input.durationSeconds, fps, step);
+      const setFrames = setTitled(workflow, 'frames', frames, label);
+      // A seconds input: video workflows that derive 8n+1 frames themselves get a
+      // length that rounds to the same frame count, so the clip covers the shot.
+      const seconds =
+        inspection.kind === 'video' && step > 1 ? Number(((frames - 1 + 0.5) / fps).toFixed(4)) : input.durationSeconds;
+      const setDuration = setTitled(workflow, 'duration', seconds, label);
+      if (!setFrames && !setDuration) {
         throw new ConfigError(
-          `ComfyUI workflow ${label} needs a node titled ${COMFYUI_TITLES.frames} so the clip can be ${input.durationSeconds}s long.`,
+          `ComfyUI workflow ${label} needs a node titled ${COMFYUI_TITLES.frames} or ${COMFYUI_TITLES.duration} ` +
+            `so the output can be ${input.durationSeconds}s long.`,
         );
       }
     }
@@ -366,17 +505,53 @@ export class ComfyUIProvider implements Provider {
     return workflow;
   }
 
-  private async run(
-    input: ProviderInput,
-    operation: 'textToVideo' | 'imageToVideo' | 'firstLastFrameToVideo',
-  ): Promise<ProviderOutput> {
-    // Validate the workflow before uploading anything.
-    await this.buildPrompt(input, operation, { start: 'check.png', end: 'check.png' });
-    const [startPath, endPath] = input.references ?? [];
-    const uploads = {
-      start: operation !== 'textToVideo' && startPath ? await this.upload(startPath) : undefined,
-      end: operation === 'firstLastFrameToVideo' && endPath ? await this.upload(endPath) : undefined,
+  /** Width and height for the size tags: override, megapixel cap, scale, then rounding. */
+  private targetSize(input: ProviderInput, params: Record<string, unknown>): { width?: number; height?: number } {
+    const rawWidth = params.width ?? input.width;
+    const rawHeight = params.height ?? input.height;
+    if (rawWidth === undefined && rawHeight === undefined) return {};
+    let width = rawWidth === undefined ? undefined : positiveInt(rawWidth, 'width', 1);
+    let height = rawHeight === undefined ? undefined : positiveInt(rawHeight, 'height', 1);
+    if (params.megapixels !== undefined && width !== undefined && height !== undefined) {
+      const factor = Math.sqrt((positiveNumber(params.megapixels, 'megapixels', 1) * 1_000_000) / (width * height));
+      width *= factor;
+      height *= factor;
+    }
+    // Workflows that upscale the latent (LTX: x2) take a fraction of the output size.
+    const scale = positiveNumber(params.size_scale, 'size_scale', 1);
+    const multiple = positiveInt(params.size_multiple, 'size_multiple', 1);
+    return {
+      width: width === undefined ? undefined : roundTo(width * scale, multiple),
+      height: height === undefined ? undefined : roundTo(height * scale, multiple),
     };
+  }
+
+  private async run(input: ProviderInput, operation: Operation): Promise<ProviderOutput> {
+    const references = input.references ?? [];
+    const takesStart = operation !== 'textToVideo' && operation !== 'generateImage' && operation !== 'generateAudio';
+    const extra = operation === 'editImage' ? references.slice(1) : [];
+    // Validate the workflow before uploading anything.
+    const check = await this.buildPrompt(input, operation, {
+      start: 'check.png',
+      end: 'check.png',
+      references: extra.map(() => 'check.png'),
+      audio: 'check.wav',
+    });
+    const inspection = inspectWorkflow(check);
+    const [startPath, endPath] = references;
+    const uploads: ComfyUploads = {
+      start: takesStart && startPath ? await this.upload(startPath) : undefined,
+      end: operation === 'firstLastFrameToVideo' && endPath ? await this.upload(endPath) : undefined,
+      references: await Promise.all(extra.map((path) => this.upload(path))),
+    };
+    if (inspection.titles.audio) {
+      // Without lip-sync the audio branch is switched off, but ComfyUI still
+      // validates the LoadAudio node, so it gets a short silent file.
+      uploads.audio =
+        operation === 'lipSync' && input.audio
+          ? await this.upload(input.audio)
+          : await this.uploadData(silentWav(Math.ceil(input.durationSeconds ?? 10) + 1), '.wav', 'audio/wav');
+    }
     const workflow = await this.buildPrompt(input, operation, uploads);
 
     const queued = await fetchJsonWithRetry(
@@ -401,15 +576,17 @@ export class ComfyUIProvider implements Provider {
     const outputs = (entry.outputs ?? {}) as Record<string, unknown>;
     const outputNodes = nodesWithTitle(workflow, COMFYUI_TITLES.output);
     const files = collectOutputFiles(outputs, outputNodes.length > 0 ? outputNodes : undefined);
-    const videos = files.filter((file) => VIDEO_EXTENSIONS.has(extname(file.filename).toLowerCase()));
-    if (videos.length === 0) {
+    const wanted = files.filter((file) => OUTPUT_EXTENSIONS[inspection.kind].has(extname(file.filename).toLowerCase()));
+    if (wanted.length === 0) {
       throw new Error(
-        `ComfyUI prompt ${promptId} produced no video output` +
+        `ComfyUI prompt ${promptId} produced no ${inspection.kind} output` +
           (files.length > 0 ? ` (only ${files.map((file) => file.filename).join(', ')})` : '') +
-          '. Save the clip with a video node (SaveVideo or VHS Video Combine as mp4/webm).',
+          (inspection.kind === 'video'
+            ? '. Save the clip with a video node (SaveVideo or VHS Video Combine as mp4/webm).'
+            : `. Save the result with a ${inspection.kind} save node tagged ${COMFYUI_TITLES.output}.`),
       );
     }
-    return { files: await this.download(videos, input.outputDir, promptId), raw: { prompt_id: promptId, outputs } };
+    return { files: await this.download(wanted, input.outputDir, promptId), raw: { prompt_id: promptId, outputs } };
   }
 
   private connectionError(error: unknown): Error {
@@ -423,10 +600,14 @@ export class ComfyUIProvider implements Provider {
   }
 
   private async upload(path: string): Promise<string> {
-    const data = await readFile(path);
-    const name = `${createHash('sha256').update(data).digest('hex').slice(0, 16)}${extname(path).toLowerCase() || '.png'}`;
+    return this.uploadData(await readFile(path), extname(path).toLowerCase() || '.png', mimeForPath(path));
+  }
+
+  /** Upload into ComfyUI's input/coreslopper/ folder; the name is the content hash. */
+  private async uploadData(data: Buffer, extension: string, mime: string): Promise<string> {
+    const name = `${createHash('sha256').update(data).digest('hex').slice(0, 16)}${extension}`;
     const form = new FormData();
-    form.append('image', new Blob([data], { type: mimeForPath(path) }), name);
+    form.append('image', new Blob([new Uint8Array(data)], { type: mime }), name);
     form.append('type', 'input');
     form.append('subfolder', 'coreslopper');
     form.append('overwrite', 'true');
@@ -525,7 +706,7 @@ export async function checkComfyUI(
 export interface WorkflowFileReport {
   name: string;
   ok: boolean;
-  operation?: WorkflowInspection['operation'];
+  operations?: Operation[];
   warnings: string[];
   error?: string;
 }
@@ -541,7 +722,7 @@ export async function inspectWorkflowDir(dir = defaultWorkflowsDir()): Promise<W
       reports.push({
         name: name.replace(/\.json$/, ''),
         ok: Boolean(inspection.titles.prompt),
-        operation: inspection.operation,
+        operations: inspection.operations,
         warnings: inspection.warnings,
       });
     } catch (error) {

@@ -7,14 +7,16 @@ export const FormatSchema = z.object({
   fps: z.number().int().positive().default(30),
 });
 
-/** Every generation provider. `comfyui` is a local backend for video clips only. */
+/** Every generation provider. `comfyui` is a local backend that runs tagged workflow exports. */
 export const ProviderKindSchema = z.enum(['fal', 'higgsfield', 'comfyui', 'mock']);
 /** Providers that can generate and edit stills. */
-export const ImageProviderKindSchema = z.enum(['fal', 'higgsfield', 'mock']);
+export const ImageProviderKindSchema = z.enum(['fal', 'higgsfield', 'comfyui', 'mock']);
 /** Providers that can generate video clips. */
 export const VideoProviderKindSchema = z.enum(['fal', 'higgsfield', 'comfyui', 'mock']);
 /** Providers that can lip-sync a face to a vocal segment. */
-export const LipSyncProviderKindSchema = z.enum(['fal', 'higgsfield', 'mock']);
+export const LipSyncProviderKindSchema = z.enum(['fal', 'higgsfield', 'comfyui', 'mock']);
+/** Providers that can generate music, stingers, and sound effects (`audio.*` roles). */
+export const AudioProviderKindSchema = z.enum(['comfyui', 'mock']);
 
 export const ProjectConfigSchema = z.object({
   version: z.literal(1),
@@ -44,6 +46,8 @@ export const ProjectConfigSchema = z.object({
        * Defaults to `video`, or to `fal` when `video` is `comfyui`.
        */
       lipsync: LipSyncProviderKindSchema.optional(),
+      /** `audio.*` roles (stingers, SFX, extra music; never the song itself). Defaults to `comfyui`. */
+      audio: AudioProviderKindSchema.optional(),
     })
     .default({ image: 'mock', video: 'mock' }),
   brand: z.string().min(1).default('example'),
