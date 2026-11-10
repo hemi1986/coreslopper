@@ -2,6 +2,7 @@ export * from './schema.js';
 export * from './errors.js';
 export * from './hash.js';
 export * from './timing.js';
+export * from './episode.js';
 export * from './state.js';
 export * from './cost.js';
 export * from './models.js';

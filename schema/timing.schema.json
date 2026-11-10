@@ -198,7 +198,6 @@
   "required": [
     "version",
     "audio",
-    "bpm",
     "energy",
     "sections"
   ]

@@ -1,0 +1,61 @@
+version: 1
+timing: timing.effective.json
+shots:
+  - id: shot-001
+    section: s01_office
+    start: { type: section, id: s01_office, edge: start }
+    end: { type: line, id: l02, edge: start }
+    source: ai-clip
+    description: Wide vertical shot of the dark office; only Mara's desk is lit as she leans back and sighs.
+    camera: slow push in
+    refs:
+      style: [palette.background, palette.primary]
+      characters: [mara]
+      sets: [office]
+    prompts:
+      keyframe: empty open-plan office at night, one lit desk with two monitors, woman with short dark hair in a grey cardigan leaning back, vertical framing
+      video: slow push in towards the lit desk, the woman exhales and looks at the ceiling
+    focus: { x: 0.5, y: 0.6 }
+  - id: shot-002
+    section: s01_office
+    start: { type: line, id: l02, edge: start }
+    end: { type: line, id: l04, edge: start }
+    source: motion
+    description: The chat window on Mara's monitor; a message from an unknown contact types itself out.
+    camera: static
+    refs:
+      style: [palette.surface, palette.text, typography.mono]
+      characters: [contact]
+    motion:
+      component: ChatWindow
+      props: { lines: [l02] }
+  - id: shot-003
+    section: s01_office
+    start: { type: line, id: l04, edge: start }
+    end: { type: section, id: s01_office, edge: end }
+    source: ai-clip
+    description: Close-up of Mara lit by the monitor, frowning at the screen.
+    camera: static, slight handheld drift
+    refs:
+      style: [palette.secondary]
+      characters: [mara]
+      sets: [office]
+    prompts:
+      keyframe: close-up of a woman with short dark hair lit by blue monitor light, frowning at a screen, dark office behind her, vertical framing
+      video: she leans closer to the screen and whispers the line to herself
+    lipSync: { character: mara }
+    focus: { x: 0.5, y: 0.4 }
+  - id: shot-004
+    section: s02_elevator
+    start: { type: section, id: s02_elevator, edge: start }
+    end: { type: section, id: s02_elevator, edge: end }
+    source: ai-clip
+    description: Mara waits in the elevator lobby under a flickering tube; the doors open, she steps in, and they close.
+    camera: static wide, then slow push
+    refs:
+      style: [palette.accent, palette.muted]
+      characters: [mara]
+      sets: [elevator]
+    prompts:
+      keyframe: elevator lobby at night, two brushed steel doors, flickering fluorescent tube, woman in a grey cardigan waiting, vertical framing
+      video: the light flickers, the doors slide open, she steps in and the doors close

@@ -34,6 +34,13 @@ license: MIT
 7. Write `review/report.md` with a pass/fail line per check, the warnings that remain, and the exact render paths.
 8. Update the state with `npm run cli -- stage-done <project> qa-export --outputs review/report.md,renders/16x9.mp4`.
 
+## Episodes
+
+- Before QA, write the subtitles: `npm run cli -- subtitles projects/<slug>` (`renders/<slug>.en.srt`).
+- `npm run cli -- qa projects/<slug>` adds the episode checks: every subtitled line has `text_en`, every speaker, set, and shot reference exists in the canon, the episode length is inside `limits.episode_seconds` of the series, and the SRT exists.
+- In the stills, read the burned-in subtitles of `renders/<format>.en.mp4` against the speech, and check chat windows for legibility.
+- The master is `renders/<format>.mp4` for the master format; record `review/report.md`, the master, and the SRT with `stage-done ... qa-export`.
+
 ## Completion criteria
 
 - Every check has a pass/fail result and evidence.

@@ -8,13 +8,19 @@ import { renderMedia, renderStill, selectComposition } from '@remotion/renderer'
 import {
   ValidationError,
   ensureDir,
+  formatId,
   loadBrand,
-  projectPaths,
+  projectAudioPath,
   repoRoot,
+  scriptLines,
+  subtitleCues,
+  type LoadedProject,
+  type ProjectConfig,
+  type ProjectPaths,
   type ResolvedShot,
   type ResolvedStoryboard,
 } from '@coreslopper/core';
-import type { BrandFont, FormatId, VideoProps } from '../../remotion/src/types.js';
+import type { BrandFont, ChatMessage, FormatId, VideoProps } from '../../remotion/src/types.js';
 import { webpackOverride } from '../../remotion/webpack-override.js';
 import { resolveBinary } from './media.js';
 import { validateProject } from './validate.js';
@@ -29,26 +35,50 @@ export interface RenderOptions {
   requireAudio?: boolean;
   /** Inclusive frame range, for test renders. */
   frames?: [number, number];
+  /** Burn in subtitles in this language (only `en`); the render is named `<format>.en.mp4`. */
+  subtitles?: 'en';
 }
 
-function aspectFor(id: FormatId): string {
-  if (id === '9x16') return '9:16';
-  if (id === '1x1') return '1:1';
-  if (id === '4x5') return '4:5';
-  return '16:9';
+export const FORMAT_IDS: FormatId[] = ['16x9', '9x16', '1x1', '4x5'];
+
+/** The master format ID, derived from `formats.master.aspect` ("9:16" -> "9x16"). */
+export function masterFormatId(config: Pick<ProjectConfig, 'formats'>): FormatId {
+  const id = formatId(config.formats.master.aspect);
+  if (!FORMAT_IDS.includes(id as FormatId)) {
+    throw new ValidationError(
+      `The master aspect ${config.formats.master.aspect} has no render format. Use one of ${FORMAT_IDS.join(', ')}.`,
+    );
+  }
+  return id as FormatId;
 }
 
-function formatConfig(project: Awaited<ReturnType<typeof validateProject>>['project'], id: FormatId) {
-  const master = project.config.formats.master;
-  if (id === '16x9') {
+/** Size and frame rate of a format: the master, or a derivative with the same aspect ID. */
+export function formatConfig(config: Pick<ProjectConfig, 'formats'>, id: FormatId) {
+  const master = config.formats.master;
+  if (id === masterFormatId(config)) {
     return { width: master.width, height: master.height, fps: master.fps };
   }
-  const aspect = aspectFor(id);
-  const derivative = project.config.formats.derivatives.find((item) => item.aspect === aspect);
+  const derivative = config.formats.derivatives.find((item) => formatId(item.aspect) === id);
   if (!derivative) {
-    throw new ValidationError(`Format ${id} (${aspect}) is not configured for this project.`);
+    const known = [masterFormatId(config), ...config.formats.derivatives.map((item) => formatId(item.aspect))];
+    throw new ValidationError(`Format ${id} is not configured for this project. Configured: ${known.join(', ')}.`);
   }
   return { width: derivative.width, height: derivative.height, fps: master.fps };
+}
+
+/** An episode's chat lines with their sender names and effective times, for ChatWindow. */
+function chatProps(project: LoadedProject): VideoProps['chat'] {
+  const { script, effectiveTiming, characters } = project;
+  if (!script?.chat || !effectiveTiming) return undefined;
+  const messages: ChatMessage[] = [];
+  for (const { line } of scriptLines(script)) {
+    if (line.kind !== 'chat') continue;
+    const timed = effectiveTiming.lines.find((candidate) => candidate.id === line.id);
+    if (!timed) continue;
+    const sender = characters?.characters.find((character) => character.id === line.speaker)?.name ?? line.speaker;
+    messages.push({ id: line.id, sender, text: line.text_de, start: timed.start, end: timed.end });
+  }
+  return { cps: script.chat.cps, hold: script.chat.hold, messages };
 }
 
 function publicAsset(path: string | undefined, projectRoot: string, root: string): string | undefined {
@@ -102,39 +132,51 @@ async function brandFonts(projectDir: string, brandId: string, root: string): Pr
 
 export async function buildVideoProps(
   options: RenderOptions,
-): Promise<{ props: VideoProps; resolved: ResolvedStoryboard; paths: ReturnType<typeof projectPaths> }> {
+): Promise<{ props: VideoProps; resolved: ResolvedStoryboard; paths: ProjectPaths }> {
   const { project, resolved } = await validateProject(options.projectDir);
   const root = repoRoot();
-  const formatId = options.format ?? '16x9';
-  const format = formatConfig(project, formatId);
-  const paths = projectPaths(options.projectDir);
+  const format = options.format ?? masterFormatId(project.config);
+  const size = formatConfig(project.config, format);
+  const paths = project.paths;
 
-  const songPath = join(paths.root, 'audio', 'song.wav');
-  const hasAudio = existsSync(songPath);
+  const audioPath = join(paths.root, projectAudioPath(project.config));
+  const hasAudio = existsSync(audioPath);
   if (options.requireAudio && !hasAudio) {
-    throw new ValidationError(`Missing ${songPath}. Generate or import the song before rendering.`);
+    throw new ValidationError(
+      `Missing ${audioPath}. ${project.config.kind === 'episode' ? 'Run episode-track' : 'Import the song'} before rendering.`,
+    );
   }
-  const audioSrc = hasAudio ? publicAsset(songPath, paths.root, root) : undefined;
+  const audioSrc = hasAudio ? publicAsset(audioPath, paths.root, root) : undefined;
+
+  let subtitles: VideoProps['subtitles'];
+  if (options.subtitles) {
+    if (!project.script || !project.effectiveTiming) {
+      throw new ValidationError('Burned-in subtitles come from an episode script; this project has none.');
+    }
+    subtitles = subtitleCues(project.script, project.effectiveTiming).map(({ start, end, text }) => ({ start, end, text }));
+  }
 
   const props: VideoProps = {
     project: { slug: project.config.slug, title: project.config.title },
-    format: formatId,
-    width: format.width,
-    height: format.height,
-    fps: format.fps,
+    format,
+    width: size.width,
+    height: size.height,
+    fps: size.fps,
     durationInFrames: resolved.durationInFrames,
     audioSrc,
     style: project.style!,
     characters: project.characters!,
     timing: project.effectiveTiming!,
     shots: withPublicAssets(resolved.shots, paths.root, root),
+    ...(project.config.kind === 'episode' ? { chat: chatProps(project) } : {}),
+    ...(subtitles ? { subtitles } : {}),
   };
   props.fonts = await brandFonts(paths.root, project.config.brand, root);
   return { props, resolved, paths };
 }
 
-function outputPath(paths: ReturnType<typeof projectPaths>, format: FormatId, preview: boolean): string {
-  return join(paths.renders, `${preview ? 'preview-' : ''}${format}.mp4`);
+export function outputPath(paths: Pick<ProjectPaths, 'renders'>, format: FormatId, preview: boolean, subtitles?: 'en'): string {
+  return join(paths.renders, `${preview ? 'preview-' : ''}${format}${subtitles ? `.${subtitles}` : ''}.mp4`);
 }
 
 /**
@@ -219,10 +261,12 @@ function runFfmpeg(args: string[]): Promise<void> {
 export async function renderProject(options: RenderOptions): Promise<string> {
   const { props, paths } = await buildVideoProps(options);
   const root = repoRoot();
-  const format = options.format ?? '16x9';
+  const format = props.format;
   const preview = options.preview ?? false;
   const limits = renderLimits();
-  const outputLocation = options.out ? resolve(process.cwd(), options.out) : outputPath(paths, format, preview);
+  const outputLocation = options.out
+    ? resolve(process.cwd(), options.out)
+    : outputPath(paths, format, preview, options.subtitles);
   await ensureDir(paths.renders);
 
   // Work files stay on the Linux filesystem (fast, never on a /mnt drive);
@@ -231,7 +275,7 @@ export async function renderProject(options: RenderOptions): Promise<string> {
     root,
     '.cache',
     'render',
-    `${props.project.slug}-${options.stillFrame !== undefined ? 'still' : `${format}${preview ? '-preview' : ''}`}`,
+    `${props.project.slug}-${options.stillFrame !== undefined ? 'still' : `${format}${preview ? '-preview' : ''}${options.subtitles ? `-${options.subtitles}` : ''}`}`,
   );
   await mkdir(workDir, { recursive: true });
   const serveUrl = await bundleFor(props, root, workDir);

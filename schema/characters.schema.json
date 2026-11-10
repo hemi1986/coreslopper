@@ -37,6 +37,33 @@
           },
           "prompt": {
             "type": "string"
+          },
+          "voice": {
+            "type": "object",
+            "properties": {
+              "ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "transcript": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "ref",
+              "transcript"
+            ]
+          },
+          "face": {
+            "default": "full",
+            "type": "string",
+            "enum": [
+              "full",
+              "silhouette",
+              "screen-only",
+              "voice-only"
+            ]
           }
         },
         "required": [

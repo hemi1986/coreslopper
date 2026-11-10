@@ -34,6 +34,15 @@ providers:
 
 Set `providers.video: comfyui` to render clips on your own GPU. Stills stay on `providers.image`; lip-sync falls back to fal.ai. Each video role's `alternatives.comfyui.model` names a workflow in `comfyui/workflows/`, exported with Export (API) and tagged by node title. A local clip costs $0 against the budget. Setup, title tags, params, and server variables are in [comfyui/README.md](../comfyui/README.md).
 
+## Audio roles and episode speech
+
+`providers.audio` selects the provider for the `audio.*` roles: `comfyui` (the default) or `mock`. A song is never generated; these roles make stingers, effects, ambience, and, for episodes, speech:
+
+- `audio.voice` speaks an episode's script line in the speaker's reference voice (`voice.ref` and `voice.transcript` in the series `characters.yaml`). `voice-track` builds these items itself.
+- `audio.sfx` makes the `sfx` lines and each scene's `atmo` ambience. An effect longer than the role's `maxDuration` for the selected provider is rejected.
+
+Speech has no cloud adapter yet ([ADR 0016](adr/0016-episode-projects.md) describes the intended `fal` path). Without a local GPU, record the lines and register them with `import-takes`. The mock provider writes silent takes whose length follows the text, so episodes run end to end in CI.
+
 ## Credentials
 
 Put keys in the workspace `.env` (gitignored), never in a file that is committed.

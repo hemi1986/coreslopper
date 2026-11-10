@@ -3,7 +3,8 @@
  * Claude Code PostToolUse hook.
  *
  * Reads the hook payload from stdin, finds the edited file, and validates
- * project artifacts with the same CLI the user runs. Exit code 2 blocks the
+ * project artifacts (below `projects/`) and series canon files (below
+ * `series/`) with the same CLI the user runs. Exit code 2 blocks the
  * tool call and shows stderr to the agent.
  */
 import { execFileSync } from 'node:child_process';
@@ -18,6 +19,9 @@ const TRACKED = new Set([
   'state.json',
   'style.yaml',
   'characters.yaml',
+  'script.yaml',
+  'series.yaml',
+  'sets.yaml',
 ]);
 
 function readStdin() {
@@ -49,10 +53,12 @@ function findRepoRoot(start) {
   }
 }
 
-function findProjectRoot(file) {
+/** The nearest project folder (project.yaml) or series folder (series.yaml) above a file. */
+function findArtifactRoot(file) {
   let current = dirname(resolve(file));
   while (true) {
-    if (existsSync(join(current, 'project.yaml'))) return current;
+    if (existsSync(join(current, 'project.yaml'))) return { dir: current, folder: 'projects' };
+    if (existsSync(join(current, 'series.yaml'))) return { dir: current, folder: 'series' };
     const parent = dirname(current);
     if (parent === current) return undefined;
     current = parent;
@@ -71,8 +77,8 @@ const file = payload?.tool_input?.file_path ?? payload?.tool_input?.path;
 if (!file) process.exit(0);
 if (!TRACKED.has(basename(file))) process.exit(0);
 
-const projectRoot = findProjectRoot(file);
-if (!projectRoot || !projectRoot.split(sep).includes('projects')) process.exit(0);
+const artifactRoot = findArtifactRoot(file);
+if (!artifactRoot || !artifactRoot.dir.split(sep).includes(artifactRoot.folder)) process.exit(0);
 
 const repoRoot = findRepoRoot(file) ?? process.cwd();
 try {

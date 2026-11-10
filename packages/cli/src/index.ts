@@ -27,10 +27,15 @@ import { createProject } from './new-project.js';
 import { linkProjectMedia } from './media-dir.js';
 import { generateBatch } from './generate.js';
 import { runQa } from './qa.js';
-import { importFootage, importSong, normalizeAudio, extractFrame, extractAudioSegment } from './media.js';
+import { importFootage, importSong, importTakes, normalizeAudio, extractFrame, extractAudioSegment } from './media.js';
+import { voiceTrack } from './voice-track.js';
+import { episodeTrack } from './episode-track.js';
+import { writeSubtitles } from './subtitles.js';
 import { runDoctor } from './doctor.js';
 import { runInitCommand, validateChoice, type InitCommandOptions } from './init-command.js';
 import { printStatus } from './status.js';
+import { printSeriesStatus, seriesDirFromArg } from './series.js';
+import { createSeries } from './new-series.js';
 import { formatSeconds, parseCsv, projectDirFromArg, run } from './utils.js';
 import { findWorkspaceRoot, loadWorkspaceEnv, ownVersion } from './workspace.js';
 import type { FormatId } from '../../remotion/src/types.js';
@@ -76,6 +81,57 @@ program
   );
 
 program
+  .command('new-series <slug>')
+  .description('Create a series canon in series/<slug>/ from templates/series.')
+  .requiredOption('--budget <usd>', 'Series budget in USD: canon generations plus every episode budget', (value) => Number(value))
+  .option('--title <title>')
+  .option('--format <id>', 'Master format: 16x9 | 9x16 | 1x1 | 4x5 (default: config/defaults.yaml)')
+  .option('--brand <kit>', 'Brand kit', 'example')
+  .option('--image-provider <provider>', 'mock | fal | higgsfield | comfyui', 'mock')
+  .option('--video-provider <provider>', 'mock | fal | higgsfield | comfyui', 'mock')
+  .option('--audio-provider <provider>', 'mock | comfyui', 'mock')
+  .action(
+    (
+      slug: string,
+      options: {
+        budget: number;
+        title?: string;
+        format?: string;
+        brand: string;
+        imageProvider: string;
+        videoProvider: string;
+        audioProvider: string;
+      },
+    ) =>
+      run(async () => {
+        const visual = ['mock', 'fal', 'higgsfield', 'comfyui'] as const;
+        await createSeries({
+          slug,
+          title: options.title,
+          budget: options.budget,
+          format: options.format
+            ? validateChoice(options.format, ['16x9', '9x16', '1x1', '4x5'] as const, 'format')
+            : undefined,
+          brand: options.brand,
+          providers: {
+            image: validateChoice(options.imageProvider, visual, 'image provider'),
+            video: validateChoice(options.videoProvider, visual, 'video provider'),
+            audio: validateChoice(options.audioProvider, ['mock', 'comfyui'] as const, 'audio provider'),
+          },
+        });
+      }),
+  );
+
+program
+  .command('series-status <series>')
+  .description('Show a series: canon, planned and created episodes, their stages, spend, and length.')
+  .action((series: string) =>
+    run(async () => {
+      await printSeriesStatus(series);
+    }),
+  );
+
+program
   .command('contact-sheet [project]')
   .description('Write review/contact-sheet.svg from the validated storyboard.')
   .action((project: string | undefined) =>
@@ -106,18 +162,20 @@ function parseFrameRange(value: string | undefined): [number, number] | undefine
 program
   .command('render [project]')
   .description('Render a format with Remotion.')
-  .option('--format <format>', '16x9 | 9x16 | 1x1 | 4x5', '16x9')
+  .option('--format <format>', '16x9 | 9x16 | 1x1 | 4x5 (default: the master format)')
   .option('--preview', 'Render a half-scale preview')
   .option('--still <frame>', 'Render a single still at this frame', (value) => Number(value))
   .option('--still-scale <scale>', 'Scale for --still (default 1)', (value) => Number(value))
   .option('--out <path>', 'Override the output path')
-  .option('--require-audio', 'Fail if audio/song.wav is missing')
+  .option('--require-audio', 'Fail if the song (audio/song.wav) or episode track (audio/episode.wav) is missing')
+  .option('--subtitles <language>', 'Burn in episode subtitles (en); writes renders/<format>.en.mp4')
   .option('--frames <range>', 'Render only frames <start>-<end> (inclusive), for test renders')
   .action(
     (
       project: string | undefined,
       options: {
-        format: string;
+        format?: string;
+        subtitles?: string;
         preview?: boolean;
         still?: number;
         stillScale?: number;
@@ -129,9 +187,12 @@ program
       run(async () => {
         const projectDir = projectDirFromArg(project);
         const frames = parseFrameRange(options.frames);
-        const format = options.format as FormatId;
-        if (!['16x9', '9x16', '1x1', '4x5'].includes(format)) {
+        const format = options.format as FormatId | undefined;
+        if (format && !['16x9', '9x16', '1x1', '4x5'].includes(format)) {
           throw new ValidationError(`Unknown format "${options.format}". Use 16x9, 9x16, 1x1, or 4x5.`);
+        }
+        if (options.subtitles && options.subtitles !== 'en') {
+          throw new ValidationError(`Unknown subtitle language "${options.subtitles}". Episodes have English subtitles (en).`);
         }
         await renderProject({
           projectDir,
@@ -142,6 +203,7 @@ program
           out: options.out,
           requireAudio: options.requireAudio,
           frames,
+          subtitles: options.subtitles as 'en' | undefined,
         });
       }),
   );
@@ -181,7 +243,10 @@ program
 
 program
   .command('new <slug>')
-  .description('Create a new project from templates/project.')
+  .description('Create a new project from templates/project, or an episode from templates/episode.')
+  .option('--kind <kind>', 'music-video | episode', 'music-video')
+  .option('--series <slug>', 'Episode: the series in series/<slug>/')
+  .option('--episode <n>', 'Episode: the episode number', (value) => Number(value))
   .option('--title <title>')
   .option('--budget <usd>', 'Project budget in USD (required)', (value) => Number(value))
   .option('--brand <kit>', 'Brand kit', 'example')
@@ -198,9 +263,13 @@ program
         visual: string;
         imageProvider?: string;
         videoProvider?: string;
+        kind: string;
+        series?: string;
+        episode?: number;
       },
     ) =>
       run(async () => {
+        const kind = validateChoice(options.kind, ['music-video', 'episode'] as const, 'project kind');
         const visuals = ['mock', 'fal', 'higgsfield'] as const;
         const visual = validateChoice(options.visual ?? 'mock', visuals, 'visual provider');
         const imageProvider = options.imageProvider
@@ -216,6 +285,9 @@ program
           brand: options.brand,
           imageProvider,
           videoProvider,
+          kind,
+          series: options.series,
+          episode: options.episode,
         });
       }),
   );
@@ -354,12 +426,14 @@ program
   .command('generate [project]')
   .description('Run a paid or mock generation batch with cache, manifest, and budget checks.')
   .requiredOption('--batch <path>', 'Batch JSON/YAML file')
+  .option('--series <series>', 'Run the batch for a series canon (budget and manifest of series/<series>/) instead of a project')
   .option('--dry-run', 'Estimate and print the batch without generating')
   .option('--provider <provider>', 'Provider override for this batch: fal | higgsfield | comfyui | mock (lip-sync keeps its own provider)')
-  .action((project: string | undefined, options: { batch: string; dryRun?: boolean; provider?: string }) =>
+  .action((project: string | undefined, options: { batch: string; series?: string; dryRun?: boolean; provider?: string }) =>
     run(async () => {
       await generateBatch({
         projectDir: projectDirFromArg(project),
+        seriesDir: options.series ? seriesDirFromArg(options.series) : undefined,
         batchPath: options.batch,
         dryRun: options.dryRun,
         provider: options.provider
@@ -405,6 +479,44 @@ program
   );
 
 program
+  .command('voice-track [project]')
+  .description('Episode: generate a take for every audible script line without a current one, then the scene ambience.')
+  .option('--dry-run', 'Estimate the takes without generating')
+  .action((project: string | undefined, options: { dryRun?: boolean }) =>
+    run(async () => {
+      await voiceTrack(projectDirFromArg(project), { dryRun: options.dryRun });
+    }),
+  );
+
+program
+  .command('import-takes [project]')
+  .description('Episode: register recordings at audio/lines/<line-id>.wav (other formats are converted) in takes.json.')
+  .option('--lines <ids>', 'Comma-separated line IDs (default: every file in audio/lines/)')
+  .action((project: string | undefined, options: { lines?: string }) =>
+    run(async () => {
+      await importTakes(projectDirFromArg(project), { lines: parseCsv(options.lines) });
+    }),
+  );
+
+program
+  .command('episode-track [project]')
+  .description('Episode: place the takes, write timing.json, and mix audio/episode.wav and the speaker stems.')
+  .action((project: string | undefined) =>
+    run(async () => {
+      await episodeTrack(projectDirFromArg(project));
+    }),
+  );
+
+program
+  .command('subtitles [project]')
+  .description('Episode: write the English subtitles to renders/<slug>.en.srt from the script and effective timing.')
+  .action((project: string | undefined) =>
+    run(async () => {
+      await writeSubtitles(projectDirFromArg(project));
+    }),
+  );
+
+program
   .command('media-link [project]')
   .description('Store assets/ and renders/ in CORESLOPPER_MEDIA_DIR (e.g. /mnt/d/{slug}) and symlink them into the project.')
   .option('--move', 'Move existing media into the media directory')
@@ -436,15 +548,16 @@ program
   .requiredOption('--start <seconds>', 'Segment start in song seconds')
   .requiredOption('--end <seconds>', 'Segment end in song seconds')
   .requiredOption('--name <name>', 'Output name (lowercase, dashes), e.g. shot-012')
-  .option('--source <path>', 'Audio source relative to the project', 'audio/stems/vocals.wav')
-  .action((project: string | undefined, options: { start: string; end: string; name: string; source: string }) =>
+  .option('--source <path>', 'Audio source relative to the project (default: audio/stems/vocals.wav, or the speaker stem of --character for an episode)')
+  .option('--character <id>', 'Episode: cut from the speaker stem audio/stems/<id>.wav')
+  .action((project: string | undefined, options: { start: string; end: string; name: string; source?: string; character?: string }) =>
     run(async () => {
       await extractAudioSegment(
         projectDirFromArg(project),
         Number(options.start),
         Number(options.end),
         options.name,
-        options.source,
+        { source: options.source, character: options.character },
       );
     }),
   );

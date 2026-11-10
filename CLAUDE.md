@@ -5,8 +5,11 @@
 ## Commands
 
 - `/new-video [slug]` — skill that creates a project for an existing song (or resumes one): asks for project data and lyrics, imports the song and vocal stem, then grills the user into the brief and treatment. Runs in the main session, not in a stage runner.
-- `/video-next <slug>` — run all open autonomous stages (from `audio-analysis` on). Add `--stage <stage>` to run one stage, or `--dry-run` to inspect the next stage.
+- `/new-series [slug]` — skill that creates a series canon (bible, characters, sets, episode plan, references) through the series budget. Runs in the main session.
+- `/new-episode [slug]` — skill that creates an episode of a series (or resumes one) and grills the user into `script.yaml`. Runs in the main session.
+- `/video-next <slug>` — run all open autonomous stages of a music video (from `audio-analysis` on) or an episode (from `voice-track` on); the kind comes from `status`. Add `--stage <stage>` to run one stage, or `--dry-run` to inspect the next stage.
 - `/video-status [slug]` — read-only stage and budget report.
+- `/series-status <series>` — read-only series overview: canon, episodes, stages, spend, length.
 
 `/video-next` dispatches one `stage-runner` subagent per stage. Do not inline a whole stage into the main context.
 
@@ -22,7 +25,7 @@ Create a workspace with `npx coreslopper init <dir>` (or `npx coreslopper@latest
 
 ## Hooks
 
-`.claude/settings.json` registers a `PostToolUse` hook for `Write|Edit`. It validates changes to `storyboard.yaml`, `timing.json`, `timing.overrides.json`, `project.yaml`, `state.json`, `style.yaml`, and `characters.yaml`. Exit code 2 blocks the edit and returns the validation message.
+`.claude/settings.json` registers a `PostToolUse` hook for `Write|Edit`. It validates changes to `storyboard.yaml`, `timing.json`, `timing.overrides.json`, `project.yaml`, `state.json`, `style.yaml`, `characters.yaml`, `script.yaml`, `series.yaml`, and `sets.yaml`, in projects and in series canons. Exit code 2 blocks the edit and returns the validation message.
 
 The hook calls `npm run cli -- validate-file <file>`, which is also runnable by hand.
 

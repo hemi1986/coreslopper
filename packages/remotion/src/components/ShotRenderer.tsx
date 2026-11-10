@@ -2,11 +2,13 @@ import type { ResolvedShot, StyleBible, Timing } from '@coreslopper/core';
 import type { ReactNode } from 'react';
 import { AbsoluteFill } from 'remotion';
 import { GlitchBackdrop, Grid, LyricCard, ParticleField, Scanlines, TitleCard } from './Backdrops';
+import { ChatWindow } from './ChatWindow';
 import { MediaLayer } from './MediaLayer';
 import { NeonTorus } from './NeonTorus';
 import { TextOverlay } from './TextOverlay';
 import { Transition } from './Transition';
 import { useBeat, useEnergy } from '../hooks/useTiming';
+import type { VideoProps } from '../types';
 
 interface ShotRendererProps {
   shot: ResolvedShot;
@@ -14,6 +16,7 @@ interface ShotRendererProps {
   style: StyleBible;
   width: number;
   height: number;
+  chat?: VideoProps['chat'];
 }
 
 function MotionLayer({
@@ -25,6 +28,7 @@ function MotionLayer({
   downbeat,
   width,
   height,
+  chat,
 }: {
   name: string;
   shot: ResolvedShot;
@@ -34,6 +38,7 @@ function MotionLayer({
   downbeat: boolean;
   width: number;
   height: number;
+  chat?: VideoProps['chat'];
 }) {
   const props = {
     shotId: shot.id,
@@ -55,6 +60,8 @@ function MotionLayer({
       return <Grid {...props} />;
     case 'Scanlines':
       return <Scanlines width={width} height={height} />;
+    case 'ChatWindow':
+      return <ChatWindow shot={shot} chat={chat} style={style} width={width} height={height} />;
     case 'NeonTorus':
       return <NeonTorus style={style} energy={energy} width={width} height={height} />;
     case 'TitleCard':
@@ -63,7 +70,7 @@ function MotionLayer({
   }
 }
 
-export function ShotRenderer({ shot, timing, style, width, height }: ShotRendererProps) {
+export function ShotRenderer({ shot, timing, style, width, height, chat }: ShotRendererProps) {
   const energy = useEnergy(timing, shot.startSeconds);
   const beat = useBeat(timing, shot.startSeconds);
   const isTitleSection = ['intro', 'outro'].some((name) => shot.section.includes(name));
@@ -82,6 +89,7 @@ export function ShotRenderer({ shot, timing, style, width, height }: ShotRendere
         downbeat={beat.downbeat}
         width={width}
         height={height}
+        chat={chat}
       />,
     );
   } else if (shot.source === 'mixed' && shot.layers) {
@@ -99,6 +107,7 @@ export function ShotRenderer({ shot, timing, style, width, height }: ShotRendere
             downbeat={beat.downbeat}
             width={width}
             height={height}
+            chat={chat}
           />,
         );
       } else {

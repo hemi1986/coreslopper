@@ -19,5 +19,6 @@ Short records of decisions that are hard to reverse, surprising without context,
 | [0013](0013-existing-song-interactive-setup.md) | Every project starts from an existing song; `new-video` runs setup, brief, and treatment interactively. |
 | [0014](0014-comfyui-local-video.md) | ComfyUI as a local video backend driven by tagged API workflow exports. |
 | [0015](0015-comfyui-images-lipsync-audio.md) | ComfyUI also for stills, edits, lip-sync, and audio; output kind from the `cs_output` node. |
+| [0016](0016-episode-projects.md) | Episode projects: a project kind with its own stage list, a series canon, and an episode track built from a script. |
 
 Status values: `Accepted`, `Deprecated`, `Superseded by ADR-NNNN`.

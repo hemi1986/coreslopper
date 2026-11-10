@@ -7,18 +7,23 @@ import {
   ConfigError,
   ValidationError,
   assertAffordable,
+  checkSpokenText,
   effectiveBatchCap,
   ensureDir,
   estimateCost,
   formatUsd,
   loadModelsConfig,
   loadProject,
+  loadSeries,
   providerForRole,
   recordSpend,
   remainingBudget,
   repoRoot,
   resolveModelRole,
   saveState,
+  writeJsonAtomic,
+  type LoadedProject,
+  type LoadedSeries,
   type ModelPricing,
   type ProjectConfig,
   type ProviderKind,
@@ -28,6 +33,7 @@ import {
   clipDurationSeconds,
   createProvider,
   type GenerationRequest,
+  type GenerationResult,
   type Operation,
 } from '@coreslopper/providers';
 import { probeDuration } from './media.js';
@@ -77,6 +83,8 @@ export const BatchSchema = z.array(BatchItemSchema).min(1);
 
 export interface GenerateOptions {
   projectDir: string;
+  /** Run the batch for this series canon instead of a project. */
+  seriesDir?: string;
   batchPath: string;
   dryRun?: boolean;
   /** Override the project provider for this batch (lip-sync keeps its own provider). */
@@ -95,33 +103,62 @@ export interface ResolvedItem {
   durationSeconds?: number;
 }
 
-function roleOverride(config: ProjectConfig, role: string): Record<string, unknown> {
+/** The configuration a batch needs: providers, model overrides, master size, and the batch cap. */
+export type BatchConfig = Pick<ProjectConfig, 'providers' | 'models' | 'formats' | 'batch_cap_usd'>;
+
+/**
+ * Where a batch runs: a project, or a series canon. It owns the budget the
+ * batch is checked against, the asset folder and manifest, and how spend is saved.
+ */
+export interface BatchTarget {
+  label: string;
+  config: BatchConfig;
+  state: { budget: { totalUsd: number; spentUsd: number; reservedUsd: number }; updatedAt: string };
+  paths: { root: string; assets: string; manifest: string };
+  saveState(): Promise<void>;
+}
+
+export function projectTarget(project: LoadedProject): BatchTarget {
+  return {
+    label: 'project',
+    config: project.config,
+    state: project.state,
+    paths: project.paths,
+    saveState: () => saveState(project.paths.state, project.state),
+  };
+}
+
+/** A series canon as a batch target; canon generations need a series budget. */
+export function seriesTarget(loaded: LoadedSeries): BatchTarget {
+  const { series, state, paths } = loaded;
+  if (series.budget_usd === undefined) {
+    throw new ConfigError(`series.yaml of "${series.slug}" has no budget_usd; canon generations need a series budget.`);
+  }
+  if (Math.abs(state.budget.totalUsd - series.budget_usd) > 1e-9) {
+    throw new ValidationError(
+      `${paths.state} budget (${state.budget.totalUsd}) does not match series.yaml budget_usd (${series.budget_usd}).`,
+    );
+  }
+  return {
+    label: 'series',
+    config: { providers: series.providers, models: {}, formats: series.formats, batch_cap_usd: series.batch_cap_usd },
+    state,
+    paths,
+    saveState: () => writeJsonAtomic(paths.state, state),
+  };
+}
+
+function roleOverride(config: BatchConfig, role: string): Record<string, unknown> {
   const value = config.models[role];
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
-/**
- * TTS reads digits, abbreviations, and symbols unreliably, so speech text must
- * spell them out ("2077" -> "zweitausendsiebenundsiebzig"). A leading voice
- * description in brackets is not spoken and is not checked.
- */
-export function checkSpokenText(prompt: string): void {
-  const spoken = prompt.replace(/^\s*\([^)]*\)/, '');
-  const digits = spoken.match(/\d+/g);
-  const symbols = spoken.match(/[%§&€$£@#+=*\/<>~^|_]/g);
-  const abbreviations = spoken.match(/\b(?:z\.\s?B|d\.\s?h|u\.\s?a|bzw|usw|ca|evtl|ggf|Nr|Dr|St|etc)\./gi);
-  const found = [...(digits ?? []), ...(symbols ?? []), ...(abbreviations ?? [])];
-  if (found.length > 0) {
-    throw new ValidationError(
-      `Speech text contains ${[...new Set(found)].join(', ')}. Spell out numbers, years, times, abbreviations, ` +
-        'and symbols in words before TTS, e.g. "2077" -> "zweitausendsiebenundsiebzig", "z. B." -> "zum Beispiel".',
-    );
-  }
-}
+/** Moved to core with the episode rules; re-exported for existing callers. */
+export { checkSpokenText };
 
 function resolveItem(
   item: z.infer<typeof BatchItemSchema>,
-  config: ProjectConfig,
+  config: BatchConfig,
   models: Awaited<ReturnType<typeof loadModelsConfig>>,
   projectRoot: string,
   providerOverride?: ProviderKind,
@@ -237,16 +274,30 @@ export function toRequest(
   };
 }
 
-export async function generateBatch(options: GenerateOptions): Promise<void> {
-  const project = await loadProject(options.projectDir);
-  const batchRaw = await readFile(resolve(options.batchPath), 'utf8');
-  let batchData: unknown;
-  try {
-    batchData = JSON.parse(batchRaw);
-  } catch {
-    batchData = parseYaml(batchRaw);
-  }
-  const batch = BatchSchema.parse(batchData);
+export type BatchItem = z.infer<typeof BatchItemSchema>;
+
+export interface BatchRunOptions {
+  dryRun?: boolean;
+  /** Override the project provider for this batch (lip-sync keeps its own provider). */
+  provider?: ProviderKind;
+}
+
+export interface BatchRunResult {
+  resolved: ResolvedItem;
+  /** Undefined on a dry run. */
+  result?: GenerationResult;
+}
+
+/**
+ * Run batch items through estimate, budget, cache, and manifest. Every
+ * command that generates media goes through here. Returns one entry per item,
+ * in order; a dry run only estimates.
+ */
+export async function runBatch(
+  project: BatchTarget,
+  batch: BatchItem[],
+  options: BatchRunOptions = {},
+): Promise<BatchRunResult[]> {
   const models = await loadModelsConfig();
   const resolved = batch.map((item) => {
     const value = resolveItem(item, project.config, models, project.paths.root, options.provider);
@@ -260,14 +311,14 @@ export async function generateBatch(options: GenerateOptions): Promise<void> {
       effectiveBatchCap(project.config, project.state),
     )}`,
   );
-  assertAffordable(project.config, project.state, totalEstimate, 'generation batch');
+  assertAffordable(project.config, project.state, totalEstimate, `${project.label} generation batch`);
   if (options.dryRun) {
     for (const item of resolved) {
       console.log(
         `  ${item.item.operation} ${item.item.role} -> ${item.provider}/${item.model} (${formatUsd(item.cost)})`,
       );
     }
-    return;
+    return resolved.map((item) => ({ resolved: item }));
   }
 
   const cacheDir = join(repoRoot(), '.cache', 'generations');
@@ -283,6 +334,7 @@ export async function generateBatch(options: GenerateOptions): Promise<void> {
     );
   }
 
+  const results: BatchRunResult[] = [];
   let actualSpend = 0;
   let cacheHits = 0;
   for (const [index, item] of resolved.entries()) {
@@ -292,13 +344,14 @@ export async function generateBatch(options: GenerateOptions): Promise<void> {
     await ensureDir(outputDir);
     const request = toRequest(item, project.config.formats.master, outputDir, project.paths.root);
     const result = await runner.run(request);
+    results.push({ resolved: item, result });
     if (result.cached) {
       cacheHits += 1;
       console.log(`[${index + 1}/${resolved.length}] ${item.item.role}: cache hit ${result.hash.slice(0, 12)}`);
     } else {
       actualSpend += result.costUsd;
       recordSpend(project.state, result.costUsd);
-      await saveState(project.paths.state, project.state);
+      await project.saveState();
       console.log(
         `[${index + 1}/${resolved.length}] ${item.item.role}: ${result.files.length} file(s), ${formatUsd(result.costUsd)}`,
       );
@@ -310,4 +363,20 @@ export async function generateBatch(options: GenerateOptions): Promise<void> {
       remainingBudget(project.state),
     )}`,
   );
+  return results;
+}
+
+export async function generateBatch(options: GenerateOptions): Promise<void> {
+  const project = options.seriesDir
+    ? seriesTarget(await loadSeries(options.seriesDir))
+    : projectTarget(await loadProject(options.projectDir));
+  const batchRaw = await readFile(resolve(options.batchPath), 'utf8');
+  let batchData: unknown;
+  try {
+    batchData = JSON.parse(batchRaw);
+  } catch {
+    batchData = parseYaml(batchRaw);
+  }
+  const batch = BatchSchema.parse(batchData);
+  await runBatch(project, batch, { dryRun: options.dryRun, provider: options.provider });
 }

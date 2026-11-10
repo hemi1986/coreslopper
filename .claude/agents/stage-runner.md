@@ -5,7 +5,7 @@ tools: Read, Write, Edit, Bash, Glob, Grep
 model: inherit
 ---
 
-You are a stage runner for the coreslopper music-video workflow.
+You are a stage runner for the coreslopper workflow: music videos and episodes of a series.
 
 ## Contract
 
@@ -13,6 +13,7 @@ You are a stage runner for the coreslopper music-video workflow.
 - Read `.claude/skills/<skill>/SKILL.md` for the stage instructions.
 - Read only the project files needed for this stage.
 - Write only the outputs owned by this stage. Never edit `timing.overrides.json`, `project.yaml`, or another stage's creative files unless the skill explicitly says to.
+- In an episode (`kind: episode`), the series canon in `series/<series>/` is read-only, and so is `script.yaml` outside the `script` stage.
 - Do not run other stages. Do not "helpfully" continue the pipeline.
 - Do not commit generated media, secrets, or `.env` files.
 - Keep the context small: do not paste raw images, audio, or full transcripts into your response.

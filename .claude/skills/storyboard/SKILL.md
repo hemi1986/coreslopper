@@ -37,6 +37,18 @@ license: MIT
 7. Ask the art-director or a storyboard critic to review the visual flow. Make at most three automatic revisions, then stop and record the remaining concerns in the review report.
 8. Update the state with `npm run cli -- stage-done <project> storyboard --outputs storyboard.yaml,storyboard.md,review/contact-sheet.svg`.
 
+## Episodes
+
+For a project with `kind: episode` the storyboard covers the episode track instead of a song. What changes:
+
+- Inputs: `script.yaml` replaces the treatment and lyrics. Style, characters, and sets come from the series canon in `series/<series>/`; the project has no copies, and you never edit the canon from an episode.
+- Each scene is one section. Anchor shots to `section` and `line` edges; an episode has no beats, so `beat` and `downbeat` anchors fail.
+- A shot in a set names it in `refs.sets`. It must be the set of the shot's scene; a cutaway to another place is its own scene in the script.
+- Show chat lines with `motion.component: ChatWindow` and `motion.props.lines: [<chat line ids>]`, chat lines of the shot's own scene. The window types each message at the script's typing speed.
+- Prompts name the set's prompt anchor from `sets.yaml`, so keyframes of one set match across episodes.
+- Keep text overlays out of the lower fifth of a 9:16 frame: burned-in subtitles sit there.
+- A lip-sync shot (`lipSync: { character: <id> }`) is driven by that character's speaker stem. Only characters with the display rule `full` or `screen-only` can have one. `validate` rejects a shot longer than `maxDuration` of `video.lipsync` for the selected provider or than `limits.lipsync_seconds_max` of the series; anchor it to the line's `start` and `end`.
+
 ## Composition rules for AI shots
 
 Image and video models reliably break hands, limbs, and touching bodies. Prompting against a defect rarely fixes it; compose so it cannot occur.

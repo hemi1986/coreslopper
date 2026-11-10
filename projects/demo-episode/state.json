@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "project": "demo-episode",
+  "kind": "episode",
+  "workflowVersion": "0.5.0",
+  "stage": "voice-track",
+  "status": "pending",
+  "stages": {
+    "setup": {
+      "status": "done",
+      "inputHash": "fixture:setup",
+      "outputs": [
+        "project.yaml"
+      ],
+      "attempts": 1,
+      "finishedAt": "2026-11-10T12:01:00.000Z"
+    },
+    "script": {
+      "status": "done",
+      "inputHash": "fixture:script",
+      "outputs": [
+        "script.yaml"
+      ],
+      "attempts": 1,
+      "finishedAt": "2026-11-10T12:02:00.000Z"
+    },
+    "voice-track": {
+      "status": "pending",
+      "outputs": [],
+      "attempts": 0
+    },
+    "episode-track": {
+      "status": "pending",
+      "outputs": [],
+      "attempts": 0
+    },
+    "storyboard": {
+      "status": "pending",
+      "outputs": [],
+      "attempts": 0
+    },
+    "assets": {
+      "status": "pending",
+      "outputs": [],
+      "attempts": 0
+    },
+    "assembly": {
+      "status": "pending",
+      "outputs": [],
+      "attempts": 0
+    },
+    "qa-export": {
+      "status": "pending",
+      "outputs": [],
+      "attempts": 0
+    }
+  },
+  "budget": {
+    "totalUsd": 10,
+    "spentUsd": 0,
+    "reservedUsd": 0
+  },
+  "artifacts": {},
+  "errors": [],
+  "updatedAt": "2026-11-10T12:02:00.000Z"
+}

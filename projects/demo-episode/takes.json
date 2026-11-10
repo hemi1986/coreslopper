@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "takes": {
+    "l01": {
+      "source": "generated",
+      "duration": 4.14,
+      "text_hash": "aecab06bfffd721b882ded867b8e0c32a097c0c2e32444376a62b1684c074f54",
+      "file_hash": "5fcc45902f13855e5573544d62dd295821d5926182126a8c3a790347b10625a7"
+    },
+    "l03": {
+      "source": "generated",
+      "duration": 0.8,
+      "text_hash": "78de98096809e1360b3c9f33701c02a5d483c828a621ebecc9faba233944eec1",
+      "file_hash": "b436ca8d6ba26dd2ca1f95a60a4b2d59e55b4cd2b5d73ddfa0a83c58e1f0d9a8"
+    },
+    "l04": {
+      "source": "generated",
+      "duration": 2.39,
+      "text_hash": "c531843928ad08c76e760147204120722fdb89d1e36f0c235e27649411c0c7cd",
+      "file_hash": "4a6ed93e3cee1f3f9a3f719074a3bc9881f3b58b685d71f1e997e4537bdbb228"
+    },
+    "l05": {
+      "source": "generated",
+      "duration": 3.09,
+      "text_hash": "7c59b3df64262ab2858949536a1431b8cee77659817258469b8f52f73529ffa6",
+      "file_hash": "414a94219fccac601b6d05fddf32b2e80b077f84c34130e42e3795845f8307a2"
+    },
+    "l07": {
+      "source": "generated",
+      "duration": 2.81,
+      "text_hash": "482aa1d680ad0e6d348022a32f321bbfbdd012ac3be1841e3d49426cca5c552d",
+      "file_hash": "d4ac5017784c63d05a7a1747a00d00c13c81f1c8d9d965ec45c188dc404c33cb"
+    },
+    "l08": {
+      "source": "generated",
+      "duration": 1.5,
+      "text_hash": "e533840a07a238395c8f7750c4de06f109a11dfd21c518476cc4f0a7129d0b9b",
+      "file_hash": "afd806c31f8a1953f2c16a88e0510613374e9428725f1d5301cdb78db497fda7"
+    }
+  },
+  "ambience": {
+    "s01_office": {
+      "source": "generated",
+      "duration": 12,
+      "text_hash": "58ad4380200795fd63f999b03f8ddd3829b9c11f80e2fbc6b8d698a348f1b51c",
+      "file_hash": "331ac2f1a6d27624df849ae82cb74b9c3b7fd3deac35b3d3fe15824d9bb29833"
+    },
+    "s02_elevator": {
+      "source": "generated",
+      "duration": 11,
+      "text_hash": "c5fd3f22565b0cb7f6dcc5e646ac529c7ab794c75ce891b874b1ad07e4c86e5c",
+      "file_hash": "dfca737fa197bb57e2de5d610e59df4d4c2785d04dc21c965fc3575b713d88f3"
+    }
+  }
+}

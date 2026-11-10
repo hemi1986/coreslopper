@@ -2,6 +2,8 @@ import {
   type Anchor,
   type CharacterBible,
   type Line,
+  type Script,
+  type SetBible,
   type Section,
   type Shot,
   type Storyboard,
@@ -21,6 +23,7 @@ export const MOTION_COMPONENTS = new Set([
   'Grid',
   'Scanlines',
   'NeonTorus',
+  'ChatWindow',
 ]);
 
 export interface ResolvedShot extends Shot {
@@ -235,6 +238,110 @@ function validateRefs(shot: Shot, style: StyleBible, characters: CharacterBible)
   }
 }
 
+/** What an episode adds to storyboard validation: its script, the series' sets, and the lip-sync limits. */
+export interface EpisodeContext {
+  script: Script;
+  sets: SetBible;
+  /** Technical limit: `maxDuration` of `video.lipsync` for the selected provider. */
+  lipsyncMaxDuration?: number;
+  /** Creative limit: `limits.lipsync_seconds_max` of the series. */
+  lipsyncSecondsMax?: number;
+}
+
+/** Display rules that hide the face; such a character cannot have a lip-sync shot. */
+export const FACELESS_DISPLAY_RULES = ['silhouette', 'voice-only'] as const;
+
+/**
+ * The audio that drives a lip-sync shot: its `source`, or by default the vocal
+ * stem of a music video or the speaker stem of an episode.
+ */
+export function lipSyncSource(shot: Pick<Shot, 'lipSync'>, kind: 'music-video' | 'episode' | undefined): string | undefined {
+  if (!shot.lipSync) return undefined;
+  if (shot.lipSync.source) return shot.lipSync.source;
+  return kind === 'episode' ? `audio/stems/${shot.lipSync.character}.wav` : 'audio/stems/vocals.wav';
+}
+
+/**
+ * Episode lip-sync shots: the character exists and shows a face, and the shot
+ * fits the provider's maximum and the series' creative limit.
+ */
+function validateLipSync(shot: Shot, seconds: number, characters: CharacterBible, episode: EpisodeContext | undefined): void {
+  if (!shot.lipSync || !episode) return;
+  const character = characters.characters.find((candidate) => candidate.id === shot.lipSync!.character);
+  if (!character) {
+    throw new ValidationError(`Lip-sync shot "${shot.id}" names missing character "${shot.lipSync.character}".`);
+  }
+  if ((FACELESS_DISPLAY_RULES as readonly string[]).includes(character.face)) {
+    throw new ValidationError(
+      `Lip-sync shot "${shot.id}": character "${character.id}" has the display rule "${character.face}", which shows no face to lip-sync.`,
+    );
+  }
+  const length = seconds.toFixed(2);
+  if (episode.lipsyncMaxDuration !== undefined && seconds > episode.lipsyncMaxDuration + TIMING_TOLERANCE_SECONDS) {
+    throw new ValidationError(
+      `Lip-sync shot "${shot.id}" is ${length}s; video.lipsync allows at most ${episode.lipsyncMaxDuration}s on the selected provider. Split the shot.`,
+    );
+  }
+  if (episode.lipsyncSecondsMax !== undefined && seconds > episode.lipsyncSecondsMax + TIMING_TOLERANCE_SECONDS) {
+    throw new ValidationError(
+      `Lip-sync shot "${shot.id}" is ${length}s; the series allows lip-sync shots of at most ${episode.lipsyncSecondsMax}s.`,
+    );
+  }
+}
+
+/**
+ * A shot may name sets of the canon. Each named set must exist and be the set
+ * of the shot's scene; a cutaway to another place is its own scene.
+ */
+function validateSets(shot: Shot, episode: EpisodeContext | undefined): void {
+  if (shot.refs.sets.length === 0) return;
+  if (!episode) {
+    throw new ValidationError(`Shot "${shot.id}" names sets in refs.sets; sets exist only in episode projects.`);
+  }
+  const scene = episode.script.scenes.find((candidate) => candidate.id === shot.section);
+  for (const set of shot.refs.sets) {
+    if (!episode.sets.sets.some((candidate) => candidate.id === set)) {
+      throw new ValidationError(
+        `Shot "${shot.id}" references missing set "${set}". Known sets: ${episode.sets.sets.map((s) => s.id).join(', ') || 'none'}.`,
+      );
+    }
+    if (!scene) {
+      throw new ValidationError(`Shot "${shot.id}" is in section "${shot.section}", which is no scene of the script.`);
+    }
+    if (scene.set !== set) {
+      throw new ValidationError(
+        `Shot "${shot.id}" references set "${set}", but its scene "${scene.id}" plays in set "${scene.set}". A cutaway to another set is its own scene.`,
+      );
+    }
+  }
+}
+
+/**
+ * A ChatWindow shows chat lines of the episode script: `motion.props.lines`
+ * names them, and each must be a chat line of the shot's scene.
+ */
+function validateChatWindow(shot: Shot, episode: EpisodeContext | undefined): void {
+  const uses =
+    shot.motion?.component === 'ChatWindow' || shot.layers?.some((layer) => layer.component === 'ChatWindow');
+  if (!uses) return;
+  if (!episode) throw new ValidationError(`Shot "${shot.id}" uses ChatWindow, which shows chat lines of an episode script.`);
+  const lines = shot.motion?.props.lines;
+  if (!Array.isArray(lines) || lines.length === 0 || !lines.every((line) => typeof line === 'string')) {
+    throw new ValidationError(`ChatWindow shot "${shot.id}" must name its chat lines in motion.props.lines.`);
+  }
+  const scene = episode.script.scenes.find((candidate) => candidate.id === shot.section);
+  for (const id of lines as string[]) {
+    const line = episode.script.scenes.flatMap((candidate) => candidate.lines).find((candidate) => candidate.id === id);
+    if (!line) throw new ValidationError(`ChatWindow shot "${shot.id}" names unknown script line "${id}".`);
+    if (line.kind !== 'chat') {
+      throw new ValidationError(`ChatWindow shot "${shot.id}" names "${id}", a ${line.kind} line; it shows chat lines only.`);
+    }
+    if (!scene?.lines.some((candidate) => candidate.id === id)) {
+      throw new ValidationError(`ChatWindow shot "${shot.id}" names "${id}", which is not in its scene "${shot.section}".`);
+    }
+  }
+}
+
 function validateSource(shot: Shot): void {
   if (shot.source === 'motion') {
     if (!shot.motion?.component) {
@@ -301,6 +408,7 @@ export function resolveStoryboard(
   characters: CharacterBible,
   fps: number,
   toleranceFrames = 1,
+  episode?: EpisodeContext,
 ): ResolvedStoryboard {
   const warnings: string[] = [];
   const resolved: ResolvedShot[] = [];
@@ -331,7 +439,10 @@ export function resolveStoryboard(
     }
 
     validateRefs(shot, style, characters);
+    validateSets(shot, episode);
     validateSource(shot);
+    validateChatWindow(shot, episode);
+    validateLipSync(shot, endSeconds - startSeconds, characters, episode);
     validateText(shot);
 
     resolved.push({

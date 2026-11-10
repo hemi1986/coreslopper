@@ -1,0 +1,24 @@
+version: 1
+slug: demo-episode
+kind: episode
+series: demo-series
+episode: 1
+title: After Midnight
+created: "2026-11-10T12:00:00.000Z"
+workflow:
+  version: 0.5.0
+budget_usd: 10
+review_mode: auto
+formats:
+  master:
+    aspect: "9:16"
+    width: 1080
+    height: 1920
+    fps: 30
+  derivatives: []
+providers:
+  image: mock
+  video: mock
+  audio: mock
+brand: example
+models: {}

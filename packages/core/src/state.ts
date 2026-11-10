@@ -1,5 +1,5 @@
 import { BudgetError } from './errors.js';
-import type { ProjectConfig, State, StageState, StageStatus } from './schema.js';
+import type { ProjectConfig, ProjectKind, State, StageState, StageStatus } from './schema.js';
 
 export interface StageDefinition {
   id: string;
@@ -9,12 +9,13 @@ export interface StageDefinition {
   mechanical: boolean;
   /**
    * Interactive stages run in the main session with the user (the
-   * `new-video` skill), never in an autonomous stage runner.
+   * `new-video` or `new-episode` skill), never in an autonomous stage runner.
    */
   interactive: boolean;
 }
 
-export const STAGES: StageDefinition[] = [
+/** The stages of a music video. */
+export const MUSIC_VIDEO_STAGES: StageDefinition[] = [
   {
     id: 'setup',
     label: 'Project setup & song import',
@@ -75,7 +76,7 @@ export const STAGES: StageDefinition[] = [
     id: 'assembly',
     label: 'Assembly',
     skills: ['assembly-render'],
-    outputs: ['renders/preview-16x9.mp4'],
+    outputs: ['renders/preview-{master}.mp4'],
     mechanical: true,
     interactive: false,
   },
@@ -83,22 +84,101 @@ export const STAGES: StageDefinition[] = [
     id: 'qa-export',
     label: 'QA & export',
     skills: ['video-qa'],
-    outputs: ['review/report.md', 'renders/16x9.mp4'],
+    outputs: ['review/report.md', 'renders/{master}.mp4'],
     mechanical: true,
     interactive: false,
   },
 ];
 
+/** The music-video stage list; kept for callers written before project kinds. */
+export const STAGES = MUSIC_VIDEO_STAGES;
+
+const SHARED_STAGE_IDS = ['storyboard', 'assets'];
+
+/**
+ * The stages of a series episode. Its canon (style, characters, sets) belongs
+ * to the series, so there is no style-character stage.
+ */
+export const EPISODE_STAGES: StageDefinition[] = [
+  {
+    id: 'setup',
+    label: 'Episode setup',
+    skills: ['new-episode'],
+    outputs: ['project.yaml'],
+    mechanical: false,
+    interactive: true,
+  },
+  {
+    id: 'script',
+    label: 'Script',
+    skills: ['grilling', 'new-episode'],
+    outputs: ['script.yaml'],
+    mechanical: false,
+    interactive: true,
+  },
+  {
+    id: 'voice-track',
+    label: 'Takes & ambience',
+    skills: ['voice-track'],
+    outputs: ['takes.json'],
+    mechanical: true,
+    interactive: false,
+  },
+  {
+    id: 'episode-track',
+    label: 'Episode track & timing',
+    skills: ['episode-track'],
+    outputs: ['timing.json', 'audio/episode.wav'],
+    mechanical: true,
+    interactive: false,
+  },
+  ...MUSIC_VIDEO_STAGES.filter((stage) => SHARED_STAGE_IDS.includes(stage.id)),
+  {
+    id: 'assembly',
+    label: 'Assembly',
+    skills: ['assembly-render'],
+    outputs: ['renders/preview-{master}.mp4'],
+    mechanical: true,
+    interactive: false,
+  },
+  {
+    id: 'qa-export',
+    label: 'QA & export',
+    skills: ['video-qa'],
+    outputs: ['review/report.md', 'renders/{master}.mp4', 'renders/{slug}.en.srt'],
+    mechanical: true,
+    interactive: false,
+  },
+];
+
+/**
+ * A stage's outputs for a project: `{master}` becomes the master format ID
+ * (`renders/16x9.mp4` for a 16:9 master) and `{slug}` the project slug.
+ */
+export function stageOutputs(
+  stage: StageDefinition,
+  config: Pick<ProjectConfig, 'slug' | 'formats'>,
+): string[] {
+  const master = config.formats.master.aspect.replace(':', 'x');
+  return stage.outputs.map((output) => output.replaceAll('{master}', master).replaceAll('{slug}', config.slug));
+}
+
+/** The stage list of a project kind. A missing kind means `music-video`. */
+export function stagesFor(kind: ProjectKind | undefined): StageDefinition[] {
+  return kind === 'episode' ? EPISODE_STAGES : MUSIC_VIDEO_STAGES;
+}
+
 export const STAGE_IDS = STAGES.map((stage) => stage.id);
 
-export function stageDefinition(id: string): StageDefinition | undefined {
-  return STAGES.find((stage) => stage.id === id);
+export function stageDefinition(id: string, kind?: ProjectKind): StageDefinition | undefined {
+  return stagesFor(kind).find((stage) => stage.id === id);
 }
 
 export function createInitialState(config: ProjectConfig, workflowVersion: string): State {
   const now = new Date().toISOString();
+  const list = stagesFor(config.kind);
   const stages: Record<string, StageState> = {};
-  for (const stage of STAGES) {
+  for (const stage of list) {
     stages[stage.id] = {
       status: 'pending',
       outputs: [],
@@ -108,8 +188,9 @@ export function createInitialState(config: ProjectConfig, workflowVersion: strin
   return {
     version: 1,
     project: config.slug,
+    kind: config.kind,
     workflowVersion,
-    stage: STAGES[0]!.id,
+    stage: list[0]!.id,
     status: 'pending',
     stages,
     budget: {
@@ -128,12 +209,16 @@ const RETIRED_STAGES = ['lyrics', 'song'];
 
 /**
  * Bring a state file written by an older workflow up to the current stage
- * list: add missing stages as pending, drop retired ones, and treat a finished
- * `song` stage as a finished `setup`.
+ * list: record the project kind when the file has none, add missing stages as
+ * pending, drop retired ones, and treat a finished `song` stage as a finished
+ * `setup`. A kind that is already recorded is never changed; `validate`
+ * reports a mismatch with project.yaml.
  */
-export function migrateState(state: State): State {
+export function migrateState(state: State, config?: Pick<ProjectConfig, 'kind'>): State {
+  if (state.kind === undefined && config) state.kind = config.kind;
+  const list = stagesFor(state.kind);
   const songDone = state.stages.song?.status === 'done' || state.stages.song?.status === 'skipped';
-  for (const stage of STAGES) {
+  for (const stage of list) {
     if (state.stages[stage.id]) continue;
     state.stages[stage.id] =
       stage.id === 'setup' && songDone
@@ -141,21 +226,21 @@ export function migrateState(state: State): State {
         : { status: 'pending', outputs: [], attempts: 0 };
   }
   for (const id of RETIRED_STAGES) delete state.stages[id];
-  if (!STAGES.some((stage) => stage.id === state.stage)) {
-    state.stage = nextStage(state)?.id ?? STAGES[STAGES.length - 1]!.id;
+  if (!list.some((stage) => stage.id === state.stage)) {
+    state.stage = nextStage(state)?.id ?? list[list.length - 1]!.id;
   }
   return state;
 }
 
 export function nextStage(state: State): StageDefinition | undefined {
-  return STAGES.find((stage) => {
+  return stagesFor(state.kind).find((stage) => {
     const status = state.stages[stage.id]?.status ?? 'pending';
     return status === 'pending' || status === 'failed';
   });
 }
 
 export function overallStatus(state: State): StageStatus {
-  const statuses = STAGES.map((stage) => state.stages[stage.id]?.status ?? 'pending');
+  const statuses = stagesFor(state.kind).map((stage) => state.stages[stage.id]?.status ?? 'pending');
   if (statuses.some((status) => status === 'failed')) return 'failed';
   if (statuses.some((status) => status === 'running')) return 'running';
   if (statuses.every((status) => status === 'done' || status === 'skipped')) return 'done';
@@ -238,11 +323,11 @@ export function resetStage(state: State, stageId: string): State {
   return state;
 }
 
-export function remainingBudget(state: State): number {
+export function remainingBudget(state: Pick<State, 'budget'>): number {
   return Math.max(0, state.budget.totalUsd - state.budget.spentUsd - state.budget.reservedUsd);
 }
 
-export function recordSpend(state: State, usd: number): State {
+export function recordSpend<T extends Pick<State, 'budget' | 'updatedAt'>>(state: T, usd: number): T {
   if (usd < 0) throw new BudgetError('Spend must not be negative.');
   const next = state.budget.spentUsd + usd;
   if (next > state.budget.totalUsd + 1e-9) {
@@ -257,7 +342,7 @@ export function recordSpend(state: State, usd: number): State {
 
 export function stageTable(state: State): string[] {
   const rows = ['Stage                 Status    Attempts  Outputs'];
-  for (const stage of STAGES) {
+  for (const stage of stagesFor(state.kind)) {
     const current = state.stages[stage.id];
     const status = current?.status ?? 'pending';
     const attempts = current?.attempts ?? 0;

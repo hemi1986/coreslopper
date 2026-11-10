@@ -10,18 +10,29 @@ import {
   CharacterBibleSchema,
   ModelsConfigSchema,
   ProjectConfigSchema,
+  ScriptSchema,
+  SeriesSchema,
+  SeriesStateSchema,
+  SetBibleSchema,
   StateSchema,
   StoryboardSchema,
   StyleBibleSchema,
+  TakesSchema,
   TimingOverridesSchema,
   TimingSchema,
   type BrandKit,
   type CharacterBible,
   type ModelsConfig,
+  type Format,
   type ProjectConfig,
+  type Script,
+  type Series,
+  type SeriesState,
+  type SetBible,
   type State,
   type Storyboard,
   type StyleBible,
+  type Takes,
   type Timing,
   type TimingOverrides,
 } from './schema.js';
@@ -35,13 +46,25 @@ export interface ProjectPaths {
   treatment: string;
   lyrics: string;
   song: string;
+  /** Episode script. */
+  script: string;
+  /** Episode takes registry (`takes.json`). */
+  takes: string;
   timing: string;
   overrides: string;
   effectiveTiming: string;
   storyboard: string;
   storyboardMd: string;
+  /** For an episode, the canon's style bible in the series folder. */
   style: string;
+  /** For an episode, the canon's character bible in the series folder. */
   characters: string;
+  /** Episode only: the series folder that holds the canon. */
+  series?: string;
+  /** Episode only: `series.yaml` of the series. */
+  seriesConfig?: string;
+  /** Episode only: the canon's set bible. */
+  sets?: string;
   review: string;
   contactSheet: string;
   renders: string;
@@ -49,8 +72,21 @@ export interface ProjectPaths {
   manifest: string;
 }
 
-export function projectPaths(projectDir: string): ProjectPaths {
+/**
+ * The folder of a series canon. Series live in `series/<slug>/` next to the
+ * `projects/` folder that holds the episode.
+ */
+export function seriesDir(projectDir: string, series: string): string {
+  return join(dirname(dirname(resolve(projectDir))), 'series', series);
+}
+
+/**
+ * Paths of a project's artifacts. With an episode config, style, characters,
+ * and sets point into the series canon instead of the project.
+ */
+export function projectPaths(projectDir: string, config?: Pick<ProjectConfig, 'kind' | 'series'>): ProjectPaths {
   const root = resolve(projectDir);
+  const canon = config?.kind === 'episode' && config.series ? seriesDir(root, config.series) : undefined;
   return {
     root,
     config: join(root, 'project.yaml'),
@@ -59,19 +95,34 @@ export function projectPaths(projectDir: string): ProjectPaths {
     treatment: join(root, 'treatment.md'),
     lyrics: join(root, 'lyrics.txt'),
     song: join(root, 'song.json'),
+    script: join(root, 'script.yaml'),
+    takes: join(root, 'takes.json'),
     timing: join(root, 'timing.json'),
     overrides: join(root, 'timing.overrides.json'),
     effectiveTiming: join(root, 'timing.effective.json'),
     storyboard: join(root, 'storyboard.yaml'),
     storyboardMd: join(root, 'storyboard.md'),
-    style: join(root, 'style.yaml'),
-    characters: join(root, 'characters.yaml'),
+    style: join(canon ?? root, 'style.yaml'),
+    characters: join(canon ?? root, 'characters.yaml'),
+    ...(canon
+      ? { series: canon, seriesConfig: join(canon, 'series.yaml'), sets: join(canon, 'sets.yaml') }
+      : {}),
     review: join(root, 'review'),
     contactSheet: join(root, 'review', 'contact-sheet.svg'),
     renders: join(root, 'renders'),
     assets: join(root, 'assets'),
     manifest: join(root, 'assets', 'manifest.jsonl'),
   };
+}
+
+/** The project's audio relative to the project: the song or the episode track. */
+export function projectAudioPath(config: Pick<ProjectConfig, 'kind'>): string {
+  return config.kind === 'episode' ? 'audio/episode.wav' : 'audio/song.wav';
+}
+
+/** Format ID for an aspect ratio, as used in render file names: "9:16" -> "9x16". */
+export function formatId(aspect: Format['aspect']): string {
+  return aspect.replace(':', 'x');
 }
 
 export async function readYamlFile<T>(path: string, schema: z.ZodType<T>): Promise<T> {
@@ -162,14 +213,27 @@ export interface LoadedProject {
   storyboard?: Storyboard;
   style?: StyleBible;
   characters?: CharacterBible;
+  /** Episode only: the series config of the canon. */
+  series?: Series;
+  /** Episode only: the canon's sets. */
+  sets?: SetBible;
+  /** Episode only. */
+  script?: Script;
+  /** Episode only. */
+  takes?: Takes;
   paths: ProjectPaths;
 }
 
+/**
+ * Load a project. An episode's style, characters, and sets come from its
+ * series canon; the storyboard's `style` and `characters` path fields are not
+ * used, so an episode cannot redirect its canon.
+ */
 export async function loadProject(projectDir: string): Promise<LoadedProject> {
-  const paths = projectPaths(projectDir);
-  const config = await readYamlFile(paths.config, ProjectConfigSchema);
+  const config = await readYamlFile(projectPaths(projectDir).config, ProjectConfigSchema);
+  const paths = projectPaths(projectDir, config);
   const state = pathExists(paths.state)
-    ? migrateState(await readJsonFile(paths.state, StateSchema))
+    ? migrateState(await readJsonFile(paths.state, StateSchema), config)
     : createInitialState(config, config.workflow.version);
   const timing = pathExists(paths.timing) ? await readJsonFile(paths.timing, TimingSchema) : undefined;
   const overrides = pathExists(paths.overrides)
@@ -184,7 +248,35 @@ export async function loadProject(projectDir: string): Promise<LoadedProject> {
     ? await readYamlFile(paths.characters, CharacterBibleSchema)
     : undefined;
 
-  return { config, state, timing, overrides, effectiveTiming, storyboard, style, characters, paths };
+  if (config.kind !== 'episode') {
+    return { config, state, timing, overrides, effectiveTiming, storyboard, style, characters, paths };
+  }
+
+  if (!paths.seriesConfig || !pathExists(paths.seriesConfig)) {
+    throw new ValidationError(
+      `Episode "${config.slug}" belongs to series "${config.series}", but ${paths.seriesConfig ?? 'its series.yaml'} does not exist.`,
+    );
+  }
+  const series = await readYamlFile(paths.seriesConfig, SeriesSchema);
+  const sets = paths.sets && pathExists(paths.sets) ? await readYamlFile(paths.sets, SetBibleSchema) : undefined;
+  const script = pathExists(paths.script) ? await readYamlFile(paths.script, ScriptSchema) : undefined;
+  const takes = pathExists(paths.takes) ? await readJsonFile(paths.takes, TakesSchema) : undefined;
+
+  return {
+    config,
+    state,
+    timing,
+    overrides,
+    effectiveTiming,
+    storyboard,
+    style,
+    characters,
+    series,
+    sets,
+    script,
+    takes,
+    paths,
+  };
 }
 
 export async function saveState(path: string, state: State): Promise<void> {
@@ -270,4 +362,55 @@ export async function loadBrand(projectDir: string, brandId?: string, root = rep
     }
   }
   return undefined;
+}
+
+export interface SeriesPaths {
+  root: string;
+  config: string;
+  state: string;
+  bible: string;
+  style: string;
+  characters: string;
+  sets: string;
+  /** Canon generations land here before the skill files them under characters/ and sets/; gitignored. */
+  assets: string;
+  manifest: string;
+}
+
+export function seriesPaths(seriesRoot: string): SeriesPaths {
+  const root = resolve(seriesRoot);
+  return {
+    root,
+    config: join(root, 'series.yaml'),
+    state: join(root, 'state.json'),
+    bible: join(root, 'bible.md'),
+    style: join(root, 'style.yaml'),
+    characters: join(root, 'characters.yaml'),
+    sets: join(root, 'sets.yaml'),
+    assets: join(root, 'assets'),
+    manifest: join(root, 'assets', 'manifest.jsonl'),
+  };
+}
+
+export function createSeriesState(series: Pick<Series, 'slug' | 'budget_usd'>): SeriesState {
+  return {
+    version: 1,
+    series: series.slug,
+    budget: { totalUsd: series.budget_usd ?? 0, spentUsd: 0, reservedUsd: 0 },
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+export interface LoadedSeries {
+  series: Series;
+  /** The canon spend; an initial state when state.json does not exist yet. */
+  state: SeriesState;
+  paths: SeriesPaths;
+}
+
+export async function loadSeries(seriesRoot: string): Promise<LoadedSeries> {
+  const paths = seriesPaths(seriesRoot);
+  const series = await readYamlFile(paths.config, SeriesSchema);
+  const state = pathExists(paths.state) ? await readJsonFile(paths.state, SeriesStateSchema) : createSeriesState(series);
+  return { series, state, paths };
 }

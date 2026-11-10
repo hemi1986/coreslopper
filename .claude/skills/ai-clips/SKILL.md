@@ -67,6 +67,7 @@ license: MIT
    2. Resolve the shot's start and end anchors to seconds from `timing.effective.json` and cut the vocal segment:
       `npm run cli -- audio-segment projects/<slug> --start <s> --end <s> --name <shot-id>`
       (source defaults to `audio/stems/vocals.wav`; use `--source audio/song.wav` only if there is no vocal stem).
+      In an episode, cut from the speaker stem that `episode-track` wrote: add `--character <id>` (`audio/stems/<id>.wav`). The stem holds only that character's takes at full length, so the segment lines up with the shot.
    3. Add a batch item:
       ```json
       {

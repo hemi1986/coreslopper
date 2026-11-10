@@ -84,7 +84,7 @@ export function resolveModelRole(
 }
 
 /** The provider a role uses in a given project. */
-export function providerForRole(config: ProjectConfig, role: string): ProviderKind {
+export function providerForRole(config: Pick<ProjectConfig, 'providers'>, role: string): ProviderKind {
   if (role === 'video.lipsync') {
     if (config.providers.lipsync) return config.providers.lipsync;
     // Projects that render clips in ComfyUI keep lip-sync on fal unless they opt in.

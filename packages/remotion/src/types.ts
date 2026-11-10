@@ -11,6 +11,24 @@ export interface BrandFont {
   style: 'normal' | 'italic';
 }
 
+/** A chat line of an episode script, timed by the effective timing, for ChatWindow. */
+export interface ChatMessage {
+  id: string;
+  /** The sender's display name from the character bible. */
+  sender: string;
+  /** The message as shown on screen. */
+  text: string;
+  start: number;
+  end: number;
+}
+
+/** A burned-in subtitle cue (seconds on the episode timeline). */
+export interface SubtitleCue {
+  start: number;
+  end: number;
+  text: string;
+}
+
 export interface VideoProps extends Record<string, unknown> {
   project: {
     slug: string;
@@ -28,6 +46,10 @@ export interface VideoProps extends Record<string, unknown> {
   shots: ResolvedShot[];
   /** Brand fonts to load; when empty the example brand fonts are loaded. */
   fonts?: BrandFont[];
+  /** Episode only: the chat lines and the typing speed. */
+  chat?: { cps: number; hold: number; messages: ChatMessage[] };
+  /** Burned-in subtitles; absent for a render without them. */
+  subtitles?: SubtitleCue[];
 }
 
 const fixtureTiming: Timing = {
@@ -54,7 +76,7 @@ const fixtureShot: ResolvedShot = {
   text: 'CORESLOPPER',
   highlights: ['CORESLOPPER'],
   transition: { type: 'cut', duration: 0 },
-  refs: { style: [], characters: [] },
+  refs: { style: [], characters: [], sets: [] },
   motion: { component: 'TitleCard', props: {} },
   startSeconds: 0,
   endSeconds: 2,

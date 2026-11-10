@@ -1,0 +1,10 @@
+# After Midnight — storyboard
+
+Demo episode of the series `demo-series`, 9:16, about 22 seconds. Times follow the effective timing.
+
+| Shot | Scene | Anchors | Source | Description |
+|---|---|---|---|---|
+| shot-001 | s01_office (set `office`) | scene start → l02 start | ai-clip | Wide shot of the dark office; Mara alone at the lit desk. |
+| shot-002 | s01_office | l02 start → l04 start | motion | `ChatWindow`: "Bist du noch da?" types itself out. |
+| shot-003 | s01_office (set `office`) | l04 start → scene end | ai-clip, lip-sync `mara` | Close-up of Mara frowning at the screen as she says l04. |
+| shot-004 | s02_elevator (set `elevator`) | scene start → scene end | ai-clip | Elevator lobby, announcement, doors close. |

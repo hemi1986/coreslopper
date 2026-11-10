@@ -49,6 +49,15 @@ async function writePlaceholder(input: ProviderInput, label: string, suffix: str
   return { files: [path], raw: { mock: true, label, model: input.model } };
 }
 
+/**
+ * Length of a mock take without an explicit duration: about 14 characters per
+ * second plus a short lead, so mock speech has realistic, deterministic lengths.
+ */
+export function mockAudioSeconds(text: string): number {
+  const characters = [...text.trim()].length;
+  return Math.round((0.5 + characters * 0.07) * 100) / 100;
+}
+
 export class MockProvider implements Provider {
   readonly name = 'mock';
 
@@ -84,7 +93,7 @@ export class MockProvider implements Provider {
   async generateAudio(input: ProviderInput): Promise<ProviderOutput> {
     await mkdir(input.outputDir, { recursive: true });
     const path = join(input.outputDir, `mock-${input.seed}-audio.wav`);
-    await writeFile(path, silentWav(input.durationSeconds ?? 5));
+    await writeFile(path, silentWav(input.durationSeconds ?? mockAudioSeconds(input.prompt)));
     return { files: [path], raw: { mock: true, model: input.model } };
   }
 }

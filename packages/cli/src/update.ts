@@ -37,8 +37,11 @@ const USER_OWNED_FILES = new Set(['.mcp.json', WORKSPACE_MARKER, 'GETTING_STARTE
 /** Files that are regenerated locally and always follow upstream. */
 const ALWAYS_UPSTREAM_FILES = new Set(['package-lock.json']);
 
-/** Upstream files below these prefixes are added when missing but never overwritten or removed. */
-const USER_OWNED_PREFIXES = ['projects/'];
+/**
+ * Upstream files below these prefixes are added when missing but never
+ * overwritten or removed: projects and series canons belong to the user.
+ */
+const USER_OWNED_PREFIXES = ['projects/', 'series/'];
 
 export function isRuntimePath(path: string): boolean {
   if (!path) return true;

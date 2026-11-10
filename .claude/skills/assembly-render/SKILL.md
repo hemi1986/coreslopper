@@ -34,6 +34,14 @@ license: MIT
 7. Update the state with `npm run cli -- stage-done <project> assembly --outputs renders/preview-16x9.mp4`.
 8. Hand off to `video-qa` for the final report.
 
+## Episodes
+
+- The master format is `formats.master` in `project.yaml` (usually 9:16 for a series); `render` without `--format` renders it, as `renders/<format>.mp4`. Every step above applies with that format in place of 16x9.
+- The audio is the episode track `audio/episode.wav` from `episode-track`. Re-timing means running `episode-track` again, never editing the audio.
+- Render the burned-in English version after the master: `npm run cli -- render projects/<slug> --subtitles en` writes `renders/<format>.en.mp4`, with the subtitles inside the format's safe area.
+- Check every `ChatWindow` shot in the preview: the message types itself out and stays readable at the format's size.
+- Record `renders/preview-<format>.mp4` with `stage-done ... assembly`.
+
 ## Completion criteria
 
 - The preview exists and plays with the song.

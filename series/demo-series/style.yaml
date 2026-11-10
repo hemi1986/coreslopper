@@ -1,0 +1,36 @@
+version: 1
+name: Night Desk
+palette:
+  background: "#07090f"
+  surface: "#121826"
+  primary: "#4fd1c5"
+  secondary: "#7f9cf5"
+  accent: "#f6ad55"
+  text: "#e2e8f0"
+  muted: "#718096"
+typography:
+  display:
+    family: Orbitron
+    weight: 800
+    letterSpacing: 0.02
+  body:
+    family: Space Grotesk
+    weight: 500
+  mono:
+    family: JetBrains Mono
+    weight: 400
+look:
+  keywords:
+    - empty office at night
+    - monitor glow
+    - fluorescent flicker
+    - cold blue shadows
+    - shallow depth of field
+  negative:
+    - daylight
+    - crowds
+    - horror gore
+  references: []
+motion:
+  easing: easeOut
+  grain: 0.1

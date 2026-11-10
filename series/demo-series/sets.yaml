@@ -1,0 +1,17 @@
+version: 1
+sets:
+  - id: office
+    name: Open-plan office at night
+    description: >-
+      Rows of empty desks on the second floor. Only Mara's desk is lit: two
+      monitors, a desk lamp, a cold coffee. Floor-to-ceiling windows show the
+      city at night.
+    prompt: empty open-plan office at night, rows of dark desks, one lit desk with two monitors, city lights through tall windows
+    refs: []
+  - id: elevator
+    name: Elevator lobby
+    description: >-
+      The lobby in front of two steel elevator doors, lit by a single
+      flickering fluorescent tube. A floor indicator glows above the doors.
+    prompt: elevator lobby at night, two brushed steel doors, flickering fluorescent tube, glowing floor indicator
+    refs: []

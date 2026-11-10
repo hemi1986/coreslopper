@@ -57,6 +57,7 @@
     "render": "npm run cli -- render",
     "contact-sheet": "npm run cli -- contact-sheet",
     "demo:audio": "node scripts/fixtures/generate-audio.mjs projects/demo/audio/song.wav",
+    "demo:episode": "node scripts/fixtures/generate-voice-refs.mjs series/demo-series",
     "demo:analyze": "cd scripts/audio-analysis && uv run python analyze.py --project ../../projects/demo --audio ../../projects/demo/audio/song.wav --no-separate --skip-asr --output ../../tmp/demo-timing.json --report ../../tmp/demo-timing.md --schema ../../schema/timing.schema.json",
     "demo": "npm run demo:audio && npm run cli -- validate projects/demo && npm run cli -- contact-sheet projects/demo && npm run cli -- render projects/demo --format 16x9 && npm run cli -- render projects/demo --format 9x16 && npm run cli -- render projects/demo --format 1x1 && npm run cli -- qa projects/demo",
     "demo:preview": "npm run demo:audio && npm run cli -- validate projects/demo && npm run cli -- render projects/demo --format 16x9 --preview",

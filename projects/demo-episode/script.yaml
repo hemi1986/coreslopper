@@ -1,0 +1,63 @@
+version: 1
+title: After Midnight
+chat:
+  cps: 12
+  hold: 1.2
+scenes:
+  - id: s01_office
+    set: office
+    description: Mara alone at her desk after midnight; a message arrives from an unknown contact.
+    atmo: low office hum, distant air conditioning, faint computer fans
+    lines:
+      - id: l01
+        kind: dialogue
+        speaker: mara
+        text_de: Schon wieder nach Mitternacht. Niemand ruft mehr an.
+        text_en: Past midnight again. Nobody calls anymore.
+        direction: tired, under her breath
+        pause_after: 0.6
+      - id: l02
+        kind: chat
+        speaker: contact
+        text_de: Bist du noch da?
+        text_en: Are you still there?
+        pause_after: 0.4
+      - id: l03
+        kind: sfx
+        prompt: single soft chat notification chime
+        duration: 0.8
+        pause_after: 0.3
+      - id: l04
+        kind: dialogue
+        speaker: mara
+        text_de: Wer schreibt um diese Zeit?
+        text_en: Who writes at this hour?
+        direction: puzzled, quiet
+        pause_after: 0.8
+  - id: s02_elevator
+    set: elevator
+    description: Mara waits for the elevator while the building announces closing time.
+    atmo: elevator shaft hum, flickering fluorescent buzz
+    lines:
+      - id: l05
+        kind: announcement
+        speaker: building
+        text_de: Das Gebäude schließt in fünf Minuten.
+        text_en: The building closes in five minutes.
+        direction: calm, metallic, from ceiling speakers
+        pause_after: 0.6
+      - id: l06
+        kind: pause
+        duration: 1
+      - id: l07
+        kind: voiceover
+        speaker: mara
+        text_de: Ich hätte nicht antworten sollen.
+        text_en: I should not have answered.
+        direction: inner voice, close
+        pause_after: 0.4
+      - id: l08
+        kind: sfx
+        prompt: steel elevator doors sliding shut with a low thud
+        duration: 1.5
+        pause_after: 1

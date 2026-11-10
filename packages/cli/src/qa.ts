@@ -5,14 +5,19 @@ import { join, relative, resolve } from 'node:path';
 import { renderStill, selectComposition } from '@remotion/renderer';
 import {
   ValidationError,
+  formatId,
   formatUsd,
   hashFile,
+  isSubtitledLine,
   loadProject,
+  projectAudioPath,
   repoRoot,
+  scriptLines,
   writeTextAtomic,
 } from '@coreslopper/core';
 import { validateProject } from './validate.js';
-import { buildVideoProps, bundleFor, renderLimits } from './render.js';
+import { buildVideoProps, bundleFor, masterFormatId, renderLimits } from './render.js';
+import { subtitlesPath } from './subtitles.js';
 
 export interface QaOptions {
   projectDir: string;
@@ -85,6 +90,58 @@ async function checkManifest(project: Awaited<ReturnType<typeof loadProject>>): 
   return { name: 'Manifest', result: 'PASS', evidence: `${lines.length} entries, ${formatUsd(total)} reconciled` };
 }
 
+/**
+ * The episode checks: subtitles complete, canon references resolved, the
+ * episode length inside the series limits, and the SRT written.
+ */
+function episodeChecks(project: Awaited<ReturnType<typeof loadProject>>, durationSeconds: number): Check[] {
+  const checks: Check[] = [];
+  const lines = project.script ? scriptLines(project.script).map(({ line }) => line) : [];
+  const subtitled = lines.filter(isSubtitledLine);
+  const missing = subtitled.filter((line) => !line.text_en?.trim()).map((line) => line.id);
+  checks.push({
+    name: 'Subtitles text',
+    result: missing.length ? 'FAIL' : 'PASS',
+    evidence: missing.length ? `no text_en: ${missing.join(', ')}` : `${subtitled.length} line(s) with text_en`,
+  });
+
+  const characterIds = new Set(project.characters?.characters.map((character) => character.id));
+  const setIds = new Set(project.sets?.sets.map((set) => set.id));
+  const unknown = [
+    ...subtitled.filter((line) => !characterIds.has(line.speaker)).map((line) => `speaker ${line.speaker}`),
+    ...(project.script?.scenes ?? []).filter((scene) => !setIds.has(scene.set)).map((scene) => `set ${scene.set}`),
+    ...(project.storyboard?.shots ?? []).flatMap((shot) => [
+      ...shot.refs.characters.filter((id) => !characterIds.has(id)).map((id) => `${shot.id} character ${id}`),
+      ...shot.refs.sets.filter((id) => !setIds.has(id)).map((id) => `${shot.id} set ${id}`),
+    ]),
+  ];
+  checks.push({
+    name: 'Canon',
+    result: unknown.length ? 'FAIL' : 'PASS',
+    evidence: unknown.length
+      ? `unknown: ${unknown.join(', ')}`
+      : `${characterIds.size} character(s), ${setIds.size} set(s) in series ${project.config.series}`,
+  });
+
+  const limit = project.series?.limits.episode_seconds;
+  const inside = !limit || (durationSeconds >= limit.min && durationSeconds <= limit.max);
+  checks.push({
+    name: 'Episode length',
+    result: inside ? 'PASS' : 'FAIL',
+    evidence: limit
+      ? `${durationSeconds.toFixed(2)}s; series limit ${limit.min}–${limit.max}s`
+      : `${durationSeconds.toFixed(2)}s; the series sets no limit`,
+  });
+
+  const srt = subtitlesPath(project.paths.renders, project.config.slug);
+  checks.push({
+    name: 'Subtitles file',
+    result: existsSync(srt) ? 'PASS' : 'FAIL',
+    evidence: existsSync(srt) ? relative(project.paths.root, srt) : `${relative(project.paths.root, srt)} is missing; run subtitles`,
+  });
+  return checks;
+}
+
 export async function runQa(options: QaOptions): Promise<string> {
   const { project, resolved } = await validateProject(options.projectDir);
   const checks: Check[] = [];
@@ -95,22 +152,25 @@ export async function runQa(options: QaOptions): Promise<string> {
     evidence: `${resolved.shots.length} shots, ${resolved.durationInFrames} frames, no gaps`,
   });
   checks.push(checkAssets(project, project.state.stages.assets?.status === 'done'));
+  const audio = projectAudioPath(project.config);
   checks.push({
     name: 'Audio',
-    result: existsSync(join(project.paths.root, 'audio', 'song.wav')) ? 'PASS' : 'FAIL',
-    evidence: existsSync(join(project.paths.root, 'audio', 'song.wav')) ? 'audio/song.wav exists' : 'missing audio/song.wav',
+    result: existsSync(join(project.paths.root, audio)) ? 'PASS' : 'FAIL',
+    evidence: existsSync(join(project.paths.root, audio)) ? `${audio} exists` : `missing ${audio}`,
   });
   checks.push(await checkManifest(project));
+  if (project.config.kind === 'episode') checks.push(...episodeChecks(project, resolved.durationSeconds));
 
-  const renderPath = join(project.paths.renders, '16x9.mp4');
+  const master = masterFormatId(project.config);
+  const renderPath = join(project.paths.renders, `${master}.mp4`);
   checks.push({
     name: 'Master render',
     result: existsSync(renderPath) ? 'PASS' : 'FAIL',
-    evidence: existsSync(renderPath) ? relative(project.paths.root, renderPath) : 'renders/16x9.mp4 is missing',
+    evidence: existsSync(renderPath) ? relative(project.paths.root, renderPath) : `renders/${master}.mp4 is missing`,
   });
 
   const derivatives = project.config.formats.derivatives.map((format) => {
-    const id = format.aspect === '9:16' ? '9x16' : format.aspect === '1:1' ? '1x1' : format.aspect === '4:5' ? '4x5' : format.aspect;
+    const id = formatId(format.aspect);
     return { id, path: join(project.paths.renders, `${id}.mp4`) };
   });
   for (const derivative of derivatives) {

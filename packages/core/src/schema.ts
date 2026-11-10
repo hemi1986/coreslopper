@@ -18,41 +18,68 @@ export const LipSyncProviderKindSchema = z.enum(['fal', 'higgsfield', 'comfyui',
 /** Providers that can generate music, stingers, and sound effects (`audio.*` roles). */
 export const AudioProviderKindSchema = z.enum(['comfyui', 'mock']);
 
-export const ProjectConfigSchema = z.object({
-  version: z.literal(1),
-  slug: z
-    .string()
-    .min(1)
-    .regex(/^[a-z0-9][a-z0-9-]*$/, 'slug must be lowercase letters, digits, and dashes'),
-  title: z.string().min(1),
-  created: z.string().min(1),
-  workflow: z.object({
-    version: z.string().min(1),
-    commit: z.string().optional(),
-  }),
-  budget_usd: z.number().positive(),
-  batch_cap_usd: z.number().positive().optional(),
-  review_mode: z.enum(['auto', 'final']).default('auto'),
-  formats: z.object({
-    master: FormatSchema,
-    derivatives: z.array(FormatSchema).default([]),
-  }),
-  providers: z
-    .object({
-      image: ImageProviderKindSchema.default('mock'),
-      video: VideoProviderKindSchema.default('mock'),
-      /**
-       * Lip-sync can use a different provider from the rest of the video.
-       * Defaults to `video`, or to `fal` when `video` is `comfyui`.
-       */
-      lipsync: LipSyncProviderKindSchema.optional(),
-      /** `audio.*` roles (stingers, SFX, extra music; never the song itself). Defaults to `comfyui`. */
-      audio: AudioProviderKindSchema.optional(),
-    })
-    .default({ image: 'mock', video: 'mock' }),
-  brand: z.string().min(1).default('example'),
-  models: z.record(z.string(), z.unknown()).default({}),
-});
+const SlugSchema = z
+  .string()
+  .min(1)
+  .regex(/^[a-z0-9][a-z0-9-]*$/, 'slug must be lowercase letters, digits, and dashes');
+
+/** IDs that become file names (`audio/lines/<line-id>.wav`) and anchor targets. */
+const ScriptIdSchema = z
+  .string()
+  .min(1)
+  .regex(/^[a-z0-9][a-z0-9_-]*$/, 'id must be lowercase letters, digits, dashes, and underscores');
+
+/** What a project produces. A missing kind means `music-video`. */
+export const ProjectKindSchema = z.enum(['music-video', 'episode']);
+
+export const ProvidersSchema = z
+  .object({
+    image: ImageProviderKindSchema.default('mock'),
+    video: VideoProviderKindSchema.default('mock'),
+    /**
+     * Lip-sync can use a different provider from the rest of the video.
+     * Defaults to `video`, or to `fal` when `video` is `comfyui`.
+     */
+    lipsync: LipSyncProviderKindSchema.optional(),
+    /** `audio.*` roles (stingers, SFX, voices, extra music; never the song itself). Defaults to `comfyui`. */
+    audio: AudioProviderKindSchema.optional(),
+  })
+  .default({ image: 'mock', video: 'mock' });
+
+export const ProjectConfigSchema = z
+  .object({
+    version: z.literal(1),
+    slug: SlugSchema,
+    kind: ProjectKindSchema.default('music-video'),
+    /** Episode only: the series whose canon this episode uses (`series/<slug>/`). */
+    series: SlugSchema.optional(),
+    /** Episode only: the episode number within the series. */
+    episode: z.number().int().positive().optional(),
+    title: z.string().min(1),
+    created: z.string().min(1),
+    workflow: z.object({
+      version: z.string().min(1),
+      commit: z.string().optional(),
+    }),
+    budget_usd: z.number().positive(),
+    batch_cap_usd: z.number().positive().optional(),
+    review_mode: z.enum(['auto', 'final']).default('auto'),
+    formats: z.object({
+      master: FormatSchema,
+      derivatives: z.array(FormatSchema).default([]),
+    }),
+    providers: ProvidersSchema,
+    brand: z.string().min(1).default('example'),
+    models: z.record(z.string(), z.unknown()).default({}),
+  })
+  .superRefine((config, ctx) => {
+    if (config.kind !== 'episode') return;
+    for (const key of ['series', 'episode'] as const) {
+      if (config[key] === undefined) {
+        ctx.addIssue({ code: 'custom', path: [key], message: `an episode project must set "${key}"` });
+      }
+    }
+  });
 
 export const StageStatusSchema = z.enum(['pending', 'running', 'done', 'failed', 'skipped']);
 
@@ -75,6 +102,11 @@ export const BudgetSchema = z.object({
 export const StateSchema = z.object({
   version: z.literal(1),
   project: z.string().min(1),
+  /**
+   * Copied from project.yaml; picks the stage list. Optional so that state
+   * files written before project kinds existed can be migrated.
+   */
+  kind: ProjectKindSchema.optional(),
   workflowVersion: z.string().min(1),
   stage: z.string().min(1),
   status: StageStatusSchema,
@@ -122,7 +154,8 @@ export const TimingSchema = z.object({
     duration: z.number().positive(),
     sampleRate: z.number().int().positive(),
   }),
-  bpm: z.number().positive(),
+  /** Tempo of a song. An episode track has no tempo and leaves it out. */
+  bpm: z.number().positive().optional(),
   beats: z.array(z.number().nonnegative()).default([]),
   downbeats: z.array(z.number().nonnegative()).default([]),
   onsets: z.array(z.number().nonnegative()).default([]),
@@ -221,8 +254,10 @@ export const ShotSchema = z.object({
     .object({
       style: z.array(z.string()).default([]),
       characters: z.array(z.string()).default([]),
+      /** Episode only: sets of the series canon; each must be the set of the shot's scene. */
+      sets: z.array(z.string()).default([]),
     })
-    .default({ style: [], characters: [] }),
+    .default({ style: [], characters: [], sets: [] }),
   motion: z
     .object({
       component: z.string().optional(),
@@ -239,11 +274,13 @@ export const ShotSchema = z.object({
   /**
    * Lip-sync shot: a frontal face keyframe (prompts.keyframe) is animated by the
    * vocal segment between the shot's start and end (operation lipSync).
+   * `source` defaults to `audio/stems/vocals.wav` for a music video and to the
+   * speaker stem `audio/stems/<character>.wav` for an episode (see lipSyncSource).
    */
   lipSync: z
     .object({
       character: z.string().min(1),
-      source: z.string().default('audio/stems/vocals.wav'),
+      source: z.string().min(1).optional(),
     })
     .optional(),
   layers: z.array(LayerSchema).optional(),
@@ -322,6 +359,9 @@ export const StyleBibleSchema = z
     }
   });
 
+/** How a character may appear on screen. */
+export const DisplayRuleSchema = z.enum(['full', 'silhouette', 'screen-only', 'voice-only']);
+
 export const CharacterSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
@@ -329,11 +369,176 @@ export const CharacterSchema = z.object({
   sheet: z.string().optional(),
   refs: z.array(z.string()).default([]),
   prompt: z.string().optional(),
+  /** Reference voice: a WAV (relative to the canon or project) and its exact transcript. */
+  voice: z
+    .object({
+      ref: z.string().min(1),
+      transcript: z.string().min(1),
+    })
+    .optional(),
+  face: DisplayRuleSchema.default('full'),
 });
 
 export const CharacterBibleSchema = z.object({
   version: z.literal(1).default(1),
   characters: z.array(CharacterSchema).default([]),
+});
+
+/** A recurring location of a series. */
+export const SetSchema = z.object({
+  id: ScriptIdSchema,
+  name: z.string().min(1),
+  description: z.string().min(1),
+  /** Prompt anchor that every keyframe in this set starts from. */
+  prompt: z.string().min(1),
+  /** Reference start frames, relative to the series folder (`sets/<id>/...`). */
+  refs: z.array(z.string()).default([]),
+});
+
+export const SetBibleSchema = z.object({
+  version: z.literal(1).default(1),
+  sets: z.array(SetSchema).default([]),
+});
+
+export const SeriesSchema = z.object({
+  version: z.literal(1),
+  slug: SlugSchema,
+  title: z.string().min(1),
+  description: z.string().optional(),
+  /** Copied into each new episode's project.yaml; never inherited at run time. */
+  formats: z.object({
+    master: FormatSchema,
+    derivatives: z.array(FormatSchema).default([]),
+  }),
+  providers: ProvidersSchema,
+  brand: z.string().min(1).default('example'),
+  /**
+   * Series budget: canon generations plus every episode budget must fit in it.
+   * Without it, episodes are unchecked and the canon cannot be generated.
+   */
+  budget_usd: z.number().positive().optional(),
+  /** Batch cap for canon generations; defaults to 30 % of the remaining series budget. */
+  batch_cap_usd: z.number().positive().optional(),
+  /** The planned episodes. */
+  episodes: z
+    .array(
+      z.object({
+        episode: z.number().int().positive(),
+        title: z.string().min(1),
+        logline: z.string().optional(),
+      }),
+    )
+    .default([]),
+  /** Optional creative limits. Without an entry nothing is checked. */
+  limits: z
+    .object({
+      episode_seconds: z
+        .object({ min: z.number().positive(), max: z.number().positive() })
+        .refine((range) => range.min <= range.max, { message: 'min must not exceed max' })
+        .optional(),
+      lipsync_seconds_max: z.number().positive().optional(),
+    })
+    .default({}),
+});
+
+const ScriptLineBase = {
+  id: ScriptIdSchema,
+  /** Reserved for overlapping lines; validation rejects it until overlap is implemented. */
+  with: ScriptIdSchema.optional(),
+};
+
+/** Silence after a line before the next one starts, in seconds. */
+const PauseAfterSchema = z.number().nonnegative().default(0);
+
+const SpokenLineFields = {
+  ...ScriptLineBase,
+  speaker: z.string().min(1),
+  /** The German text that is spoken; follows the TTS text rule. */
+  text_de: z.string().min(1),
+  /** The English subtitle. */
+  text_en: z.string().optional(),
+  /** Acting direction for the take. */
+  direction: z.string().optional(),
+  pause_after: PauseAfterSchema,
+};
+
+export const ScriptLineSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('dialogue'), ...SpokenLineFields }),
+  z.object({ kind: z.literal('voiceover'), ...SpokenLineFields }),
+  z.object({ kind: z.literal('announcement'), ...SpokenLineFields }),
+  z.object({
+    kind: z.literal('chat'),
+    ...ScriptLineBase,
+    /** The character who sends the message. */
+    speaker: z.string().min(1),
+    /** The message as shown on screen; not spoken. */
+    text_de: z.string().min(1),
+    text_en: z.string().optional(),
+    pause_after: PauseAfterSchema,
+  }),
+  z.object({
+    kind: z.literal('sfx'),
+    ...ScriptLineBase,
+    prompt: z.string().min(1),
+    duration: z.number().positive(),
+    pause_after: PauseAfterSchema,
+  }),
+  z.object({
+    kind: z.literal('pause'),
+    ...ScriptLineBase,
+    duration: z.number().positive(),
+  }),
+]);
+
+export const SceneSchema = z.object({
+  id: ScriptIdSchema,
+  /** The set this scene plays in. */
+  set: z.string().min(1),
+  description: z.string().min(1),
+  /** Ambience prompt for `audio.sfx`, looped or trimmed under the scene. */
+  atmo: z.string().optional(),
+  lines: z.array(ScriptLineSchema).min(1),
+});
+
+export const ScriptSchema = z.object({
+  version: z.literal(1),
+  title: z.string().optional(),
+  /** Typing speed of chat lines: characters per second plus a hold. Required when the script has chat lines. */
+  chat: z
+    .object({
+      cps: z.number().positive(),
+      hold: z.number().nonnegative(),
+    })
+    .optional(),
+  scenes: z.array(SceneSchema).min(1),
+});
+
+/** `series/<slug>/state.json`: the spend of canon generations against the series budget. */
+export const SeriesStateSchema = z.object({
+  version: z.literal(1),
+  series: SlugSchema,
+  budget: BudgetSchema,
+  updatedAt: z.string().min(1),
+});
+
+export const TakeSchema = z.object({
+  source: z.enum(['generated', 'imported']),
+  duration: z.number().positive(),
+  /** Hash of the text or prompt the take was made from; a different hash makes the take stale. */
+  text_hash: z.string().min(1),
+  /** SHA-256 of the WAV as registered; a different file means someone replaced it. */
+  file_hash: z.string().min(1).optional(),
+});
+
+/**
+ * `takes.json`: one take per audible script line (`audio/lines/<line-id>.wav`),
+ * keyed by line ID, and one ambience per scene with an `atmo` prompt
+ * (`audio/ambience/<scene-id>.wav`), keyed by scene ID.
+ */
+export const TakesSchema = z.object({
+  version: z.literal(1).default(1),
+  takes: z.record(ScriptIdSchema, TakeSchema).default({}),
+  ambience: z.record(ScriptIdSchema, TakeSchema).default({}),
 });
 
 export const BrandKitSchema = z.object({
@@ -396,6 +601,17 @@ export const ModelsConfigSchema = z.object({
 });
 
 export type ProjectConfig = z.infer<typeof ProjectConfigSchema>;
+export type ProjectKind = z.infer<typeof ProjectKindSchema>;
+export type DisplayRule = z.infer<typeof DisplayRuleSchema>;
+export type SetDefinition = z.infer<typeof SetSchema>;
+export type SetBible = z.infer<typeof SetBibleSchema>;
+export type Series = z.infer<typeof SeriesSchema>;
+export type ScriptLine = z.infer<typeof ScriptLineSchema>;
+export type Scene = z.infer<typeof SceneSchema>;
+export type Script = z.infer<typeof ScriptSchema>;
+export type Take = z.infer<typeof TakeSchema>;
+export type SeriesState = z.infer<typeof SeriesStateSchema>;
+export type Takes = z.infer<typeof TakesSchema>;
 export type Format = z.infer<typeof FormatSchema>;
 export type StageStatus = z.infer<typeof StageStatusSchema>;
 export type StageState = z.infer<typeof StageStateSchema>;
