@@ -52,7 +52,7 @@ function toolCheck(tool: ToolCheck): DoctorCheck {
   };
 }
 
-/** Optional local video backend: server reachability and the workflow exports. */
+/** Optional local backend: server reachability and the workflow exports. */
 async function comfyUIChecks(root: string): Promise<DoctorCheck[]> {
   const server = await checkComfyUI();
   const dir = process.env.COMFYUI_WORKFLOWS_DIR ? resolve(process.env.COMFYUI_WORKFLOWS_DIR) : join(root, 'comfyui', 'workflows');
@@ -60,9 +60,9 @@ async function comfyUIChecks(root: string): Promise<DoctorCheck[]> {
   const checks: DoctorCheck[] = [
     {
       id: 'comfyui',
-      name: 'ComfyUI (local video)',
+      name: 'ComfyUI (local)',
       ok: server.ok,
-      detail: server.ok ? `${server.message} at ${server.url}` : `not reachable at ${server.url} (only needed for providers.video: comfyui)`,
+      detail: server.ok ? `${server.message} at ${server.url}` : `not reachable at ${server.url} (only needed when a provider is comfyui)`,
       required: false,
       group: 'local',
     },
@@ -82,7 +82,7 @@ async function comfyUIChecks(root: string): Promise<DoctorCheck[]> {
       id: `comfyui-workflow-${report.name}`,
       name: `ComfyUI workflow ${report.name}`,
       ok: report.ok,
-      detail: report.error ?? [report.operation, ...report.warnings].join('; '),
+      detail: report.error ?? [report.operations?.join('/'), ...report.warnings].join('; '),
       required: false,
       group: 'local',
     });

@@ -135,6 +135,7 @@
           "enum": [
             "fal",
             "higgsfield",
+            "comfyui",
             "mock"
           ]
         },
@@ -153,6 +154,14 @@
           "enum": [
             "fal",
             "higgsfield",
+            "comfyui",
+            "mock"
+          ]
+        },
+        "audio": {
+          "type": "string",
+          "enum": [
+            "comfyui",
             "mock"
           ]
         }
