@@ -58,7 +58,7 @@ AGENTS.md          This file: the project description agents read
 CLAUDE.md          @AGENTS.md + Claude Code specifics
 config/            models.yaml and defaults.yaml
 comfyui/           README + workflows/ for local ComfyUI video (API exports)
-docs/              PLAN.md, glossary.md, architecture.md, pipeline.md, ADRs, third-party notices
+docs/              glossary.md, architecture.md, pipeline.md, ADRs, third-party notices
 packages/
   core/            Zod schemas, state, timing resolver, hash, cost, project loader
   providers/       image, video, and lip-sync operations; fal.ai + Higgsfield + ComfyUI + mock; cache/manifest runner
@@ -177,7 +177,6 @@ CI runs without API keys and uses the mock provider. GPU tests are opt-in.
 
 ## Documentation
 
-- `docs/PLAN.md` — the agreed architecture and delivery plan.
 - `docs/glossary.md` — ubiquitous language.
 - `docs/architecture.md` — data flow, state, cache, providers, rendering.
 - `docs/pipeline.md` — stage-by-stage runbook.
