@@ -181,7 +181,10 @@ program
 
 program
   .command('new <slug>')
-  .description('Create a new project from templates/project.')
+  .description('Create a new project from templates/project, or an episode from templates/episode.')
+  .option('--kind <kind>', 'music-video | episode', 'music-video')
+  .option('--series <slug>', 'Episode: the series in series/<slug>/')
+  .option('--episode <n>', 'Episode: the episode number', (value) => Number(value))
   .option('--title <title>')
   .option('--budget <usd>', 'Project budget in USD (required)', (value) => Number(value))
   .option('--brand <kit>', 'Brand kit', 'example')
@@ -198,9 +201,13 @@ program
         visual: string;
         imageProvider?: string;
         videoProvider?: string;
+        kind: string;
+        series?: string;
+        episode?: number;
       },
     ) =>
       run(async () => {
+        const kind = validateChoice(options.kind, ['music-video', 'episode'] as const, 'project kind');
         const visuals = ['mock', 'fal', 'higgsfield'] as const;
         const visual = validateChoice(options.visual ?? 'mock', visuals, 'visual provider');
         const imageProvider = options.imageProvider
@@ -216,6 +223,9 @@ program
           brand: options.brand,
           imageProvider,
           videoProvider,
+          kind,
+          series: options.series,
+          episode: options.episode,
         });
       }),
   );

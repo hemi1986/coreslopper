@@ -2,6 +2,8 @@ import {
   type Anchor,
   type CharacterBible,
   type Line,
+  type Script,
+  type SetBible,
   type Section,
   type Shot,
   type Storyboard,
@@ -235,6 +237,39 @@ function validateRefs(shot: Shot, style: StyleBible, characters: CharacterBible)
   }
 }
 
+/** What an episode adds to storyboard validation: its script and the series' sets. */
+export interface EpisodeContext {
+  script: Script;
+  sets: SetBible;
+}
+
+/**
+ * A shot may name sets of the canon. Each named set must exist and be the set
+ * of the shot's scene; a cutaway to another place is its own scene.
+ */
+function validateSets(shot: Shot, episode: EpisodeContext | undefined): void {
+  if (shot.refs.sets.length === 0) return;
+  if (!episode) {
+    throw new ValidationError(`Shot "${shot.id}" names sets in refs.sets; sets exist only in episode projects.`);
+  }
+  const scene = episode.script.scenes.find((candidate) => candidate.id === shot.section);
+  for (const set of shot.refs.sets) {
+    if (!episode.sets.sets.some((candidate) => candidate.id === set)) {
+      throw new ValidationError(
+        `Shot "${shot.id}" references missing set "${set}". Known sets: ${episode.sets.sets.map((s) => s.id).join(', ') || 'none'}.`,
+      );
+    }
+    if (!scene) {
+      throw new ValidationError(`Shot "${shot.id}" is in section "${shot.section}", which is no scene of the script.`);
+    }
+    if (scene.set !== set) {
+      throw new ValidationError(
+        `Shot "${shot.id}" references set "${set}", but its scene "${scene.id}" plays in set "${scene.set}". A cutaway to another set is its own scene.`,
+      );
+    }
+  }
+}
+
 function validateSource(shot: Shot): void {
   if (shot.source === 'motion') {
     if (!shot.motion?.component) {
@@ -301,6 +336,7 @@ export function resolveStoryboard(
   characters: CharacterBible,
   fps: number,
   toleranceFrames = 1,
+  episode?: EpisodeContext,
 ): ResolvedStoryboard {
   const warnings: string[] = [];
   const resolved: ResolvedShot[] = [];
@@ -331,6 +367,7 @@ export function resolveStoryboard(
     }
 
     validateRefs(shot, style, characters);
+    validateSets(shot, episode);
     validateSource(shot);
     validateText(shot);
 

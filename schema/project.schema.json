@@ -11,6 +11,24 @@
       "minLength": 1,
       "pattern": "^[a-z0-9][a-z0-9-]*$"
     },
+    "kind": {
+      "default": "music-video",
+      "type": "string",
+      "enum": [
+        "music-video",
+        "episode"
+      ]
+    },
+    "series": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "episode": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    },
     "title": {
       "type": "string",
       "minLength": 1

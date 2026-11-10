@@ -10,6 +10,13 @@
       "type": "string",
       "minLength": 1
     },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "music-video",
+        "episode"
+      ]
+    },
     "workflowVersion": {
       "type": "string",
       "minLength": 1

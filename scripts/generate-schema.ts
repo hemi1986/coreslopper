@@ -6,9 +6,13 @@ import {
   BrandKitSchema,
   ModelsConfigSchema,
   ProjectConfigSchema,
+  ScriptSchema,
+  SeriesSchema,
+  SetBibleSchema,
   StateSchema,
   StoryboardSchema,
   StyleBibleSchema,
+  TakesSchema,
   TimingOverridesSchema,
   TimingSchema,
 } from '../packages/core/src/schema.js';
@@ -23,6 +27,10 @@ const schemas = {
   characters: CharacterBibleSchema,
   brand: BrandKitSchema,
   models: ModelsConfigSchema,
+  series: SeriesSchema,
+  sets: SetBibleSchema,
+  script: ScriptSchema,
+  takes: TakesSchema,
 };
 
 const outputDir = join(process.cwd(), 'schema');

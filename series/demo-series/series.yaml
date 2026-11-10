@@ -1,0 +1,30 @@
+version: 1
+slug: demo-series
+title: Night Desk
+description: >-
+  A hand-written demo canon for episode projects. Short vertical episodes about
+  a help-desk agent on the night shift and the messages that reach her after
+  midnight. Runs on the mock provider; no keys or GPU needed.
+formats:
+  master:
+    aspect: "9:16"
+    width: 1080
+    height: 1920
+    fps: 30
+  derivatives: []
+providers:
+  image: mock
+  video: mock
+  audio: mock
+brand: example
+episodes:
+  - episode: 1
+    title: After Midnight
+    logline: An unknown contact writes to Mara just before the building closes.
+  - episode: 2
+    title: Second Floor
+    logline: The contact knows which floor Mara works on.
+limits:
+  episode_seconds:
+    min: 15
+    max: 30

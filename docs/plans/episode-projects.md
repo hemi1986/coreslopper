@@ -18,7 +18,7 @@ The first real series is "Restlaufzeit" (10 episodes of 60–120 s, 9:16, German
 ## Progress
 
 - [x] Step 1 — ADR 0016 and glossary
-- [ ] Step 2a — schemas, state, canon loader, fixture; the demo episode validates
+- [x] Step 2a — schemas, state, canon loader, fixture; the demo episode validates
 - [ ] Step 2b — `voice-track`, `import-takes`, `episode-track`
 - [ ] Step 2c — master format and 9:16 render, `ChatWindow`, subtitles, QA, `new-episode`, docs
 - [ ] Step 3 — lip-sync, display rules, series state, orchestration

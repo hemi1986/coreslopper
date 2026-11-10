@@ -23,7 +23,8 @@ export function beatAt(timing: Timing, seconds: number): { index: number; progre
     else break;
   }
   const current = timing.beats[index] ?? 0;
-  const next = timing.beats[index + 1] ?? current + 60 / timing.bpm;
+  // Without a tempo the last beat has no length and its progress stays 0.
+  const next = timing.beats[index + 1] ?? (timing.bpm ? current + 60 / timing.bpm : current);
   const progress = next > current ? Math.max(0, Math.min(1, (seconds - current) / (next - current))) : 0;
   const downbeat = timing.downbeats.some((value) => Math.abs(value - current) < 0.02);
   return { index, progress, downbeat };

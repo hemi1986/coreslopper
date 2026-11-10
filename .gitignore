@@ -39,6 +39,12 @@ projects/*/renders/*
 !projects/*/renders/.gitkeep
 projects/*/timing.effective.json
 
+# Series canon media (references, reference voices); the YAML canon stays tracked
+series/*/characters/*
+!series/*/characters/.gitkeep
+series/*/sets/*
+!series/*/sets/.gitkeep
+
 # Python
 .venv/
 __pycache__/

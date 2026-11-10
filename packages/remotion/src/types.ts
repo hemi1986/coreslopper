@@ -54,7 +54,7 @@ const fixtureShot: ResolvedShot = {
   text: 'CORESLOPPER',
   highlights: ['CORESLOPPER'],
   transition: { type: 'cut', duration: 0 },
-  refs: { style: [], characters: [] },
+  refs: { style: [], characters: [], sets: [] },
   motion: { component: 'TitleCard', props: {} },
   startSeconds: 0,
   endSeconds: 2,

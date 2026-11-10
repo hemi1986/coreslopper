@@ -7,6 +7,7 @@ import {
   ConfigError,
   ValidationError,
   assertAffordable,
+  checkSpokenText,
   effectiveBatchCap,
   ensureDir,
   estimateCost,
@@ -100,24 +101,8 @@ function roleOverride(config: ProjectConfig, role: string): Record<string, unkno
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
-/**
- * TTS reads digits, abbreviations, and symbols unreliably, so speech text must
- * spell them out ("2077" -> "zweitausendsiebenundsiebzig"). A leading voice
- * description in brackets is not spoken and is not checked.
- */
-export function checkSpokenText(prompt: string): void {
-  const spoken = prompt.replace(/^\s*\([^)]*\)/, '');
-  const digits = spoken.match(/\d+/g);
-  const symbols = spoken.match(/[%§&€$£@#+=*\/<>~^|_]/g);
-  const abbreviations = spoken.match(/\b(?:z\.\s?B|d\.\s?h|u\.\s?a|bzw|usw|ca|evtl|ggf|Nr|Dr|St|etc)\./gi);
-  const found = [...(digits ?? []), ...(symbols ?? []), ...(abbreviations ?? [])];
-  if (found.length > 0) {
-    throw new ValidationError(
-      `Speech text contains ${[...new Set(found)].join(', ')}. Spell out numbers, years, times, abbreviations, ` +
-        'and symbols in words before TTS, e.g. "2077" -> "zweitausendsiebenundsiebzig", "z. B." -> "zum Beispiel".',
-    );
-  }
-}
+/** Moved to core with the episode rules; re-exported for existing callers. */
+export { checkSpokenText };
 
 function resolveItem(
   item: z.infer<typeof BatchItemSchema>,

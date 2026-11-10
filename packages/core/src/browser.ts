@@ -5,4 +5,5 @@
 export * from './schema.js';
 export * from './errors.js';
 export * from './timing.js';
+export * from './episode.js';
 export * from './palette.js';

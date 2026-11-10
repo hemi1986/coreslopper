@@ -1,0 +1,31 @@
+version: 1
+characters:
+  - id: mara
+    name: Mara
+    description: >-
+      Help-desk agent in her early thirties, short dark hair, oversized grey
+      cardigan over a company polo shirt, headset around her neck. Tired but
+      alert.
+    refs: []
+    prompt: woman in her early thirties, short dark hair, oversized grey cardigan, headset around her neck
+    voice:
+      ref: characters/mara/voice.wav
+      transcript: Guten Abend, hier ist der IT-Support, was kann ich für Sie tun?
+    face: full
+  - id: contact
+    name: Unknown contact
+    description: >-
+      The sender of the night messages. Never seen or heard; exists only as
+      chat messages on Mara's screen.
+    refs: []
+    face: screen-only
+  - id: building
+    name: Building announcement
+    description: >-
+      The tower's automated announcement system. A calm, slightly metallic
+      voice from ceiling speakers.
+    refs: []
+    voice:
+      ref: characters/building/voice.wav
+      transcript: Sehr geehrte Damen und Herren, bitte beachten Sie die folgende Durchsage.
+    face: voice-only

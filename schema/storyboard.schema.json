@@ -403,7 +403,8 @@
           "refs": {
             "default": {
               "style": [],
-              "characters": []
+              "characters": [],
+              "sets": []
             },
             "type": "object",
             "properties": {
@@ -415,6 +416,13 @@
                 }
               },
               "characters": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "sets": {
                 "default": [],
                 "type": "array",
                 "items": {

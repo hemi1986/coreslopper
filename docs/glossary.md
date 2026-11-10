@@ -230,6 +230,14 @@ _Avoid_: lore, shared assets
 The written premise, tone, world rules, and episode plan of a series.
 _Avoid_: brief, treatment
 
+**Episode Plan**:
+The planned episodes of a series, each with a number, a title, and an optional logline.
+_Avoid_: season plan, schedule
+
+**Creative Limit**:
+An optional bound a series sets on its episodes, such as episode length or lip-sync shot length. Technical limits of a model are not creative limits.
+_Avoid_: constraint, max duration
+
 **Episode**:
 One installment of a series: a project of kind `episode` with a number, a script, and its own budget.
 _Avoid_: part, chapter
@@ -265,6 +273,10 @@ _Avoid_: location, background, stage (a **Stage** is a pipeline step)
 **Take**:
 The audio of one script line, generated or recorded by the user.
 _Avoid_: clip, recording, segment
+
+**Ambience**:
+The background sound of a scene, such as room tone or machine hum, laid under its takes.
+_Avoid_: background music, soundscape
 
 **Episode Track**:
 The finished audio of an episode, mixed from its takes, ambience, and optional music. It takes the place of the song.

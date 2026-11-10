@@ -1,0 +1,202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "number",
+      "const": 1
+    },
+    "slug": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string"
+    },
+    "formats": {
+      "type": "object",
+      "properties": {
+        "master": {
+          "type": "object",
+          "properties": {
+            "aspect": {
+              "type": "string",
+              "minLength": 1
+            },
+            "width": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "height": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "fps": {
+              "default": 30,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "aspect",
+            "width",
+            "height"
+          ]
+        },
+        "derivatives": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "aspect": {
+                "type": "string",
+                "minLength": 1
+              },
+              "width": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "height": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "fps": {
+                "default": 30,
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "aspect",
+              "width",
+              "height"
+            ]
+          }
+        }
+      },
+      "required": [
+        "master"
+      ]
+    },
+    "providers": {
+      "default": {
+        "image": "mock",
+        "video": "mock"
+      },
+      "type": "object",
+      "properties": {
+        "image": {
+          "default": "mock",
+          "type": "string",
+          "enum": [
+            "fal",
+            "higgsfield",
+            "comfyui",
+            "mock"
+          ]
+        },
+        "video": {
+          "default": "mock",
+          "type": "string",
+          "enum": [
+            "fal",
+            "higgsfield",
+            "comfyui",
+            "mock"
+          ]
+        },
+        "lipsync": {
+          "type": "string",
+          "enum": [
+            "fal",
+            "higgsfield",
+            "comfyui",
+            "mock"
+          ]
+        },
+        "audio": {
+          "type": "string",
+          "enum": [
+            "comfyui",
+            "mock"
+          ]
+        }
+      }
+    },
+    "brand": {
+      "default": "example",
+      "type": "string",
+      "minLength": 1
+    },
+    "episodes": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "episode": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "logline": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "episode",
+          "title"
+        ]
+      }
+    },
+    "limits": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "episode_seconds": {
+          "type": "object",
+          "properties": {
+            "min": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "max": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          },
+          "required": [
+            "min",
+            "max"
+          ]
+        },
+        "lipsync_seconds_max": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    }
+  },
+  "required": [
+    "version",
+    "slug",
+    "title",
+    "formats"
+  ]
+}
