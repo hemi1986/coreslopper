@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed — 2026-11-10. Extends [ADR 0001](0001-folder-based-projects.md), [ADR 0005](0005-symbolic-timing-anchors.md), and [ADR 0013](0013-existing-song-interactive-setup.md). ADR 0013 stays in force for music videos.
+Accepted — 2026-11-10. Extends [ADR 0001](0001-folder-based-projects.md), [ADR 0005](0005-symbolic-timing-anchors.md), and [ADR 0013](0013-existing-song-interactive-setup.md). ADR 0013 stays in force for music videos.
 
 ## Context
 

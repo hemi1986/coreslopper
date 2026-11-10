@@ -21,4 +21,4 @@ Short records of decisions that are hard to reverse, surprising without context,
 | [0015](0015-comfyui-images-lipsync-audio.md) | ComfyUI also for stills, edits, lip-sync, and audio; output kind from the `cs_output` node. |
 | [0016](0016-episode-projects.md) | Episode projects: a project kind with its own stage list, a series canon, and an episode track built from a script. |
 
-Status values: `Proposed`, `Accepted`, `Deprecated`, `Superseded by ADR-NNNN`.
+Status values: `Accepted`, `Deprecated`, `Superseded by ADR-NNNN`.
