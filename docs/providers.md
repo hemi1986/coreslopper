@@ -17,7 +17,7 @@ providers:
 |---|---|---|
 | `image` | `generateImage`, `editImage` | `fal`, `higgsfield`, `mock` |
 | `video` | `textToVideo`, `imageToVideo`, `firstLastFrameToVideo` | `fal`, `higgsfield`, `comfyui`, `mock` |
-| `lipsync` | `lipSync` | `fal`, `mock` (Higgsfield has no lip-sync yet). Defaults to `video`, or to `fal` when `video` is `comfyui`. |
+| `lipsync` | `lipSync` | `fal`, `comfyui` (LTX FLF2V lip-sync, see [comfyui/README.md](../comfyui/README.md)), `mock` (Higgsfield has no lip-sync yet). Defaults to `video`, or to `fal` when `video` is `comfyui`. |
 
 When a storyboard uses lip-sync shots and `video` is `higgsfield`, set `lipsync: fal`.
 

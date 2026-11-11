@@ -24,18 +24,26 @@ license: MIT
 ## Process
 
 1. Read the shot's prompts, style refs, and character refs. If the shot names a character but the character has no reference image, stop and run `character-bible` first. Pick any user-provided moodboard or composition references from `assets/references/` and pass their project-relative paths in the batch `references` array.
-2. Choose roles from `config/models.yaml`, not hard-coded model IDs. Use the cheapest role that meets the shot's quality needs. Pick the clip operation per shot:
-   | Operation | References | Role | Use for |
-   |---|---|---|---|
-   | `imageToVideo` | start frame | `video.image_to_video.*` | Default; every character shot. |
-   | `firstLastFrameToVideo` | start frame, end frame | `video.first_last_frame` | A move or morph between two keyframes. |
-   | `textToVideo` | none | `video.text_to_video` | Abstract B-roll and atmospheres without a character. |
+2. Choose roles from `config/models.yaml`, not hard-coded model IDs. Use the cheapest role that meets the shot's quality needs. Route each clip by its keyframes and lip-sync:
+   | Shot | Operation | References | Role | Local workflow |
+   |---|---|---|---|---|
+   | Lip-sync | `lipSync` | start frame, end frame (the start frame again when there is one keyframe) | `video.lipsync` | `ltx25-lipsync-flf2v` |
+   | Movement with a fixed target (turn, sit down, draw a weapon, push into a close-up) | `firstLastFrameToVideo` | start frame, end frame; both show the face cleanly | `video.first_last_frame` | `ltx-flf2v` |
+   | One keyframe | `imageToVideo` | start frame | `video.image_to_video.*` | `ltx-i2v` |
+   | No keyframe: atmosphere and establishing shots only, never a recurring character | `textToVideo` | none | `video.text_to_video` | `ltx-t2v` |
+
+   Clip rules for every non-lip-sync shot: 3–6 s with one clear action. Keep important faces large in frame. A wide shot with several people gets 2–3 s of minimal motion, or stays a still with a slow zoom in the edit.
+
+   Prompts are short and concrete; long scene descriptions make the result worse. The local LTX models run distilled at CFG 1, so a negative prompt has no effect: write what should happen instead ("her mouth stays closed", "static camera", "calm, natural expression").
+   - Non-lip-sync prompts start with "Preserve the exact characters, faces, clothing and lighting from the input image." and describe motion precisely and calmly ("smooth, natural movement, steady camera"). These workflows generate their own sound, which the edit discards; where nobody speaks, add "Nobody speaks, mouths stay closed."
+   - Lip-sync prompts are 2–3 sentences: shot size and camera, "speaks/sings the audio with accurate lip sync", the exact words in quotes, one note on expression. Template: `Close-up, static camera. She softly speaks the audio with accurate lip sync: "<text>". Calm, natural expression, eyes on camera.` Frame close-up or medium close-up, face large, static camera.
 
    With a `comfyui` provider the generation runs locally from the workflow the role names (`comfyui/workflows/<model>.json`). It costs $0; stills take seconds, clips about a minute per 3 s, so keep clip batches small. Run `npm run cli -- doctor` first; if ComfyUI is unreachable or the workflow is missing, stop with a credential-class hard stop. Local specifics:
    - `editImage` on `qwen-edit` takes up to 16 references; `references[0]` is the image that is edited and sets the output size.
    - `image.background_removal` (`editImage`, one reference, prompt "Remove the background, and output a PNG image") cuts a subject out as a transparent PNG for Remotion layers. It needs a clear subject; check that the result is not empty.
    - Speech (`generateAudio`, role `audio.voice`, workflow `voxcpm-clone`): `audio` is the reference WAV, `params.transcript` its exact words, `prompt` the text to speak. Before writing the prompt, spell out every number, year, time, abbreviation, and symbol in German words ("2077" → "zweitausendsiebenundsiebzig", "z. B." → "zum Beispiel"); `generate` rejects digits and symbols. Generate one sentence or paragraph per item and join the takes with ffmpeg. On a slip or wrong stress, retry with up to 3 seeds. Use `audio.voice_design` (`"(description)Text"`) only to find a new voice.
-   - Local `lipSync` (`providers.lipsync: comfyui`, workflow `ltx-av`) takes its length from the vocal segment; keep segments at 10 s or less. Write the prompt as "Preserve the exact person from the input image … sings the supplied vocal audio with accurate lip sync".
+   - Local `lipSync` (`providers.lipsync: comfyui`, workflow `ltx25-lipsync-flf2v`) is driven by the isolated vocal stem `audio/stems/vocals.wav`, never the full mix. Set `"audio": "audio/stems/vocals.wav"`, `audioStartSeconds` to the line's start, and `durationSeconds` to the exact length of the line plus about 0.3 s of the pause after it; keep it at 10 s or less. Cut every segment in a speech pause: the frame count rounds down to 8n+1, so only that silent tail is dropped, never the end of a word. On a weak take, try 2–3 other seeds first, then adjust the prompt.
+   - Resolution follows the project format (16:9 or 9:16) in multiples of 64. The roles render drafts at 0.8 MP; for the final render set `models.<role>.params.megapixels: 1.9` in `project.yaml`. Keyframes must already have the video's aspect ratio.
 3. Write a batch JSON file outside the repo or under `projects/<slug>/assets/batches/`. Shape:
    ```json
    [
@@ -64,20 +72,21 @@ license: MIT
    and pass it as the first reference of the next clip. To land on a planned frame, use `firstLastFrameToVideo` with that keyframe as the second reference.
 8. **Lip-sync shots** (`lipSync` set on the shot):
    1. Generate a dedicated keyframe with `editImage` from the character sheet: face frontal or slight 3/4, evenly lit, mouth slightly open, face filling at least a third of the frame, modest clothing (high neckline, covered shoulders). Never feed the multi-view sheet itself. Keep the prompt neutral; words such as "sexy", "intimate", or "seductive" trigger the provider's content moderation.
-   2. Resolve the shot's start and end anchors to seconds from `timing.effective.json` and cut the vocal segment:
-      `npm run cli -- audio-segment projects/<slug> --start <s> --end <s> --name <shot-id>`
-      (source defaults to `audio/stems/vocals.wav`; use `--source audio/song.wav` only if there is no vocal stem).
-      In an episode, cut from the speaker stem that `episode-track` wrote: add `--character <id>` (`audio/stems/<id>.wav`). The stem holds only that character's takes at full length, so the segment lines up with the shot.
-   3. Add a batch item:
+   2. Resolve the shot's start and end anchors to seconds from `timing.effective.json`. Place the start just before the first word and the end in the pause after the last word, about 0.3 s past it. The vocals always come from `audio/stems/vocals.wav`; `generate` rejects the full mix (`audio/song.*`).
+   3. Add a batch item. Local (`providers.lipsync: comfyui`) cuts the stem in the workflow; add the end keyframe as a second reference when the shot has one:
       ```json
       {
         "operation": "lipSync",
         "role": "video.lipsync",
-        "prompt": "she sings with intensity, subtle head movement",
+        "prompt": "Close-up, static camera. She softly sings the audio with accurate lip sync: \"<text>\". Calm, natural expression, eyes on camera.",
         "references": ["assets/image/keyframe/<keyframe>.png"],
-        "audio": "assets/audio-segments/<shot-id>.mp3"
+        "audio": "audio/stems/vocals.wav",
+        "audioStartSeconds": 61.2,
+        "durationSeconds": 3.4
       }
       ```
+      In an episode, use the speaker stem that `episode-track` wrote (`audio/stems/<id>.wav`) instead of `vocals.wav`; with fal.ai, cut it with `audio-segment --character <id>`.
+      fal.ai takes a cut segment instead: `npm run cli -- audio-segment projects/<slug> --start <s> --end <s> --name <shot-id>`, then `"audio": "assets/audio-segments/<shot-id>.mp3"` without `audioStartSeconds`.
       Cost is billed by the audio length; keep each segment ≤ 30 s and as tight as the sung line.
       A `422 content_policy_violation` (`partner_validation_failed` or a `sexual` category) means moderation rejected the image or prompt; the call is not billed. Retry once with a more covered close-up and a neutral prompt. If it fails again, stop retrying that shot, because repeated rejections can flag the account. Use a non-lip-synced clip as a stand-in and report it.
    4. The clip must start exactly at the shot start; do not trim its head in Remotion. Its audio is muted; the song stays the only audio source. Check sync at first/middle/last frame against the lyric word timestamps.

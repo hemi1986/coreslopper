@@ -27,11 +27,10 @@
 # need no pricing. Adapter params:
 #   fps: 24            frame rate the workflow renders at (sets cs_fps if present)
 #   frame_step: 8      round frame counts to step*n+1 (LTX needs 8n+1)
-#   size_multiple: 32  round width/height to a multiple (LTX needs 32)
-#   size_scale: 0.5    fraction of the output size for workflows that upscale the latent
-#   megapixels: 1      scale the target size to this many megapixels, keeping the aspect
+#   size_multiple: 64  round width/height to a multiple (LTX: 64)
+#   megapixels: 0.8    scale the target size to this many megapixels, keeping the aspect
+#                      (LTX: 0.8 for drafts, 1.9 for final renders)
 #   width/height       override the project's master size
-#   audio_offset: 0    start of the driving audio in seconds (cs_audio_start)
 #   lyrics: "..."      lyrics for music workflows (cs_lyrics); empty means none
 #   node_inputs        {"<node title or id>.<input>": value} for anything else
 # See comfyui/README.md for the node titles.
@@ -192,17 +191,17 @@ roles:
           upscaled in a 1080p master; use the Pro variant for native 1080p. Verify the
           current price and duration limit.
       comfyui:
-        model: ltx-av
+        model: ltx-i2v
         params:
           fps: 24
           frame_step: 8
-          size_multiple: 32
-          size_scale: 0.5
+          size_multiple: 64
+          megapixels: 0.8
         maxDuration: 10
         notes: >-
-          Local LTX 2.5 audio-video workflow in image-to-video mode (custom audio
-          off). Set models.<role>.model to ltx-i2v to keep a plain LTX i2v
-          workflow. Duration limit depends on VRAM.
+          Official LTX 2.5 image-to-video template. 0.8 MP is the draft size; set
+          megapixels: 1.9 in a project override for the final render. Clips of
+          3-6 s, one clear action per shot.
   video.image_to_video.fast:
     provider: fal
     model: kling/v4/flash/image-to-video
@@ -227,17 +226,17 @@ roles:
         maxDuration: 10
         notes: Kling 2.5 Turbo Standard. 5 s or 10 s only.
       comfyui:
-        model: ltx-av
+        model: ltx-i2v
         params:
           fps: 24
           frame_step: 8
-          size_multiple: 32
-          size_scale: 0.5
+          size_multiple: 64
+          megapixels: 0.8
         maxDuration: 10
         notes: >-
-          Local LTX 2.5 audio-video workflow in image-to-video mode (custom audio
-          off). Set models.<role>.model to ltx-i2v to keep a plain LTX i2v
-          workflow. Duration limit depends on VRAM.
+          Official LTX 2.5 image-to-video template. 0.8 MP is the draft size; set
+          megapixels: 1.9 in a project override for the final render. Clips of
+          3-6 s, one clear action per shot.
   video.image_to_video.premium:
     provider: fal
     model: bytedance/seedance-2.5/us/image-to-video
@@ -263,17 +262,17 @@ roles:
         maxDuration: 30
         notes: Seedance 2.5 list price at 1080p; discounts may lower it.
       comfyui:
-        model: ltx-av
+        model: ltx-i2v
         params:
           fps: 24
           frame_step: 8
-          size_multiple: 32
-          size_scale: 0.5
+          size_multiple: 64
+          megapixels: 0.8
         maxDuration: 10
         notes: >-
-          Local LTX 2.5 audio-video workflow in image-to-video mode (custom audio
-          off). Set models.<role>.model to ltx-i2v to keep a plain LTX i2v
-          workflow. Duration limit depends on VRAM.
+          Official LTX 2.5 image-to-video template. 0.8 MP is the draft size; set
+          megapixels: 1.9 in a project override for the final render. Clips of
+          3-6 s, one clear action per shot.
   video.image_to_video.budget:
     provider: fal
     model: alibaba/wan-3.0/image-to-video
@@ -300,17 +299,17 @@ roles:
         maxDuration: 30
         notes: Wan 3.0 at 720p. Planning estimate.
       comfyui:
-        model: ltx-av
+        model: ltx-i2v
         params:
           fps: 24
           frame_step: 8
-          size_multiple: 32
-          size_scale: 0.5
+          size_multiple: 64
+          megapixels: 0.8
         maxDuration: 10
         notes: >-
-          Local LTX 2.5 audio-video workflow in image-to-video mode (custom audio
-          off). Set models.<role>.model to ltx-i2v to keep a plain LTX i2v
-          workflow. Duration limit depends on VRAM.
+          Official LTX 2.5 image-to-video template. 0.8 MP is the draft size; set
+          megapixels: 1.9 in a project override for the final render. Clips of
+          3-6 s, one clear action per shot.
 
   video.premium.veo:
     provider: fal
@@ -339,17 +338,17 @@ roles:
         maxDuration: 8
         notes: Veo 3.1 Fast supports 4, 6, or 8 second clips.
       comfyui:
-        model: ltx-av
+        model: ltx-i2v
         params:
           fps: 24
           frame_step: 8
-          size_multiple: 32
-          size_scale: 0.5
+          size_multiple: 64
+          megapixels: 0.8
         maxDuration: 10
         notes: >-
-          Local LTX 2.5 audio-video workflow in image-to-video mode (custom audio
-          off). Set models.<role>.model to ltx-i2v to keep a plain LTX i2v
-          workflow. Duration limit depends on VRAM.
+          Official LTX 2.5 image-to-video template. 0.8 MP is the draft size; set
+          megapixels: 1.9 in a project override for the final render. Clips of
+          3-6 s, one clear action per shot.
 
   video.text_to_video:
     provider: comfyui
@@ -357,7 +356,8 @@ roles:
     params:
       fps: 24
       frame_step: 8
-      size_multiple: 32
+      size_multiple: 64
+      megapixels: 0.8
     maxDuration: 10
     notes: >-
       Text-to-video for abstract B-roll and atmospheres without a keyframe. Local
@@ -371,7 +371,8 @@ roles:
     params:
       fps: 24
       frame_step: 8
-      size_multiple: 32
+      size_multiple: 64
+      megapixels: 0.8
     maxDuration: 10
     notes: >-
       Animate between a start and an end keyframe (firstLastFrameToVideo). Local
@@ -395,18 +396,19 @@ roles:
       Higgsfield has no lip-sync adapter yet; set providers.lipsync to fal.
     alternatives:
       comfyui:
-        model: ltx-av
+        model: ltx25-lipsync-flf2v
         params:
           fps: 24
           frame_step: 8
-          size_multiple: 32
-          size_scale: 0.5
+          size_multiple: 64
+          megapixels: 0.8
         maxDuration: 10
         notes: >-
-          Local LTX 2.5 with custom audio on (providers.lipsync: comfyui). The
-          clip length follows the vocal segment; split longer lines. Prompt the
-          singing explicitly ("sings the supplied vocal audio with accurate lip
-          sync").
+          LTX 2.5 FLF2V lip-sync, single pass (providers.lipsync: comfyui). Start
+          frame, end frame (the start frame again when there is only one), and the
+          vocal stem cut by audioStartSeconds + durationSeconds. Frames round down
+          to 8n+1, so end each segment in a pause with about 0.3 s of silence.
+          0.8 MP draft, megapixels: 1.9 for the final render.
 
   audio.music:
     provider: comfyui
