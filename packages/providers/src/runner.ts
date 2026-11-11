@@ -78,6 +78,7 @@ export class GenerationRunner {
       params,
       references: referenceHashes,
       ...(audioHash ? { audio: audioHash } : {}),
+      ...(request.audioStartSeconds !== undefined ? { audioStartSeconds: request.audioStartSeconds } : {}),
       ...(fingerprint ? { fingerprint } : {}),
     });
 
@@ -107,6 +108,7 @@ export class GenerationRunner {
         negativePrompt: request.negativePrompt,
         references,
         audio: request.audio,
+        audioStartSeconds: request.audioStartSeconds,
         seed,
         width: request.width,
         height: request.height,

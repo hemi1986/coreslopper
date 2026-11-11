@@ -12,8 +12,10 @@ export interface ProviderInput {
   prompt: string;
   negativePrompt?: string;
   references?: string[];
-  /** Audio file that drives a lipSync generation (vocal segment). */
+  /** Audio file that drives a lipSync generation (vocal stem or a cut vocal segment). */
   audio?: string;
+  /** Where the driving audio starts in `audio`, in seconds (local lip-sync cuts the stem itself). */
+  audioStartSeconds?: number;
   seed: number;
   width?: number;
   height?: number;
