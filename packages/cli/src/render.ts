@@ -111,7 +111,7 @@ function withPublicAssets(
  * `brand/<project.brand>/`), as public URLs. A family with a single file gets
  * the full weight range so variable fonts work; extra files default to 400.
  */
-async function brandFonts(projectDir: string, brandId: string, root: string): Promise<BrandFont[]> {
+export async function brandFonts(projectDir: string, brandId: string, root: string): Promise<BrandFont[]> {
   const brand = await loadBrand(projectDir, brandId, root);
   if (!brand) return [];
   const counts = new Map<string, number>();
@@ -206,7 +206,7 @@ const STAGED_FILE = /\.(png|jpe?g|webp|avif|gif|svg|mp4|webm|mov|mkv|wav|mp3|m4a
  * bundle; using the repository root copied node_modules, .git, .cache and all
  * projects (several GB) on each render.
  */
-async function stagePublicDir(props: VideoProps, root: string, dir: string): Promise<number> {
+async function stagePublicDir(props: unknown, root: string, dir: string): Promise<number> {
   await rm(dir, { recursive: true, force: true });
   await mkdir(dir, { recursive: true });
   const files = new Set<string>();
@@ -234,7 +234,8 @@ async function stagePublicDir(props: VideoProps, root: string, dir: string): Pro
   return files.size;
 }
 
-export async function bundleFor(props: VideoProps, root: string, workDir: string): Promise<string> {
+/** Bundle the Remotion entry point with a public dir holding only the files `props` references. */
+export async function bundleFor(props: { project: { slug: string } }, root: string, workDir: string): Promise<string> {
   const publicDir = join(workDir, 'public');
   const staged = await stagePublicDir(props, root, publicDir);
   console.log(`Bundling Remotion composition for ${props.project.slug} (${staged} public files)...`);

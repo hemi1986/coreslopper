@@ -179,6 +179,10 @@ The composition:
 
 Formats are `16x9`, `9x16`, `1x1`, and `4x5`, with safe-area-aware layouts. The master is whatever `formats.master` says; render, QA, and stage outputs derive its ID from the master's aspect (`renders/16x9.mp4` for a 16:9 music video, `renders/9x16.mp4` for a vertical episode). Derivatives are not naive crops. The composition plays `audio/song.wav` or `audio/episode.wav` by kind. For episodes it also gets the chat lines for the `ChatWindow` component and, with `render --subtitles en`, burns in the English subtitles inside the format's safe area.
 
+Thumbnails use a second composition, `Thumbnail` (one frame; 1280x720, or 1080x1920 for a Short with `--format 9x16`, set through `calculateMetadata`). `npm run cli -- thumbnail` resolves the colors from the style bible's palette roles and the hook and tag fonts from its typography, copies the still into `.cache/thumbnail/`, and renders a JPEG with `renderStill`. The composition measures the glyphs once, before the frame is captured, and passes the metrics to pure layout functions, so the same inputs give the same pixels.
+
+Shorts are not rendered: `npm run cli -- short` re-encodes a frame-snapped range of `renders/9x16.mp4` with ffmpeg into `renders/shorts/`. Its bounds use the storyboard's anchor kinds in a compact string form, resolved against the effective timing. `qa` probes each Short (9:16, at most 60 s), checks the Short thumbnails, and parses `review/upload.md` for a title, description, and hashtags per item.
+
 ## Claude Code layer
 
 - `.claude/skills/<name>/SKILL.md` — the stage skills.

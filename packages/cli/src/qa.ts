@@ -18,6 +18,18 @@ import {
 import { validateProject } from './validate.js';
 import { buildVideoProps, bundleFor, masterFormatId, renderLimits } from './render.js';
 import { subtitlesPath } from './subtitles.js';
+import { listThumbnails, thumbnailProblems } from './thumbnail-files.js';
+import {
+  SHORTS_PER_VIDEO,
+  listShorts,
+  parseUploadText,
+  shortName,
+  shortPaths,
+  shortProblems,
+  uploadTextProblems,
+  type ShortProbe,
+} from './release-files.js';
+import { probeVideo } from './short.js';
 
 export interface QaOptions {
   projectDir: string;
@@ -54,6 +66,90 @@ function checkAssets(project: Awaited<ReturnType<typeof loadProject>>, assetsDon
   return missing.length
     ? { name: 'Assets', result: 'FAIL', evidence: `missing: ${missing.join(', ')}` }
     : { name: 'Assets', result: 'PASS', evidence: 'all referenced assets exist' };
+}
+
+/** Three 1280x720 JPEGs under 2 MB in renders/thumbnails/; fewer is a warning, a bad file a failure. */
+export async function checkThumbnails(renders: string, root: string): Promise<{ check: Check; files: string[] }> {
+  const files = await listThumbnails(renders);
+  const bad: string[] = [];
+  for (const file of files) {
+    const problems = await thumbnailProblems(file);
+    if (problems.length) bad.push(`${relative(root, file)}: ${problems.join(', ')}`);
+  }
+  const check: Check = bad.length
+    ? { name: 'Thumbnails', result: 'FAIL', evidence: bad.join('; ') }
+    : files.length < 3
+      ? { name: 'Thumbnails', result: 'WARN', evidence: `${files.length} of 3 in renders/thumbnails/; run thumbnail` }
+      : { name: 'Thumbnails', result: 'PASS', evidence: `${files.length} JPEGs, 1280x720, under 2 MB` };
+  return { check, files: files.map((file) => relative(root, file)) };
+}
+
+/**
+ * The Shorts of the release package: each 9:16 and at most 60 s (else FAIL)
+ * with a 1080x1920 thumbnail beside it; fewer than three is a warning.
+ */
+export async function checkShorts(
+  renders: string,
+  root: string,
+  probe: (path: string) => Omit<ShortProbe, 'name'> = probeVideo,
+): Promise<{ checks: Check[]; files: string[]; names: string[] }> {
+  const videos = await listShorts(renders);
+  const names = videos.map((video) => shortName(video)!);
+  const bad: string[] = [];
+  const badThumbs: string[] = [];
+  const missingThumbs: string[] = [];
+  let unprobed = 0;
+  for (const [index, video] of videos.entries()) {
+    const name = names[index]!;
+    try {
+      const problems = shortProblems({ name, ...probe(video) });
+      if (problems.length) bad.push(`${relative(root, video)}: ${problems.join(', ')}`);
+    } catch {
+      unprobed += 1;
+    }
+    const thumb = shortPaths(renders, name).thumbnail;
+    if (!existsSync(thumb)) missingThumbs.push(name);
+    else {
+      const problems = await thumbnailProblems(thumb, '9x16');
+      if (problems.length) badThumbs.push(`${relative(root, thumb)}: ${problems.join(', ')}`);
+    }
+  }
+  const shorts: Check = bad.length
+    ? { name: 'Shorts', result: 'FAIL', evidence: bad.join('; ') }
+    : videos.length < SHORTS_PER_VIDEO || unprobed
+      ? {
+          name: 'Shorts',
+          result: 'WARN',
+          evidence: `${videos.length} of ${SHORTS_PER_VIDEO} in renders/shorts/${unprobed ? `; ${unprobed} not probed (ffprobe missing)` : '; run short'}`,
+        }
+      : { name: 'Shorts', result: 'PASS', evidence: `${videos.length} videos, 9:16, at most 60 s` };
+  const thumbs: Check = badThumbs.length
+    ? { name: 'Short thumbnails', result: 'FAIL', evidence: badThumbs.join('; ') }
+    : missingThumbs.length || videos.length === 0
+      ? {
+          name: 'Short thumbnails',
+          result: 'WARN',
+          evidence: videos.length ? `missing for ${missingThumbs.join(', ')}; run thumbnail --format 9x16` : 'no Shorts yet',
+        }
+      : { name: 'Short thumbnails', result: 'PASS', evidence: `${videos.length} JPEGs, 1080x1920, under 2 MB` };
+  const files = videos.flatMap((video, index) => {
+    const thumb = shortPaths(renders, names[index]!).thumbnail;
+    return [relative(root, video), ...(existsSync(thumb) ? [relative(root, thumb)] : [])];
+  });
+  return { checks: [shorts, thumbs], files, names };
+}
+
+/** `review/upload.md`: missing is a warning; an item without title, description, or hashtags a failure. */
+export async function checkUploadText(review: string, root: string, shortNames: string[]): Promise<Check> {
+  const path = join(review, 'upload.md');
+  if (!existsSync(path)) {
+    return { name: 'Upload text', result: 'WARN', evidence: `${relative(root, path)} is missing; write it from the release-package step` };
+  }
+  const markdown = await readFile(path, 'utf8');
+  const { errors, warnings } = uploadTextProblems(parseUploadText(markdown), markdown, shortNames);
+  if (errors.length) return { name: 'Upload text', result: 'FAIL', evidence: errors.join('; ') };
+  if (warnings.length) return { name: 'Upload text', result: 'WARN', evidence: warnings.join('; ') };
+  return { name: 'Upload text', result: 'PASS', evidence: `${relative(root, path)}: main video and ${shortNames.length} Shorts` };
 }
 
 async function checkManifest(project: Awaited<ReturnType<typeof loadProject>>): Promise<Check> {
@@ -183,6 +279,12 @@ export async function runQa(options: QaOptions): Promise<string> {
     });
   }
 
+  const thumbnails = await checkThumbnails(project.paths.renders, project.paths.root);
+  checks.push(thumbnails.check);
+  const shorts = await checkShorts(project.paths.renders, project.paths.root);
+  checks.push(...shorts.checks);
+  checks.push(await checkUploadText(project.paths.review, project.paths.root, shorts.names));
+
   if (options.determinismFrame !== undefined) {
     const { props } = await buildVideoProps({ projectDir: options.projectDir });
     const root = repoRoot();
@@ -233,6 +335,8 @@ export async function runQa(options: QaOptions): Promise<string> {
     '',
     `READY: ${ready ? 'yes' : 'no'}`,
     '',
+    ...(thumbnails.files.length ? ['## Thumbnails', '', ...thumbnails.files.map((file) => `- \`${file}\``), ''] : []),
+    ...(shorts.files.length ? ['## Shorts', '', ...shorts.files.map((file) => `- \`${file}\``), ''] : []),
     'Visual checks (sync, readability, character consistency) are performed by the `qa-checker` agent using stills and clip frames.',
     '',
   ].join('\n');
