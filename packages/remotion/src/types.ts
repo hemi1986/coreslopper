@@ -117,8 +117,10 @@ export const defaultVideoProps: VideoProps = {
   shots: [fixtureShot],
 };
 
-/** Props of the Thumbnail composition (1280x720 still); colours are resolved by the CLI. */
+/** Props of the Thumbnail composition (one still); colours are resolved by the CLI. */
 export interface ThumbnailProps extends Record<string, unknown> {
+  /** `16x9` (1280x720, main video) or `9x16` (1080x1920, Short); default `16x9`. */
+  format?: '16x9' | '9x16';
   /** Public path of the source still; empty renders the background colour only. */
   still: string;
   /** Hook lines, already in capitals. */
@@ -144,6 +146,7 @@ export interface ThumbnailProps extends Record<string, unknown> {
 }
 
 export const defaultThumbnailProps: ThumbnailProps = {
+  format: '16x9',
   still: '',
   lines: ['CORESLOPPER'],
   tag: 'DEMO',

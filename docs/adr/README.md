@@ -22,5 +22,6 @@ Short records of decisions that are hard to reverse, surprising without context,
 | [0016](0016-episode-projects.md) | Episode projects: a project kind with its own stage list, a series canon, and an episode track built from a script. |
 | [0017](0017-ltx-lipsync-flf2v-official-templates.md) | Local lip-sync on an LTX FLF2V lip-sync workflow; all other clips on the official LTX templates; no negative prompts. |
 | [0018](0018-thumbnails.md) | `qa-export` makes three thumbnails: the agent picks stills and words, a Remotion still composes the pixels. |
+| [0019](0019-release-package.md) | `qa-export` ends with a release package: three Shorts with vertical thumbnails and one upload text, checked by `qa`. |
 
 Status values: `Accepted`, `Deprecated`, `Superseded by ADR-NNNN`.

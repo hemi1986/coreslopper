@@ -26,9 +26,9 @@ A coreslopper music-video project.
 | `storyboard.md` | Human-readable shot list. |
 | `state.json` | Resumable pipeline state and spend. |
 | `brand/` | Optional project-specific brand overrides. |
-| `review/` | Contact sheet, QA report, small stills. |
+| `review/` | Contact sheet, QA report, small stills, and `upload.md` (titles, descriptions, and hashtags for the video and its Shorts). |
 | `characters/<id>/` | Character sheets and reference images; gitignored. |
-| `audio/`, `assets/`, `renders/` | Local media; gitignored. |
+| `audio/`, `assets/`, `renders/` | Local media; gitignored. `renders/thumbnails/` and `renders/shorts/` hold the release package's thumbnails and Shorts. |
 
 User-provided references belong in `assets/references/` (moodboards, composition, color) or `characters/<id>/` (recurring characters). Actual footage or stills used in the timeline belong in `assets/footage/`. All of these stay local.
 
