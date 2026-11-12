@@ -55,6 +55,15 @@ jobs:
       - name: Contact sheet
         run: npm run cli -- contact-sheet projects/demo
 
+      - name: Short smoke test
+        run: |
+          mkdir -p projects/demo/renders
+          ffmpeg -v error -y -f lavfi -i testsrc2=size=1080x1920:rate=30:duration=12 -f lavfi -i sine=frequency=440:duration=12 \
+            -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest -threads 6 projects/demo/renders/9x16.mp4
+          npm run cli -- short projects/demo --from section:verse_1 --to section:chorus_1:end --name D1-chorus
+          test -s projects/demo/renders/shorts/D1-chorus-9x16.mp4
+          rm -rf projects/demo/renders/9x16.mp4 projects/demo/renders/shorts
+
       - name: Cache Remotion browser
         uses: actions/cache@v6
         with:

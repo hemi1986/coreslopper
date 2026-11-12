@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { THUMBNAIL_HEIGHT, THUMBNAIL_MAX_BYTES, THUMBNAIL_WIDTH } from '../../remotion/src/lib/thumbnail.js';
+import { THUMBNAIL_MAX_BYTES, thumbnailSize, type ThumbnailFormat } from '../../remotion/src/lib/thumbnail.js';
 
 // Thumbnail file checks without the renderer, so status (also in the npx bundle) can list them.
 
@@ -26,13 +26,14 @@ export function jpegSize(buffer: Buffer): { width: number; height: number } | un
 }
 
 /** Problems of a finished thumbnail file: wrong size, wrong type, over 2 MB. Empty when it is fine. */
-export async function thumbnailProblems(path: string): Promise<string[]> {
+export async function thumbnailProblems(path: string, format: ThumbnailFormat = '16x9'): Promise<string[]> {
   const problems: string[] = [];
   const buffer = await readFile(path);
   const size = jpegSize(buffer);
+  const expected = thumbnailSize(format);
   if (!size) problems.push('not a JPEG');
-  else if (size.width !== THUMBNAIL_WIDTH || size.height !== THUMBNAIL_HEIGHT) {
-    problems.push(`${size.width}x${size.height}, expected ${THUMBNAIL_WIDTH}x${THUMBNAIL_HEIGHT}`);
+  else if (size.width !== expected.width || size.height !== expected.height) {
+    problems.push(`${size.width}x${size.height}, expected ${expected.width}x${expected.height}`);
   }
   if (buffer.length >= THUMBNAIL_MAX_BYTES) problems.push(`${(buffer.length / 1024 / 1024).toFixed(2)} MB, limit 2 MB`);
   return problems;

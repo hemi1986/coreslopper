@@ -13,11 +13,13 @@ import {
   type StyleBible,
 } from '@coreslopper/core';
 import {
+  THUMBNAIL_FORMAT_IDS,
   THUMBNAIL_LAYOUTS,
   THUMBNAIL_MAX_BYTES,
   parseFocus,
   parseThumbnailText,
   readableOn,
+  type ThumbnailFormat,
   type ThumbnailLayout,
 } from '../../remotion/src/lib/thumbnail.js';
 import type { ThumbnailProps } from '../../remotion/src/types.js';
@@ -36,6 +38,8 @@ export interface ThumbnailOptions {
   zoom?: number;
   /** Typography key of style.yaml for the hook (default `display`). */
   font?: string;
+  /** `16x9` (default, 1280x720) or `9x16` (1080x1920, a Short). */
+  format?: string;
 }
 
 const STILL_TYPES = new Set(['.png', '.jpg', '.jpeg', '.webp', '.svg']);
@@ -86,9 +90,17 @@ export async function buildThumbnailProps(
   const style = project.style;
   if (!style) throw new ValidationError('The project has no style.yaml; run the style-character stage first.');
 
-  const layout = (options.layout ?? 'left') as ThumbnailLayout;
+  const format = (options.format ?? '16x9') as ThumbnailFormat;
+  if (!THUMBNAIL_FORMAT_IDS.includes(format)) {
+    throw new ValidationError(`Unknown thumbnail format "${options.format}". Use ${THUMBNAIL_FORMAT_IDS.join(', ')}.`);
+  }
+  // A Short thumbnail has one vertical layout: text in the lower part, face above.
+  const layout = (options.layout ?? (format === '9x16' ? 'bottom' : 'left')) as ThumbnailLayout;
   if (!THUMBNAIL_LAYOUTS.includes(layout)) {
     throw new ValidationError(`Unknown layout "${options.layout}". Use ${THUMBNAIL_LAYOUTS.join(', ')}.`);
+  }
+  if (format === '9x16' && layout !== 'bottom') {
+    throw new ValidationError('A 9x16 thumbnail has a fixed vertical layout (text below, face above); omit --layout.');
   }
   let lines: string[];
   let focus: { x: number; y: number };
@@ -123,6 +135,7 @@ export async function buildThumbnailProps(
   const tagFont = typographyFont(style, 'mono', 700) ?? { family: 'JetBrains Mono', weight: 700 };
 
   const props: ThumbnailProps = {
+    format,
     still: relative(root, staged).split('\\').join('/'),
     lines,
     ...(tag ? { tag } : {}),
@@ -137,7 +150,7 @@ export async function buildThumbnailProps(
   return { props, slug: project.config.slug };
 }
 
-/** Render one 1280x720 JPEG thumbnail; returns its path. */
+/** Render one JPEG thumbnail (1280x720, or 1080x1920 for `--format 9x16`); returns its path. */
 export async function renderThumbnail(options: ThumbnailOptions): Promise<string> {
   const root = repoRoot();
   const { props, slug } = await buildThumbnailProps(options, root);
@@ -163,7 +176,7 @@ export async function renderThumbnail(options: ThumbnailOptions): Promise<string
       });
       if ((await stat(output)).size < THUMBNAIL_MAX_BYTES) break;
     }
-    const problems = await thumbnailProblems(output);
+    const problems = await thumbnailProblems(output, props.format);
     if (problems.length) throw new ValidationError(`Thumbnail ${output} failed its checks`, problems);
     console.log(`Thumbnail written to ${output}`);
     return output;

@@ -2,11 +2,10 @@ import { useEffect, useState } from 'react';
 import { AbsoluteFill, Img, cancelRender, continueRender, delayRender, staticFile } from 'remotion';
 import { EXAMPLE_BRAND_FONTS } from './fonts';
 import {
-  THUMBNAIL_HEIGHT,
-  THUMBNAIL_WIDTH,
   coverPlacement,
   faceAnchor,
   layoutThumbnail,
+  thumbnailSize,
   type LineMetrics,
   type ThumbnailLayoutResult,
 } from './lib/thumbnail';
@@ -65,13 +64,16 @@ function fontStack(font: { family: string }, fallback: string): string {
 }
 
 /**
- * A 1280x720 video thumbnail: the still covers the frame with its focus point
- * on the face side, a scrim darkens the text side, and the hook lines sit on
- * solid, slightly tilted slabs (first line on the slab colour, the rest on the
- * accent). An optional mono tag sits in a top corner. Everything is measured
- * once before the frame is captured, so the same props give the same pixels.
+ * A video thumbnail, 1280x720 for the main video or 1080x1920 for a Short:
+ * the still covers the frame with its focus point on the face side, a scrim
+ * darkens the text side, and the hook lines sit on solid, slightly tilted
+ * slabs (first line on the slab colour, the rest on the accent). An optional
+ * mono tag sits in a top corner. Everything is measured once before the frame
+ * is captured, so the same props give the same pixels.
  */
 export function Thumbnail(props: ThumbnailProps) {
+  const format = props.format ?? '16x9';
+  const frame = thumbnailSize(format);
   const [measured, setMeasured] = useState<Measured | null>(null);
   const [handle] = useState(() => delayRender('Thumbnail fonts, still, and layout'));
 
@@ -84,8 +86,11 @@ export function Thumbnail(props: ThumbnailProps) {
         props.lines.map((line) => measure(line, props.hookFont)),
         props.layout,
         props.tag ? measure(props.tag, props.tagFont) : undefined,
+        format,
       );
-      const image = source ? coverPlacement(source, props.focus, props.zoom, faceAnchor(props.layout)) : undefined;
+      const image = source
+        ? coverPlacement(source, props.focus, props.zoom, faceAnchor(props.layout, format), frame)
+        : undefined;
       if (active) setMeasured({ layout, image });
       continueRender(handle);
     })().catch((error: unknown) => cancelRender(error));
@@ -98,7 +103,9 @@ export function Thumbnail(props: ThumbnailProps) {
 
   const { colors } = props;
   const scrim =
-    props.layout === 'bottom'
+    format === '9x16'
+      ? `linear-gradient(to top, ${colors.background}f0 0%, ${colors.background}c0 22%, ${colors.background}00 58%)`
+      : props.layout === 'bottom'
       ? `linear-gradient(to top, ${colors.background}e6 0%, ${colors.background}b3 18%, ${colors.background}00 46%)`
       : `linear-gradient(to ${props.layout === 'left' ? 'right' : 'left'}, ${colors.background}e0 11%, ${colors.background}00 50%)`;
 
@@ -117,16 +124,16 @@ export function Thumbnail(props: ThumbnailProps) {
         />
       ) : null}
       <AbsoluteFill style={{ background: scrim }} />
-      {props.layout === 'bottom' ? null : (
+      {props.layout === 'bottom' || format === '9x16' ? null : (
         <AbsoluteFill
           style={{ background: `linear-gradient(to bottom, ${colors.background}00 72%, ${colors.background}8c 100%)` }}
         />
       )}
       {measured ? (
         <svg
-          width={THUMBNAIL_WIDTH}
-          height={THUMBNAIL_HEIGHT}
-          viewBox={`0 0 ${THUMBNAIL_WIDTH} ${THUMBNAIL_HEIGHT}`}
+          width={frame.width}
+          height={frame.height}
+          viewBox={`0 0 ${frame.width} ${frame.height}`}
           style={{ position: 'absolute', inset: 0 }}
         >
           <defs>

@@ -133,8 +133,20 @@ A grid of stills sampled from the storyboard for fast visual review.
 _Avoid_: thumbnail sheet
 
 **Thumbnail**:
-The 1280x720 still that represents a finished video on a platform such as YouTube: a generated still with the hook on solid slabs. Each video gets three, of different subjects.
+The still that represents a finished video on a platform such as YouTube: a generated still with the hook on solid slabs. The main video gets three 1280x720 thumbnails of different subjects; each Short gets one at 1080x1920.
 _Avoid_: poster, cover, preview image
+
+**Short**:
+A vertical excerpt of the finished video for YouTube Shorts and similar feeds: 9:16, 30–50 s (never over 60 s), cut from the 9:16 render on section boundaries, stored as `renders/shorts/<name>-9x16.mp4`. Each video gets three.
+_Avoid_: clip (an AI clip is a generated shot), teaser, reel
+
+**Upload Text**:
+`review/upload.md`: the title, description, hashtags, and tags of the main video and of every Short, plus a checklist per Short, in the project's language.
+_Avoid_: metadata, copy
+
+**Release Package**:
+What `qa-export` hands over for publishing: the master, three thumbnails, three Shorts with their thumbnails, and the upload text.
+_Avoid_: deliverables, export bundle
 
 **Animatic**:
 A low-fidelity, timed preview of the storyboard before final assets.
@@ -217,7 +229,7 @@ The skeleton copied by `npm run cli -- new` (called from the `new-video` skill) 
 _Avoid_: boilerplate
 
 **Export**:
-The final step that produces all format renders and the review report; also the optional extraction of a project into its own repository.
+The final step that produces all format renders, the review report, and the release package; also the optional extraction of a project into its own repository.
 _Avoid_: render
 
 ## Series and episodes
