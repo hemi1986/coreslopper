@@ -69,6 +69,11 @@ jobs:
           npm run cli -- render projects/demo --still 130 --still-scale 0.25
           test -s projects/demo/renders/still-130.png
 
+      - name: Thumbnail smoke test
+        env:
+          CORESLOPPER_RENDER_TESTS: "1"
+        run: npx vitest run tests/thumbnail-render.test.ts
+
       - name: Demo episode (mock provider)
         run: |
           npm run demo:episode

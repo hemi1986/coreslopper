@@ -23,6 +23,7 @@ import { validateProject } from './validate.js';
 import { validateChangedFile } from './validate-file.js';
 import { writeContactSheet } from './contact-sheet.js';
 import { renderProject } from './render.js';
+import { renderThumbnail } from './thumbnail.js';
 import { createProject } from './new-project.js';
 import { linkProjectMedia } from './media-dir.js';
 import { generateBatch } from './generate.js';
@@ -205,6 +206,28 @@ program
           frames,
           subtitles: options.subtitles as 'en' | undefined,
         });
+      }),
+  );
+
+program
+  .command('thumbnail [project]')
+  .description('Compose a 1280x720 JPEG video thumbnail from a still, the hook text, and the style bible.')
+  .requiredOption('--still <path>', 'Source still (png, jpg, webp, svg); relative to the working directory or the project')
+  .requiredOption('--text <lines>', 'Hook text; separate lines with "|" (at most 3 lines of 4 words)')
+  .requiredOption('--out <file>', 'Output JPEG, e.g. projects/<slug>/renders/thumbnails/thumb-1-hero.jpg')
+  .option('--tag <text>', 'Small mono tag in a top corner, e.g. SATIRE')
+  .option('--layout <side>', 'Text side: left | right | bottom; the face goes opposite', 'left')
+  .option('--accent <token>', 'Palette key or role for the slabs after the first line and the tag', 'accent')
+  .option('--focus <x,y>', 'Point of the still (fractions 0-1) placed on the face side', '0.5,0.4')
+  .option('--zoom <factor>', 'Extra zoom on the still, 1-4', (value) => Number(value), 1)
+  .option('--font <key>', 'Typography key of style.yaml for the hook', 'display')
+  .action(
+    (
+      project: string | undefined,
+      options: { still: string; text: string; out: string; tag?: string; layout: string; accent: string; focus: string; zoom: number; font: string },
+    ) =>
+      run(async () => {
+        await renderThumbnail({ projectDir: projectDirFromArg(project), ...options });
       }),
   );
 

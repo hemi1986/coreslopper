@@ -116,3 +116,42 @@ export const defaultVideoProps: VideoProps = {
   timing: fixtureTiming,
   shots: [fixtureShot],
 };
+
+/** Props of the Thumbnail composition (1280x720 still); colours are resolved by the CLI. */
+export interface ThumbnailProps extends Record<string, unknown> {
+  /** Public path of the source still; empty renders the background colour only. */
+  still: string;
+  /** Hook lines, already in capitals. */
+  lines: string[];
+  tag?: string;
+  layout: 'left' | 'right' | 'bottom';
+  /** The point of the still (fractions 0–1) that lands on the face side. */
+  focus: { x: number; y: number };
+  zoom: number;
+  hookFont: { family: string; weight: number };
+  tagFont: { family: string; weight: number };
+  colors: {
+    /** Frame fill behind the still and the scrim towards the text side. */
+    background: string;
+    /** First line: slab and text. */
+    slab: string;
+    slabText: string;
+    /** Further lines and the tag: slab and text. */
+    accent: string;
+    accentText: string;
+  };
+  fonts: BrandFont[];
+}
+
+export const defaultThumbnailProps: ThumbnailProps = {
+  still: '',
+  lines: ['CORESLOPPER'],
+  tag: 'DEMO',
+  layout: 'left',
+  focus: { x: 0.5, y: 0.4 },
+  zoom: 1,
+  hookFont: { family: 'Space Grotesk', weight: 700 },
+  tagFont: { family: 'JetBrains Mono', weight: 700 },
+  colors: { background: '#050510', slab: '#0d0d24', slabText: '#f8f8ff', accent: '#f9f002', accentText: '#050510' },
+  fonts: [],
+};
