@@ -132,6 +132,10 @@ _Avoid_: theme
 A grid of stills sampled from the storyboard for fast visual review.
 _Avoid_: thumbnail sheet
 
+**Thumbnail**:
+The 1280x720 still that represents a finished video on a platform such as YouTube: a generated still with the hook on solid slabs. Each video gets three, of different subjects.
+_Avoid_: poster, cover, preview image
+
 **Animatic**:
 A low-fidelity, timed preview of the storyboard before final assets.
 _Avoid_: previz

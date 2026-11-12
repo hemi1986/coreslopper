@@ -1,6 +1,6 @@
 ---
 name: video-qa
-description: Use before delivering a music video to run still checks, sync checks, readability, determinism, budget reconciliation, and final format renders.
+description: Use before delivering a music video to run still checks, sync checks, readability, determinism, budget reconciliation, final format renders, and YouTube thumbnails.
 license: MIT
 ---
 
@@ -31,8 +31,9 @@ license: MIT
    - Character consistency: the same character looks like the same character.
 5. Run the determinism check: render the same still frame twice and compare SHA-256 hashes. They must match.
 6. Render all formats: 16:9 master, 9:16, 1:1, and 4:5 if configured.
-7. Write `review/report.md` with a pass/fail line per check, the warnings that remain, and the exact render paths.
-8. Update the state with `npm run cli -- stage-done <project> qa-export --outputs review/report.md,renders/16x9.mp4`.
+7. Once the master passes, make three thumbnails: follow [thumbnails.md](thumbnails.md) for the stills, the hook, the `thumbnail` command, and the art-director review.
+8. Run `npm run cli -- qa projects/<slug>` and complete `review/report.md` with a pass/fail line per check, the warnings that remain, and the exact render and thumbnail paths.
+9. Update the state with `npm run cli -- stage-done <project> qa-export --outputs review/report.md,renders/16x9.mp4,renders/thumbnails`.
 
 ## Episodes
 
@@ -46,6 +47,7 @@ license: MIT
 - Every check has a pass/fail result and evidence.
 - Sync, readability, determinism, coverage, and budget reconciliation pass, or the exceptions are documented.
 - All configured formats are rendered.
+- Three thumbnails in `renders/thumbnails/` passed the art director; `qa` reports `Thumbnails: PASS`.
 - `review/report.md` is current.
 - No secrets, copyrighted media, or generated assets are staged for commit.
 
@@ -55,3 +57,4 @@ license: MIT
 - Trusting a previous render after changing timing or a component.
 - A manifest with a cost that does not match the budget.
 - Calling a render "final" without a determinism check.
+- Three thumbnails of the same subject, or a hook too small to read at 320x180.

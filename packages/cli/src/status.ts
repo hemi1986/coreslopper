@@ -8,6 +8,8 @@ import {
   stageDefinition,
   stageTable,
 } from '@coreslopper/core';
+import { relative } from 'node:path';
+import { listThumbnails } from './thumbnail-files.js';
 
 export async function printStatus(projectDir: string): Promise<void> {
   const loaded = await loadProject(projectDir);
@@ -26,6 +28,10 @@ export async function printStatus(projectDir: string): Promise<void> {
   );
   const next = nextStage(state);
   const interactive = next && stageDefinition(next.id, state.kind)?.interactive;
+  const thumbnails = await listThumbnails(loaded.paths.renders);
+  if (thumbnails.length) {
+    console.log(`Thumbnails: ${thumbnails.map((file) => relative(loaded.paths.root, file)).join(', ')}`);
+  }
   console.log(`Next: ${next ? `${next.id} (${next.skills.join(', ')})${interactive ? ' · interactive' : ''}` : 'done'}`);
   if (!existsSync(loaded.paths.state)) console.log('Note: state.json does not exist yet; showing the initial state.');
 }

@@ -21,5 +21,6 @@ Short records of decisions that are hard to reverse, surprising without context,
 | [0015](0015-comfyui-images-lipsync-audio.md) | Superseded by 0017. ComfyUI also for stills, edits, lip-sync, and audio; output kind from the `cs_output` node. |
 | [0016](0016-episode-projects.md) | Episode projects: a project kind with its own stage list, a series canon, and an episode track built from a script. |
 | [0017](0017-ltx-lipsync-flf2v-official-templates.md) | Local lip-sync on an LTX FLF2V lip-sync workflow; all other clips on the official LTX templates; no negative prompts. |
+| [0018](0018-thumbnails.md) | `qa-export` makes three thumbnails: the agent picks stills and words, a Remotion still composes the pixels. |
 
 Status values: `Accepted`, `Deprecated`, `Superseded by ADR-NNNN`.

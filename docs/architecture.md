@@ -179,6 +179,8 @@ The composition:
 
 Formats are `16x9`, `9x16`, `1x1`, and `4x5`, with safe-area-aware layouts. The master is whatever `formats.master` says; render, QA, and stage outputs derive its ID from the master's aspect (`renders/16x9.mp4` for a 16:9 music video, `renders/9x16.mp4` for a vertical episode). Derivatives are not naive crops. The composition plays `audio/song.wav` or `audio/episode.wav` by kind. For episodes it also gets the chat lines for the `ChatWindow` component and, with `render --subtitles en`, burns in the English subtitles inside the format's safe area.
 
+Thumbnails use a second composition, `Thumbnail` (1280x720, one frame). `npm run cli -- thumbnail` resolves the colors from the style bible's palette roles and the hook and tag fonts from its typography, copies the still into `.cache/thumbnail/`, and renders a JPEG with `renderStill`. The composition measures the glyphs once, before the frame is captured, and passes the metrics to pure layout functions, so the same inputs give the same pixels.
+
 ## Claude Code layer
 
 - `.claude/skills/<name>/SKILL.md` — the stage skills.

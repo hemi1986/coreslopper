@@ -127,10 +127,19 @@ Completion: preview plays with the song; master is 1080p30 H.264; derivatives us
 ## 9. QA & export
 
 - Skill: `video-qa`
-- Input: all renders, manifest, state
-- Output: `review/report.md`, all formats
+- Input: all renders, manifest, state, generated stills
+- Output: `review/report.md`, all formats, three thumbnails in `renders/thumbnails/`
 
-Completion: schema, assets, sync, readability, determinism, budget reconciliation, and all formats pass or are documented.
+Once the master passes, the skill makes three YouTube thumbnails: the main character, the cameo or key scene, and the ensemble. The agent picks the stills and writes the hook; the `thumbnail` command composes each image deterministically with the brand fonts and the style bible's palette, as a 1280x720 sRGB JPEG under 2 MB. The art director reviews all three ([ADR 0018](adr/0018-thumbnails.md)).
+
+```bash
+npm run cli -- thumbnail projects/my-video --still assets/image/keyframe/<hash>-0.png \
+  --text "THE HOOK|OF THE SONG" --tag LIVE --layout left --focus 0.6,0.35 \
+  --out projects/my-video/renders/thumbnails/thumb-1-hero.jpg
+npm run cli -- qa projects/my-video        # lists the thumbnails, checks size and format
+```
+
+Completion: schema, assets, sync, readability, determinism, budget reconciliation, all formats, and three thumbnails pass or are documented.
 
 ## Running the demo
 

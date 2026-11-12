@@ -18,6 +18,7 @@ import {
 import { validateProject } from './validate.js';
 import { buildVideoProps, bundleFor, masterFormatId, renderLimits } from './render.js';
 import { subtitlesPath } from './subtitles.js';
+import { listThumbnails, thumbnailProblems } from './thumbnail-files.js';
 
 export interface QaOptions {
   projectDir: string;
@@ -54,6 +55,22 @@ function checkAssets(project: Awaited<ReturnType<typeof loadProject>>, assetsDon
   return missing.length
     ? { name: 'Assets', result: 'FAIL', evidence: `missing: ${missing.join(', ')}` }
     : { name: 'Assets', result: 'PASS', evidence: 'all referenced assets exist' };
+}
+
+/** Three 1280x720 JPEGs under 2 MB in renders/thumbnails/; fewer is a warning, a bad file a failure. */
+export async function checkThumbnails(renders: string, root: string): Promise<{ check: Check; files: string[] }> {
+  const files = await listThumbnails(renders);
+  const bad: string[] = [];
+  for (const file of files) {
+    const problems = await thumbnailProblems(file);
+    if (problems.length) bad.push(`${relative(root, file)}: ${problems.join(', ')}`);
+  }
+  const check: Check = bad.length
+    ? { name: 'Thumbnails', result: 'FAIL', evidence: bad.join('; ') }
+    : files.length < 3
+      ? { name: 'Thumbnails', result: 'WARN', evidence: `${files.length} of 3 in renders/thumbnails/; run thumbnail` }
+      : { name: 'Thumbnails', result: 'PASS', evidence: `${files.length} JPEGs, 1280x720, under 2 MB` };
+  return { check, files: files.map((file) => relative(root, file)) };
 }
 
 async function checkManifest(project: Awaited<ReturnType<typeof loadProject>>): Promise<Check> {
@@ -183,6 +200,9 @@ export async function runQa(options: QaOptions): Promise<string> {
     });
   }
 
+  const thumbnails = await checkThumbnails(project.paths.renders, project.paths.root);
+  checks.push(thumbnails.check);
+
   if (options.determinismFrame !== undefined) {
     const { props } = await buildVideoProps({ projectDir: options.projectDir });
     const root = repoRoot();
@@ -233,6 +253,7 @@ export async function runQa(options: QaOptions): Promise<string> {
     '',
     `READY: ${ready ? 'yes' : 'no'}`,
     '',
+    ...(thumbnails.files.length ? ['## Thumbnails', '', ...thumbnails.files.map((file) => `- \`${file}\``), ''] : []),
     'Visual checks (sync, readability, character consistency) are performed by the `qa-checker` agent using stills and clip frames.',
     '',
   ].join('\n');

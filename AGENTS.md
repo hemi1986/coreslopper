@@ -89,7 +89,7 @@ dist/              Generated npx bundle (gitignored)
 | 6 | `storyboard` | `storyboard` | `storyboard.yaml`, `storyboard.md`, contact sheet | Schema, anchors, coverage, refs, source rules |
 | 7 | `assets` | `remotion-motion`, `ai-clips`, `footage` | Components, keyframes, clips, footage | Per-batch cost + QA; cache |
 | 8 | `assembly` | `assembly-render` | `renders/preview-16x9.mp4` | Preview; sync/legibility |
-| 9 | `qa-export` | `video-qa` | `review/report.md`, all formats | Sync, readability, determinism |
+| 9 | `qa-export` | `video-qa` | `review/report.md`, all formats, 3 thumbnails | Sync, readability, determinism; art director on thumbnails |
 
 The song always exists already; the workflow never writes lyrics or generates music. ✋ marks the **interactive stages**: the `new-video` skill runs them in the main session with the user (project data, lyrics, song import, grilling). `/video-next` refuses to start while one is open.
 
@@ -137,6 +137,7 @@ npm run schema
 | `npm run cli -- status <project>` | Show stage state and budget. |
 | `npm run cli -- contact-sheet <project>` | Write `review/contact-sheet.svg`. |
 | `npm run cli -- render <project> [--format <id>]` | Render with Remotion in segments; the default is the master format. `--frames <a>-<b>` renders a test range; `--subtitles en` burns in episode subtitles. |
+| `npm run cli -- thumbnail <project> --still <file> --text "<a\|b>" --out <file>` | Compose a 1280x720 JPEG thumbnail with the brand fonts and palette; `--tag`, `--layout left\|right\|bottom`, `--accent <role>`, `--focus x,y`. |
 | `npm run cli -- media-link <project> [--move]` | Move `assets/` and `renders/` to `CORESLOPPER_MEDIA_DIR` and symlink them. |
 | `npm run cli -- new <slug> --budget <usd>` | Create a project from the template. |
 | `npm run cli -- new <slug> --kind episode --series <s> --episode <n> --budget <usd>` | Create an episode of a series. |
