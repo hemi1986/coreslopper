@@ -7,9 +7,11 @@ import {
   ComfyUIProvider,
   GenerationRunner,
   framesFor,
+  framesWithin,
   inspectWorkflow,
   inspectWorkflowDir,
   parseWorkflow,
+  resolutionAspect,
   type ComfyWorkflow,
   type FetchLike,
 } from '../packages/providers/src/index.ts';
@@ -337,25 +339,28 @@ describe('ComfyUI provider selection', () => {
   });
 });
 
-/** The LTX audio-video graph: start image, optional driving audio, seconds-based length. */
-function ltxAvWorkflow(): ComfyWorkflow {
+/** The LTX FLF2V lip-sync graph: start/end frame, driving audio cut by start + frames, ResolutionSelector. */
+function ltxLipsyncWorkflow(): ComfyWorkflow {
   return {
     '1': { class_type: 'PrimitiveStringMultiline', inputs: { value: 'demo' }, _meta: { title: 'Prompt cs_prompt' } },
-    '2': { class_type: 'LoadImage', inputs: { image: 'demo.png' }, _meta: { title: 'Load Image cs_start_image' } },
-    '3': { class_type: 'LoadAudio', inputs: { audio: 'demo.mp3' }, _meta: { title: 'Load Audio cs_audio' } },
-    '4': { class_type: 'PrimitiveFloat', inputs: { value: 7 }, _meta: { title: 'duration cs_duration' } },
-    '5': { class_type: 'PrimitiveFloat', inputs: { value: 24 }, _meta: { title: 'fps cs_fps' } },
-    '6': {
-      class_type: 'EmptyLTXVLatentVideo',
-      inputs: { width: 544, height: 960, length: ['9', 0] },
-      _meta: { title: 'latent cs_width cs_height' },
+    '2': { class_type: 'LoadImage', inputs: { image: 'a.png' }, _meta: { title: 'Load First Frame cs_start_image' } },
+    '3': { class_type: 'LoadImage', inputs: { image: 'b.png' }, _meta: { title: 'Load Last Frame cs_end_image' } },
+    '4': { class_type: 'LoadAudio', inputs: { audio: 'demo.mp3' }, _meta: { title: 'Load Driving Audio cs_audio' } },
+    '5': {
+      class_type: 'ResolutionSelector',
+      inputs: { aspect_ratio: '16:9 (Widescreen)', megapixels: 0.9, multiple: 64 },
+      _meta: { title: 'Resolution Selector cs_resolution' },
     },
-    '7': { class_type: 'Switch latent [Crystools]', inputs: { boolean: true }, _meta: { title: 'cs_use_audio' } },
-    '8': { class_type: 'BooleanBasic', inputs: { boolean: true }, _meta: { title: 'cs_use_audio' } },
-    '9': { class_type: 'TrimAudioDuration', inputs: { start_index: 17, duration: ['4', 0] }, _meta: { title: 'cs_audio_start' } },
-    '10': { class_type: 'RandomNoise', inputs: { noise_seed: 1 }, _meta: { title: 'cs_seed' } },
-    '11': { class_type: 'RandomNoise', inputs: { noise_seed: 1 }, _meta: { title: 'cs_seed' } },
-    '12': { class_type: 'VHS_VideoCombine', inputs: { frame_rate: ['5', 0] }, _meta: { title: 'cs_output' } },
+    '6': { class_type: 'PrimitiveInt', inputs: { value: 73 }, _meta: { title: 'Duration (frames) cs_frames' } },
+    '7': { class_type: 'PrimitiveInt', inputs: { value: 25 }, _meta: { title: 'Frame Rate(int) cs_fps' } },
+    '8': {
+      class_type: 'TrimAudioDuration',
+      inputs: { start_index: 0, duration: ['9', 0], audio: ['4', 0] },
+      _meta: { title: 'Trim Driving Audio cs_audio_start' },
+    },
+    '9': { class_type: 'ComfyMathExpression', inputs: { expression: 'a / b', 'values.a': ['6', 0] }, _meta: { title: 'len' } },
+    '10': { class_type: 'RandomNoise', inputs: { noise_seed: 1 }, _meta: { title: 'RandomNoise cs_seed' } },
+    '11': { class_type: 'SaveVideo', inputs: { filename_prefix: 'x' }, _meta: { title: 'Save Video cs_output' } },
   };
 }
 
@@ -393,7 +398,7 @@ function outputsServer(outputs: Record<string, unknown>): FakeServer {
 
 describe('ComfyUI images, lip-sync, and audio', () => {
   it('derives operations from the output node and the image/audio tags', () => {
-    expect(inspectWorkflow(ltxAvWorkflow()).operations).toEqual(['imageToVideo', 'lipSync']);
+    expect(inspectWorkflow(ltxLipsyncWorkflow()).operations).toEqual(['lipSync']);
     expect(inspectWorkflow(qwenEditWorkflow()).operations).toEqual(['editImage']);
     const t2i = qwenEditWorkflow();
     delete t2i['2'];
@@ -401,56 +406,70 @@ describe('ComfyUI images, lip-sync, and audio', () => {
     expect(inspectWorkflow(musicWorkflow())).toMatchObject({ kind: 'audio', operations: ['generateAudio'] });
   });
 
-  it('lip-syncs with the uploaded vocal segment and a seconds-based length', async () => {
-    const { dir, root, start } = await setup({ 'ltx-av': ltxAvWorkflow() });
+  it('lip-syncs start and end frame to the vocal stem, cut by start time and frames that never outrun it', async () => {
+    const { dir, root, start, end } = await setup({ 'ltx25-lipsync-flf2v': ltxLipsyncWorkflow() });
     const vocals = join(root, 'vocals.wav');
-    await writeFile(vocals, 'vocal-segment');
-    const server = outputsServer({ '12': { gifs: [{ filename: 'ltx-av_00001.mp4', subfolder: '', type: 'output' }] } });
+    await writeFile(vocals, 'vocal-stem');
+    const server = outputsServer({ '11': { images: [{ filename: 'lip_00001.mp4', subfolder: '', type: 'output' }] } });
     const result = await provider(dir, server).lipSync({
-      model: 'ltx-av',
-      prompt: 'she sings',
-      references: [start],
+      model: 'ltx25-lipsync-flf2v',
+      prompt: 'Close-up, static camera. She sings the audio with accurate lip sync.',
+      references: [start, end],
       audio: vocals,
+      audioStartSeconds: 42.5,
       seed: 9,
-      width: 1920,
-      height: 1080,
-      durationSeconds: 3.2,
-      params: { fps: 24, frame_step: 8, size_multiple: 32, size_scale: 0.5 },
+      width: 1080,
+      height: 1920,
+      durationSeconds: 3.6,
+      params: { fps: 24, frame_step: 8, size_multiple: 64, megapixels: 0.8 },
       outputDir: join(root, 'out'),
     });
     const prompt = server.submitted();
-    expect(server.uploads).toHaveLength(2);
+    expect(server.uploads).toHaveLength(3);
     expect(prompt['2']!.inputs.image).toBe(`coreslopper/${server.uploads[0]}`);
-    expect(prompt['3']!.inputs.audio).toBe(`coreslopper/${server.uploads[1]}`);
-    expect(prompt['7']!.inputs.boolean).toBe(true);
-    expect(prompt['8']!.inputs.boolean).toBe(true);
-    expect(prompt['9']!.inputs.start_index).toBe(0);
-    expect(prompt['9']!.inputs.duration).toEqual(['4', 0]);
-    // 3.2 s at 24 fps -> 81 frames; the workflow computes 1 + floor(fps*s/8)*8 from the seconds.
-    const seconds = prompt['4']!.inputs.value as number;
-    expect(1 + Math.floor((24 * seconds) / 8) * 8).toBe(81);
-    expect(prompt['6']!.inputs).toMatchObject({ width: 960, height: 544 });
+    expect(prompt['3']!.inputs.image).toBe(`coreslopper/${server.uploads[1]}`);
+    expect(prompt['4']!.inputs.audio).toBe(`coreslopper/${server.uploads[2]}`);
+    expect(prompt['5']!.inputs).toEqual({ aspect_ratio: '9:16 (Portrait Widescreen)', megapixels: 0.8, multiple: 64 });
+    // 3.6 s at 24 fps = 86.4 frames -> 81 (8n+1, rounded down): the clip never runs past the audio.
+    expect(prompt['6']!.inputs.value).toBe(81);
+    expect(prompt['7']!.inputs.value).toBe(24);
+    expect(prompt['8']!.inputs.start_index).toBe(42.5);
+    expect(prompt['8']!.inputs.duration).toEqual(['9', 0]);
     expect(prompt['10']!.inputs.noise_seed).toBe(9);
-    expect(prompt['11']!.inputs.noise_seed).toBe(9);
     expect(result.files[0]!.endsWith('.mp4')).toBe(true);
   });
 
-  it('runs the same workflow as image-to-video with audio off and a silent placeholder', async () => {
-    const { dir, root, start } = await setup({ 'ltx-av': ltxAvWorkflow() });
-    const server = outputsServer({ '12': { gifs: [{ filename: 'clip.mp4', subfolder: '', type: 'output' }] } });
-    await provider(dir, server).imageToVideo({
-      model: 'ltx-av',
-      prompt: 'slow push in',
+  it('uses the single keyframe as start and end frame', async () => {
+    const { dir, root, start } = await setup({ 'ltx25-lipsync-flf2v': ltxLipsyncWorkflow() });
+    const vocals = join(root, 'vocals.wav');
+    await writeFile(vocals, 'vocal-stem');
+    const server = outputsServer({ '11': { images: [{ filename: 'clip.mp4', subfolder: '', type: 'output' }] } });
+    await provider(dir, server).lipSync({
+      model: 'ltx25-lipsync-flf2v',
+      prompt: 'x',
       references: [start],
+      audio: vocals,
       seed: 2,
-      durationSeconds: 5,
+      durationSeconds: 2,
       params: { fps: 24, frame_step: 8 },
       outputDir: join(root, 'out'),
     });
     const prompt = server.submitted();
-    expect(prompt['7']!.inputs.boolean).toBe(false);
-    expect(prompt['8']!.inputs.boolean).toBe(false);
-    expect(server.uploads[1]!.endsWith('.wav')).toBe(true);
+    expect(prompt['3']!.inputs.image).toBe(prompt['2']!.inputs.image);
+    expect(prompt['8']!.inputs.start_index).toBe(0);
+    expect(prompt['6']!.inputs.value).toBe(41);
+  });
+
+  it('rejects other operations and too-short segments on the lip-sync workflow', async () => {
+    const { dir, root, start } = await setup({ 'ltx25-lipsync-flf2v': ltxLipsyncWorkflow() });
+    const server = outputsServer({});
+    await expect(
+      provider(dir, server).imageToVideo({ model: 'ltx25-lipsync-flf2v', prompt: 'x', references: [start], seed: 1, outputDir: root }),
+    ).rejects.toThrow(/fits lipSync/);
+    expect(framesWithin(3.6, 24, 8)).toBe(81);
+    expect(() => framesWithin(0.3, 24, 8)).toThrow(/too short/);
+    expect(resolutionAspect(1920, 1088)).toBe('16:9 (Widescreen)');
+    expect(() => resolutionAspect(1080, 1350)).toThrow(/aspect ratio/);
   });
 
   it('edits with extra references linked into the autogrow input', async () => {

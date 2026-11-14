@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
 import {
@@ -53,10 +53,13 @@ export const BatchItemSchema = z
     prompt: z.string().min(1),
     references: z.array(z.string()).default([]),
     /**
-     * Vocal segment for lipSync (see `audio-segment`), or the reference voice for a
-     * voice-clone generateAudio; relative to the project.
+     * Vocals for lipSync: the vocal stem (`audio/stems/vocals.wav`) with
+     * `audioStartSeconds`, or a cut segment (see `audio-segment`). For a voice-clone
+     * generateAudio, the reference voice. Relative to the project.
      */
     audio: z.string().optional(),
+    /** Local lip-sync: where the line starts in `audio`; needs `durationSeconds`. */
+    audioStartSeconds: z.number().min(0).optional(),
     seed: z.number().int().optional(),
     width: z.number().int().positive().optional(),
     height: z.number().int().positive().optional(),
@@ -65,6 +68,12 @@ export const BatchItemSchema = z
   })
   .refine((item) => item.operation !== 'lipSync' || (item.audio && item.references.length > 0), {
     message: 'lipSync needs "audio" (a vocal segment) and a face image as the first reference.',
+  })
+  .refine((item) => item.audioStartSeconds === undefined || item.operation === 'lipSync', {
+    message: 'audioStartSeconds is only for lipSync.',
+  })
+  .refine((item) => item.audioStartSeconds === undefined || item.durationSeconds !== undefined, {
+    message: 'audioStartSeconds needs durationSeconds: the length of the vocal line plus about 0.3 s of the pause after it.',
   })
   .refine((item) => item.operation !== 'generateAudio' || item.references.length === 0, {
     message: 'generateAudio takes no references.',
@@ -77,7 +86,23 @@ export const BatchItemSchema = z
   })
   .refine((item) => item.operation !== 'firstLastFrameToVideo' || item.references.length === 2, {
     message: 'firstLastFrameToVideo needs exactly two references: the start frame, then the end frame.',
+  })
+  .refine((item) => item.operation !== 'lipSync' || item.references.length <= 2, {
+    message: 'lipSync takes a start frame and an optional end frame.',
   });
+
+/** Lip-sync must be driven by isolated vocals, never by the full mix. */
+function checkVocalSource(audio: string, projectRoot: string): void {
+  const audioDir = resolve(projectRoot, 'audio');
+  if (dirname(audio) === audioDir && /^song\./i.test(basename(audio))) {
+    throw new ValidationError(
+      `Lip-sync audio ${basename(audio)} is the full mix. Use the isolated vocal stem at audio/stems/vocals.wav: ` +
+        'export it from the song session and register it with `npm run cli -- import-song <project>`, or let ' +
+        '`audio-analysis` separate it with Demucs (it writes audio/stems/vocals.wav). Then set "audio" to ' +
+        'audio/stems/vocals.wav with audioStartSeconds, or cut a segment from it with `audio-segment`.',
+    );
+  }
+}
 
 export const BatchSchema = z.array(BatchItemSchema).min(1);
 
@@ -100,6 +125,7 @@ export interface ResolvedItem {
   cost: number;
   references: string[];
   audio?: string;
+  audioStartSeconds?: number;
   durationSeconds?: number;
 }
 
@@ -177,6 +203,12 @@ function resolveItem(
     throw new ConfigError(`Only the ComfyUI backend generates audio, but role "${item.role}" resolved to ${provider}.`);
   }
   if (item.operation === 'generateAudio' && item.role.startsWith('audio.voice')) checkSpokenText(item.prompt);
+  if (item.audioStartSeconds !== undefined && provider !== 'comfyui' && provider !== 'mock') {
+    throw new ValidationError(
+      `audioStartSeconds needs the local lip-sync workflow; ${provider} takes a cut segment. ` +
+        'Cut the line with `audio-segment` and drop audioStartSeconds.',
+    );
+  }
   const resolved = resolveModelRole(role, provider, override, item.role);
   const params = { ...resolved.params, ...item.params };
   const pricing =
@@ -195,8 +227,19 @@ function resolveItem(
   if (audio && !existsSync(audio)) {
     throw new ValidationError(`Missing audio input: ${audio}`);
   }
-  // A lip-sync clip is billed by the length of its driving audio.
-  const exactAudioSeconds = audio ? probeDuration(audio) : undefined;
+  if (audio && item.operation === 'lipSync') checkVocalSource(audio, projectRoot);
+  // A lip-sync clip is billed by the length of its driving audio: the cut
+  // window when the stem is cut in the workflow, else the whole segment.
+  const fileSeconds = audio ? probeDuration(audio) : undefined;
+  if (item.audioStartSeconds !== undefined && fileSeconds !== undefined) {
+    const end = item.audioStartSeconds + (item.durationSeconds ?? 0);
+    if (end > fileSeconds + 0.05) {
+      throw new ValidationError(
+        `Lip-sync window ${item.audioStartSeconds}-${end.toFixed(2)} s runs past the end of ${item.audio} (${fileSeconds.toFixed(2)} s).`,
+      );
+    }
+  }
+  const exactAudioSeconds = item.audioStartSeconds !== undefined ? item.durationSeconds : fileSeconds;
   const audioSeconds = exactAudioSeconds === undefined ? undefined : Math.ceil(exactAudioSeconds);
   // For generateAudio the audio is a reference voice, not the output length.
   if (
@@ -236,6 +279,7 @@ function resolveItem(
     cost,
     references,
     audio,
+    ...(item.audioStartSeconds !== undefined ? { audioStartSeconds: item.audioStartSeconds } : {}),
     // A local lip-sync workflow sets its clip length from the driving audio.
     durationSeconds:
       item.durationSeconds ??
@@ -264,6 +308,7 @@ export function toRequest(
     seed: item.item.seed,
     references: item.references,
     audio: item.audio,
+    ...(item.audioStartSeconds !== undefined ? { audioStartSeconds: item.audioStartSeconds } : {}),
     width: item.item.width ?? master.width,
     height: item.item.height ?? master.height,
     durationSeconds: item.durationSeconds,

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — 2026-11-10. Extends [ADR 0014](0014-comfyui-local-video.md).
+Superseded by ADR-0017 — 2026-11-11. Was: Accepted — 2026-11-10. Extends [ADR 0014](0014-comfyui-local-video.md). The local video and lip-sync parts are replaced by [ADR 0017](0017-ltx-lipsync-flf2v-official-templates.md); its decisions on stills, edits, and audio are carried over there.
 
 ## Context
 

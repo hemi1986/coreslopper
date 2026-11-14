@@ -10,7 +10,6 @@ import {
   delay,
   fetchJsonWithRetry,
   mimeForPath,
-  silentWav,
   type FetchLike,
 } from './http.js';
 import type { Operation, Provider, ProviderInput, ProviderOutput } from './types.js';
@@ -43,7 +42,7 @@ export const COMFYUI_TITLES = {
   duration: 'cs_duration',
   audio: 'cs_audio',
   audioStart: 'cs_audio_start',
-  useAudio: 'cs_use_audio',
+  resolution: 'cs_resolution',
   references: 'cs_references',
   lyrics: 'cs_lyrics',
   transcript: 'cs_transcript',
@@ -66,7 +65,7 @@ const INPUT_CANDIDATES: Record<ComfyTag, string[]> = {
   duration: ['seconds', 'duration', 'max_duration', 'value'],
   audio: ['audio'],
   audioStart: ['start_index', 'start', 'value'],
-  useAudio: ['boolean', 'value'],
+  resolution: ['aspect_ratio'],
   references: [],
   lyrics: ['lyrics', 'text', 'value'],
   transcript: ['prompt_text', 'transcript', 'reference_text', 'text', 'value'],
@@ -78,11 +77,9 @@ const ADAPTER_PARAMS = new Set([
   'fps',
   'frame_step',
   'size_multiple',
-  'size_scale',
   'megapixels',
   'width',
   'height',
-  'audio_offset',
   'lyrics',
   'transcript',
   'node_inputs',
@@ -207,17 +204,19 @@ export function inspectWorkflow(workflow: ComfyWorkflow): WorkflowInspection {
   const operations: Operation[] = [];
   if (kind === 'audio') operations.push('generateAudio');
   else if (kind === 'image') operations.push(titles.startImage ? 'editImage' : 'generateImage');
+  // A video workflow with driving audio lip-syncs a start (and optional end) frame.
+  else if (titles.audio) operations.push('lipSync');
   else if (titles.endImage) operations.push('firstLastFrameToVideo');
-  else if (titles.startImage) {
-    // A workflow with a cs_audio input lip-syncs; with cs_use_audio it can also run without audio.
-    if (!titles.audio || titles.useAudio) operations.push('imageToVideo');
-    if (titles.audio) operations.push('lipSync');
-  } else operations.push('textToVideo');
+  else if (titles.startImage) operations.push('imageToVideo');
+  else operations.push('textToVideo');
 
   const warnings: string[] = [];
   if (!titles.prompt) warnings.push(`no node titled ${COMFYUI_TITLES.prompt}; the prompt cannot be set`);
   if (titles.endImage && !titles.startImage) {
     warnings.push(`${COMFYUI_TITLES.endImage} without ${COMFYUI_TITLES.startImage}`);
+  }
+  if (kind === 'video' && titles.audio && !titles.startImage) {
+    warnings.push(`${COMFYUI_TITLES.audio} without ${COMFYUI_TITLES.startImage}; lip-sync needs a face frame`);
   }
   if (!titles.seed) warnings.push(`no node titled ${COMFYUI_TITLES.seed}; every run uses the workflow's seed`);
   if (kind === 'video' && !titles.frames && !titles.duration) {
@@ -318,6 +317,49 @@ function positiveInt(value: unknown, name: string, fallback: number): number {
 
 function roundTo(value: number, multiple: number): number {
   return Math.max(multiple, Math.round(value / multiple) * multiple);
+}
+
+/**
+ * ResolutionSelector aspect options by width/height ratio. A workflow tagged
+ * cs_resolution gets the option that matches the requested output size.
+ */
+const RESOLUTION_ASPECTS: [string, number][] = [
+  ['1:1 (Square)', 1],
+  ['2:3 (Portrait Photo)', 2 / 3],
+  ['3:2 (Photo)', 3 / 2],
+  ['3:4 (Portrait Standard)', 3 / 4],
+  ['4:3 (Standard)', 4 / 3],
+  ['9:16 (Portrait Widescreen)', 9 / 16],
+  ['16:9 (Widescreen)', 16 / 9],
+  ['21:9 (Ultrawide)', 21 / 9],
+];
+
+export function resolutionAspect(width: number, height: number): string {
+  const ratio = width / height;
+  const match = RESOLUTION_ASPECTS.find(([, value]) => Math.abs(value - ratio) / value < 0.02);
+  if (!match) {
+    throw new ConfigError(
+      `Output size ${width}x${height} has no matching ResolutionSelector aspect ratio. ` +
+        `Supported: ${RESOLUTION_ASPECTS.map(([name]) => name).join(', ')}.`,
+    );
+  }
+  return match[0];
+}
+
+/**
+ * Frames that fit inside a duration, never more. Lip-sync uses it so the clip
+ * never outruns its audio; the dropped remainder is the silent tail of the segment.
+ */
+export function framesWithin(durationSeconds: number, fps: number, step: number): number {
+  const available = Math.floor(durationSeconds * fps + 1e-6);
+  if (step <= 1) return Math.max(1, available);
+  const blocks = Math.floor((available - 1) / step);
+  if (blocks < 1) {
+    throw new ConfigError(
+      `A ${durationSeconds}s lip-sync segment is too short: it needs at least ${step + 1} frames at ${fps} fps.`,
+    );
+  }
+  return blocks * step + 1;
 }
 
 /** Frames for a duration. With frame_step 8 the count is 8n+1, as LTX expects. */
@@ -462,9 +504,11 @@ export class ComfyUIProvider implements Provider {
     if (uploads.end) setTitled(workflow, 'endImage', uploads.end, label);
     addReferenceImages(workflow, uploads.references ?? [], label);
     if (uploads.audio) setTitled(workflow, 'audio', uploads.audio, label);
-    if (inspection.titles.audio && inspection.kind === 'video') {
-      setTitled(workflow, 'useAudio', operation === 'lipSync', label);
-      setTitled(workflow, 'audioStart', Number(params.audio_offset ?? 0), label);
+    if (inspection.kind === 'video' && inspection.titles.audio) {
+      // The driving audio is cut in the workflow: start here, length = frames / fps.
+      const start = input.audioStartSeconds ?? 0;
+      if (!Number.isFinite(start) || start < 0) throw new ConfigError('audioStartSeconds must be 0 or more.');
+      setTitled(workflow, 'audioStart', start, label);
     }
     if (inspection.titles.lyrics) {
       if (params.lyrics !== undefined && typeof params.lyrics !== 'string') {
@@ -487,12 +531,28 @@ export class ComfyUIProvider implements Provider {
     const size = this.targetSize(input, params);
     if (size.width !== undefined) setTitled(workflow, 'width', size.width, label);
     if (size.height !== undefined) setTitled(workflow, 'height', size.height, label);
+    if (inspection.titles.resolution) {
+      const width = Number(params.width ?? input.width);
+      const height = Number(params.height ?? input.height);
+      if (width > 0 && height > 0) setTitled(workflow, 'resolution', resolutionAspect(width, height), label);
+      if (params.megapixels !== undefined) {
+        const megapixels = positiveNumber(params.megapixels, 'megapixels', 1);
+        for (const id of inspection.titles.resolution) setNodeInput(workflow, `${id}.megapixels`, megapixels, label);
+      }
+      if (params.size_multiple !== undefined) {
+        const multiple = positiveInt(params.size_multiple, 'size_multiple', 1);
+        for (const id of inspection.titles.resolution) setNodeInput(workflow, `${id}.multiple`, multiple, label);
+      }
+    }
 
     const fps = positiveInt(params.fps, 'fps', 24);
     if (params.fps !== undefined) setTitled(workflow, 'fps', fps, label);
     if (input.durationSeconds !== undefined) {
       const step = positiveInt(params.frame_step, 'frame_step', 1);
-      const frames = framesFor(input.durationSeconds, fps, step);
+      const frames =
+        operation === 'lipSync'
+          ? framesWithin(input.durationSeconds, fps, step)
+          : framesFor(input.durationSeconds, fps, step);
       const setFrames = setTitled(workflow, 'frames', frames, label);
       // A seconds input: video workflows that derive 8n+1 frames themselves get a
       // length that rounds to the same frame count, so the clip covers the shot.
@@ -517,7 +577,7 @@ export class ComfyUIProvider implements Provider {
     return workflow;
   }
 
-  /** Width and height for the size tags: override, megapixel cap, scale, then rounding. */
+  /** Width and height for the size tags: override, megapixel target, then rounding. */
   private targetSize(input: ProviderInput, params: Record<string, unknown>): { width?: number; height?: number } {
     const rawWidth = params.width ?? input.width;
     const rawHeight = params.height ?? input.height;
@@ -529,12 +589,10 @@ export class ComfyUIProvider implements Provider {
       width *= factor;
       height *= factor;
     }
-    // Workflows that upscale the latent (LTX: x2) take a fraction of the output size.
-    const scale = positiveNumber(params.size_scale, 'size_scale', 1);
     const multiple = positiveInt(params.size_multiple, 'size_multiple', 1);
     return {
-      width: width === undefined ? undefined : roundTo(width * scale, multiple),
-      height: height === undefined ? undefined : roundTo(height * scale, multiple),
+      width: width === undefined ? undefined : roundTo(width, multiple),
+      height: height === undefined ? undefined : roundTo(height, multiple),
     };
   }
 
@@ -551,24 +609,28 @@ export class ComfyUIProvider implements Provider {
     });
     const inspection = inspectWorkflow(check);
     const [startPath, endPath] = references;
+    const start = takesStart && startPath ? await this.upload(startPath) : undefined;
+    // Lip-sync with a single keyframe uses it as start and end frame.
+    const end =
+      operation === 'firstLastFrameToVideo' || (operation === 'lipSync' && inspection.titles.endImage)
+        ? endPath
+          ? await this.upload(endPath)
+          : start
+        : undefined;
     const uploads: ComfyUploads = {
-      start: takesStart && startPath ? await this.upload(startPath) : undefined,
-      end: operation === 'firstLastFrameToVideo' && endPath ? await this.upload(endPath) : undefined,
+      start,
+      end,
       references: await Promise.all(extra.map((path) => this.upload(path))),
     };
-    if (inspection.titles.audio && inspection.kind === 'audio') {
-      // A voice-clone workflow: the batch item's audio is the reference voice.
+    if (inspection.titles.audio) {
+      // Lip-sync: the driving vocals. Voice clone: the reference voice.
       if (!input.audio) {
-        throw new ConfigError(`ComfyUI workflow ${basename(this.workflowPath(input.model))} needs "audio": a reference voice recording.`);
+        throw new ConfigError(
+          `ComfyUI workflow ${basename(this.workflowPath(input.model))} needs "audio": ` +
+            (inspection.kind === 'audio' ? 'a reference voice recording.' : 'the vocal stem that drives the lip-sync.'),
+        );
       }
       uploads.audio = await this.upload(input.audio);
-    } else if (inspection.titles.audio) {
-      // Without lip-sync the audio branch is switched off, but ComfyUI still
-      // validates the LoadAudio node, so it gets a short silent file.
-      uploads.audio =
-        operation === 'lipSync' && input.audio
-          ? await this.upload(input.audio)
-          : await this.uploadData(silentWav(Math.ceil(input.durationSeconds ?? 10) + 1), '.wav', 'audio/wav');
     }
     const workflow = await this.buildPrompt(input, operation, uploads);
 
