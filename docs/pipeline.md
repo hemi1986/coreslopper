@@ -127,10 +127,24 @@ Completion: preview plays with the song; master is 1080p30 H.264; derivatives us
 ## 9. QA & export
 
 - Skill: `video-qa`
-- Input: all renders, manifest, state
-- Output: `review/report.md`, all formats
+- Input: all renders, manifest, state, generated stills, brief, lyrics, `song.json`
+- Output: `review/report.md`, all formats, and the release package: three thumbnails in `renders/thumbnails/`, three Shorts with their thumbnails in `renders/shorts/`, `review/upload.md`
 
-Completion: schema, assets, sync, readability, determinism, budget reconciliation, and all formats pass or are documented.
+Once the master passes, the skill makes three YouTube thumbnails: the main character, the cameo or key scene, and the ensemble. The agent picks the stills and writes the hook; the `thumbnail` command composes each image deterministically with the brand fonts and the style bible's palette, as a 1280x720 sRGB JPEG under 2 MB. The art director reviews all three ([ADR 0018](adr/0018-thumbnails.md)).
+
+Then it builds the rest of the release package ([ADR 0019](adr/0019-release-package.md)). The agent picks three Short moments on section boundaries (typically hook or intro, chorus, climax or drop; 30–50 s each); the `short` command cuts them from `renders/9x16.mp4`, frame-accurately with audio fades, and refuses more than 60 s. Each Short gets a 1080x1920 thumbnail (`thumbnail --format 9x16`). Last, the agent writes `review/upload.md` in the project's language: title, description, hashtags, and tags for the main video, and title, description, hashtags, and an upload checklist for every Short. Spend comes from `state.json`, models from the manifest.
+
+```bash
+npm run cli -- thumbnail projects/my-video --still assets/image/keyframe/<hash>-0.png \
+  --text "THE HOOK|OF THE SONG" --tag LIVE --layout left --focus 0.6,0.35 \
+  --out projects/my-video/renders/thumbnails/thumb-1-hero.jpg
+npm run cli -- short projects/my-video --from section:chorus_1 --to section:chorus_1:end --name M2-chorus
+npm run cli -- thumbnail projects/my-video --format 9x16 --still assets/image/keyframe/<hash>-0.png \
+  --text "THE HOOK" --out projects/my-video/renders/shorts/M2-chorus-thumb.jpg
+npm run cli -- qa projects/my-video        # checks thumbnails, Shorts, and the upload text
+```
+
+Completion: schema, assets, sync, readability, determinism, budget reconciliation, all formats, and the release package pass or are documented.
 
 ## Running the demo
 

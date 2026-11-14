@@ -23,6 +23,8 @@ import { validateProject } from './validate.js';
 import { validateChangedFile } from './validate-file.js';
 import { writeContactSheet } from './contact-sheet.js';
 import { renderProject } from './render.js';
+import { renderThumbnail } from './thumbnail.js';
+import { cutShort } from './short.js';
 import { createProject } from './new-project.js';
 import { linkProjectMedia } from './media-dir.js';
 import { generateBatch } from './generate.js';
@@ -206,6 +208,52 @@ program
           subtitles: options.subtitles as 'en' | undefined,
         });
       }),
+  );
+
+program
+  .command('thumbnail [project]')
+  .description('Compose a JPEG thumbnail (1280x720, or 1080x1920 for a Short) from a still, the hook text, and the style bible.')
+  .requiredOption('--still <path>', 'Source still (png, jpg, webp, svg); relative to the working directory or the project')
+  .requiredOption('--text <lines>', 'Hook text; separate lines with "|" (at most 3 lines of 4 words)')
+  .requiredOption('--out <file>', 'Output JPEG, e.g. projects/<slug>/renders/thumbnails/thumb-1-hero.jpg')
+  .option('--tag <text>', 'Small mono tag in a top corner, e.g. SATIRE')
+  .option('--layout <side>', 'Text side: left | right | bottom; the face goes opposite (default left; 9x16 is always vertical)')
+  .option('--format <id>', '16x9 (1280x720, main video) or 9x16 (1080x1920, Short)', '16x9')
+  .option('--accent <token>', 'Palette key or role for the slabs after the first line and the tag', 'accent')
+  .option('--focus <x,y>', 'Point of the still (fractions 0-1) placed on the face side', '0.5,0.4')
+  .option('--zoom <factor>', 'Extra zoom on the still, 1-4', (value) => Number(value), 1)
+  .option('--font <key>', 'Typography key of style.yaml for the hook', 'display')
+  .action(
+    (
+      project: string | undefined,
+      options: {
+        still: string;
+        text: string;
+        out: string;
+        tag?: string;
+        layout?: string;
+        format: string;
+        accent: string;
+        focus: string;
+        zoom: number;
+        font: string;
+      },
+    ) =>
+      run(async () => {
+        await renderThumbnail({ projectDir: projectDirFromArg(project), ...options });
+      }),
+  );
+
+program
+  .command('short [project]')
+  .description('Cut a Short (at most 60 s) from renders/9x16.mp4 into renders/shorts/<name>-9x16.mp4, frame-accurate with audio fades.')
+  .requiredOption('--from <time>', 'Start: seconds or an anchor, e.g. section:chorus_1, line:l12:end-0.5, beat:64')
+  .requiredOption('--to <time>', 'End: seconds or an anchor, e.g. section:chorus_1:end')
+  .requiredOption('--name <stem>', 'File stem, e.g. Z1-intro (writes Z1-intro-9x16.mp4)')
+  .action((project: string | undefined, options: { from: string; to: string; name: string }) =>
+    run(async () => {
+      await cutShort({ projectDir: projectDirFromArg(project), ...options });
+    }),
   );
 
 program

@@ -4,7 +4,8 @@ The central renderer for coreslopper. It receives a serializable `VideoProps` ob
 
 ## Composition
 
-- `src/Root.tsx` registers `MusicVideo`.
+- `src/Root.tsx` registers `MusicVideo` and `Thumbnail`.
+- `src/Thumbnail.tsx` composes a video thumbnail (1280x720, or 1080x1920 for a Short) from a still and the hook lines (`npm run cli -- thumbnail`); the layout math is in `src/lib/thumbnail.ts`.
 - `src/MusicVideo.tsx` maps every resolved shot to a `<Sequence>` and renders the audio, vignette, and grain.
 - `src/components/ShotRenderer.tsx` chooses motion backdrops, media layers, mixed layers, and text overlays.
 - `src/components/TextOverlay.tsx` animates lyric words and highlights.
