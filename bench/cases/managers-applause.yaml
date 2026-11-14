@@ -1,0 +1,35 @@
+id: managers-applause
+title: Three managers applauding
+sets:
+  - core
+  - smoke
+focus: Text-to-image with several people and clapping hands at mid-distance.
+source:
+  project: zukunft-auf-kredit
+  shot: shot-035
+operation: generateImage
+role: image.keyframe
+seed: 6035
+prompt: medium-wide shot of three middle-aged managers in navy and grey business suits with blank name badges
+  on lanyards, standing in a row with clear gaps between them, at mid-distance, standing and applauding at
+  mid-distance in the big dark conference hall with rows of chairs facing a stage and a huge blank projector
+  screen, cold white-blue spot lights and haze, smug faces, photoreal, cinematic music-video still, natural
+  anatomy, no text, no letters, no logos. Main subject centred in the middle third of the frame so the shot
+  survives a vertical 9:16 centre crop. All signs, screens, boards and papers are plain and blank with no
+  writing.
+fixtures:
+  golden:
+    from: zukunft-auf-kredit/assets/image/keyframe/a3c0b7fb2860b7c8-0.png
+golden: golden
+rubric:
+  - id: count
+    check: Exactly three managers in a row with clear gaps.
+  - id: distinct-faces
+    check: Three different people, not clones.
+  - id: hands
+    check: "Clapping hands are clean: five fingers, hands meet plausibly, no extra hands."
+    weight: 2
+  - id: blank-badges
+    check: Name badges and the projector screen are blank.
+  - id: photoreal
+    check: Stays photoreal live-action; no CGI doll face, plastic skin, or anime drift.

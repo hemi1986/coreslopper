@@ -1,0 +1,56 @@
+id: contract-signing
+title: Contract signing at a table
+sets:
+  - core
+focus: Two people from two references, four hands on a tabletop, one hand holding a pen.
+source:
+  project: zukunft-auf-kredit
+  shot: shot-079
+operation: editImage
+role: image.edit
+seed: 61179
+prompt: "Replace this plain grey canvas with a new wide 16:9 photo, using the reference images only for the
+  people's identity, face and costume: a bright glass-walled meeting room in cold daylight, straight-on
+  frontal medium shot at seated eye level from across a plain white table. The white table runs horizontally
+  across the whole lower third of the frame, parallel to the camera; its straight front edge is the bottom of
+  the frame and its far edge is a clean horizontal line at waist height of the two people. Behind the far edge
+  of the table two people sit side by side on two separate black high-backed office chairs, with a clear gap
+  of about one metre between them: on the left the manager from the third reference image (same face, hair,
+  navy suit, tie), on the right the agency woman from the second reference image (same face, dark hair tied
+  back, thick black glasses, grey hoodie under a grey blazer). Both are seated behind the table, the table
+  edge in front of their waists, their lower bodies hidden behind the table, the black chair backs clearly
+  visible behind their shoulders. Both forearms of each person rest on the tabletop. The manager's right hand
+  holds a pen over a blank sheet of paper lying on the tabletop in front of him, his left hand lies flat on
+  the tabletop beside the paper; the woman's hands rest flat on the tabletop, she beams with a too-bright
+  smile. Behind them the glass wall of the room. Natural relaxed eyes. Photoreal, cinematic music-video still,
+  natural anatomy, natural hands with five fingers each, hands clearly visible and separated, no text, no
+  letters, no logos. Both people inside the centre half of the frame so the shot survives a vertical 9:16
+  centre crop. All papers are plain and blank with no writing."
+fixtures:
+  canvas:
+    from: zukunft-auf-kredit/characters/canvas-16x9.png
+  ref-agency:
+    from: zukunft-auf-kredit/assets/image/keyframe/e8a14da4786e36b0-0.png
+  ref-manager:
+    from: zukunft-auf-kredit/assets/image/keyframe/18a7a7cc8435ce1f-0.png
+  golden:
+    from: zukunft-auf-kredit/assets/image/edit/aa3dd41711855ba3-0.png
+inputs:
+  references:
+    - canvas
+    - ref-agency
+    - ref-manager
+golden: golden
+rubric:
+  - id: identity
+    check: Manager and agency woman match their references (glasses and hoodie under the blazer; navy suit and tie).
+    weight: 2
+  - id: pen-grip
+    check: The pen is held naturally between thumb and fingers over the paper.
+    weight: 2
+  - id: hands
+    check: All four hands visible on the tabletop, five fingers each, none merged.
+  - id: layout
+    check: Frontal, table parallel to the camera, both seated behind it with a gap between them.
+  - id: blank-paper
+    check: The paper is blank.

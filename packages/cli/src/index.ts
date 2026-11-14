@@ -38,6 +38,7 @@ import { runInitCommand, validateChoice, type InitCommandOptions } from './init-
 import { printStatus } from './status.js';
 import { printSeriesStatus, seriesDirFromArg } from './series.js';
 import { createSeries } from './new-series.js';
+import { importBenchFixtures, listBench, resolveRunDir, runBench, writeBenchReport } from './bench.js';
 import { formatSeconds, parseCsv, projectDirFromArg, run } from './utils.js';
 import { findWorkspaceRoot, loadWorkspaceEnv, ownVersion } from './workspace.js';
 import type { FormatId } from '../../remotion/src/types.js';
@@ -639,6 +640,78 @@ program
       const root = workspaceRoot ?? process.cwd();
       const result = await runDoctor(root, { json: options.json });
       if (!result.ok) process.exitCode = 1;
+    }),
+  );
+
+const bench = program
+  .command('bench')
+  .description('Model bench: render fixed cases from past projects on several targets and compare them (bench/).');
+
+bench
+  .command('list')
+  .description('List bench cases, their fixtures, and the targets.')
+  .action(() => run(() => listBench()));
+
+bench
+  .command('import')
+  .description('Copy the case fixtures (keyframes, references, vocal segments, known good results) into bench/fixtures/.')
+  .option('--from <workspace>', 'Workspace (or its projects/ directory) that holds the source projects; default this repository')
+  .option('--cases <ids>', 'Comma-separated case ids; default all')
+  .option('--force', 'Copy again even when a fixture exists')
+  .action((options: { from?: string; cases?: string; force?: boolean }) =>
+    run(async () => {
+      const summary = await importBenchFixtures({ from: options.from, cases: parseCsv(options.cases), force: options.force });
+      if (summary.missing.length > 0) process.exitCode = 1;
+    }),
+  );
+
+bench
+  .command('run')
+  .description('Render the selected cases on the targets, with cost estimate, bench budget, and cache; writes bench/runs/<id>/.')
+  .requiredOption('--targets <names>', 'Comma-separated target names from bench/targets.yaml')
+  .option('--set <set>', 'Bench set, e.g. core or smoke')
+  .option('--cases <ids>', 'Comma-separated case ids')
+  .option('--seeds <n>', 'Seeds per case (case seed, +101, +202, ...)', '1')
+  .option('--repeat', 'Render the first seed twice without cache and compare the bytes')
+  .option('--fresh', 'Ignore cached generations (measures time again)')
+  .option('--transcribe', 'Transcribe speech outputs with faster-whisper and compute the word error rate')
+  .option('--id <id>', 'Run name; an existing run is extended')
+  .option('--dry-run', 'Estimate and list the generations without running them')
+  .action(
+    (options: {
+      targets: string;
+      set?: string;
+      cases?: string;
+      seeds: string;
+      repeat?: boolean;
+      fresh?: boolean;
+      transcribe?: boolean;
+      id?: string;
+      dryRun?: boolean;
+    }) =>
+      run(async () => {
+        const seeds = Number(options.seeds);
+        if (!Number.isInteger(seeds) || seeds < 1) throw new ValidationError('--seeds must be a positive integer.');
+        await runBench({
+          targets: parseCsv(options.targets),
+          set: options.set,
+          cases: parseCsv(options.cases),
+          seeds,
+          repeat: options.repeat,
+          fresh: options.fresh,
+          transcribe: options.transcribe,
+          id: options.id,
+          dryRun: options.dryRun,
+        });
+      }),
+  );
+
+bench
+  .command('report [run]')
+  .description('Rebuild bench/runs/<run>/index.html from run.json, scores.json, and ratings.json; default the latest run.')
+  .action((runArg: string | undefined) =>
+    run(async () => {
+      console.log(`Report: ${await writeBenchReport(resolveRunDir(runArg))}`);
     }),
   );
 

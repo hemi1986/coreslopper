@@ -115,6 +115,10 @@ Every call is cached by a SHA-256 hash of the canonical request and recorded in 
 - Every paid batch is estimated first; unknown pricing is a hard error.
 - `state.json` records the spend of every stage.
 
+## Comparing models before a switch
+
+To decide between workflows, checkpoints, servers, or providers, run the model bench instead of a project: `bench/targets.yaml` names each variant per operation, and `npm run cli -- bench run` renders fixed scenes from past projects on them, with its own budget in `bench/bench.yaml`. See [`bench/README.md`](../bench/README.md) and [ADR 0020](adr/0020-model-bench.md). Change `config/models.yaml` once a bench shows the switch is worth it.
+
 ## Model roles
 
 A role has a base provider and optional alternatives:

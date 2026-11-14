@@ -1,0 +1,31 @@
+id: blank-boards
+title: Empty stage with a blank screen
+sets:
+  - core
+focus: Large blank surfaces (projector screen, lectern front) must stay free of pseudo-text.
+source:
+  project: zukunft-auf-kredit
+  shot: shot-001
+operation: generateImage
+role: image.keyframe
+seed: 6001
+prompt: wide establishing shot of an empty lectern with a microphone on the dark conference stage of a big
+  convention hall with a huge blank projector screen, a lectern with a microphone, rows of chairs and blinding
+  cold white-blue spot lights, haze in the projector beam, nobody on stage, cold and almost documentary,
+  photoreal, cinematic music-video still, natural anatomy, no text, no letters, no logos. Main subject centred
+  in the middle third of the frame so the shot survives a vertical 9:16 centre crop. All signs, screens,
+  boards and papers are plain and blank with no writing.
+fixtures:
+  golden:
+    from: zukunft-auf-kredit/assets/image/keyframe/0c91689c0d18deb5-0.png
+golden: golden
+rubric:
+  - id: no-text
+    check: "Screen, lectern front, and every surface are blank: no letters, glyphs, logos, or symbols."
+    weight: 3
+  - id: empty
+    check: Nobody on stage.
+  - id: scene
+    check: "Wide establishing shot: lectern with microphone, huge screen, rows of chairs, cold spots and haze."
+  - id: photoreal
+    check: Stays photoreal live-action; no CGI doll face, plastic skin, or anime drift.

@@ -1,0 +1,213 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sets": {
+      "default": [
+        "core"
+      ],
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9-]*$"
+      }
+    },
+    "focus": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "type": "object",
+      "properties": {
+        "project": {
+          "type": "string",
+          "minLength": 1
+        },
+        "shot": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "project"
+      ]
+    },
+    "operation": {
+      "type": "string",
+      "enum": [
+        "generateImage",
+        "editImage",
+        "textToVideo",
+        "imageToVideo",
+        "firstLastFrameToVideo",
+        "lipSync",
+        "generateAudio"
+      ]
+    },
+    "role": {
+      "type": "string",
+      "minLength": 1
+    },
+    "prompt": {
+      "type": "string",
+      "minLength": 1
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "width": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    },
+    "height": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    },
+    "durationSeconds": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "params": {
+      "default": {},
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {}
+    },
+    "fixtures": {
+      "default": {},
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9-]*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "minLength": 1
+          },
+          "cut": {
+            "type": "object",
+            "properties": {
+              "start": {
+                "type": "number",
+                "minimum": 0
+              },
+              "duration": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            },
+            "required": [
+              "start",
+              "duration"
+            ]
+          }
+        },
+        "required": [
+          "from"
+        ]
+      }
+    },
+    "inputs": {
+      "default": {
+        "references": []
+      },
+      "type": "object",
+      "properties": {
+        "references": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "audio": {
+          "type": "string"
+        }
+      }
+    },
+    "golden": {
+      "type": "string"
+    },
+    "goldenNote": {
+      "type": "string"
+    },
+    "expectText": {
+      "type": "string"
+    },
+    "refusalOk": {
+      "default": false,
+      "type": "boolean"
+    },
+    "frames": {
+      "default": [
+        0.05,
+        0.35,
+        0.65,
+        0.95
+      ],
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      }
+    },
+    "rubric": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          },
+          "check": {
+            "type": "string",
+            "minLength": 1
+          },
+          "weight": {
+            "default": 1,
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "required": [
+          "id",
+          "check"
+        ]
+      }
+    }
+  },
+  "required": [
+    "id",
+    "title",
+    "focus",
+    "operation",
+    "role",
+    "prompt",
+    "seed",
+    "rubric"
+  ]
+}

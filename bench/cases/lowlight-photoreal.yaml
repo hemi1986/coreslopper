@@ -1,0 +1,44 @@
+id: lowlight-photoreal
+title: Dance in low light
+sets:
+  - core
+focus: Dark pop-studio keyframe where Kling drifted into a CGI doll face unless forced to stay photoreal.
+source:
+  project: ich-tu-dir-nichts
+  shot: shot-075
+operation: imageToVideo
+role: video.image_to_video.quality
+seed: 7475
+durationSeconds: 3
+prompt: "She dances to the beat with a smooth hip sway from side to side and both arms up, laughing at the
+  lens; she moves at a moderate pace, her head stays steady so her face stays sharp and clearly visible the
+  whole time, her ponytail moves gently. Same young woman as in the start frame throughout: identical face,
+  light freckles, hazel-green eyes, long mint-green hair in a high sleek ponytail that stays tied, soft
+  straight bangs, short white bomber jacket with mint-green cuffs over a silver crop top, white pleated mini
+  skirt, green LED heart pin. Face stays sharp and in focus, hands keep five fingers, the background stays
+  exactly as in the start frame, camera locked off and static, no zoom, one continuous take. Photoreal
+  live-action footage, realistic human skin and natural facial proportions."
+fixtures:
+  start:
+    from: ich-tu-dir-nichts/assets/keyframes/shot-075.png
+  golden:
+    from: ich-tu-dir-nichts/assets/video/image_to_video/quality/1af89956cf92a66a-0.mp4
+inputs:
+  references:
+    - start
+golden: golden
+goldenNote: Higgsfield Kling 3.0 Standard, retry 1.
+rubric:
+  - id: photoreal
+    check: Skin and face stay photoreal in the dark light; no doll face, no plastic skin.
+    weight: 3
+  - id: face-sharp
+    check: The face stays sharp through the dance.
+  - id: identity
+    check: Face, hair, and outfit match the start frame or references for the whole clip; no drift into another
+      person.
+    weight: 2
+  - id: hands
+    check: Every visible hand has five fingers, no merged or melting fingers, also in motion.
+  - id: camera
+    check: The camera does what the prompt says (static means no push-in, zoom, or jump-zoom).

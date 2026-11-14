@@ -1,0 +1,36 @@
+id: hostess-march
+title: Three hostesses marching
+sets:
+  - core
+focus: "Several people walking in profile: identities must stay separate, legs and boards must not merge."
+source:
+  project: zukunft-auf-kredit
+  shot: shot-005
+operation: imageToVideo
+role: video.image_to_video.fast
+seed: 20005
+durationSeconds: 4
+prompt: Preserve the exact characters, faces, clothing and lighting from the input image. The three hostesses
+  march toward frame left in a stiff, almost military rhythm, small precise steps, sign boards upright. Steady
+  camera. Nobody speaks, mouths stay closed.
+fixtures:
+  start:
+    from: zukunft-auf-kredit/assets/image/edit/b862c24acf1aa92b-0.png
+  golden:
+    from: zukunft-auf-kredit/assets/video/image_to_video/fast/ecaffe4820fba7d2-0.mp4
+inputs:
+  references:
+    - start
+golden: golden
+rubric:
+  - id: separate
+    check: Three distinct women throughout; nobody merges, duplicates, or vanishes.
+    weight: 2
+  - id: walk
+    check: Stiff, rhythmic small steps in one direction; legs stay anatomically correct.
+  - id: uniform
+    check: Sashes, hats, and boards keep their shape and stay blank.
+  - id: camera
+    check: The camera does what the prompt says (static means no push-in, zoom, or jump-zoom).
+  - id: artifacts
+    check: No morphing, smearing, flicker, or objects appearing from nowhere.

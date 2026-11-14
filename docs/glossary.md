@@ -309,3 +309,33 @@ _Avoid_: voice track, dialogue stem
 **Subtitles**:
 The translated text of the spoken and chat lines, timed by the effective timing.
 _Avoid_: captions, lyrics
+
+## Model bench
+
+**Model Bench**:
+The fixed comparison of generation models and servers on scenes from past projects, stored in `bench/`. It informs model choices; it never produces project assets.
+_Avoid_: test suite, eval, benchmark project
+
+**Bench Case**:
+One scene that once broke or was hard, with its prompt, seed, inputs, known good result, and rubric, in `bench/cases/<id>.yaml`.
+_Avoid_: test, scenario, shot (a **Shot** belongs to a storyboard)
+
+**Bench Target**:
+A named way to run operations: a provider, a ComfyUI workflow or model slug per operation, its params, and optionally another ComfyUI server.
+_Avoid_: model, backend, config
+
+**Bench Fixture**:
+A media file a bench case needs (keyframe, reference, vocal segment, known good result), copied from a workspace project by `bench import`. Fixtures are never committed.
+_Avoid_: asset, sample
+
+**Bench Run**:
+One execution of selected bench cases on selected bench targets, stored in `bench/runs/<id>/` with its results, scores, ratings, and comparison page.
+_Avoid_: job, batch
+
+**Rubric**:
+The weighted criteria of a bench case, each scored 0 (fail), 1 (weak), or 2 (pass) by the art director.
+_Avoid_: checklist, test
+
+**Rating**:
+The user's own 1-5 grade of a bench result, given on the comparison page and exported as `ratings.json`.
+_Avoid_: score (the art director's rubric result)

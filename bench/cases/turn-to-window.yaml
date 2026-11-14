@@ -1,0 +1,47 @@
+id: turn-to-window
+title: Turn to the window and back, 5 s
+sets:
+  - core
+focus: A long clip with a head-and-shoulder turn away and back; earlier seeds became a CGI face or jump-cut.
+source:
+  project: ich-tu-dir-nichts
+  shot: shot-057
+operation: imageToVideo
+role: video.image_to_video.fast
+seed: 5657
+durationSeconds: 5
+prompt: "Medium close-up at a huge night window over the foggy glittering city: the same young woman from the
+  start frame faces the lens with a calm face, then slowly turns her head and shoulders to her left toward the
+  window and looks out at the city lights for a moment, calm and thoughtful, then slowly turns back toward the
+  lens. Her ponytail moves softly with the turn. Her face, light freckles, hazel-green eyes, glossy pink lips,
+  mint-green high ponytail with soft straight bangs, the black long-sleeve turtleneck mini dress and the small
+  glowing green LED heart at the collar stay exactly as in the start frame. Static locked-off camera, no zoom,
+  one continuous take, slow smooth natural motion, photoreal live-action, one person only, no text, no logos."
+fixtures:
+  start:
+    from: ich-tu-dir-nichts/assets/keyframes/shot-057.v1.png
+  golden:
+    from: ich-tu-dir-nichts/assets/video/image_to_video/fast/b4ef2953480fc8a4-0.mp4
+inputs:
+  references:
+    - start
+golden: golden
+frames:
+  - 0.05
+  - 0.3
+  - 0.5
+  - 0.7
+  - 0.95
+rubric:
+  - id: turn
+    check: She turns toward the window, holds, and turns back toward the lens.
+  - id: identity
+    check: Face, hair, and outfit match the start frame or references for the whole clip; no drift into another
+      person.
+    weight: 2
+  - id: photoreal
+    check: Stays photoreal live-action; no CGI doll face, plastic skin, or anime drift.
+  - id: continuity
+    check: "One continuous take: no cut, no zoom-out to a wide, no jump."
+  - id: camera
+    check: The camera does what the prompt says (static means no push-in, zoom, or jump-zoom).

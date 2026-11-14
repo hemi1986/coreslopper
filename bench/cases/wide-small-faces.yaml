@@ -1,0 +1,42 @@
+id: wide-small-faces
+title: Full-length in a corridor
+sets:
+  - core
+focus: "A small face at full-length scale: soft faces and bobble-head motion."
+source:
+  project: ich-tu-dir-nichts
+  shot: shot-056
+operation: imageToVideo
+role: video.image_to_video.fast
+seed: 5356
+durationSeconds: 2
+prompt: "Full-length shot: the same young woman from the start frame stands centred in a long dark corridor of
+  soft blue light and faces the lens. She stands still and looks steadily into the lens with a calm knowing
+  expression, one slow breath, her hands relaxed at her sides. Soft blue lights flicker gently along the
+  walls. Her face, light freckles, hazel-green eyes, glossy pink lips, mint-green high ponytail with soft
+  straight bangs, the black long-sleeve turtleneck mini dress and the small glowing green LED heart at the
+  collar stay exactly as in the start frame. Static camera, no zoom, one continuous take, smooth natural
+  motion, one person only, no text, no logos."
+fixtures:
+  start:
+    from: ich-tu-dir-nichts/assets/keyframes/shot-056.png
+  golden:
+    from: ich-tu-dir-nichts/assets/video/image_to_video/fast/cb5c6a0e6767d334-0.mp4
+inputs:
+  references:
+    - start
+golden: golden
+rubric:
+  - id: face-detail
+    check: Eyes and mouth remain readable at full-length scale, not a blur.
+    weight: 2
+  - id: body
+    check: Body proportions and stance stay natural; no bobble-head nodding.
+  - id: identity
+    check: Face, hair, and outfit match the start frame or references for the whole clip; no drift into another
+      person.
+    weight: 2
+  - id: camera
+    check: The camera does what the prompt says (static means no push-in, zoom, or jump-zoom).
+  - id: lights
+    check: The wall lights flicker softly; the corridor does not warp.

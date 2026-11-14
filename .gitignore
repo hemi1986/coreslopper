@@ -56,3 +56,10 @@ __pycache__/
 
 # Temporary
 tmp/
+
+# Model bench: case and target files stay tracked; media, runs, and spend are local
+bench/fixtures/
+bench/runs/
+bench/state.json
+bench/manifest.jsonl
+bench/timings.jsonl

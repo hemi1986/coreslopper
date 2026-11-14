@@ -1,0 +1,100 @@
+# Bench targets: where and with which model each operation runs.
+#
+# A target runs only the operations it lists. An operation with `{}` uses the
+# role's entry for that provider in config/models.yaml; `model` names a ComfyUI
+# workflow (comfyui/workflows/<model>.json) or a provider model slug, `params`
+# are merged over the role and case params, and `pricing` is required for a
+# paid model that config/models.yaml does not price.
+#
+# ComfyUI targets can point at another server (`comfyui_url`) and another
+# workflow folder (`comfyui_workflows_dir`). The URL is part of the cache key,
+# so a remote server never reuses a local result.
+version: 1
+targets:
+  local:
+    description: Local ComfyUI with the default workflows (Qwen Image 2.1 Turbo, LTX 2.5, 0.8 MP drafts)
+    provider: comfyui
+    operations:
+      generateImage: {}
+      editImage: {}
+      imageToVideo: {}
+      firstLastFrameToVideo: {}
+      lipSync: {}
+      generateAudio: {}
+
+  local-hq:
+    description: Local ComfyUI as used for Zukunft auf Kredit (17-step Qwen sigmas, LTX at 1.9 MP)
+    provider: comfyui
+    operations:
+      generateImage:
+        params:
+          node_inputs:
+            "459:484.sigmas": "1.0, 0.99, 0.978453, 0.966, 0.95418, 0.94, 0.926626, 0.91, 0.89508, 0.87, 0.845148, 0.78, 0.704534, 0.56, 0.414568, 0.25, 0.12, 0"
+      editImage:
+        params:
+          node_inputs:
+            "459:502.sigmas": "1.0, 0.99, 0.978453, 0.966, 0.95418, 0.94, 0.926626, 0.91, 0.89508, 0.87, 0.845148, 0.78, 0.704534, 0.56, 0.414568, 0.25, 0.12, 0"
+      imageToVideo:
+        params: { megapixels: 1.9 }
+      firstLastFrameToVideo:
+        params: { megapixels: 1.9 }
+      lipSync:
+        params: { megapixels: 1.9 }
+
+  fal:
+    description: fal.ai with the roles in config/models.yaml (FLUX.2, Nano Banana, Kling, OmniHuman)
+    provider: fal
+    operations:
+      generateImage: {}
+      editImage: {}
+      imageToVideo: {}
+      firstLastFrameToVideo: {}
+      lipSync: {}
+
+  kling:
+    description: Higgsfield Kling 3.0 Standard for clips (the dance fallback)
+    provider: higgsfield
+    operations:
+      imageToVideo:
+        model: kling-video/v3.0/std/image-to-video
+        params: { min_duration: 3, sound: "off", cfg_scale: 0.5 }
+        pricing: { unit: second, usd: 0.063 }
+
+  mock:
+    description: Mock provider for tests and dry runs; costs nothing, renders placeholders
+    provider: mock
+    operations:
+      generateImage: {}
+      editImage: {}
+      textToVideo: {}
+      imageToVideo: {}
+      firstLastFrameToVideo: {}
+      lipSync: {}
+      generateAudio: {}
+
+  # New workflows: export them next to the defaults and add a target. Examples:
+  #
+  # local-qwen-full:
+  #   description: Qwen Image 2.1 (not Turbo)
+  #   provider: comfyui
+  #   operations:
+  #     generateImage: { model: qwen-t2i-full }
+  #     editImage: { model: qwen-edit-full }
+  #
+  # local-ltx-int8:
+  #   description: LTX 2.5 int8 checkpoints
+  #   provider: comfyui
+  #   operations:
+  #     imageToVideo: { model: ltx-i2v-int8 }
+  #     firstLastFrameToVideo: { model: ltx-flf2v-int8 }
+  #     lipSync: { model: ltx25-lipsync-flf2v-int8 }
+  #
+  # remote-gpu:
+  #   description: Same workflows on another machine
+  #   provider: comfyui
+  #   comfyui_url: http://192.168.1.50:8188
+  #   operations:
+  #     generateImage: {}
+  #     editImage: {}
+  #     imageToVideo: {}
+  #     lipSync: {}

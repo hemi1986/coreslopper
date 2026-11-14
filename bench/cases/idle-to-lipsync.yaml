@@ -1,0 +1,49 @@
+id: idle-to-lipsync
+title: Idle webcam clip landing on a frame
+sets:
+  - core
+focus: "First/last frame: 6 s of calm idle that ends exactly on the given last frame without a jump."
+source:
+  project: ich-tu-dir-nichts
+  shot: cameo 029-031
+operation: firstLastFrameToVideo
+role: video.first_last_frame
+seed: 9151
+durationSeconds: 6
+prompt: Use the provided start image as the first frame and the provided end image as the final frame. Webcam
+  view of the same bald man with the full dark beard in a plain black t-shirt, sitting in a dark night home
+  office, cool blue monitor glow on his face. He sits calmly and looks at his screen, breathes gently, blinks
+  naturally a few times and makes small natural head movements. His mouth stays closed and relaxed; he does
+  not speak. In the last second he looks into the webcam and his lips part slightly as if about to speak.
+  Static webcam camera, one continuous take, no camera movement, no zoom, one person only, no text.
+fixtures:
+  start:
+    from: ich-tu-dir-nichts/assets/keyframes/cameo-hemi-neutral-16x9.png
+  end:
+    from: ich-tu-dir-nichts/assets/keyframes/cameo-hemi-lipsync-f0.png
+  golden:
+    from: ich-tu-dir-nichts/assets/video/first_last_frame/56c6afc8abd1ad7a-0.mp4
+inputs:
+  references:
+    - start
+    - end
+golden: golden
+frames:
+  - 0.02
+  - 0.35
+  - 0.7
+  - 0.9
+  - 1
+rubric:
+  - id: lands
+    check: "The last frame matches the end image: no visible jump or crossfade."
+    weight: 3
+  - id: idle
+    check: "Calm idle: breathing, blinks, small head moves; mouth closed until the end."
+  - id: identity
+    check: Same man throughout.
+    weight: 2
+  - id: no-acting
+    check: No smirks, glances, or speaking.
+  - id: camera
+    check: The camera does what the prompt says (static means no push-in, zoom, or jump-zoom).

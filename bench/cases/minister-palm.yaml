@@ -1,0 +1,52 @@
+id: minister-palm
+title: Minister presents with an open palm
+sets:
+  - core
+  - smoke
+focus: Identity from three references plus one clean open hand in free air.
+source:
+  project: zukunft-auf-kredit
+  shot: shot-003
+operation: editImage
+role: image.edit
+seed: 6003
+prompt: "Replace this plain grey canvas with a new wide 16:9 photo, using the reference images only for the
+  people's identity, face and costume: medium shot of the exact same fictional middle-aged minister as in the
+  reference images: identical fleshy face with a deep artificial tan, too-wide sleazy grin with very bright
+  white veneers, slick black hair combed straight back with glossy gel, shiny charcoal-navy suit, pale blue
+  shirt, sickly gold satin tie, small plain round gold lapel pin, at the lectern on the dark conference stage
+  of a big convention hall with a huge blank projector screen, a lectern with a microphone, rows of chairs and
+  blinding cold white-blue spot lights, haze in the projector beam, half turned towards the huge blank
+  projector screen behind him, presenting it with one open palm in free air, too-wide grin, one clear action,
+  hands relaxed and in free air, photoreal, cinematic music-video still, natural anatomy, no text, no letters,
+  no logos. The minister has exactly the same fictional face as in the reference images; no resemblance to any
+  real politician, no flags. Main subject centred in the middle third of the frame so the shot survives a
+  vertical 9:16 centre crop. All signs, screens, boards and papers are plain and blank with no writing."
+fixtures:
+  canvas:
+    from: zukunft-auf-kredit/characters/canvas-16x9.png
+  ref-lectern:
+    from: zukunft-auf-kredit/characters/minister/seed-lectern.png
+  ref-thumbs:
+    from: zukunft-auf-kredit/characters/minister/thumbs-up.png
+  golden:
+    from: zukunft-auf-kredit/assets/image/edit/413fb03872e408fb-0.png
+inputs:
+  references:
+    - canvas
+    - ref-lectern
+    - ref-thumbs
+golden: golden
+rubric:
+  - id: identity
+    check: "Same fictional minister as the references: fleshy tanned face, too-wide veneer grin, slick gelled
+      hair, gold tie and lapel pin."
+    weight: 2
+  - id: hands
+    check: Every visible hand has five fingers, no merged or melting fingers, also in motion.
+  - id: composition
+    check: Medium shot at the lectern, half turned to the blank screen, subject in the centre third.
+  - id: no-text
+    check: No letters, pseudo-glyphs, logos, or writing anywhere in the image.
+  - id: photoreal
+    check: Stays photoreal live-action; no CGI doll face, plastic skin, or anime drift.

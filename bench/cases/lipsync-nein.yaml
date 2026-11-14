@@ -1,0 +1,49 @@
+id: lipsync-nein
+title: Lip-sync "nein, nein, nein"
+sets:
+  - core
+focus: "Hard case: five fast repeated words need five separate open-close cycles, not a held grin."
+source:
+  project: ich-tu-dir-nichts
+  shot: shot-067
+  note: "No usable reference: the old ltx-av result fails the case."
+operation: lipSync
+role: video.lipsync
+seed: 5518
+prompt: 'She sings the supplied vocal audio with accurate lip sync, clearly mouthing the German lyrics: "nein,
+  nein, nein, nein, nein". Every word is articulated visibly: her mouth opens on each "nein" and closes
+  between the words. Frontal close-up of the same young woman from the input image: freckles, hazel-green
+  eyes, mint-green ponytail with bangs, black turtleneck with a small glowing green heart at the collar, dark
+  room at a night window over the city, soft cool light. A small playful side-to-side head shake on each word.
+  Gentle natural singer movement, static camera, one continuous take.'
+fixtures:
+  face:
+    from: ich-tu-dir-nichts/assets/keyframes/shot-067-cu.png
+  vocal:
+    from: ich-tu-dir-nichts/assets/audio-segments/shot-067-tight.mp3
+inputs:
+  references:
+    - face
+  audio: vocal
+frames:
+  - 0.1
+  - 0.25
+  - 0.4
+  - 0.55
+  - 0.7
+  - 0.85
+rubric:
+  - id: cycles
+    check: The mouth opens on each "nein" and closes between the words (count the cycles).
+    weight: 3
+  - id: timing
+    check: Cycles line up with the vocal, no late start.
+    weight: 2
+  - id: no-grin
+    check: No held open-mouth grin.
+  - id: identity
+    check: Face, hair, and outfit match the start frame or references for the whole clip; no drift into another
+      person.
+    weight: 2
+  - id: night
+    check: Night-window light and black turtleneck stay as in the keyframe.

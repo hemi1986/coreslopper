@@ -71,6 +71,7 @@ templates/project/ Project template used by the new-video skill
 templates/episode/ Episode template used by the new-episode skill
 templates/series/  Series canon template used by the new-series skill
 brand/example/     Neutral synthwave/cyberpunk brand kit with OFL fonts
+bench/             Model bench: cases, targets, budget (fixtures and runs gitignored)
 projects/          Video projects and episodes (media gitignored)
 series/            Series canons: series.yaml, bible, style, characters, sets (references gitignored)
 runtime/           Generated npm runtime snapshot (gitignored)
@@ -159,6 +160,7 @@ npm run schema
 | `npm run cli -- stage-start/-done/-fail/-skip/-reset` | Update `state.json` from the orchestrator. |
 | `npm run cli -- estimate --role <role> --units <n>` | Check a generation cost against the budget. |
 | `npm run cli -- validate-file <file>` | Validate one changed artifact (used by the hook). |
+| `npm run cli -- bench list\|import\|run\|report` | Model bench: compare models and servers on fixed scenes from past projects (`bench/README.md`). |
 | `npm run cli -- doctor` | Check workspace, tools, fonts, Remotion, and keys. |
 | `npx coreslopper init [dir]` | Create a workspace, install tools, configure fal.ai and Higgsfield. |
 | `npx coreslopper@latest update [dir]` | Update a workspace to the latest workflow; keeps local edits (`--dry-run`, `--force`). |
@@ -175,7 +177,7 @@ The root package is published as `coreslopper`. `npm run build` copies the track
 
 ## Skills
 
-Own skills: `new-video`, `video-brief`, `video-treatment`, `audio-analysis`, `style-bible`, `character-bible`, `storyboard`, `remotion-motion`, `ai-clips`, `footage`, `assembly-render`, `video-qa`, and for series and episodes `new-series`, `new-episode`, `voice-track`, `episode-track`.
+Own skills: `new-video`, `video-brief`, `video-treatment`, `audio-analysis`, `style-bible`, `character-bible`, `storyboard`, `remotion-motion`, `ai-clips`, `footage`, `assembly-render`, `video-qa`, and for series and episodes `new-series`, `new-episode`, `voice-track`, `episode-track`. Outside the pipeline: `model-bench` compares models and servers before a model switch.
 
 Vendored from Matt Pocock (MIT, see `docs/THIRD_PARTY.md`): `grill-me`, `grilling`, `writing-for-agents`, `domain-modeling`.
 

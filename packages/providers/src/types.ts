@@ -85,5 +85,10 @@ export interface GenerationRunnerOptions {
   provider: Provider;
   cacheDir: string;
   manifestPath: string;
+  /**
+   * Extra cache-key material for runs that must not share results with the
+   * plain request, e.g. a different ComfyUI server or a determinism repeat.
+   */
+  cacheKey?: Record<string, unknown>;
   beforeGenerate?: (estimatedCostUsd: number) => Promise<void> | void;
 }
