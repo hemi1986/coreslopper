@@ -34,13 +34,20 @@ export function sectionAt(timing: Timing, seconds: number) {
   return timing.sections.find((section) => seconds >= section.start && seconds <= section.end);
 }
 
+/**
+ * On-screen form of a lyric. Suno lyrics mark backing vocals in parentheses,
+ * as in "My Machine (my machine)"; the words are sung, the parentheses are not.
+ */
+export function displayLyric(text: string): string {
+  return text.replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 export function lineForText(timing: Timing, sectionId: string, text: string) {
-  const normalized = text.trim().toLowerCase();
+  const normalized = displayLyric(text).toLowerCase();
   if (!normalized) return undefined;
+  const lineText = (line: Timing['lines'][number]) => displayLyric(line.text).toLowerCase();
   return (
-    timing.lines.find(
-      (line) => line.section === sectionId && line.text.toLowerCase().includes(normalized),
-    ) ??
-    timing.lines.find((line) => line.text.toLowerCase() === normalized)
+    timing.lines.find((line) => line.section === sectionId && lineText(line).includes(normalized)) ??
+    timing.lines.find((line) => lineText(line) === normalized)
   );
 }

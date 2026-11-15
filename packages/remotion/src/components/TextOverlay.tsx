@@ -1,6 +1,6 @@
 import type { StyleBible, Timing } from '@coreslopper/core';
 import { interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
-import { lineForText } from '../lib/timing';
+import { displayLyric, lineForText } from '../lib/timing';
 
 interface TextOverlayProps {
   text: string;
@@ -23,7 +23,7 @@ interface TimedWord {
 }
 
 function splitWords(text: string): string[] {
-  return text.trim().split(/\s+/).filter(Boolean);
+  return displayLyric(text).split(/\s+/).filter(Boolean);
 }
 
 function isHighlight(word: string, highlights: string[]): boolean {
