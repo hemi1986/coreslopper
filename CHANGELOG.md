@@ -1,5 +1,44 @@
 # Changelog
 
+## [0.6.0](https://github.com/hemi1986/coreslopper/compare/v0.5.0...v0.6.0) (2026-11-15)
+
+
+### ⚠ BREAKING CHANGES
+
+* **providers:** ltx-av is no longer a default workflow. The ComfyUI params size_scale and audio_offset and the cs_use_audio tag are removed; a workflow with cs_audio now fits lipSync only.
+
+### Features
+
+* /video-next by project kind and /series-status ([05e48b1](https://github.com/hemi1986/coreslopper/commit/05e48b15ab35f7b862708ae7e99b91d02ba7dc7c))
+* **cli:** voice-track, import-takes, and episode-track for episodes ([c07f44c](https://github.com/hemi1986/coreslopper/commit/c07f44cf84b1f5502965bf144416e56df3e5c688))
+* **core:** episode schemas, kind-aware state, canon loader, demo episode ([2ad85b5](https://github.com/hemi1986/coreslopper/commit/2ad85b5b6e4e333efeafc5f29172b981a2cdadb5))
+* episode lip-sync from speaker stems, display rules, and limits ([7010ef8](https://github.com/hemi1986/coreslopper/commit/7010ef89bf1b21e9fcf251a0cf7520521e870167))
+* episode projects for series (ADR 0016) ([67d18d5](https://github.com/hemi1986/coreslopper/commit/67d18d506b8255abdceb0047f640f75bd397fed6))
+* master-format render, ChatWindow, subtitles, and episode QA ([d111de2](https://github.com/hemi1986/coreslopper/commit/d111de2a0433f9588030dc6dd8ab82e0be26cdcd))
+* model bench for comparing models, workflows, and servers ([bb7c3dc](https://github.com/hemi1986/coreslopper/commit/bb7c3dc8eddc7ed2ac7728ca22ee62fdab337699))
+* model bench for comparing models, workflows, and servers ([99b981a](https://github.com/hemi1986/coreslopper/commit/99b981a78d1d864d40ab65bfab8ba42da6fbf3c8))
+* **providers:** add Topview as a cloud provider for stills and clips ([59ecb7b](https://github.com/hemi1986/coreslopper/commit/59ecb7b7652f3b131707c7421d007d38aab1ab01))
+* **providers:** add Topview as a cloud provider for stills and clips ([07a4d80](https://github.com/hemi1986/coreslopper/commit/07a4d8026618b0e9b262e6082dd3a7291def2e2f))
+* **providers:** lip-sync on an LTX FLF2V graph, other clips on the official LTX templates ([7e810b4](https://github.com/hemi1986/coreslopper/commit/7e810b407992f4f602d87cfd56e5ffe522a60472))
+* **providers:** use Wan 3.0 at 1080P for Topview quality and first/last-frame clips ([a669cd0](https://github.com/hemi1986/coreslopper/commit/a669cd026864abebbcfc36d5e0bf253db5d10ea2))
+* **qa-export:** release package with shorts and upload texts ([2bfb15e](https://github.com/hemi1986/coreslopper/commit/2bfb15e6a1cd1d7a49b1243c77a7844c798c5c20))
+* **qa-export:** release package with thumbnails, shorts, and upload texts ([172f4ed](https://github.com/hemi1986/coreslopper/commit/172f4ede55e7a5a2338e8c58b953d711e5936005))
+* **qa-export:** three thumbnails per video ([7027d42](https://github.com/hemi1986/coreslopper/commit/7027d426c0760c5556890a4d2cebe994dbf4abec))
+* series budget, canon state and manifest, and new-series ([628dc4a](https://github.com/hemi1986/coreslopper/commit/628dc4a94abfc02661437ec0e96da3962e54b340))
+
+
+### Bug Fixes
+
+* **cli:** pass the probed lip-sync length to local generations ([eb2b49a](https://github.com/hemi1986/coreslopper/commit/eb2b49a83face05dcfd5d029acd561226a27e21f))
+* **cli:** pass the probed lip-sync length to local generations ([30acae6](https://github.com/hemi1986/coreslopper/commit/30acae6f27b960acf589f318e2ffb0375f823144))
+
+
+### Documentation
+
+* accept ADR 0016 and add the episode-projects plan ([f9b8581](https://github.com/hemi1986/coreslopper/commit/f9b85810d2323974df5d854036b448d81eb374f5))
+* ADR 0016 and glossary for episode projects ([945957e](https://github.com/hemi1986/coreslopper/commit/945957ebae81125f4896ccf72f53be7dfc842596))
+* remove the finished episode-projects plan ([bdc1ae4](https://github.com/hemi1986/coreslopper/commit/bdc1ae44e869482715f283e55dd193b24d072988))
+
 ## [0.5.0](https://github.com/hemi1986/coreslopper/compare/v0.4.1...v0.5.0) (2026-11-10)
 
 
