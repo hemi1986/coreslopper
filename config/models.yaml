@@ -221,19 +221,27 @@ roles:
     notes: 3-30 s, optional end frame for frame chaining. Kling v4 has no audio switch and may return clips with sound; MediaLayer mutes clips, so the song stays the only audio source.
     alternatives:
       topview:
-        model: kling/kling-4.0/image-to-video
+        model: alibaba/wan-3.0/image-to-video
         params:
+          request_format: wan
           duration: 5
-          min_duration: 3
+          min_duration: 2
           resolution: 1080P
-          aspect_ratio: "16:9"
-          reference_field: image
-          end_reference_field: last_image
+          ratio: adaptive
+          audio: false
+          prompt_extend: false
+          watermark: false
+          send_seed: true
         pricing:
           unit: second
-          usd: 0.2096
+          usd: 0.1235
         maxDuration: 30
-        notes: Kling 4.0 at native 1080P, 3-30 s. Optional end frame via last_image.
+        notes: >-
+          Wan 3.0 at 1080P, 2-30 s, takes a seed. Chosen over Kling 4.0 (1080P,
+          $0.2096/s) after a side-by-side test on 2026-11-15; switch with a project
+          override (model kling/kling-4.0/image-to-video, reference_field: image,
+          end_reference_field: last_image) for tighter continuity. Output is 30 fps.
+          No PNG alpha channel in the start frame.
       higgsfield:
         model: kling-video/v3.0/std/image-to-video
         params:
@@ -498,19 +506,22 @@ roles:
       to the model's end-frame field.
     alternatives:
       topview:
-        model: kling/kling-4.0/image-to-video
+        model: alibaba/wan-3.0/image-to-video
         params:
+          request_format: wan
           duration: 5
-          min_duration: 3
+          min_duration: 2
           resolution: 1080P
-          aspect_ratio: "16:9"
-          reference_field: image
-          end_reference_field: last_image
+          ratio: adaptive
+          audio: false
+          prompt_extend: false
+          watermark: false
+          send_seed: true
         pricing:
           unit: second
-          usd: 0.2096
+          usd: 0.1235
         maxDuration: 30
-        notes: Kling 4.0 with start (image) and end frame (last_image).
+        notes: Wan 3.0 with first_frame and last_frame media at 1080P. Output is 30 fps.
 
   video.lipsync:
     provider: fal
