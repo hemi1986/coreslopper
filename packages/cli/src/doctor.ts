@@ -1,6 +1,11 @@
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { checkComfyUI, inspectWorkflowDir, resolveHiggsfieldCredentials } from '@coreslopper/providers';
+import {
+  checkComfyUI,
+  inspectWorkflowDir,
+  resolveHiggsfieldCredentials,
+  resolveTopviewApiKey,
+} from '@coreslopper/providers';
 import { detectTools, type ToolCheck } from './tools.js';
 import { isWorkspace, loadWorkspaceEnv } from './workspace.js';
 
@@ -93,6 +98,7 @@ async function comfyUIChecks(root: string): Promise<DoctorCheck[]> {
 export async function runDoctor(root: string, options: DoctorOptions = {}): Promise<DoctorResult> {
   loadWorkspaceEnv(root);
   const higgsfield = resolveHiggsfieldCredentials();
+  const topview = resolveTopviewApiKey();
 
   const checks: DoctorCheck[] = [
     {
@@ -123,6 +129,14 @@ export async function runDoctor(root: string, options: DoctorOptions = {}): Prom
       name: 'HIGGSFIELD_API_KEY',
       ok: Boolean(higgsfield),
       detail: higgsfield ? 'set (from environment or .env)' : 'not set (mock works without it)',
+      required: false,
+      group: 'credentials',
+    },
+    {
+      id: 'topview-key',
+      name: 'TOPVIEW_API_PLATFORM_KEY',
+      ok: Boolean(topview),
+      detail: topview ? 'set (from environment or .env)' : 'not set (mock works without it)',
       required: false,
       group: 'credentials',
     },

@@ -153,6 +153,7 @@
           "enum": [
             "fal",
             "higgsfield",
+            "topview",
             "comfyui",
             "mock"
           ]
@@ -163,6 +164,7 @@
           "enum": [
             "fal",
             "higgsfield",
+            "topview",
             "comfyui",
             "mock"
           ]

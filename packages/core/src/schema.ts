@@ -8,11 +8,11 @@ export const FormatSchema = z.object({
 });
 
 /** Every generation provider. `comfyui` is a local backend that runs tagged workflow exports. */
-export const ProviderKindSchema = z.enum(['fal', 'higgsfield', 'comfyui', 'mock']);
+export const ProviderKindSchema = z.enum(['fal', 'higgsfield', 'topview', 'comfyui', 'mock']);
 /** Providers that can generate and edit stills. */
-export const ImageProviderKindSchema = z.enum(['fal', 'higgsfield', 'comfyui', 'mock']);
+export const ImageProviderKindSchema = z.enum(['fal', 'higgsfield', 'topview', 'comfyui', 'mock']);
 /** Providers that can generate video clips. */
-export const VideoProviderKindSchema = z.enum(['fal', 'higgsfield', 'comfyui', 'mock']);
+export const VideoProviderKindSchema = z.enum(['fal', 'higgsfield', 'topview', 'comfyui', 'mock']);
 /** Providers that can lip-sync a face to a vocal segment. */
 export const LipSyncProviderKindSchema = z.enum(['fal', 'higgsfield', 'comfyui', 'mock']);
 /** Providers that can generate music, stingers, and sound effects (`audio.*` roles). */
@@ -38,7 +38,7 @@ export const ProvidersSchema = z
     video: VideoProviderKindSchema.default('mock'),
     /**
      * Lip-sync can use a different provider from the rest of the video.
-     * Defaults to `video`, or to `fal` when `video` is `comfyui`.
+     * Defaults to `video`, or to `fal` when `video` is `comfyui` or `topview`.
      */
     lipsync: LipSyncProviderKindSchema.optional(),
     /** `audio.*` roles (stingers, SFX, voices, extra music; never the song itself). Defaults to `comfyui`. */

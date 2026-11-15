@@ -13,7 +13,12 @@ import {
 } from '@clack/prompts';
 import { resolve } from 'node:path';
 import { ValidationError } from '@coreslopper/core';
-import { checkComfyUI, comfyUIBaseUrl, resolveHiggsfieldCredentials } from '@coreslopper/providers';
+import {
+  checkComfyUI,
+  comfyUIBaseUrl,
+  resolveHiggsfieldCredentials,
+  resolveTopviewApiKey,
+} from '@coreslopper/providers';
 import {
   defaultProjectSlug,
   initWorkspace,
@@ -33,6 +38,7 @@ import {
   missingTools,
   validateFalKey,
   validateHiggsfieldKey,
+  validateTopviewKey,
 } from './tools.js';
 
 export interface OnboardOptions {
@@ -49,6 +55,7 @@ export interface OnboardOptions {
   title?: string;
   falKey?: string;
   higgsfieldKey?: string;
+  topviewKey?: string;
   noProject?: boolean;
 }
 
@@ -243,6 +250,47 @@ async function chooseHiggsfieldKey(
   return key;
 }
 
+async function chooseTopviewKey(options: OnboardOptions, needed: boolean): Promise<string | undefined> {
+  let key = options.topviewKey ?? resolveTopviewApiKey();
+  if (!needed) return key;
+
+  if (!key) {
+    key = unwrap(
+      await password({
+        message: 'Topview platform API key from platform.topview.ai/api-keys (leave empty to add it later)',
+        mask: '•',
+      }),
+    );
+  }
+
+  if (!key) {
+    log.warn('No Topview key yet. Add TOPVIEW_API_PLATFORM_KEY to .env before generating paid assets.');
+    return undefined;
+  }
+
+  const check = spinner();
+  check.start('Checking the Topview key...');
+  const result = await validateTopviewKey(key);
+  if (result.status === 'valid') {
+    check.stop('Topview key is valid.');
+    return key;
+  }
+
+  check.stop(`Could not verify the Topview key (${result.message}).`);
+  if (result.status === 'invalid') {
+    const keep = unwrap(
+      await confirm({
+        message: 'The key was rejected. Keep it in .env anyway?',
+        initialValue: false,
+      }),
+    );
+    if (!keep) return undefined;
+  }
+  return key;
+}
+
+const CLOUD_LABELS: Record<string, string> = { fal: 'fal.ai', higgsfield: 'Higgsfield', topview: 'Topview' };
+
 function printNextSteps(target: string, result: InitResult, options: OnboardOptions): void {
   const project = result.projectSlug;
   const lines = [
@@ -285,6 +333,7 @@ export async function onboard(options: OnboardOptions = {}): Promise<InitResult>
   let falKey: string | undefined = options.falKey ?? process.env.FAL_KEY;
   let higgsfieldKey: string | undefined =
     options.higgsfieldKey ?? resolveHiggsfieldCredentials();
+  let topviewKey: string | undefined = options.topviewKey ?? resolveTopviewApiKey();
   let project: FirstProjectOptions | null = null;
 
   if (!options.noProject) {
@@ -303,6 +352,11 @@ export async function onboard(options: OnboardOptions = {}): Promise<InitResult>
                   label: 'Higgsfield',
                   hint: 'AI keyframes and image-to-video, needs HIGGSFIELD_API_KEY',
                 },
+                {
+                  value: 'topview',
+                  label: 'Topview',
+                  hint: 'AI keyframes and image-to-video, needs TOPVIEW_API_PLATFORM_KEY',
+                },
               ],
               initialValue: 'mock',
             }),
@@ -316,7 +370,7 @@ export async function onboard(options: OnboardOptions = {}): Promise<InitResult>
             await select({
               message: 'Where should video clips be rendered?',
               options: [
-                { value: visual, label: `${visual === 'fal' ? 'fal.ai' : 'Higgsfield'} (cloud)`, hint: 'same as images' },
+                { value: visual, label: `${CLOUD_LABELS[visual] ?? visual} (cloud)`, hint: 'same as images' },
                 {
                   value: 'comfyui',
                   label: 'ComfyUI (local)',
@@ -342,6 +396,7 @@ export async function onboard(options: OnboardOptions = {}): Promise<InitResult>
       options,
       image === 'higgsfield' || video === 'higgsfield',
     );
+    topviewKey = await chooseTopviewKey(options, image === 'topview' || video === 'topview');
 
     const budget =
       options.budget ??
@@ -420,6 +475,7 @@ export async function onboard(options: OnboardOptions = {}): Promise<InitResult>
     project,
     falKey,
     higgsfieldKey,
+    topviewKey,
     onProgress: (message) => log.step(message),
   });
 
