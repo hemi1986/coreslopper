@@ -325,6 +325,34 @@ export async function validateFalKey(
 }
 
 /**
+ * Check a Topview platform key by querying a task id that cannot exist: an
+ * accepted key gets 404, a rejected key 401. Network failures are unknown.
+ */
+export async function validateTopviewKey(
+  key: string,
+  fetchImpl: (input: string, init?: RequestInit) => Promise<Response> = fetch,
+): Promise<ProviderKeyResult> {
+  const trimmed = key.trim().replace(/^Bearer\s+/i, '');
+  if (!trimmed) return { status: 'invalid', message: 'empty key' };
+
+  try {
+    const response = await fetchImpl('https://platform-backend.topview.ai/api/v1/predictions/coreslopperkeycheck', {
+      headers: { Authorization: `Bearer ${trimmed}` },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (response.ok || response.status === 404) return { status: 'valid', message: `HTTP ${response.status}` };
+    if (response.status === 401) return { status: 'invalid', message: 'HTTP 401 (key rejected)' };
+    if (response.status === 403) return { status: 'unknown', message: 'HTTP 403 (key may lack requests:read permission)' };
+    return { status: 'unknown', message: `HTTP ${response.status}` };
+  } catch (error) {
+    return {
+      status: 'unknown',
+      message: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+/**
  * Check a Higgsfield credential against a lightweight authenticated endpoint.
  * Network failures are reported as unknown, not as an invalid credential.
  */

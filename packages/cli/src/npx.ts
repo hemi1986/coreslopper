@@ -62,26 +62,27 @@ program
 
 program
   .command('init [dir]')
-  .description('Create a workspace, install tools, and configure fal.ai and Higgsfield.')
+  .description('Create a workspace, install tools, and configure fal.ai, Higgsfield, and Topview.')
   .option('-y, --yes', 'Use defaults and skip prompts')
   .option('--force', 'Merge into a non-empty directory')
   .option('--no-install', 'Skip npm install and uv sync')
   .option('--no-git', 'Do not initialize a git repository')
   .option('--install-tools', 'Install missing uv, Python, ffmpeg, and Claude Code')
   .option('--no-tool-install', 'Do not offer to install system tools')
-  .option('--visual <provider>', 'mock | fal | higgsfield', 'mock')
-  .option('--image-provider <provider>', 'mock | fal | higgsfield')
-  .option('--video-provider <provider>', 'mock | fal | higgsfield | comfyui')
+  .option('--visual <provider>', 'mock | fal | higgsfield | topview', 'mock')
+  .option('--image-provider <provider>', 'mock | fal | higgsfield | topview')
+  .option('--video-provider <provider>', 'mock | fal | higgsfield | topview | comfyui')
   .option('--budget <usd>', 'First project budget in USD', (value) => Number(value))
   .option('--project <slug>', 'First project slug')
   .option('--title <title>', 'First project title')
   .option('--fal-key <key>', 'fal.ai API key (prefer FAL_KEY in the environment)')
   .option('--higgsfield-key <key>', 'Higgsfield credential (prefer HIGGSFIELD_API_KEY in the environment)')
+  .option('--topview-key <key>', 'Topview platform key (prefer TOPVIEW_API_PLATFORM_KEY in the environment)')
   .option('--skip-project', 'Create the workspace without a first project')
   .option('--runtime <dir>', 'Runtime directory (development only)')
   .action((dir: string | undefined, options: InitCommandOptions) =>
     run(async () => {
-      const visuals = ['mock', 'fal', 'higgsfield'] as const;
+      const visuals = ['mock', 'fal', 'higgsfield', 'topview'] as const;
       const videoProviders = [...visuals, 'comfyui'] as const;
       if (options.visual) options.visual = validateChoice(options.visual, visuals, 'visual provider');
       if (options.imageProvider) {
@@ -137,13 +138,13 @@ program
   .description('Create a project inside the current workspace.')
   .option('--budget <usd>', 'Project budget in USD (required)', (value) => Number(value))
   .option('--title <title>')
-  .option('--visual <provider>', 'mock | fal | higgsfield', 'mock')
-  .option('--image-provider <provider>', 'mock | fal | higgsfield')
-  .option('--video-provider <provider>', 'mock | fal | higgsfield | comfyui')
+  .option('--visual <provider>', 'mock | fal | higgsfield | topview', 'mock')
+  .option('--image-provider <provider>', 'mock | fal | higgsfield | topview')
+  .option('--video-provider <provider>', 'mock | fal | higgsfield | topview | comfyui')
   .action((slug: string, options: NewCommandOptions) =>
     run(async () => {
       const root = requireWorkspace();
-      const visuals = ['mock', 'fal', 'higgsfield'] as const;
+      const visuals = ['mock', 'fal', 'higgsfield', 'topview'] as const;
       const visual = validateChoice(options.visual ?? 'mock', visuals, 'visual provider');
       const image = options.imageProvider
         ? validateChoice(options.imageProvider, visuals, 'image provider')

@@ -16,7 +16,7 @@
 
 ## Workspace setup
 
-Create a workspace with `npx coreslopper init <dir>` (or `npx coreslopper@latest init`). The onboarding CLI checks tools and writes `FAL_KEY` and Higgsfield credentials to `.env`. The workspace is a private runtime snapshot, so run day-to-day commands with its local `npm run cli -- ...`; `npx coreslopper doctor` works from anywhere. See `docs/onboarding.md`.
+Create a workspace with `npx coreslopper init <dir>` (or `npx coreslopper@latest init`). The onboarding CLI checks tools and writes `FAL_KEY`, Higgsfield, and Topview credentials to `.env`. The workspace is a private runtime snapshot, so run day-to-day commands with its local `npm run cli -- ...`; `npx coreslopper doctor` works from anywhere. See `docs/onboarding.md`.
 
 ## Agents
 
@@ -32,7 +32,7 @@ The hook calls `npm run cli -- validate-file <file>`, which is also runnable by 
 
 ## MCP
 
-The pipeline needs no MCP server. The song is always supplied by the user. fal.ai and Higgsfield are used through the pipeline adapters (`FAL_KEY`, `HIGGSFIELD_API_KEY`), not through MCP. If you want to explore fal.ai models interactively, see `docs/mcp.md` and add a project-scoped MCP server for fal.ai; keep it out of the pipeline.
+The pipeline needs no MCP server. The song is always supplied by the user. fal.ai, Higgsfield, and Topview are used through the pipeline adapters (`FAL_KEY`, `HIGGSFIELD_API_KEY`, `TOPVIEW_API_PLATFORM_KEY`), not through MCP. If you want to explore fal.ai models interactively, see `docs/mcp.md` and add a project-scoped MCP server for fal.ai; keep it out of the pipeline.
 
 ## Permissions and safety
 

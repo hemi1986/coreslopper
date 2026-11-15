@@ -1,8 +1,8 @@
 # Model roles used by the generation adapter.
 #
 # Each role has a base provider (fal.ai unless stated otherwise) and optional
-# `alternatives` for other providers. When a project selects higgsfield, the
-# adapter uses `alternatives.higgsfield` instead of the fal.ai slug.
+# `alternatives` for other providers. When a project selects higgsfield or
+# topview, the adapter uses `alternatives.<provider>` instead of the fal.ai slug.
 #
 # These are planning estimates. Before a paid run, verify the exact model slug
 # and price at https://fal.ai or https://console.higgsfield.ai and update this
@@ -15,7 +15,16 @@
 #   reference_field: <name>    body field for uploaded edit references
 #   end_reference_field: <name> body field for the end frame (firstLastFrameToVideo)
 #
-# Clip length (fal.ai and Higgsfield video roles): a batch item's
+# Topview (providers.image / video: topview) takes the same send_seed,
+# send_negative_prompt, reference_field, and end_reference_field options, plus:
+#   request_format: content    content[] request (Topview T1, Seedance, MiniMax)
+#   request_format: wan        input + parameters request (Wan 3.0); params go
+#                              into `parameters`, send_seed sets parameters.seed
+#                              the default "flat" sends prompt + named image fields
+# Edit references default to `images`, video start frames to `image`. Prices are
+# the Topview column of https://platform.topview.ai/pricing.
+#
+# Clip length (fal.ai, Higgsfield, and Topview video roles): a batch item's
 # `durationSeconds` wins and is rounded up to whole seconds; `params.duration`
 # is only the fallback. Adapter options, stripped before the request is sent:
 #   min_duration: 3            raise shorter requests to the model's minimum
@@ -50,6 +59,15 @@ roles:
       usd: 0.15
     notes: Multi-reference character sheets. Requires reference images; text-only prompts are rejected.
     alternatives:
+      topview:
+        model: google/nano-banana-2.1/edit
+        params:
+          resolution: 2k
+          aspect_ratio: "1:1"
+        pricing:
+          unit: image
+          usd: 0.035
+        notes: Nano Banana 2.1 edit, up to 14 references. $0.03 at 2k plus $0.001 per input image (Topview price 2026-11-15).
       higgsfield:
         model: alibaba/qwen-image-3/edit
         params:
@@ -77,6 +95,15 @@ roles:
       usd: 0.05
     notes: Hero keyframes and look development.
     alternatives:
+      topview:
+        model: google/nano-banana-2.1/text-to-image
+        params:
+          resolution: 2k
+          aspect_ratio: "16:9"
+        pricing:
+          unit: image
+          usd: 0.03
+        notes: Nano Banana 2.1 text-to-image at 2k. No seed parameter, so reruns are not reproducible on the provider side.
       higgsfield:
         model: higgsfield-ai/soul/v2/standard
         params:
@@ -107,6 +134,15 @@ roles:
       usd: 0.05
     notes: Reference-preserving edits.
     alternatives:
+      topview:
+        model: google/nano-banana-2.1/edit
+        params:
+          resolution: 2k
+          aspect_ratio: "16:9"
+        pricing:
+          unit: image
+          usd: 0.035
+        notes: Nano Banana 2.1 edit. $0.03 at 2k plus $0.001 per input image.
       higgsfield:
         model: alibaba/qwen-image-3/edit
         params:
@@ -134,6 +170,15 @@ roles:
       usd: 0.03
     notes: Cheaper drafts and background stills.
     alternatives:
+      topview:
+        model: google/nano-banana-2.1/text-to-image
+        params:
+          resolution: 1k
+          aspect_ratio: "16:9"
+        pricing:
+          unit: image
+          usd: 0.02
+        notes: Nano Banana 2.1 at 1k.
       higgsfield:
         model: higgsfield-ai/soul/v2/standard
         params:
@@ -175,6 +220,28 @@ roles:
     maxDuration: 30
     notes: 3-30 s, optional end frame for frame chaining. Kling v4 has no audio switch and may return clips with sound; MediaLayer mutes clips, so the song stays the only audio source.
     alternatives:
+      topview:
+        model: alibaba/wan-3.0/image-to-video
+        params:
+          request_format: wan
+          duration: 5
+          min_duration: 2
+          resolution: 1080P
+          ratio: adaptive
+          audio: false
+          prompt_extend: false
+          watermark: false
+          send_seed: true
+        pricing:
+          unit: second
+          usd: 0.1235
+        maxDuration: 30
+        notes: >-
+          Wan 3.0 at 1080P, 2-30 s, takes a seed. Chosen over Kling 4.0 (1080P,
+          $0.2096/s) after a side-by-side test on 2026-11-15; switch with a project
+          override (model kling/kling-4.0/image-to-video, reference_field: image,
+          end_reference_field: last_image) for tighter continuity. Output is 30 fps.
+          No PNG alpha channel in the start frame.
       higgsfield:
         model: kling-video/v3.0/std/image-to-video
         params:
@@ -215,6 +282,19 @@ roles:
     maxDuration: 20
     notes: Cheap drafts and B-roll.
     alternatives:
+      topview:
+        model: minimax/minimax-h3/image-to-video
+        params:
+          request_format: content
+          duration: 5
+          min_duration: 5
+          resolution: 768P
+          ratio: adaptive
+        pricing:
+          unit: second
+          usd: 0.0299
+        maxDuration: 15
+        notes: MiniMax H3 at 768P, 5-15 s; the aspect follows the start frame. Cheap drafts and B-roll.
       higgsfield:
         model: kling-video/v2.5-turbo/standard/image-to-video
         params:
@@ -250,6 +330,20 @@ roles:
     maxDuration: 30
     notes: Hero shots only.
     alternatives:
+      topview:
+        model: topview/topview-t1/image-to-video
+        params:
+          request_format: content
+          duration: 5
+          min_duration: 4
+          resolution: 1080p
+          ratio: adaptive
+          generate_audio: false
+        pricing:
+          unit: second
+          usd: 0.4265
+        maxDuration: 30
+        notes: Topview T1 at 1080p, 4-30 s, no audio track. Rejects seed and negative_prompt.
       higgsfield:
         model: bytedance/seedance-2.5/image-to-video
         params:
@@ -285,6 +379,25 @@ roles:
       usd: 0.06
     notes: Lowest-cost motion pass.
     alternatives:
+      topview:
+        model: alibaba/wan-3.0/image-to-video
+        params:
+          request_format: wan
+          duration: 5
+          min_duration: 2
+          resolution: 720P
+          ratio: adaptive
+          audio: false
+          prompt_extend: false
+          watermark: false
+          send_seed: true
+        pricing:
+          unit: second
+          usd: 0.0618
+        maxDuration: 30
+        notes: >-
+          Wan 3.0 at 720P, 2-30 s, the same model as the fal.ai base. Takes a seed.
+          No PNG alpha channel in the start frame. 1080P costs $0.1235/s.
       higgsfield:
         model: alibaba/wan-3.0/image-to-video
         params:
@@ -364,7 +477,20 @@ roles:
       LTX workflow by default. Do not use it for character shots; they need a
       reference frame. Add alternatives.fal (model slug and pricing) to run it in
       the cloud.
-    alternatives: {}
+    alternatives:
+      topview:
+        model: minimax/minimax-h3/text-to-video
+        params:
+          request_format: content
+          duration: 5
+          min_duration: 5
+          resolution: 768P
+          ratio: "16:9"
+        pricing:
+          unit: second
+          usd: 0.0299
+        maxDuration: 15
+        notes: MiniMax H3 text-to-video. Text-only requests need an explicit ratio; set it per project format.
   video.first_last_frame:
     provider: comfyui
     model: ltx-flf2v
@@ -378,7 +504,24 @@ roles:
       Animate between a start and an end keyframe (firstLastFrameToVideo). Local
       LTX workflow by default. A cloud alternative needs end_reference_field set
       to the model's end-frame field.
-    alternatives: {}
+    alternatives:
+      topview:
+        model: alibaba/wan-3.0/image-to-video
+        params:
+          request_format: wan
+          duration: 5
+          min_duration: 2
+          resolution: 1080P
+          ratio: adaptive
+          audio: false
+          prompt_extend: false
+          watermark: false
+          send_seed: true
+        pricing:
+          unit: second
+          usd: 0.1235
+        maxDuration: 30
+        notes: Wan 3.0 with first_frame and last_frame media at 1080P. Output is 30 fps.
 
   video.lipsync:
     provider: fal

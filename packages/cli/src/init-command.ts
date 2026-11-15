@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
 import { ValidationError } from '@coreslopper/core';
-import { checkComfyUI, resolveHiggsfieldCredentials } from '@coreslopper/providers';
+import { checkComfyUI, resolveHiggsfieldCredentials, resolveTopviewApiKey } from '@coreslopper/providers';
 import {
   defaultProjectSlug,
   initWorkspace,
@@ -10,7 +10,7 @@ import {
   type VisualProvider,
 } from './init.js';
 import { onboard } from './onboarding.js';
-import { validateFalKey, validateHiggsfieldKey } from './tools.js';
+import { validateFalKey, validateHiggsfieldKey, validateTopviewKey } from './tools.js';
 
 export interface InitCommandOptions {
   yes?: boolean;
@@ -27,6 +27,7 @@ export interface InitCommandOptions {
   title?: string;
   falKey?: string;
   higgsfieldKey?: string;
+  topviewKey?: string;
   skipProject?: boolean;
   runtime?: string;
 }
@@ -75,6 +76,7 @@ export async function runInitCommand(targetArg: string | undefined, options: Ini
       title: options.title,
       falKey: options.falKey,
       higgsfieldKey: options.higgsfieldKey,
+      topviewKey: options.topviewKey,
       noProject: options.skipProject,
     });
     return;
@@ -86,6 +88,7 @@ export async function runInitCommand(targetArg: string | undefined, options: Ini
   const video = options.videoProvider ?? visual;
   const falKey = options.falKey ?? process.env.FAL_KEY;
   const higgsfieldKey = options.higgsfieldKey ?? resolveHiggsfieldCredentials();
+  const topviewKey = options.topviewKey ?? resolveTopviewApiKey();
   for (const provider of new Set([image, video])) {
     if (provider === 'comfyui') {
       const server = await checkComfyUI();
@@ -113,6 +116,14 @@ export async function runInitCommand(targetArg: string | undefined, options: Ini
         }
       }
     }
+    if (provider === 'topview') {
+      if (!topviewKey) {
+        console.warn('! No Topview key was provided. Add TOPVIEW_API_PLATFORM_KEY to .env before generating paid assets.');
+      } else {
+        const check = await validateTopviewKey(topviewKey);
+        if (check.status !== 'valid') console.warn(`! Could not verify the Topview key (${check.message}).`);
+      }
+    }
   }
 
   const projectSlug = options.project ?? defaultProjectSlug(target);
@@ -136,6 +147,7 @@ export async function runInitCommand(targetArg: string | undefined, options: Ini
     project,
     falKey,
     higgsfieldKey,
+    topviewKey,
   });
   printInitSummary(result);
   if (!result.installed && options.install !== false) process.exitCode = 1;

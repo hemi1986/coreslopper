@@ -200,6 +200,9 @@ function resolveItem(
       'The Higgsfield adapter does not support lip-sync. Set providers.lipsync to "fal" and provide FAL_KEY, or keep providers.video on fal.',
     );
   }
+  if (item.operation === 'lipSync' && provider === 'topview') {
+    throw new ConfigError('The Topview adapter does not support lip-sync. Set providers.lipsync to "fal" or "comfyui".');
+  }
   if (item.operation === 'generateAudio' && provider !== 'comfyui' && provider !== 'mock') {
     throw new ConfigError(`Only the ComfyUI backend generates audio, but role "${item.role}" resolved to ${provider}.`);
   }

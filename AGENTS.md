@@ -23,7 +23,7 @@ cd my-video
 claude
 ```
 
-The wizard checks and optionally installs Node-adjacent tools, validates optional fal.ai and Higgsfield credentials, and creates the first project. In Claude Code, run `/new-video my-video` to add lyrics, import the song, and write the brief, then `/video-next my-video`. Use `--yes` for a non-interactive run and see `docs/onboarding.md` for all flags.
+The wizard checks and optionally installs Node-adjacent tools, validates optional fal.ai, Higgsfield, and Topview credentials, and creates the first project. In Claude Code, run `/new-video my-video` to add lyrics, import the song, and write the brief, then `/video-next my-video`. Use `--yes` for a non-interactive run and see `docs/onboarding.md` for all flags.
 
 Work in this repository instead:
 
@@ -61,7 +61,7 @@ comfyui/           README + workflows/ for local ComfyUI generation (tagged API 
 docs/              glossary.md, architecture.md, pipeline.md, ADRs, third-party notices
 packages/
   core/            Zod schemas, state, timing resolver, hash, cost, project loader
-  providers/       image, video, lip-sync, and audio operations; fal.ai + Higgsfield + ComfyUI + mock; cache/manifest runner
+  providers/       image, video, lip-sync, and audio operations; fal.ai + Higgsfield + Topview + ComfyUI + mock; cache/manifest runner
   cli/             validate, status, new, render, contact-sheet, stage-*, estimate, doctor
                    npx entry, onboarding, tool checks, workspace init
   remotion/        MusicVideo composition, motion components, effects, 3D
@@ -162,7 +162,7 @@ npm run schema
 | `npm run cli -- validate-file <file>` | Validate one changed artifact (used by the hook). |
 | `npm run cli -- bench list\|import\|run\|report` | Model bench: compare models and servers on fixed scenes from past projects (`bench/README.md`). |
 | `npm run cli -- doctor` | Check workspace, tools, fonts, Remotion, and keys. |
-| `npx coreslopper init [dir]` | Create a workspace, install tools, configure fal.ai and Higgsfield. |
+| `npx coreslopper init [dir]` | Create a workspace, install tools, configure fal.ai, Higgsfield, and Topview. |
 | `npx coreslopper@latest update [dir]` | Update a workspace to the latest workflow; keeps local edits (`--dry-run`, `--force`). |
 | `npx coreslopper doctor` | Check a workspace from outside it. |
 | `npx coreslopper new <slug> --budget <usd>` | Create a project inside a workspace. |
@@ -214,4 +214,4 @@ CI runs without API keys and uses the mock provider. GPU tests are opt-in.
 
 ## License
 
-MIT. Remotion is source-available under its own license; see `docs/THIRD_PARTY.md`. Do not commit songs, stems, generated fal.ai/Higgsfield media, or copyrighted music to this repository.
+MIT. Remotion is source-available under its own license; see `docs/THIRD_PARTY.md`. Do not commit songs, stems, generated fal.ai/Higgsfield/Topview media, or copyrighted music to this repository.

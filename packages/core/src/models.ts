@@ -87,8 +87,9 @@ export function resolveModelRole(
 export function providerForRole(config: Pick<ProjectConfig, 'providers'>, role: string): ProviderKind {
   if (role === 'video.lipsync') {
     if (config.providers.lipsync) return config.providers.lipsync;
-    // Projects that render clips in ComfyUI keep lip-sync on fal unless they opt in.
-    return config.providers.video === 'comfyui' ? 'fal' : config.providers.video;
+    // ComfyUI projects keep lip-sync on fal unless they opt in; Topview has no lip-sync.
+    const video = config.providers.video;
+    return video === 'comfyui' || video === 'topview' ? 'fal' : video;
   }
   if (role.startsWith('audio.')) return config.providers.audio ?? 'comfyui';
   if (role.startsWith('video.')) return config.providers.video;

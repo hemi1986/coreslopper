@@ -24,7 +24,7 @@ import {
   type WorkspaceMarker,
 } from './workspace.js';
 
-export type VisualProvider = 'fal' | 'higgsfield' | 'mock';
+export type VisualProvider = 'fal' | 'higgsfield' | 'topview' | 'mock';
 /** Video clips can also come from a local ComfyUI server. */
 export type VideoProvider = VisualProvider | 'comfyui';
 
@@ -46,6 +46,7 @@ export interface InitOptions {
   project?: FirstProjectOptions | null;
   falKey?: string;
   higgsfieldKey?: string;
+  topviewKey?: string;
   onProgress?: (message: string) => void;
 }
 
@@ -128,6 +129,7 @@ async function ensureEnvFile(
   target: string,
   falKey?: string,
   higgsfieldKey?: string,
+  topviewKey?: string,
 ): Promise<void> {
   const envPath = join(target, '.env');
   let content: string;
@@ -144,6 +146,10 @@ async function ensureEnvFile(
   if (higgsfieldKey) content = upsertEnv(content, 'HIGGSFIELD_API_KEY', higgsfieldKey.trim());
   if (!/^HIGGSFIELD_API_KEY=/m.test(content)) {
     content = `${content.trimEnd()}\nHIGGSFIELD_API_KEY=\n`;
+  }
+  if (topviewKey) content = upsertEnv(content, 'TOPVIEW_API_PLATFORM_KEY', topviewKey.trim());
+  if (!/^TOPVIEW_API_PLATFORM_KEY=/m.test(content)) {
+    content = `${content.trimEnd()}\nTOPVIEW_API_PLATFORM_KEY=\n`;
   }
   await writeFile(envPath, content, { encoding: 'utf8', mode: 0o600 });
   await chmod(envPath, 0o600).catch(() => undefined);
@@ -230,6 +236,7 @@ function gettingStarted(target: string, result: InitResult, options: InitOptions
     '',
     '- fal.ai: `FAL_KEY` in `.env` (gitignored).',
     '- Higgsfield: `HIGGSFIELD_API_KEY` (or `HF_API_KEY_ID` + `HF_API_KEY_SECRET`) in `.env`.',
+    '- Topview: `TOPVIEW_API_PLATFORM_KEY` in `.env`.',
     '',
     'Bring a finished song: `/new-video` tells you where to put the mix and the vocal stem.',
     '',
@@ -295,7 +302,7 @@ export async function initWorkspace(options: InitOptions): Promise<InitResult> {
   await copyRuntime(runtime, target);
 
   options.onProgress?.('Writing credentials...');
-  await ensureEnvFile(target, options.falKey, options.higgsfieldKey);
+  await ensureEnvFile(target, options.falKey, options.higgsfieldKey, options.topviewKey);
 
   if (options.tools) {
     options.onProgress?.('Installing missing tools...');

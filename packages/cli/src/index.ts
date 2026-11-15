@@ -90,8 +90,8 @@ program
   .option('--title <title>')
   .option('--format <id>', 'Master format: 16x9 | 9x16 | 1x1 | 4x5 (default: config/defaults.yaml)')
   .option('--brand <kit>', 'Brand kit', 'example')
-  .option('--image-provider <provider>', 'mock | fal | higgsfield | comfyui', 'mock')
-  .option('--video-provider <provider>', 'mock | fal | higgsfield | comfyui', 'mock')
+  .option('--image-provider <provider>', 'mock | fal | higgsfield | topview | comfyui', 'mock')
+  .option('--video-provider <provider>', 'mock | fal | higgsfield | topview | comfyui', 'mock')
   .option('--audio-provider <provider>', 'mock | comfyui', 'mock')
   .action(
     (
@@ -107,7 +107,7 @@ program
       },
     ) =>
       run(async () => {
-        const visual = ['mock', 'fal', 'higgsfield', 'comfyui'] as const;
+        const visual = ['mock', 'fal', 'higgsfield', 'topview', 'comfyui'] as const;
         await createSeries({
           slug,
           title: options.title,
@@ -266,18 +266,19 @@ program
   .option('--no-git', 'Do not initialize a git repository')
   .option('--install-tools', 'Install missing uv, Python, ffmpeg, and Claude Code')
   .option('--no-tool-install', 'Do not offer to install system tools')
-  .option('--visual <provider>', 'mock | fal | higgsfield', 'mock')
-  .option('--image-provider <provider>', 'mock | fal | higgsfield')
-  .option('--video-provider <provider>', 'mock | fal | higgsfield | comfyui')
+  .option('--visual <provider>', 'mock | fal | higgsfield | topview', 'mock')
+  .option('--image-provider <provider>', 'mock | fal | higgsfield | topview')
+  .option('--video-provider <provider>', 'mock | fal | higgsfield | topview | comfyui')
   .option('--budget <usd>', 'First project budget in USD', (value) => Number(value))
   .option('--project <slug>', 'First project slug')
   .option('--title <title>', 'First project title')
   .option('--fal-key <key>', 'fal.ai API key (prefer FAL_KEY in the environment)')
   .option('--higgsfield-key <key>', 'Higgsfield credential (prefer HIGGSFIELD_API_KEY in the environment)')
+  .option('--topview-key <key>', 'Topview platform key (prefer TOPVIEW_API_PLATFORM_KEY in the environment)')
   .option('--skip-project', 'Create the workspace without a first project')
   .action((dir: string | undefined, options: InitCommandOptions) =>
     run(async () => {
-      const visuals = ['mock', 'fal', 'higgsfield'] as const;
+      const visuals = ['mock', 'fal', 'higgsfield', 'topview'] as const;
       const videoProviders = [...visuals, 'comfyui'] as const;
       if (options.visual) options.visual = validateChoice(options.visual, visuals, 'visual provider');
       if (options.imageProvider) {
@@ -299,9 +300,9 @@ program
   .option('--title <title>')
   .option('--budget <usd>', 'Project budget in USD (required)', (value) => Number(value))
   .option('--brand <kit>', 'Brand kit', 'example')
-  .option('--visual <provider>', 'mock | fal | higgsfield', 'mock')
-  .option('--image-provider <provider>', 'mock | fal | higgsfield')
-  .option('--video-provider <provider>', 'mock | fal | higgsfield | comfyui')
+  .option('--visual <provider>', 'mock | fal | higgsfield | topview', 'mock')
+  .option('--image-provider <provider>', 'mock | fal | higgsfield | topview')
+  .option('--video-provider <provider>', 'mock | fal | higgsfield | topview | comfyui')
   .action(
     (
       slug: string,
@@ -319,7 +320,7 @@ program
     ) =>
       run(async () => {
         const kind = validateChoice(options.kind, ['music-video', 'episode'] as const, 'project kind');
-        const visuals = ['mock', 'fal', 'higgsfield'] as const;
+        const visuals = ['mock', 'fal', 'higgsfield', 'topview'] as const;
         const visual = validateChoice(options.visual ?? 'mock', visuals, 'visual provider');
         const imageProvider = options.imageProvider
           ? validateChoice(options.imageProvider, visuals, 'image provider')
@@ -429,7 +430,7 @@ program
   .requiredOption('--role <role>', 'Role from config/models.yaml')
   .requiredOption('--units <n>', 'Number of images, seconds, or requests', (value) => Number(value))
   .option('--project <project>', 'Project directory for budget checks')
-  .option('--provider <provider>', 'Provider override: fal | higgsfield | comfyui | mock')
+  .option('--provider <provider>', 'Provider override: fal | higgsfield | topview | comfyui | mock')
   .action((options: { role: string; units: number; project?: string; provider?: string }) =>
     run(async () => {
       const models = await loadModelsConfig();
@@ -437,7 +438,7 @@ program
       if (!role) throw new ValidationError(`Unknown model role "${options.role}".`);
       const loaded = options.project ? await loadProject(projectDirFromArg(options.project)) : undefined;
       const provider = options.provider
-        ? validateChoice(options.provider, ['fal', 'higgsfield', 'comfyui', 'mock'] as const, 'provider')
+        ? validateChoice(options.provider, ['fal', 'higgsfield', 'topview', 'comfyui', 'mock'] as const, 'provider')
         : loaded
           ? providerForRole(loaded.config, options.role)
           : role.provider;
@@ -477,7 +478,7 @@ program
   .requiredOption('--batch <path>', 'Batch JSON/YAML file')
   .option('--series <series>', 'Run the batch for a series canon (budget and manifest of series/<series>/) instead of a project')
   .option('--dry-run', 'Estimate and print the batch without generating')
-  .option('--provider <provider>', 'Provider override for this batch: fal | higgsfield | comfyui | mock (lip-sync keeps its own provider)')
+  .option('--provider <provider>', 'Provider override for this batch: fal | higgsfield | topview | comfyui | mock (lip-sync keeps its own provider)')
   .action((project: string | undefined, options: { batch: string; series?: string; dryRun?: boolean; provider?: string }) =>
     run(async () => {
       await generateBatch({
@@ -486,7 +487,7 @@ program
         batchPath: options.batch,
         dryRun: options.dryRun,
         provider: options.provider
-          ? validateChoice(options.provider, ['fal', 'higgsfield', 'comfyui', 'mock'] as const, 'provider')
+          ? validateChoice(options.provider, ['fal', 'higgsfield', 'topview', 'comfyui', 'mock'] as const, 'provider')
           : undefined,
       });
     }),

@@ -24,5 +24,6 @@ Short records of decisions that are hard to reverse, surprising without context,
 | [0018](0018-thumbnails.md) | `qa-export` makes three thumbnails: the agent picks stills and words, a Remotion still composes the pixels. |
 | [0019](0019-release-package.md) | `qa-export` ends with a release package: three Shorts with vertical thumbnails and one upload text, checked by `qa`. |
 | [0020](0020-model-bench.md) | A model bench in `bench/`: fixed cases from past projects, rendered on named targets, scored by rubric and by the user. |
+| [0021](0021-topview-provider.md) | Topview as a third cloud adapter for stills and clips; one endpoint pattern, two request formats, no lip-sync. |
 
 Status values: `Accepted`, `Deprecated`, `Superseded by ADR-NNNN`.

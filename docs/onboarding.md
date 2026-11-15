@@ -22,8 +22,9 @@ The wizard:
 4. Asks how visuals are generated:
    - `mock` — motion graphics and dry runs, no API key;
    - `fal` — AI keyframes and image-to-video, needs `FAL_KEY`;
-   - `higgsfield` — AI keyframes and image-to-video, needs a Higgsfield credential.
-5. Validates optional fal.ai and Higgsfield credentials and writes them to `.env` with mode `0600`.
+   - `higgsfield` — AI keyframes and image-to-video, needs a Higgsfield credential;
+   - `topview` — AI keyframes and image-to-video, needs `TOPVIEW_API_PLATFORM_KEY`.
+5. Validates optional fal.ai, Higgsfield, and Topview credentials and writes them to `.env` with mode `0600`.
 6. Creates the first project and runs `npm install` plus `uv sync --group dev`.
 
 At the end, open Claude Code in the workspace and run `/new-video <slug>`. The skill asks for the lyrics, tells you where to put the song and its vocal stem, and grills you into the brief and treatment. Then `/video-next <slug>` runs the rest. coreslopper always works from a finished song; it does not generate music.
@@ -40,7 +41,7 @@ npx coreslopper@latest init my-video \
   --project my-video
 ```
 
-`--yes` uses the `mock` visual provider by default. Set `FAL_KEY` or `HIGGSFIELD_API_KEY` in the environment for a real provider. Prefer environment variables or the interactive prompt; a key passed on the command line can end up in your shell history. Use `--image-provider` and `--video-provider` to mix providers, for example Higgsfield for keyframes and fal.ai for video.
+`--yes` uses the `mock` visual provider by default. Set `FAL_KEY`, `HIGGSFIELD_API_KEY`, or `TOPVIEW_API_PLATFORM_KEY` in the environment for a real provider. Prefer environment variables or the interactive prompt; a key passed on the command line can end up in your shell history. Use `--image-provider` and `--video-provider` to mix providers, for example Higgsfield for keyframes and fal.ai for video.
 
 Add `--install-tools` to let the non-interactive run install missing uv, Python, ffmpeg, and Claude Code.
 
@@ -55,14 +56,15 @@ Add `--install-tools` to let the non-interactive run install missing uv, Python,
 | `--no-git` | git init | Do not initialize a git repository. |
 | `--install-tools` | off | Install missing uv, Python, ffmpeg, and Claude Code in non-interactive mode. |
 | `--no-tool-install` | off | Do not offer to install system tools in interactive mode. |
-| `--visual <mock\|fal\|higgsfield>` | `mock` | Image and video provider for the first project. |
-| `--image-provider <mock\|fal\|higgsfield>` | `--visual` | Image provider override. |
-| `--video-provider <mock\|fal\|higgsfield\|comfyui>` | `--visual` | Video provider override. `comfyui` renders clips locally ([comfyui/README.md](../comfyui/README.md)). |
+| `--visual <mock\|fal\|higgsfield\|topview>` | `mock` | Image and video provider for the first project. |
+| `--image-provider <mock\|fal\|higgsfield\|topview>` | `--visual` | Image provider override. |
+| `--video-provider <mock\|fal\|higgsfield\|topview\|comfyui>` | `--visual` | Video provider override. `comfyui` renders clips locally ([comfyui/README.md](../comfyui/README.md)). |
 | `--budget <usd>` | `50` | First project budget. Minimum $5. |
 | `--project <slug>` | target folder name | First project slug. |
 | `--title <title>` | derived from slug | First project title. |
 | `--fal-key <key>` | `FAL_KEY` | fal.ai API key. |
 | `--higgsfield-key <key>` | `HIGGSFIELD_API_KEY` | Higgsfield credential (`key_id:key_secret`). |
+| `--topview-key <key>` | `TOPVIEW_API_PLATFORM_KEY` | Topview platform API key. |
 | `--skip-project` | off | Create the workspace without a first project. |
 
 Run `npx coreslopper init --help` for the current list.
@@ -102,6 +104,9 @@ HIGGSFIELD_API_KEY=key_id:key_secret
 # ... or the split values. HF_API_KEY, HF_KEY, and HF_CREDENTIALS are also accepted.
 HF_API_KEY_ID=...
 HF_API_KEY_SECRET=...
+
+# Topview: platform API key from platform.topview.ai/api-keys (TOPVIEW_API_KEY also works)
+TOPVIEW_API_PLATFORM_KEY=...
 ```
 
 The song needs no credential; you bring it yourself. The mock provider and the motion-only demo need no credentials.
@@ -176,6 +181,7 @@ Workspaces created before `update` existed have no baseline, so every file that 
 - **ffmpeg missing** — on Linux x64, run `./scripts/install-ffmpeg.sh` in the workspace; otherwise install it with your package manager. It is optional for the motion-only demo.
 - **`FAL_KEY` rejected** — create a key on the `API` preset at <https://fal.ai/dashboard/keys> and update `.env`.
 - **Higgsfield credential rejected** — create or rotate an API key in the Higgsfield Console at <https://console.higgsfield.ai> and update `.env`. Use `key_id:key_secret` as one value or set `HF_API_KEY_ID` and `HF_API_KEY_SECRET`.
+- **Topview key rejected** — create a key with `models:generate` and `requests:read` at <https://platform.topview.ai/api-keys> and update `.env`. A `payment_required` task means the Topview workspace balance is short; top it up and the task settles without a new submission.
 - **`npm install` failed** — run it again in the workspace. The rest of the onboarding output is still valid.
 - **`uv sync` failed** — run `npm run python:sync` inside the workspace. Audio analysis needs it; the motion-only demo does not.
 - **A paid generation is refused** — check the project budget and the batch cap with `npm run cli -- status <slug>`.
