@@ -1,0 +1,40 @@
+id: finger-cheek
+title: Finger held at the cheek
+sets:
+  - core
+focus: A hand near the face must stay put; earlier seeds moved the finger onto nose and lips.
+source:
+  project: ich-tu-dir-nichts
+  shot: shot-016
+operation: imageToVideo
+role: video.image_to_video.fast
+seed: 5516
+durationSeconds: 2
+prompt: She keeps her raised index finger perfectly still beside her cheek, a hand's width away from her face,
+  and smiles conspiratorially with one slow playful wink; only her eyes and smile move, the hand does not move
+  at all, static camera, one continuous take. Keep her face, freckles, mint-green ponytail, outfit and the
+  background exactly as in the start frame. One person only, natural anatomy, smooth natural motion, no
+  morphing, no text, no logos.
+fixtures:
+  start:
+    from: ich-tu-dir-nichts/assets/keyframes/shot-016.png
+  golden:
+    from: ich-tu-dir-nichts/assets/video/image_to_video/fast/41aa36abd05b6602-0.mp4
+inputs:
+  references:
+    - start
+golden: golden
+rubric:
+  - id: hand-still
+    check: The index finger stays beside the cheek and never touches lips or nose.
+    weight: 3
+  - id: hands
+    check: Every visible hand has five fingers, no merged or melting fingers, also in motion.
+  - id: identity
+    check: Face, hair, and outfit match the start frame or references for the whole clip; no drift into another
+      person.
+    weight: 2
+  - id: expression
+    check: "Only eyes and smile move: one slow wink, a conspiratorial smile."
+  - id: camera
+    check: The camera does what the prompt says (static means no push-in, zoom, or jump-zoom).

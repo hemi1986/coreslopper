@@ -783,6 +783,44 @@ export async function checkComfyUI(
   }
 }
 
+export interface ComfyUIVram {
+  device?: string;
+  /** Total device memory, GB. */
+  totalGb: number;
+  /** Memory in use on the device (total minus free), GB. */
+  usedGb: number;
+  /** Memory PyTorch holds reserved, GB; ComfyUI keeps it after a job, so it approximates the job's peak. */
+  torchReservedGb?: number;
+}
+
+/** VRAM of the server's first device, or undefined when the server does not report it. */
+export async function comfyUIVram(
+  baseUrl = comfyUIBaseUrl(),
+  fetchImpl: FetchLike = fetch,
+  timeoutMs = 3_000,
+): Promise<ComfyUIVram | undefined> {
+  try {
+    const response = await fetchImpl(`${comfyUIBaseUrl(baseUrl)}/system_stats`, {
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!response.ok) return undefined;
+    const stats = (await response.json()) as {
+      devices?: { name?: string; vram_total?: number; vram_free?: number; torch_vram_total?: number }[];
+    };
+    const device = stats.devices?.[0];
+    if (!device?.vram_total) return undefined;
+    const gb = (bytes: number) => Number((bytes / 1024 ** 3).toFixed(2));
+    return {
+      ...(device.name ? { device: device.name } : {}),
+      totalGb: gb(device.vram_total),
+      usedGb: gb(device.vram_total - (device.vram_free ?? 0)),
+      ...(device.torch_vram_total !== undefined ? { torchReservedGb: gb(device.torch_vram_total) } : {}),
+    };
+  } catch {
+    return undefined;
+  }
+}
+
 export interface WorkflowFileReport {
   name: string;
   ok: boolean;

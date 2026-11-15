@@ -1,0 +1,45 @@
+id: dance-energetic-3s
+title: Energetic dance, 3 s
+sets:
+  - core
+  - smoke
+focus: "Stress test: arms-up dancing where local LTX smears the face from about 1 s and Kling holds."
+source:
+  project: ich-tu-dir-nichts
+  shot: shot-012
+operation: imageToVideo
+role: video.image_to_video.quality
+seed: 7412
+durationSeconds: 3
+prompt: "She dances to the beat with a light, smooth hip sway from side to side and both arms raised above her
+  head, beaming at the lens; she moves at a moderate pace, her head stays steady so her face stays sharp and
+  clearly visible the whole time, her ponytail moves gently. Same young woman as in the start frame
+  throughout: identical face, light freckles, hazel-green eyes, long mint-green hair in a high sleek ponytail
+  that stays tied, soft straight bangs, short white bomber jacket with mint-green cuffs over a silver crop
+  top, white pleated mini skirt, green LED heart pin. Face stays sharp and in focus, hands keep five fingers,
+  the background stays exactly as in the start frame, camera locked off and static, no zoom, one continuous
+  take. Photoreal live-action footage, realistic human skin and natural facial proportions."
+fixtures:
+  start:
+    from: ich-tu-dir-nichts/assets/keyframes/shot-012.png
+  golden:
+    from: ich-tu-dir-nichts/assets/video/image_to_video/quality/1042788475e4e918-0.mp4
+inputs:
+  references:
+    - start
+golden: golden
+goldenNote: Higgsfield Kling 3.0 Standard, retry 1.
+rubric:
+  - id: face-sharp
+    check: The face stays sharp and recognisable at every strip frame, including the last.
+    weight: 3
+  - id: energy
+    check: "Clearly energetic: arms up, sway with the beat."
+  - id: camera
+    check: The camera does what the prompt says (static means no push-in, zoom, or jump-zoom).
+  - id: hands
+    check: Every visible hand has five fingers, no merged or melting fingers, also in motion.
+  - id: hair
+    check: Ponytail stays tied and does not cover the face.
+  - id: photoreal
+    check: Stays photoreal live-action; no CGI doll face, plastic skin, or anime drift.

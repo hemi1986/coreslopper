@@ -80,6 +80,7 @@ export class GenerationRunner {
       ...(audioHash ? { audio: audioHash } : {}),
       ...(request.audioStartSeconds !== undefined ? { audioStartSeconds: request.audioStartSeconds } : {}),
       ...(fingerprint ? { fingerprint } : {}),
+      ...(this.options.cacheKey ? { cacheKey: this.options.cacheKey } : {}),
     });
 
     const cacheDir = join(this.options.cacheDir, hash);

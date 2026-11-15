@@ -9,6 +9,7 @@
 - `/new-episode [slug]` — skill that creates an episode of a series (or resumes one) and grills the user into `script.yaml`. Runs in the main session.
 - `/video-next <slug>` — run all open autonomous stages of a music video (from `audio-analysis` on) or an episode (from `voice-track` on); the kind comes from `status`. Add `--stage <stage>` to run one stage, or `--dry-run` to inspect the next stage.
 - `/video-status [slug]` — read-only stage and budget report.
+- `/model-bench` — skill that compares models, workflows, or ComfyUI servers on the bench cases in `bench/` and scores them with `art-director` agents.
 - `/series-status <series>` — read-only series overview: canon, episodes, stages, spend, length.
 
 `/video-next` dispatches one `stage-runner` subagent per stage. Do not inline a whole stage into the main context.

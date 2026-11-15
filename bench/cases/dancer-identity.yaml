@@ -1,0 +1,48 @@
+id: dancer-identity
+title: Alexis dancing, from references
+sets:
+  - core
+focus: Character identity and outfit from three references in a dynamic pose with raised arms.
+source:
+  project: ich-tu-dir-nichts
+  shot: shot-046
+operation: editImage
+role: image.edit
+seed: 4346
+prompt: "medium-wide shot, knees up, Alexis, the exact same young woman as in the reference images: identical
+  face, big friendly hazel-green eyes, light freckles across nose and cheeks, glossy pink lips, long
+  mint-green hair fading to deep emerald in a high sleek ponytail with soft straight bangs, wearing a short
+  glossy white bomber jacket with mint-green ribbed collar, cuffs and hem open over a silver metallic crop
+  top, a white pleated mini skirt, a small glowing green LED heart pin on the left collar, dancing with arms
+  raised, laughing, ponytail swinging, in the glossy pastel studio with white and sky-blue tiles, curved glass
+  arches and giant bubblegum-pink and mint-green inflatable hearts and spheres, soft even beauty light, one
+  person only, natural anatomy, hands relaxed and not touching anything, tasteful and fully clothed, photoreal
+  glossy AI-pop fashion-editorial music-video still, clean bright slightly too perfect, no text, no letters,
+  no logos"
+fixtures:
+  canvas:
+    from: ich-tu-dir-nichts/characters/alexis/canvas-16x9.png
+  ref-seed:
+    from: ich-tu-dir-nichts/characters/alexis/seed.png
+  ref-outfit:
+    from: ich-tu-dir-nichts/characters/alexis/outfit-a.png
+  golden:
+    from: ich-tu-dir-nichts/assets/image/edit/076ffc431b5b0207-0.png
+inputs:
+  references:
+    - canvas
+    - ref-seed
+    - ref-outfit
+golden: golden
+rubric:
+  - id: identity
+    check: "Same young woman: hazel-green eyes, freckles, mint-to-emerald high ponytail with bangs."
+    weight: 2
+  - id: outfit
+    check: White bomber with mint cuffs, silver crop top, white pleated skirt, green LED heart pin.
+  - id: hands
+    check: Every visible hand has five fingers, no merged or melting fingers, also in motion.
+  - id: pose
+    check: Dancing with arms raised, laughing, medium-wide knee-up framing.
+  - id: tasteful
+    check: Tasteful and fully clothed.

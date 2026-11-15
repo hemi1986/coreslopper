@@ -35,6 +35,7 @@ import {
   type GenerationRequest,
   type GenerationResult,
   type Operation,
+  type Provider,
 } from '@coreslopper/providers';
 import { probeDuration } from './media.js';
 
@@ -325,6 +326,12 @@ export interface BatchRunOptions {
   dryRun?: boolean;
   /** Override the project provider for this batch (lip-sync keeps its own provider). */
   provider?: ProviderKind;
+  /** Build the provider adapter, e.g. for another ComfyUI server; default `createProvider`. */
+  providerFactory?: (kind: ProviderKind) => Provider;
+  /** Extra cache-key material (see GenerationRunnerOptions.cacheKey). */
+  cacheKey?: Record<string, unknown>;
+  /** Print the per-item and summary lines; default true. */
+  log?: boolean;
 }
 
 export interface BatchRunResult {
@@ -343,6 +350,7 @@ export async function runBatch(
   batch: BatchItem[],
   options: BatchRunOptions = {},
 ): Promise<BatchRunResult[]> {
+  const log = options.log === false ? () => undefined : (...args: unknown[]) => console.log(...args);
   const models = await loadModelsConfig();
   const resolved = batch.map((item) => {
     const value = resolveItem(item, project.config, models, project.paths.root, options.provider);
@@ -350,8 +358,8 @@ export async function runBatch(
   });
   const totalEstimate = resolved.reduce((sum, item) => sum + item.cost, 0);
 
-  console.log(`Batch: ${resolved.length} generation(s), worst-case estimate ${formatUsd(totalEstimate)}`);
-  console.log(
+  log(`Batch: ${resolved.length} generation(s), worst-case estimate ${formatUsd(totalEstimate)}`);
+  log(
     `Budget: ${formatUsd(remainingBudget(project.state))} remaining · batch cap ${formatUsd(
       effectiveBatchCap(project.config, project.state),
     )}`,
@@ -359,7 +367,7 @@ export async function runBatch(
   assertAffordable(project.config, project.state, totalEstimate, `${project.label} generation batch`);
   if (options.dryRun) {
     for (const item of resolved) {
-      console.log(
+      log(
         `  ${item.item.operation} ${item.item.role} -> ${item.provider}/${item.model} (${formatUsd(item.cost)})`,
       );
     }
@@ -372,9 +380,10 @@ export async function runBatch(
     runners.set(
       provider,
       new GenerationRunner({
-        provider: createProvider(provider),
+        provider: (options.providerFactory ?? createProvider)(provider),
         cacheDir,
         manifestPath: project.paths.manifest,
+        ...(options.cacheKey ? { cacheKey: options.cacheKey } : {}),
       }),
     );
   }
@@ -392,18 +401,18 @@ export async function runBatch(
     results.push({ resolved: item, result });
     if (result.cached) {
       cacheHits += 1;
-      console.log(`[${index + 1}/${resolved.length}] ${item.item.role}: cache hit ${result.hash.slice(0, 12)}`);
+      log(`[${index + 1}/${resolved.length}] ${item.item.role}: cache hit ${result.hash.slice(0, 12)}`);
     } else {
       actualSpend += result.costUsd;
       recordSpend(project.state, result.costUsd);
       await project.saveState();
-      console.log(
+      log(
         `[${index + 1}/${resolved.length}] ${item.item.role}: ${result.files.length} file(s), ${formatUsd(result.costUsd)}`,
       );
     }
   }
 
-  console.log(
+  log(
     `Done. Actual spend ${formatUsd(actualSpend)} · cache hits ${cacheHits}/${resolved.length} · remaining ${formatUsd(
       remainingBudget(project.state),
     )}`,

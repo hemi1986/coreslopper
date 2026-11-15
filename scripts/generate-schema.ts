@@ -17,6 +17,7 @@ import {
   TimingOverridesSchema,
   TimingSchema,
 } from '../packages/core/src/schema.js';
+import { BenchCaseSchema, BenchConfigSchema, BenchTargetsFileSchema } from '../packages/core/src/bench.js';
 
 const schemas = {
   project: ProjectConfigSchema,
@@ -33,6 +34,9 @@ const schemas = {
   sets: SetBibleSchema,
   script: ScriptSchema,
   takes: TakesSchema,
+  'bench-case': BenchCaseSchema,
+  'bench-targets': BenchTargetsFileSchema,
+  'bench-config': BenchConfigSchema,
 };
 
 const outputDir = join(process.cwd(), 'schema');

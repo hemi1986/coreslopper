@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "number",
+      "const": 1
+    },
+    "targets": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9-]*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "fal",
+              "higgsfield",
+              "comfyui",
+              "mock"
+            ]
+          },
+          "comfyui_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "comfyui_workflows_dir": {
+            "type": "string"
+          },
+          "operations": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "enum": [
+                "generateImage",
+                "editImage",
+                "textToVideo",
+                "imageToVideo",
+                "firstLastFrameToVideo",
+                "lipSync",
+                "generateAudio"
+              ]
+            },
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "model": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "params": {
+                  "default": {},
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
+                },
+                "pricing": {
+                  "type": "object",
+                  "properties": {
+                    "unit": {
+                      "type": "string",
+                      "enum": [
+                        "image",
+                        "second",
+                        "request"
+                      ]
+                    },
+                    "usd": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "unit",
+                    "usd"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "provider",
+          "operations"
+        ]
+      }
+    }
+  },
+  "required": [
+    "version",
+    "targets"
+  ]
+}

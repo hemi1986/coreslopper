@@ -1,0 +1,48 @@
+id: lipsync-panel
+title: Lip-sync "Herzlich willkommen zum Panel"
+sets:
+  - core
+  - smoke
+focus: Speech-like line on a medium close-up of a character with a fixed grin.
+source:
+  project: zukunft-auf-kredit
+  shot: shot-002
+operation: lipSync
+role: video.lipsync
+seed: 30002
+prompt: 'Medium close-up, static camera. He speaks the audio with accurate lip sync: "Herzlich willkommen zum
+  Panel". Smug, too-wide grin, eyes on camera.'
+fixtures:
+  face:
+    from: zukunft-auf-kredit/characters/minister/lipsync-lectern.png
+  vocal:
+    from: zukunft-auf-kredit/audio/stems/vocals.wav
+    cut:
+      start: 5.38
+      duration: 2.1
+  golden:
+    from: zukunft-auf-kredit/assets/video/lipsync/836dc2cbbb4f6518-0.mp4
+inputs:
+  references:
+    - face
+  audio: vocal
+golden: golden
+frames:
+  - 0.1
+  - 0.3
+  - 0.5
+  - 0.7
+  - 0.9
+rubric:
+  - id: visemes
+    check: 'Readable shapes: open "Her-", round "zum", open "Pa-nel".'
+    weight: 3
+  - id: timing
+    check: Mouth follows the vocal and closes after "Panel".
+    weight: 2
+  - id: grin
+    check: The smug grin stays without freezing the mouth open.
+  - id: identity
+    check: Same minister as the keyframe.
+  - id: camera
+    check: The camera does what the prompt says (static means no push-in, zoom, or jump-zoom).

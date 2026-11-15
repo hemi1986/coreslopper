@@ -1,0 +1,35 @@
+id: managers-clap
+title: Managers clapping
+sets:
+  - core
+focus: Clapping hands in motion at mid-distance, three people at once.
+source:
+  project: zukunft-auf-kredit
+  shot: shot-035
+operation: imageToVideo
+role: video.image_to_video.fast
+seed: 20035
+durationSeconds: 2
+prompt: Preserve the exact characters, faces, clothing and lighting from the input image. The three managers
+  clap their hands slowly and self-satisfied, nodding. Steady camera. Nobody speaks, mouths stay closed.
+fixtures:
+  start:
+    from: zukunft-auf-kredit/assets/image/keyframe/a3c0b7fb2860b7c8-0.png
+  golden:
+    from: zukunft-auf-kredit/assets/video/image_to_video/fast/386acdd09e9b0ebe-0.mp4
+inputs:
+  references:
+    - start
+golden: golden
+rubric:
+  - id: hands
+    check: Hands clap without smearing into blobs; five fingers at the still frames.
+    weight: 2
+  - id: action
+    check: Slow, self-satisfied clapping and nodding by all three.
+  - id: mouths
+    check: Mouths stay closed (nobody speaks).
+  - id: camera
+    check: The camera does what the prompt says (static means no push-in, zoom, or jump-zoom).
+  - id: identity
+    check: The three managers keep their faces.

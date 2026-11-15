@@ -1,0 +1,44 @@
+id: hemi-identity
+title: Real person into a film still
+sets:
+  - core
+focus: Keep a real face exactly (bald, dark beard with few grey strands) while changing room, shirt, and expression.
+source:
+  project: zukunft-auf-kredit
+  shot: shot-118
+operation: editImage
+role: image.edit
+seed: 3101
+prompt: "Turn this photo into a cinematic film still: the same bald man with the full dark beard with grey
+  strands, keep his face, eyes, nose, beard shape and identity exactly identical. Fill the dark grey side bars
+  by extending the scene naturally so the frame is one continuous image. He sits at a desk, chest-up, centred,
+  facing a monitor just below the camera, staring at it with a puzzled frown, eyebrows pulled together, mouth
+  closed. Replace his shirt with a plain black crew-neck t-shirt with NO print, no text, no logo, no graphic;
+  remove the necklace completely, bare neck. The room is now a cold, grey open-plan office at night: grey
+  cubicle partitions, empty desks, rows of long white fluorescent neon tubes on the ceiling behind him, softly
+  out of focus. His face and beard are lit from the front and below by the harsh red glow of a computer
+  monitor showing an error; the rest of the office is cold blue-white from the neon tubes. No shelves, no
+  posters, no masks, no figures, no bottles, no ceiling spotlights, no recognisable objects, no brand items.
+  Realistic, photographic, cinematic, one person only, no text, no letters, no logos"
+fixtures:
+  source:
+    from: zukunft-auf-kredit/characters/hemi/source-crop.png
+  golden:
+    from: zukunft-auf-kredit/characters/hemi/office-puzzled.png
+inputs:
+  references:
+    - source
+golden: golden
+goldenNote: The accepted reference after several edits; the raw seed-3101 result was not used as is.
+rubric:
+  - id: identity
+    check: "Clearly the same man as the source photo: head shape, eyes, nose, beard shape."
+    weight: 3
+  - id: beard
+    check: Full dark beard with only sparse grey strands, natural hair texture, no stripes.
+  - id: wardrobe
+    check: Plain black t-shirt without print, no necklace.
+  - id: expression
+    check: Puzzled frown at a monitor below the camera, mouth closed.
+  - id: scene
+    check: Cold grey open-plan office at night, side bars filled seamlessly.
