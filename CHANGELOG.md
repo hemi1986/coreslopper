@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.7.0](https://github.com/hemi1986/coreslopper/compare/v0.6.0...v0.7.0) (2026-11-16)
+
+
+### Features
+
+* publish command and one release folder for the whole release package ([4aaa705](https://github.com/hemi1986/coreslopper/commit/4aaa70536423015be288193ae64eacbdc3036f58))
+* **publish:** upload the release package to YouTube and TikTok ([887769d](https://github.com/hemi1986/coreslopper/commit/887769da49c0b6b86597f24541655b6a0a3e54ba))
+* **release:** collect the whole release package in renders/release/ ([f9e48c8](https://github.com/hemi1986/coreslopper/commit/f9e48c85d57d122f0ae487c32fcc4d5fdd647650))
+* **remotion:** render Suno lyrics without parentheses ([b3d9d38](https://github.com/hemi1986/coreslopper/commit/b3d9d3899165dbf9cf6ac0fb46b29a8aad4c4d62))
+* **remotion:** render Suno lyrics without parentheses ([e04ce0f](https://github.com/hemi1986/coreslopper/commit/e04ce0f3964c67b5a42113ce21a699a2e132cea6))
+* review player for frame-accurate notes on renders ([901a654](https://github.com/hemi1986/coreslopper/commit/901a65495d853cd77ada654ac1a3cea16f59f5d7))
+* review player for frame-accurate notes on renders ([4194d21](https://github.com/hemi1986/coreslopper/commit/4194d21ab4e14def8833a953b010bee91e0bf51e))
+
+
+### Documentation
+
+* review player usage in the README ([82d0ec4](https://github.com/hemi1986/coreslopper/commit/82d0ec4e491552a150d71c032052a9b2f08da2d2))
+
 ## [0.6.0](https://github.com/hemi1986/coreslopper/compare/v0.5.0...v0.6.0) (2026-11-15)
 
 
