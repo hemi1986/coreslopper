@@ -1,4 +1,11 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+// The release reads config/channel.yaml of the repo it runs in; a workspace's
+// own channel (with <ID> placeholders) must not change these results.
+vi.mock('@coreslopper/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@coreslopper/core')>()),
+  loadChannel: async () => undefined,
+}));
 import { existsSync } from 'node:fs';
 import { cp, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';

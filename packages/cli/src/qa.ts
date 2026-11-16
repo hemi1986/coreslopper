@@ -188,7 +188,13 @@ export async function checkUploadData(projectDir: string, shortNames: string[]):
   return { name: 'Upload data', result: 'PASS', evidence: `${relative(root, paths.data)}: main video and ${data.shorts.length} Shorts, all files present` };
 }
 
-async function checkManifest(project: Awaited<ReturnType<typeof loadProject>>): Promise<Check> {
+/**
+ * The manifest reconciles with the recorded spend. A failed call stays in the
+ * log as history (a provider error, a timeout, a retried request): it is a
+ * WARN, not a FAIL. Only an unreadable line or a total that does not match
+ * the spend fails the check.
+ */
+export async function checkManifest(project: Pick<Awaited<ReturnType<typeof loadProject>>, 'paths' | 'state'>): Promise<Check> {
   if (!existsSync(project.paths.manifest)) {
     return {
       name: 'Manifest',
@@ -198,25 +204,38 @@ async function checkManifest(project: Awaited<ReturnType<typeof loadProject>>): 
   }
   const lines = (await readFile(project.paths.manifest, 'utf8')).trim().split('\n').filter(Boolean);
   let total = 0;
-  let failures = 0;
+  let malformed = 0;
+  const failed: { hash?: string; costUsd: number }[] = [];
+  const succeeded = new Set<string>();
   for (const line of lines) {
     try {
-      const entry = JSON.parse(line) as { costUsd?: number; status?: string };
-      total += Number(entry.costUsd ?? 0);
-      if (entry.status === 'failed') failures += 1;
+      const entry = JSON.parse(line) as { hash?: string; costUsd?: number; status?: string };
+      const cost = Number(entry.costUsd ?? 0);
+      total += cost;
+      if (entry.status === 'failed') failed.push({ hash: entry.hash, costUsd: cost });
+      else if (entry.hash) succeeded.add(entry.hash);
     } catch {
-      failures += 1;
+      malformed += 1;
     }
   }
-  const difference = Math.abs(total - project.state.budget.spentUsd);
-  if (failures > 0) {
-    return { name: 'Manifest', result: 'FAIL', evidence: `${failures} malformed or failed entries` };
+  if (malformed > 0) {
+    return { name: 'Manifest', result: 'FAIL', evidence: `${malformed} malformed entries` };
   }
+  const difference = Math.abs(total - project.state.budget.spentUsd);
   if (difference > 0.01) {
     return {
       name: 'Manifest',
       result: 'FAIL',
       evidence: `manifest total ${formatUsd(total)} does not match spent ${formatUsd(project.state.budget.spentUsd)}`,
+    };
+  }
+  if (failed.length > 0) {
+    const retried = failed.filter((entry) => entry.hash && succeeded.has(entry.hash)).length;
+    const cost = failed.reduce((sum, entry) => sum + entry.costUsd, 0);
+    return {
+      name: 'Manifest',
+      result: 'WARN',
+      evidence: `${lines.length} entries, ${formatUsd(total)} reconciled; ${failed.length} failed call(s) (${retried} retried successfully, ${formatUsd(cost)})`,
     };
   }
   return { name: 'Manifest', result: 'PASS', evidence: `${lines.length} entries, ${formatUsd(total)} reconciled` };
