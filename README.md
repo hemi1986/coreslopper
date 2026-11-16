@@ -1,6 +1,6 @@
 # coreslopper
 
-An open-source, Claude Code-native workflow for making music videos: from an idea and a song to a validated storyboard and a finished Remotion render.
+An open-source, Claude Code-native workflow for making music videos and episodes of a series: from an idea and a song (or a script) to a validated storyboard and a finished Remotion render.
 
 > **Status: work in progress.** The pipeline is being tested end to end. Stages, schemas, and provider integrations may still change. Treat it as an experiment, not a production tool.
 
@@ -81,6 +81,35 @@ Space plays and pauses, ←/→ steps one frame, ↑/↓ one second. While pause
 
 Then ask Claude Code for a fix pass, for example *"work through the review notes for <slug>"*. It maps every note to its shot, fixes timing, motion, or generated media, re-renders, and reports which notes are done. Keys and file format: [scripts/review-player/README.md](scripts/review-player/README.md).
 
+## Series and episodes
+
+Besides music videos, coreslopper makes episodes of a series from a script instead of a song. A **series** has a canon in `series/<slug>/`: bible, style, characters, sets, reference images and voices, and an episode plan. Each **episode** is its own project that reads this canon and builds its audio from `script.yaml`: generated or recorded takes per line, ambience per scene, and English subtitles.
+
+**Create the series once:**
+
+```text
+/new-series
+```
+
+The `new-series` skill asks for the title, slug, series budget (USD, mandatory), master format, and providers, then grills you into the bible, characters, sets, and episode plan. It generates the character and set references and the reference voices through the series budget. The series budget covers the canon and every episode's budget.
+
+**Create each episode:**
+
+```text
+/new-episode
+```
+
+The `new-episode` skill asks for the series, episode number, slug, and episode budget, creates the project (formats, providers, and brand come from the series), and grills you into `script.yaml`. Characters and sets come from the canon; if the story needs a new one, add it to the series first.
+
+**Run the pipeline** as for a music video:
+
+```text
+/video-next <slug>
+/series-status <series>
+```
+
+`/video-next` generates the takes, mixes the episode track, then storyboards, generates, and renders. To use your own recordings, put them at `projects/<slug>/audio/lines/<line-id>.wav` and run `npm run cli -- import-takes <slug>` before the `voice-track` stage. Review and fix pass work as above. Details and the manual commands: [docs/pipeline.md](docs/pipeline.md#episodes).
+
 ## Everyday commands
 
 Run these inside the workspace.
@@ -96,6 +125,7 @@ Run these inside the workspace.
 | `/video-next <project>` | Run all open stages in Claude Code. |
 | `/video-next <project> --stage storyboard` | Rerun one stage. |
 | `/video-status <project>` | Read-only status in Claude Code. |
+| `/series-status <series>` | Canon, episodes, stages, and spend of a series. |
 
 The pipeline is resumable: run `/video-next` again after a stop, and it continues where it left off. Generated assets are cached, so a rerun does not pay twice.
 
@@ -116,6 +146,7 @@ Your projects, `.env`, and your own edits to workflow files are kept. If a file 
 |---|---|
 | Setup flags, credentials, updating, troubleshooting | [docs/onboarding.md](docs/onboarding.md) |
 | What each stage does, and running one by hand | [docs/pipeline.md](docs/pipeline.md) |
+| Series and episodes: stages, takes, re-timing | [docs/pipeline.md#episodes](docs/pipeline.md#episodes), [ADR 0016](docs/adr/0016-episode-projects.md) |
 | fal.ai, Higgsfield, budgets, and model roles | [docs/providers.md](docs/providers.md) |
 | Review player: keys, notes, fix pass | [scripts/review-player/README.md](scripts/review-player/README.md) |
 | Local video clips with ComfyUI | [comfyui/README.md](comfyui/README.md) |
