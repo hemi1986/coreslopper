@@ -343,7 +343,9 @@ describe('TODO detection and text limits', () => {
     expect(texts['youtube.md']).toMatch(/spotify: https:\/\/open\.spotify\.com\/artist\/<ID> TODO/);
     expect(texts['instagram.md']).toContain('2/5 Hashtags');
     expect(texts['instagram.md']).toContain('Link-Sticker');
-    expect(texts['tiktok.md']).toContain('KI-generierter Inhalt');
+    expect(texts['tiktok.md']).toContain('KI-generierte Inhalte');
+    expect(texts['tiktok.md']).toContain('Cover bearbeiten');
+    expect(texts['tiktok.md']).not.toContain('Text-Overlay');
     expect(texts['spotify.md']).toMatch(/1\. \*\*Künstler:\*\* Neon Static/);
     expect(texts['spotify.md']).toContain('Musik: vollständig KI');
     expect(texts['release-plan.md']).toContain('| -21 | 2026-11-20 |');

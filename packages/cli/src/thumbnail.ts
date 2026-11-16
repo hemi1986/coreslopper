@@ -148,7 +148,8 @@ export async function buildThumbnailProps(
     format,
     still: relative(root, staged).split('\\').join('/'),
     lines,
-    ...(tag ? { tag } : {}),
+    // An empty tag, not a missing one: Remotion would fill a missing prop with the 'DEMO' default.
+    tag: tag ?? '',
     layout,
     focus,
     zoom,

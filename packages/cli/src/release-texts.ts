@@ -81,7 +81,7 @@ interface Labels {
     post: string;
     postImage: string;
   };
-  tt: { heading: string; caption: string; overlay: string; overlayDefault: (handle: string) => string; aiLabel: string; pinned: string; sound: string };
+  tt: { heading: string; description: string; cover: string; coverUpload: (file: string) => string; coverFrame: string; settings: string; visibility: string; aiLabel: string; schedule: string; overlayDefault: (handle: string) => string; afterPost: string; pinned: string };
   sp: {
     heading: string;
     form: (distributor: string) => string;
@@ -151,12 +151,17 @@ const EN: Labels = {
   },
   tt: {
     heading: 'TikTok',
-    caption: 'Caption',
-    overlay: 'Text overlay (first seconds)',
+    description: 'Description',
+    cover: 'Cover',
+    coverUpload: (file) => `Edit cover → Upload: \`${file}\``,
+    coverFrame: 'Edit cover → pick the frame with the hook',
+    settings: 'Settings',
+    visibility: 'Who can watch: Everyone',
+    aiLabel: 'Show more → turn on "AI-generated content"',
+    schedule: 'When to post: now, or scheduled as in release-plan.md',
     overlayDefault: (handle) => (handle === 'YouTube' ? 'Full video on YouTube' : `Full video on YouTube: ${handle}`),
-    aiLabel: 'Turn on "AI-generated content" under More options',
-    pinned: 'Comment to pin',
-    sound: 'Keep the original sound; name it after the song',
+    afterPost: 'After posting',
+    pinned: 'Post this comment and pin it',
   },
   sp: {
     heading: 'Streaming release',
@@ -273,12 +278,17 @@ const DE: Labels = {
   },
   tt: {
     heading: 'TikTok',
-    caption: 'Caption',
-    overlay: 'Text-Overlay (erste Sekunden)',
+    description: 'Beschreibung',
+    cover: 'Cover',
+    coverUpload: (file) => `Cover bearbeiten → Hochladen: \`${file}\``,
+    coverFrame: 'Cover bearbeiten → das Bild mit dem Hook wählen',
+    settings: 'Einstellungen',
+    visibility: 'Wer kann das ansehen: Alle',
+    aiLabel: '„Mehr anzeigen“ → „KI-generierte Inhalte“ einschalten',
+    schedule: 'Veröffentlichen: sofort oder geplant laut release-plan.md',
     overlayDefault: (handle) => (handle === 'YouTube' ? 'Ganzes Video auf YouTube' : `Ganzes Video auf YouTube: ${handle}`),
-    aiLabel: '„KI-generierter Inhalt“ unter Weitere Optionen einschalten',
-    pinned: 'Kommentar zum Anpinnen',
-    sound: 'Originalton behalten und nach dem Song benennen',
+    afterPost: 'Nach dem Posten',
+    pinned: 'Diesen Kommentar posten und anpinnen',
   },
   sp: {
     heading: 'Streaming-Release',
@@ -471,20 +481,28 @@ function instagramText(input: ReleaseTextInput, l: Labels): string {
 }
 
 function tiktokText(input: ReleaseTextInput, l: Labels): string {
+  // Laid out like the TikTok Studio upload form: description, cover, settings.
   const lines = [`# ${l.tt.heading}`, ''];
   const youtube = channelLink(input.channel, 'youtube', l);
   for (const file of input.files.shorts) {
     const tt = shortFor(input, file.name)?.tiktok;
     lines.push(`## ${file.name}`, '', `**${l.file}:** \`${file.video}\``, '');
-    const caption = tt ? [tt.caption.trim(), tt.hashtags.join(' ')].filter(Boolean).join(' ') : l.todo(`shorts.${file.name}.tiktok in review/upload.yaml`);
-    lines.push(`### ${l.tt.caption} (${l.chars(count(caption), input.limits.tiktok.caption)})`, '', ...block(caption), '');
-    lines.push(`### ${l.tt.overlay}`, '', ...block(tt?.overlay ?? l.tt.overlayDefault(youtube ?? 'YouTube')), '');
-    if (tt?.pinned_comment) lines.push(`### ${l.tt.pinned}`, '', ...block(tt.pinned_comment), '');
-    lines.push(`### ${l.checklist}`, '');
+    const description = tt
+      ? tiktokDescription(tt, l.tt.overlayDefault(youtube ?? 'YouTube'))
+      : l.todo(`shorts.${file.name}.tiktok in review/upload.yaml`);
+    lines.push(`### ${l.tt.description} (${l.chars(count(description), input.limits.tiktok.caption)})`, '', ...block(description), '');
+    lines.push(`### ${l.tt.cover}`, '', file.thumbnail ? l.tt.coverUpload(file.thumbnail) : l.tt.coverFrame, '');
+    lines.push(`### ${l.tt.settings}`, '', checkbox(l.tt.visibility));
     if (input.channel?.disclosure.tiktok_ai_label ?? true) lines.push(checkbox(l.tt.aiLabel));
-    lines.push(checkbox(l.tt.sound), '');
+    lines.push(checkbox(l.tt.schedule), '');
+    if (tt?.pinned_comment) lines.push(`### ${l.tt.afterPost}`, '', checkbox(l.tt.pinned), '', ...block(tt.pinned_comment), '');
   }
   return `${lines.join('\n').trimEnd()}\n`;
+}
+
+/** The TikTok description: caption, the pointer to the full video (TikTok Studio has no text overlay), hashtags. */
+export function tiktokDescription(tt: { caption: string; hashtags: string[]; overlay?: string }, pointer: string): string {
+  return [tt.caption.trim(), (tt.overlay ?? pointer).trim(), tt.hashtags.join(' ')].filter(Boolean).join('\n\n');
 }
 
 function spotifyText(input: ReleaseTextInput, l: Labels): string {

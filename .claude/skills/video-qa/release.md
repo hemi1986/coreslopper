@@ -117,7 +117,7 @@ shorts:
     tiktok:
       caption: "<short, spoken-sounding, a question or a dare>"
       hashtags: ['#topic']
-      overlay: "<'Full video on YouTube: @handle' in the project's language>"
+      overlay: "<'Full video on YouTube: @handle' in the project's language>"  # pointer line in the description; TikTok Studio has no text overlay
       pinned_comment: "<optional>"
     platforms: [youtube, tiktok]
 # instagram_post: { caption: "...", hashtags: [...] }   # optional feed post for the release

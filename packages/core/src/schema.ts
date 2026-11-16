@@ -717,7 +717,7 @@ export const UploadShortSchema = z.object({
       story: z.string().min(1).optional(),
     })
     .optional(),
-  /** The Short on TikTok: caption, hashtags, the on-screen pointer to the full video, and a comment to pin. */
+  /** The Short on TikTok, laid out like the TikTok Studio form: caption, hashtags, the pointer to the full video (`overlay`, a line in the description), and a comment to pin after posting. */
   tiktok: z
     .object({
       caption: z.string().min(1),
