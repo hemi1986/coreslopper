@@ -67,6 +67,20 @@ Higgsfield has no lip-sync yet. For lip-sync shots, add a `FAL_KEY` to `.env` an
 
 It analyzes the song, builds the style and character bibles, writes and validates the storyboard, generates the assets, and renders `projects/<slug>/renders/` without further questions. If you stop halfway through setup, `/new-video <slug>` resumes where you left off.
 
+## 3. Review and fix
+
+Watch the result in the review player and leave notes on exact frames:
+
+```bash
+npm run cli -- review <slug>                  # newer of preview and master render
+npm run cli -- review <slug> --format 9x16    # another format
+npm run cli -- review <slug> --video projects/<slug>/renders/shorts/M2-chorus-9x16.mp4
+```
+
+Space plays and pauses, ←/→ steps one frame, ↑/↓ one second. While paused, type what is wrong and press Enter: the note is saved with its frame and time in `projects/<slug>/review/notes/<video>.json`. PageUp/PageDown jumps between notes, Delete removes one, Esc quits. The first start sets up the player's Python environment with uv.
+
+Then ask Claude Code for a fix pass, for example *"work through the review notes for <slug>"*. It maps every note to its shot, fixes timing, motion, or generated media, re-renders, and reports which notes are done. Keys and file format: [scripts/review-player/README.md](scripts/review-player/README.md).
+
 ## Everyday commands
 
 Run these inside the workspace.
@@ -76,6 +90,7 @@ Run these inside the workspace.
 | `npm run cli -- status <project>` | Stages, spend, and the next step. |
 | `npm run cli -- validate <project>` | Check timing, storyboard, style, and characters. |
 | `npm run cli -- render <project> --format 16x9` | Render a format (`16x9`, `9x16`, `1x1`). |
+| `npm run cli -- review <project>` | Watch a render frame by frame and leave review notes. |
 | `npm run cli -- estimate --role image.keyframe --units 8 --project projects/<project>` | Check a cost against the budget. |
 | `npm run cli -- doctor` | Check tools, fonts, Remotion, and keys. |
 | `/video-next <project>` | Run all open stages in Claude Code. |
@@ -102,6 +117,7 @@ Your projects, `.env`, and your own edits to workflow files are kept. If a file 
 | Setup flags, credentials, updating, troubleshooting | [docs/onboarding.md](docs/onboarding.md) |
 | What each stage does, and running one by hand | [docs/pipeline.md](docs/pipeline.md) |
 | fal.ai, Higgsfield, budgets, and model roles | [docs/providers.md](docs/providers.md) |
+| Review player: keys, notes, fix pass | [scripts/review-player/README.md](scripts/review-player/README.md) |
 | Local video clips with ComfyUI | [comfyui/README.md](comfyui/README.md) |
 | Optional MCP servers | [docs/mcp.md](docs/mcp.md) |
 | How it works inside | [docs/architecture.md](docs/architecture.md), [docs/adr/](docs/adr/) |
