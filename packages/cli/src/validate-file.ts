@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import {
   ProjectConfigSchema,
+  PublishLogSchema,
   SeriesSchema,
   SeriesStateSchema,
   SetBibleSchema,
@@ -16,6 +17,7 @@ import {
   seriesDir,
   validateScript,
 } from '@coreslopper/core';
+import { loadUploadData } from './upload-text.js';
 import { assertKindMatches, validateProject } from './validate.js';
 
 interface ArtifactRoot {
@@ -152,6 +154,14 @@ export async function validateChangedFile(file: string): Promise<string | undefi
   if (name === 'style.yaml') {
     await readYamlFile(join(projectDir, 'style.yaml'), StyleBibleSchema);
     return 'style';
+  }
+  if (name === 'upload.yaml' && basename(dirname(resolve(file))) === 'review') {
+    await loadUploadData(projectDir);
+    return 'upload data';
+  }
+  if (name === 'publish.json' && basename(dirname(resolve(file))) === 'review') {
+    await readJsonFile(join(projectDir, 'review', 'publish.json'), PublishLogSchema);
+    return 'publish log';
   }
   if (name === 'characters.yaml') {
     await readYamlFile(join(projectDir, 'characters.yaml'), CharacterBibleSchema);

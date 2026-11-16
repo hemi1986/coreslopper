@@ -40,8 +40,9 @@ import {
   validateHiggsfieldKey,
   validateTopviewKey,
 } from './tools.js';
+import { checkPublishClients, pendingPublishAuth, publishClientEnv, type PublishClientOptions } from './publish-setup.js';
 
-export interface OnboardOptions {
+export interface OnboardOptions extends PublishClientOptions {
   dir?: string;
   force?: boolean;
   install?: boolean;
@@ -289,9 +290,45 @@ async function chooseTopviewKey(options: OnboardOptions, needed: boolean): Promi
   return key;
 }
 
+/**
+ * Optional OAuth clients for `publish`. Flags or environment values are
+ * checked and kept; otherwise the user may add them now or later.
+ */
+async function choosePublishClients(options: OnboardOptions): Promise<Record<string, string>> {
+  const given = publishClientEnv(options);
+  const result: Record<string, string> = { ...given };
+  const wants = Object.keys(given).length
+    ? false
+    : unwrap(
+        await confirm({
+          message: 'Set up publishing to YouTube or TikTok now? Optional: `publish` uploads private videos and TikTok drafts.',
+          initialValue: false,
+        }),
+      );
+  if (wants) {
+    if (unwrap(await confirm({ message: 'Add a YouTube OAuth client (Google Cloud, Desktop app)?', initialValue: true }))) {
+      const id = unwrap(await text({ message: 'YOUTUBE_CLIENT_ID (…apps.googleusercontent.com)', placeholder: 'leave empty to add it later' }));
+      const secret = id ? unwrap(await password({ message: 'YOUTUBE_CLIENT_SECRET', mask: '•' })) : '';
+      if (id && secret) Object.assign(result, { YOUTUBE_CLIENT_ID: id.trim(), YOUTUBE_CLIENT_SECRET: secret.trim() });
+    }
+    if (unwrap(await confirm({ message: 'Add a TikTok client (developer portal, Content Posting API)?', initialValue: true }))) {
+      const key = unwrap(await text({ message: 'TIKTOK_CLIENT_KEY', placeholder: 'leave empty to add it later' }));
+      const secret = key ? unwrap(await password({ message: 'TIKTOK_CLIENT_SECRET', mask: '•' })) : '';
+      if (key && secret) Object.assign(result, { TIKTOK_CLIENT_KEY: key.trim(), TIKTOK_CLIENT_SECRET: secret.trim() });
+    }
+  }
+  if (Object.keys(result).length === 0) return result;
+  const check = spinner();
+  check.start('Checking the publishing clients...');
+  const problems = await checkPublishClients(result);
+  check.stop(problems.length ? 'Some publishing clients could not be verified.' : 'Publishing clients are valid.');
+  for (const problem of problems) log.warn(`${problem} They stay in .env; fix them there (docs/publishing.md).`);
+  return result;
+}
+
 const CLOUD_LABELS: Record<string, string> = { fal: 'fal.ai', higgsfield: 'Higgsfield', topview: 'Topview' };
 
-function printNextSteps(target: string, result: InitResult, options: OnboardOptions): void {
+function printNextSteps(target: string, result: InitResult, options: OnboardOptions, publishAuth: string[] = []): void {
   const project = result.projectSlug;
   const lines = [
     `Workspace: ${target}`,
@@ -308,6 +345,7 @@ function printNextSteps(target: string, result: InitResult, options: OnboardOpti
     '',
     'In Claude Code:',
     ...(project ? [`  /new-video ${project}    lyrics, song import, brief`] : ['  /new-video']),
+    ...(publishAuth.length ? ['', 'Publishing (once, opens the browser):', ...publishAuth.map((command) => `  ${command}`)] : []),
   ];
   outro(lines.join('\n'));
 }
@@ -429,6 +467,8 @@ export async function onboard(options: OnboardOptions = {}): Promise<InitResult>
     project = { slug: projectSlug, title: options.title, budget, image, video };
   }
 
+  const publishEnv = await choosePublishClients(options);
+
   const install =
     options.install ??
     (unwrap(
@@ -476,6 +516,7 @@ export async function onboard(options: OnboardOptions = {}): Promise<InitResult>
     falKey,
     higgsfieldKey,
     topviewKey,
+    publishEnv,
     onProgress: (message) => log.step(message),
   });
 
@@ -490,6 +531,6 @@ export async function onboard(options: OnboardOptions = {}): Promise<InitResult>
     process.exitCode = 1;
   }
 
-  printNextSteps(target, result, options);
+  printNextSteps(target, result, options, pendingPublishAuth(publishEnv));
   return result;
 }

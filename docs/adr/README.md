@@ -26,5 +26,6 @@ Short records of decisions that are hard to reverse, surprising without context,
 | [0020](0020-model-bench.md) | A model bench in `bench/`: fixed cases from past projects, rendered on named targets, scored by rubric and by the user. |
 | [0021](0021-topview-provider.md) | Topview as a third cloud adapter for stills and clips; one endpoint pattern, two request formats, no lip-sync. |
 | [0022](0022-review-player.md) | A review player writes frame-accurate notes on renders to `review/notes/`; outside the pipeline, read on a fix pass. |
+| [0023](0023-publish-command.md) | `publish` is a user command, not a stage: YouTube private or scheduled, TikTok inbox drafts, from `upload.yaml`, idempotent by file hash; no Instagram, no MCP. |
 
 Status values: `Accepted`, `Deprecated`, `Superseded by ADR-NNNN`.

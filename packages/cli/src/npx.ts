@@ -78,6 +78,10 @@ program
   .option('--fal-key <key>', 'fal.ai API key (prefer FAL_KEY in the environment)')
   .option('--higgsfield-key <key>', 'Higgsfield credential (prefer HIGGSFIELD_API_KEY in the environment)')
   .option('--topview-key <key>', 'Topview platform key (prefer TOPVIEW_API_PLATFORM_KEY in the environment)')
+  .option('--youtube-client-id <id>', 'YouTube OAuth client ID for publish (prefer YOUTUBE_CLIENT_ID in the environment)')
+  .option('--youtube-client-secret <secret>', 'YouTube OAuth client secret (prefer YOUTUBE_CLIENT_SECRET in the environment)')
+  .option('--tiktok-client-key <key>', 'TikTok client key for publish (prefer TIKTOK_CLIENT_KEY in the environment)')
+  .option('--tiktok-client-secret <secret>', 'TikTok client secret (prefer TIKTOK_CLIENT_SECRET in the environment)')
   .option('--skip-project', 'Create the workspace without a first project')
   .option('--runtime <dir>', 'Runtime directory (development only)')
   .action((dir: string | undefined, options: InitCommandOptions) =>

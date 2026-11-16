@@ -1,0 +1,31 @@
+# Upload data of the release package (schema/upload.schema.json).
+# `npm run cli -- upload-text projects/demo` renders review/upload.md from it;
+# `npm run cli -- publish projects/demo --dry-run` checks it against the platforms.
+version: 1
+language: en
+main:
+  file: renders/16x9.mp4
+  title: Neon Rain — a night walk through a rain-lit city
+  description: |
+    Twelve seconds of neon rain: chrome reflections, a grid horizon, and a city that never switches its lights off.
+
+    ⚠️ Demo video of the coreslopper workflow. Motion graphics only, made with AI tools.
+
+    🎬 Made with an agent and coreslopper, https://www.npmjs.com/package/coreslopper
+    🖥️ Rendered locally with Remotion; no cloud spend ($0.00).
+    🎵 "Neon Rain (Demo)" by coreslopper fixture, CC0-1.0
+  hashtags: ['#synthwave', '#cyberpunk', '#neon', '#musicvideo', '#motiongraphics', '#coreslopper']
+  tags: [synthwave, cyberpunk, neon rain, music video, motion graphics, remotion, coreslopper]
+  platforms: [youtube]
+shorts:
+  - name: N1-rain
+    moment: the whole demo
+    file: renders/9x16.mp4
+    title: "Neon rain, twelve seconds 🌧️ #synthwave #shorts"
+    description: |
+      The rain-lit city in one vertical loop 🌧️
+      Full video: link above ☝️
+      Demo of coreslopper, motion graphics only.
+    hashtags: ['#synthwave', '#neon', '#cyberpunk', '#shorts']
+    tags: [synthwave, neon, shorts]
+    platforms: [youtube, tiktok]

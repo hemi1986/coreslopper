@@ -22,6 +22,7 @@ const TRACKED = new Set([
   'script.yaml',
   'series.yaml',
   'sets.yaml',
+  'upload.yaml',
 ]);
 
 function readStdin() {

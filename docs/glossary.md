@@ -140,13 +140,43 @@ _Avoid_: poster, cover, preview image
 A vertical excerpt of the finished video for YouTube Shorts and similar feeds: 9:16, 30–50 s (never over 60 s), cut from the 9:16 render on section boundaries, stored as `renders/shorts/<name>-9x16.mp4`. Each video gets three.
 _Avoid_: clip (an AI clip is a generated shot), teaser, reel
 
+**Upload Data**:
+`review/upload.yaml`: the structured upload facts of the main video and of every Short: file, title, description, tags, hashtags, thumbnail, language, the made-for-kids and synthetic-content declarations, and target platforms. The source of the upload text and of every publish.
+_Avoid_: metadata, upload manifest
+
 **Upload Text**:
-`review/upload.md`: the title, description, hashtags, and tags of the main video and of every Short, plus a checklist per Short, in the project's language.
+`review/upload.md`: the upload data rendered for people, with labels and checklists in the project's language. It is generated, never edited by hand.
 _Avoid_: metadata, copy
 
 **Release Package**:
-What `qa-export` hands over for publishing: the master, three thumbnails, three Shorts with their thumbnails, and the upload text.
+What `qa-export` hands over for publishing: the master, three thumbnails, three Shorts with their thumbnails, the upload data, and the upload text.
 _Avoid_: deliverables, export bundle
+
+## Publishing
+
+**Publish**:
+The user's explicit act of uploading a release package to platforms, as private videos or drafts. It is never a stage, and it never makes a video public.
+_Avoid_: release, post, deploy
+
+**Platform**:
+A service a video is published on: YouTube or TikTok.
+_Avoid_: channel, network, provider (a **Provider Adapter** generates media)
+
+**Publish Adapter**:
+The small implementation that uploads one item of upload data to one platform; YouTube and TikTok are the real adapters, mock the test adapter.
+_Avoid_: uploader, integration
+
+**Publish Log**:
+`review/publish.json`: one entry per upload attempt with platform, item, file hash, remote ID, URL, status, and time. A file already in it for a platform is not uploaded again.
+_Avoid_: upload history, manifest (the **Manifest** records generations)
+
+**Draft**:
+A TikTok upload waiting in the user's inbox for sound, caption, and posting.
+_Avoid_: private video (a YouTube upload that is not public)
+
+**Publish Plan**:
+What a publish run will upload and skip, with the problems and the quota it found, before any network call. A dry run prints only the plan.
+_Avoid_: preview (a **Preview** is a render)
 
 **Animatic**:
 A low-fidelity, timed preview of the storyboard before final assets.

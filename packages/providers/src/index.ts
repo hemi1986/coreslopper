@@ -14,6 +14,7 @@ export * from './comfyui.js';
 export * from './topview.js';
 export * from './runner.js';
 export * from './duration.js';
+export * from './publish/index.js';
 
 export type ProviderKind = 'mock' | 'fal' | 'higgsfield' | 'topview' | 'comfyui';
 

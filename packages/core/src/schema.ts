@@ -600,6 +600,111 @@ export const ModelsConfigSchema = z.object({
   roles: z.record(z.string(), ModelRoleSchema),
 });
 
+/** Platforms the `publish` command uploads to. Instagram is not one of them yet (ADR 0023). */
+export const PublishPlatformSchema = z.enum(['youtube', 'tiktok']);
+
+const HashtagSchema = z
+  .string()
+  .regex(/^#[\p{L}\p{N}_]+$/u, 'a hashtag is # followed by letters, digits, or underscores');
+
+/** Fields every upload item shares: the main video and each Short. */
+const UploadItemFields = {
+  /** The video the user uploads, relative to the project (or absolute, e.g. on the media drive). */
+  file: z.string().min(1),
+  title: z.string().min(1),
+  /** The description body, without the hashtag line; `publish` and `upload-text` append the hashtags. */
+  description: z.string().min(1),
+  /** Studio tags (YouTube): plain words or phrases, without `#`. */
+  tags: z.array(z.string().min(1)).default([]),
+  hashtags: z.array(HashtagSchema).min(1),
+  /** The thumbnail `publish` sets, relative to the project. */
+  thumbnail: z.string().min(1).optional(),
+  /** BCP-47 language of the texts and the audio; defaults to the file's `language`. */
+  language: z.string().min(2).optional(),
+  /** "Made for kids" on YouTube. */
+  made_for_kids: z.boolean().default(false),
+  /** "Altered or synthetic content" on YouTube. */
+  synthetic_media: z.boolean().default(true),
+  /** YouTube video category; 10 is Music. */
+  category_id: z.string().regex(/^\d+$/).default('10'),
+};
+
+export const UploadMainSchema = z.object({
+  ...UploadItemFields,
+  /** Further thumbnails for YouTube's Test & compare, set by hand in YouTube Studio. */
+  alternate_thumbnails: z.array(z.string().min(1)).default([]),
+  platforms: z.array(PublishPlatformSchema).min(1).default(['youtube']),
+});
+
+export const UploadShortSchema = z.object({
+  /** The Short name (`Z1-intro`), as in `renders/shorts/<name>-9x16.mp4`. */
+  name: z
+    .string()
+    .min(1)
+    .regex(/^[A-Za-z0-9][A-Za-z0-9_-]*$/, 'name must be letters, digits, dashes, and underscores'),
+  /** The moment in a few words, for the heading of the upload text. */
+  moment: z.string().min(1).optional(),
+  ...UploadItemFields,
+  /** The video this Short points to; YouTube's "related video" is set by hand. */
+  related: z.literal('main').default('main'),
+  platforms: z.array(PublishPlatformSchema).min(1).default(['youtube', 'tiktok']),
+});
+
+/**
+ * `review/upload.yaml`: the upload data of the release package. `qa-export`
+ * writes it; `upload-text` renders `review/upload.md` from it, and `publish`
+ * uploads from it.
+ */
+export const UploadDataSchema = z
+  .object({
+    version: z.literal(1),
+    /** BCP-47 language of the texts, e.g. `de` or `en`. */
+    language: z.string().min(2),
+    main: UploadMainSchema,
+    shorts: z.array(UploadShortSchema).default([]),
+  })
+  .superRefine((data, ctx) => {
+    const seen = new Set<string>(['main']);
+    data.shorts.forEach((short, index) => {
+      if (seen.has(short.name)) {
+        ctx.addIssue({ code: 'custom', path: ['shorts', index, 'name'], message: `duplicate item name "${short.name}"` });
+      }
+      seen.add(short.name);
+    });
+  });
+
+export const PublishStatusSchema = z.enum(['uploaded', 'scheduled', 'draft', 'processing', 'failed']);
+
+/** One upload attempt of one item to one platform. */
+export const PublishEntrySchema = z.object({
+  platform: PublishPlatformSchema,
+  /** `main` or a Short name. */
+  item: z.string().min(1),
+  file: z.string().min(1),
+  /** SHA-256 of the uploaded video. */
+  file_hash: z.string().regex(/^[0-9a-f]{64}$/),
+  /** YouTube video ID or TikTok publish ID. */
+  remote_id: z.string().min(1).optional(),
+  url: z.string().url().optional(),
+  status: PublishStatusSchema,
+  /** YouTube: the scheduled `publishAt`. */
+  publish_at: z.string().optional(),
+  thumbnail: z.enum(['set', 'skipped', 'failed', 'none']).optional(),
+  /** True for runs of the mock adapter; a real run never skips because of them. */
+  mock: z.boolean().default(false),
+  warnings: z.array(z.string()).default([]),
+  error: z.string().optional(),
+  /** YouTube API quota units the attempt spent. */
+  quota_units: z.number().int().nonnegative().optional(),
+  at: z.string().min(1),
+});
+
+/** `review/publish.json`: the publish log, one entry per upload attempt, oldest first. */
+export const PublishLogSchema = z.object({
+  version: z.literal(1),
+  entries: z.array(PublishEntrySchema).default([]),
+});
+
 export type ProjectConfig = z.infer<typeof ProjectConfigSchema>;
 export type ProjectKind = z.infer<typeof ProjectKindSchema>;
 export type DisplayRule = z.infer<typeof DisplayRuleSchema>;
@@ -638,3 +743,10 @@ export type ModelsConfig = z.infer<typeof ModelsConfigSchema>;
 export type ProviderKind = z.infer<typeof ProviderKindSchema>;
 export type ImageProviderKind = z.infer<typeof ImageProviderKindSchema>;
 export type VideoProviderKind = z.infer<typeof VideoProviderKindSchema>;
+export type PublishPlatform = z.infer<typeof PublishPlatformSchema>;
+export type UploadMain = z.infer<typeof UploadMainSchema>;
+export type UploadShort = z.infer<typeof UploadShortSchema>;
+export type UploadData = z.infer<typeof UploadDataSchema>;
+export type PublishStatus = z.infer<typeof PublishStatusSchema>;
+export type PublishEntry = z.infer<typeof PublishEntrySchema>;
+export type PublishLog = z.infer<typeof PublishLogSchema>;

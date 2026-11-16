@@ -24,8 +24,11 @@ import { validateChangedFile } from './validate-file.js';
 import { writeContactSheet } from './contact-sheet.js';
 import { renderProject } from './render.js';
 import { renderThumbnail } from './thumbnail.js';
-import { cutShort } from './short.js';
+import { cutShort, probeVideo } from './short.js';
 import { openReview } from './review.js';
+import { publishProject, type PlatformChoice } from './publish.js';
+import { publishAuth, saveEnvValue } from './publish-auth.js';
+import { writeUploadText } from './upload-text.js';
 import { createProject } from './new-project.js';
 import { linkProjectMedia } from './media-dir.js';
 import { generateBatch } from './generate.js';
@@ -271,6 +274,64 @@ program
   );
 
 program
+  .command('upload-text [project]')
+  .description('Render review/upload.md from review/upload.yaml.')
+  .action((project: string | undefined) =>
+    run(async () => {
+      const path = await writeUploadText(projectDirFromArg(project), (file) => {
+        try {
+          return probeVideo(file).duration;
+        } catch {
+          return undefined;
+        }
+      });
+      console.log(`✔ Upload text: ${path}`);
+    }),
+  );
+
+program
+  .command('publish [project]')
+  .description(
+    'Upload the release package from review/upload.yaml: YouTube as private (or scheduled) videos, TikTok as inbox drafts. ' +
+      'A user command, never a pipeline stage; nothing is made public.',
+  )
+  .option('--platform <platform>', 'youtube | tiktok | all', 'all')
+  .option('--only <item>', 'main | shorts | <short name>')
+  .option('--schedule <iso-date>', 'YouTube: publish at this time (ISO 8601 with time zone); the video stays private until then')
+  .option('--dry-run', 'Validate upload.yaml, files, limits, and quota, and print the plan; no network calls')
+  .option('--force', 'Upload again even when review/publish.json has the same file')
+  .option('--mock', 'Use the mock adapters (no network); entries are marked as mock')
+  .action(
+    (
+      project: string | undefined,
+      options: { platform: string; only?: string; schedule?: string; dryRun?: boolean; force?: boolean; mock?: boolean },
+    ) =>
+      run(async () => {
+        await publishProject({
+          projectDir: projectDirFromArg(project),
+          platform: validateChoice(options.platform, ['youtube', 'tiktok', 'all'] as const, 'platform') as PlatformChoice,
+          only: options.only,
+          schedule: options.schedule,
+          dryRun: options.dryRun,
+          force: options.force,
+          mock: options.mock,
+          probe: probeVideo,
+          onTikTokRefreshToken: (token) => saveEnvValue('TIKTOK_REFRESH_TOKEN', token),
+        });
+      }),
+  );
+
+program
+  .command('publish-auth <platform>')
+  .description('One-time OAuth consent for publish: youtube | tiktok. Stores the refresh token in .env.')
+  .option('--redirect-uri <uri>', 'Loopback redirect URI (TikTok: the one registered in the developer portal)')
+  .action((platform: string, options: { redirectUri?: string }) =>
+    run(async () => {
+      await publishAuth(validateChoice(platform, ['youtube', 'tiktok'] as const, 'platform'), { redirectUri: options.redirectUri });
+    }),
+  );
+
+program
   .command('init [dir]')
   .description('Create a new workspace from the bundled runtime.')
   .option('-y, --yes', 'Use defaults and skip prompts')
@@ -288,6 +349,10 @@ program
   .option('--fal-key <key>', 'fal.ai API key (prefer FAL_KEY in the environment)')
   .option('--higgsfield-key <key>', 'Higgsfield credential (prefer HIGGSFIELD_API_KEY in the environment)')
   .option('--topview-key <key>', 'Topview platform key (prefer TOPVIEW_API_PLATFORM_KEY in the environment)')
+  .option('--youtube-client-id <id>', 'YouTube OAuth client ID for publish (prefer YOUTUBE_CLIENT_ID in the environment)')
+  .option('--youtube-client-secret <secret>', 'YouTube OAuth client secret (prefer YOUTUBE_CLIENT_SECRET in the environment)')
+  .option('--tiktok-client-key <key>', 'TikTok client key for publish (prefer TIKTOK_CLIENT_KEY in the environment)')
+  .option('--tiktok-client-secret <secret>', 'TikTok client secret (prefer TIKTOK_CLIENT_SECRET in the environment)')
   .option('--skip-project', 'Create the workspace without a first project')
   .action((dir: string | undefined, options: InitCommandOptions) =>
     run(async () => {

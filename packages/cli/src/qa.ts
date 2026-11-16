@@ -1,7 +1,7 @@
-import { existsSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import { readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, relative, resolve } from 'node:path';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 import { renderStill, selectComposition } from '@remotion/renderer';
 import {
   ValidationError,
@@ -30,6 +30,7 @@ import {
   type ShortProbe,
 } from './release-files.js';
 import { probeVideo } from './short.js';
+import { loadUploadData, uploadPaths } from './upload-text.js';
 
 export interface QaOptions {
   projectDir: string;
@@ -150,6 +151,40 @@ export async function checkUploadText(review: string, root: string, shortNames: 
   if (errors.length) return { name: 'Upload text', result: 'FAIL', evidence: errors.join('; ') };
   if (warnings.length) return { name: 'Upload text', result: 'WARN', evidence: warnings.join('; ') };
   return { name: 'Upload text', result: 'PASS', evidence: `${relative(root, path)}: main video and ${shortNames.length} Shorts` };
+}
+
+/**
+ * `review/upload.yaml`, the source of the upload text and of `publish`:
+ * missing is a warning; invalid, or pointing at a missing file, a failure.
+ */
+export async function checkUploadData(projectDir: string, shortNames: string[]): Promise<Check> {
+  const paths = uploadPaths(projectDir);
+  const root = resolve(projectDir);
+  if (!existsSync(paths.data)) {
+    return { name: 'Upload data', result: 'WARN', evidence: `${relative(root, paths.data)} is missing; write it from the release-package step` };
+  }
+  let data;
+  try {
+    data = await loadUploadData(projectDir);
+  } catch (error) {
+    const details = error instanceof ValidationError && error.details.length ? `: ${error.details.join('; ')}` : '';
+    return { name: 'Upload data', result: 'FAIL', evidence: `${(error as Error).message}${details}` };
+  }
+  const missing: string[] = [];
+  for (const item of [data.main, ...data.shorts]) {
+    for (const file of [item.file, ...(item.thumbnail ? [item.thumbnail] : [])]) {
+      if (!existsSync(isAbsolute(file) ? file : join(root, file))) missing.push(file);
+    }
+  }
+  if (missing.length) return { name: 'Upload data', result: 'FAIL', evidence: `missing files: ${missing.join(', ')}` };
+  const warnings: string[] = [];
+  const described = new Set(data.shorts.map((short) => short.name));
+  for (const name of shortNames) if (!described.has(name)) warnings.push(`Short ${name} is not in upload.yaml`);
+  if (!existsSync(paths.text) || statSync(paths.text).mtimeMs < statSync(paths.data).mtimeMs) {
+    warnings.push('upload.md is older than upload.yaml; run upload-text');
+  }
+  if (warnings.length) return { name: 'Upload data', result: 'WARN', evidence: warnings.join('; ') };
+  return { name: 'Upload data', result: 'PASS', evidence: `${relative(root, paths.data)}: main video and ${data.shorts.length} Shorts, all files present` };
 }
 
 async function checkManifest(project: Awaited<ReturnType<typeof loadProject>>): Promise<Check> {
@@ -284,6 +319,7 @@ export async function runQa(options: QaOptions): Promise<string> {
   const shorts = await checkShorts(project.paths.renders, project.paths.root);
   checks.push(...shorts.checks);
   checks.push(await checkUploadText(project.paths.review, project.paths.root, shorts.names));
+  checks.push(await checkUploadData(project.paths.root, shorts.names));
 
   if (options.determinismFrame !== undefined) {
     const { props } = await buildVideoProps({ projectDir: options.projectDir });

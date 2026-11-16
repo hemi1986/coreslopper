@@ -6,6 +6,7 @@ import {
   BrandKitSchema,
   ModelsConfigSchema,
   ProjectConfigSchema,
+  PublishLogSchema,
   ScriptSchema,
   SeriesSchema,
   SeriesStateSchema,
@@ -16,6 +17,7 @@ import {
   TakesSchema,
   TimingOverridesSchema,
   TimingSchema,
+  UploadDataSchema,
 } from '../packages/core/src/schema.js';
 import { BenchCaseSchema, BenchConfigSchema, BenchTargetsFileSchema } from '../packages/core/src/bench.js';
 
@@ -34,6 +36,8 @@ const schemas = {
   sets: SetBibleSchema,
   script: ScriptSchema,
   takes: TakesSchema,
+  upload: UploadDataSchema,
+  'publish-log': PublishLogSchema,
   'bench-case': BenchCaseSchema,
   'bench-targets': BenchTargetsFileSchema,
   'bench-config': BenchConfigSchema,

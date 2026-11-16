@@ -183,12 +183,16 @@ Thumbnails use a second composition, `Thumbnail` (one frame; 1280x720, or 1080x1
 
 Shorts are not rendered: `npm run cli -- short` re-encodes a frame-snapped range of `renders/9x16.mp4` with ffmpeg into `renders/shorts/`. Its bounds use the storyboard's anchor kinds in a compact string form, resolved against the effective timing. `qa` probes each Short (9:16, at most 60 s), checks the Short thumbnails, and parses `review/upload.md` for a title, description, and hashtags per item.
 
+## Publishing
+
+`publish` is a user command after the pipeline, not a stage ([ADR 0023](adr/0023-publish-command.md)). It reads `review/upload.yaml` (Zod `UploadDataSchema`), builds a publish plan without network calls (files, platform limits, quota, and earlier uploads from `review/publish.json` by file hash), and then runs one publish adapter per platform: `YouTubePublisher` (Data API v3, resumable `videos.insert` as private or scheduled, `thumbnails.set`), `TikTokPublisher` (Content Posting API inbox path, chunked upload, status polling), or `MockPublisher`. The adapters live in `packages/providers/src/publish/`, next to the generation providers but behind their own interface (`PublishAdapter.publish(item)`). OAuth uses a loopback redirect with PKCE (`publish-auth`); refresh tokens are in `.env`, access tokens only in memory, and errors are masked before they are printed or logged. `upload-text` renders `review/upload.md` from the same data.
+
 ## Claude Code layer
 
 - `.claude/skills/<name>/SKILL.md` — the stage skills.
 - `.claude/commands/` — `/video-next`, `/video-status`, `/series-status`. `/new-video` and `/new-episode` are skills. `/video-next` reads the project kind from `status` and walks that kind's stages.
 - `.claude/agents/` — `stage-runner`, `art-director`, `qa-checker`.
-- `.claude/hooks/validate-artifacts.mjs` — validates project artifacts after `Write|Edit`.
+- `.claude/hooks/validate-artifacts.mjs` — validates project artifacts (including `review/upload.yaml`) after `Write|Edit`.
 - `.claude/settings.json` — registers the hook.
 
 The core skills and scripts are tool-agnostic. The commands, agents, and hooks are the Claude Code layer.
@@ -205,6 +209,7 @@ The root package is publishable as `coreslopper`. `npm run build` produces two a
 ## Security and licensing
 
 - No secrets in the repository. `.env.example` documents the variables; `.env` is gitignored.
+- Nothing is published automatically: `publish` is a user command and uploads only private videos and drafts.
 - Generated media and copyrighted material are gitignored. The demo audio is synthetic.
 - Vendored skills are MIT, pinned, and attributed in `docs/THIRD_PARTY.md`.
 - Remotion is source-available; its license is separate from this repository's MIT license.

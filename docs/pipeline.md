@@ -139,11 +139,11 @@ Notes land in `review/notes/<video-stem>.json`. No stage waits for them; on a fi
 
 - Skill: `video-qa`
 - Input: all renders, manifest, state, generated stills, brief, lyrics, `song.json`
-- Output: `review/report.md`, all formats, and the release package: three thumbnails in `renders/thumbnails/`, three Shorts with their thumbnails in `renders/shorts/`, `review/upload.md`
+- Output: `review/report.md`, all formats, and the release package: three thumbnails in `renders/thumbnails/`, three Shorts with their thumbnails in `renders/shorts/`, `review/upload.yaml`, and `review/upload.md` rendered from it
 
 Once the master passes, the skill makes three YouTube thumbnails: the main character, the cameo or key scene, and the ensemble. The agent picks the stills and writes the hook; the `thumbnail` command composes each image deterministically with the brand fonts and the style bible's palette, as a 1280x720 sRGB JPEG under 2 MB. The art director reviews all three ([ADR 0018](adr/0018-thumbnails.md)).
 
-Then it builds the rest of the release package ([ADR 0019](adr/0019-release-package.md)). The agent picks three Short moments on section boundaries (typically hook or intro, chorus, climax or drop; 30–50 s each); the `short` command cuts them from `renders/9x16.mp4`, frame-accurately with audio fades, and refuses more than 60 s. Each Short gets a 1080x1920 thumbnail (`thumbnail --format 9x16`). Last, the agent writes `review/upload.md` in the project's language: title, description, hashtags, and tags for the main video, and title, description, hashtags, and an upload checklist for every Short. Spend comes from `state.json`, models from the manifest.
+Then it builds the rest of the release package ([ADR 0019](adr/0019-release-package.md)). The agent picks three Short moments on section boundaries (typically hook or intro, chorus, climax or drop; 30–50 s each); the `short` command cuts them from `renders/9x16.mp4`, frame-accurately with audio fades, and refuses more than 60 s. Each Short gets a 1080x1920 thumbnail (`thumbnail --format 9x16`). Last, the agent writes `review/upload.yaml` in the project's language: file, title, description, hashtags, tags, thumbnail, and the made-for-kids and synthetic-content declarations for the main video and every Short. Spend comes from `state.json`, models from the manifest. `upload-text` renders `review/upload.md` from it, with a checklist per item, and `publish --dry-run` checks it against YouTube's and TikTok's limits ([ADR 0023](adr/0023-publish-command.md)).
 
 ```bash
 npm run cli -- thumbnail projects/my-video --still assets/image/keyframe/<hash>-0.png \
@@ -152,10 +152,26 @@ npm run cli -- thumbnail projects/my-video --still assets/image/keyframe/<hash>-
 npm run cli -- short projects/my-video --from section:chorus_1 --to section:chorus_1:end --name M2-chorus
 npm run cli -- thumbnail projects/my-video --format 9x16 --still assets/image/keyframe/<hash>-0.png \
   --text "THE HOOK" --out projects/my-video/renders/shorts/M2-chorus-thumb.jpg
-npm run cli -- qa projects/my-video        # checks thumbnails, Shorts, and the upload text
+npm run cli -- upload-text projects/my-video          # review/upload.md from review/upload.yaml
+npm run cli -- publish projects/my-video --dry-run    # limits and quota, no network calls
+npm run cli -- qa projects/my-video                   # checks thumbnails, Shorts, upload data and text
 ```
 
 Completion: schema, assets, sync, readability, determinism, budget reconciliation, all formats, and the release package pass or are documented.
+
+## After the pipeline: publish
+
+Uploading is not a stage: `/video-next` ends with `qa-export`, and the user runs `publish` when they want to ([ADR 0023](adr/0023-publish-command.md)). It uploads the main video and the Shorts to YouTube as private videos (or scheduled with `--schedule`) and the Shorts to TikTok as inbox drafts, from `review/upload.yaml`. Nothing becomes public; the user reviews each upload and publishes it on the platform.
+
+```bash
+npm run cli -- publish-auth youtube                 # once per workspace; opens the browser
+npm run cli -- publish-auth tiktok
+npm run cli -- publish projects/my-video --dry-run  # plan, limits, quota; no network calls
+npm run cli -- publish projects/my-video            # upload what is not uploaded yet
+npm run cli -- publish projects/my-video --only Z2-chorus --platform tiktok
+```
+
+Every attempt goes into `review/publish.json` with the file hash; a second run skips what is already uploaded with the same file (`--force` uploads again). A YouTube batch that would exceed the daily quota stops before the first upload. After the run, `publish` prints the manual steps: the related video of each Short in YouTube Studio, and the TikTok caption to paste. Setup of the Google Cloud project and the TikTok app: [publishing.md](publishing.md).
 
 ## Running the demo
 
