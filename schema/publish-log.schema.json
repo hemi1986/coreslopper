@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "number",
+      "const": 1
+    },
+    "entries": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "youtube",
+              "tiktok"
+            ]
+          },
+          "item": {
+            "type": "string",
+            "minLength": 1
+          },
+          "file": {
+            "type": "string",
+            "minLength": 1
+          },
+          "file_hash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "remote_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "uploaded",
+              "scheduled",
+              "draft",
+              "processing",
+              "failed"
+            ]
+          },
+          "publish_at": {
+            "type": "string"
+          },
+          "thumbnail": {
+            "type": "string",
+            "enum": [
+              "set",
+              "skipped",
+              "failed",
+              "none"
+            ]
+          },
+          "mock": {
+            "default": false,
+            "type": "boolean"
+          },
+          "warnings": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "error": {
+            "type": "string"
+          },
+          "quota_units": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "at": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "platform",
+          "item",
+          "file",
+          "file_hash",
+          "status",
+          "at"
+        ]
+      }
+    }
+  },
+  "required": [
+    "version"
+  ]
+}

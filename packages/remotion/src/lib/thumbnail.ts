@@ -8,10 +8,11 @@
 export const THUMBNAIL_WIDTH = 1280;
 export const THUMBNAIL_HEIGHT = 720;
 
-/** Thumbnail sizes: 16:9 for the main video, 9:16 for a Short. */
+/** Thumbnail sizes: 16:9 for the main video, 9:16 for a Short, 1:1 for the streaming cover. */
 export const THUMBNAIL_FORMATS = {
   '16x9': { width: THUMBNAIL_WIDTH, height: THUMBNAIL_HEIGHT },
   '9x16': { width: 1080, height: 1920 },
+  '1x1': { width: 3000, height: 3000 },
 } as const;
 export type ThumbnailFormat = keyof typeof THUMBNAIL_FORMATS;
 export const THUMBNAIL_FORMAT_IDS = Object.keys(THUMBNAIL_FORMATS) as ThumbnailFormat[];
@@ -42,6 +43,29 @@ export function centralSquare(frame: FrameSize): { top: number; bottom: number }
 }
 /** YouTube's upload limit for a custom thumbnail. */
 export const THUMBNAIL_MAX_BYTES = 2 * 1024 * 1024;
+/** File size limit per format: YouTube's 2 MB for thumbnails, a distributor's 10 MB for the cover. */
+export const THUMBNAIL_FORMAT_MAX_BYTES: Record<ThumbnailFormat, number> = {
+  '16x9': THUMBNAIL_MAX_BYTES,
+  '9x16': THUMBNAIL_MAX_BYTES,
+  '1x1': 10 * 1024 * 1024,
+};
+
+/**
+ * What a streaming cover may not show: URLs, handles, prices, and platform
+ * names (stores reject covers with them). Artist and title are fine.
+ */
+const COVER_FORBIDDEN: { pattern: RegExp; what: string }[] = [
+  { pattern: /https?:|www\.|\.(com|de|net|org|io|fm|tv)\b/i, what: 'a URL' },
+  { pattern: /@\w/, what: 'a handle' },
+  { pattern: /[$€£¥]|\b\d+([.,]\d+)?\s?(eur|usd|euro|dollar)\b/i, what: 'a price' },
+  { pattern: /\b(spotify|apple music|itunes|youtube|tiktok|instagram|amazon|deezer|soundcloud)\b/i, what: 'a platform name' },
+];
+
+/** Why a cover text is not allowed; undefined when it is fine. */
+export function coverTextProblem(text: string): string | undefined {
+  const found = COVER_FORBIDDEN.find(({ pattern }) => pattern.test(text));
+  return found ? `the cover text contains ${found.what}; a streaming cover shows only artist and title` : undefined;
+}
 export const THUMBNAIL_MAX_LINES = 3;
 export const THUMBNAIL_MAX_WORDS = 4;
 
@@ -150,6 +174,7 @@ export function parseFocus(value: string | undefined): { x: number; y: number } 
 
 /** Where the focus point of the still lands: the middle of the side opposite the text (upper middle for 9:16). */
 export function faceAnchor(layout: ThumbnailLayout, format: ThumbnailFormat = '16x9'): { x: number; y: number } {
+  if (format === '1x1') return { x: 1500, y: 3000 * 0.4 };
   if (format === '9x16') {
     const frame = thumbnailSize(format);
     return { x: frame.width * 0.5, y: frame.height * 0.32 };
@@ -242,6 +267,7 @@ export function layoutThumbnail(
 ): ThumbnailLayoutResult {
   if (lines.length === 0) return { fontSize: 0, slabs: [], tag: tagBox(tag, layout, format) };
   if (format === '9x16') return layoutVertical(lines, layout, tag);
+  if (format === '1x1') return layoutSquare(lines);
 
   if (layout === 'bottom') {
     const maxWidth = THUMBNAIL_WIDTH - 2 * MARGIN;
@@ -314,6 +340,39 @@ export function layoutVertical(lines: LineMetrics[], layout: ThumbnailLayout, ta
     return slab;
   });
   return { fontSize: size, slabs, tag: tagBox(tag, layout, '9x16') };
+}
+
+/** Cover margins and the largest type, as fractions of the 3000 px side. */
+const SQUARE_MARGIN = 0.07;
+const SQUARE_MAX_SIZE = 0.15;
+const SQUARE_TEXT_TOP = 0.58;
+
+/**
+ * The 1:1 streaming cover: artist and title stacked centred in the lower part,
+ * untilted, at one font size that fits the widest line; the image above. The
+ * cover is shown as small as 64 px in lists, so it stays plain.
+ */
+export function layoutSquare(lines: LineMetrics[]): ThumbnailLayoutResult {
+  const frame = thumbnailSize('1x1');
+  const margin = frame.width * SQUARE_MARGIN;
+  const zoneTop = frame.height * SQUARE_TEXT_TOP;
+  const zoneBottom = frame.height - margin;
+  const stackHeight = (size: number) =>
+    lines.reduce((sum, metrics) => sum + slabSize(metrics, size).height, 0) - ROW_OVERLAP * (lines.length - 1);
+  const size = largestSize(
+    frame.width * SQUARE_MAX_SIZE,
+    (candidate) =>
+      lines.every((metrics) => slabSize(metrics, candidate).width <= frame.width - 2 * margin) &&
+      stackHeight(candidate) <= zoneBottom - zoneTop,
+  );
+  let y = zoneBottom - stackHeight(size);
+  const slabs = lines.map((metrics) => {
+    const { width } = slabSize(metrics, size);
+    const slab = slabAt(metrics, size, (frame.width - width) / 2, y, 0);
+    y += slab.height - ROW_OVERLAP;
+    return slab;
+  });
+  return { fontSize: size, slabs };
 }
 
 function channel(value: number): number {

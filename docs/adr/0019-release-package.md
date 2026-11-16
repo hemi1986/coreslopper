@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — 2026-11-13. Extends [ADR 0018](0018-thumbnails.md) and [ADR 0005](0005-symbolic-timing-anchors.md).
+Accepted — 2026-11-13. Extends [ADR 0018](0018-thumbnails.md) and [ADR 0005](0005-symbolic-timing-anchors.md). Amended by [ADR 0023](0023-publish-command.md): `review/upload.md` is rendered from `review/upload.yaml`; and by [ADR 0024](0024-release-folder-manual-distribution.md): the package is assembled in `renders/release/`.
 
 ## Context
 

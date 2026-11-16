@@ -9,3 +9,4 @@ export * from './models.js';
 export * from './project.js';
 export * from './palette.js';
 export * from './bench.js';
+export * from './release.js';

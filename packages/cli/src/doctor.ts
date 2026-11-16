@@ -4,7 +4,9 @@ import {
   checkComfyUI,
   inspectWorkflowDir,
   resolveHiggsfieldCredentials,
+  resolveTikTokCredentials,
   resolveTopviewApiKey,
+  resolveYouTubeCredentials,
 } from '@coreslopper/providers';
 import { detectTools, type ToolCheck } from './tools.js';
 import { isWorkspace, loadWorkspaceEnv } from './workspace.js';
@@ -95,6 +97,41 @@ async function comfyUIChecks(root: string): Promise<DoctorCheck[]> {
   return checks;
 }
 
+/**
+ * Optional publish credentials: the OAuth client and the refresh token from
+ * `publish-auth`. Read from the environment only; doctor makes no call.
+ */
+export function publishChecks(env: NodeJS.ProcessEnv = process.env): DoctorCheck[] {
+  const youtube = resolveYouTubeCredentials(env);
+  const tiktok = resolveTikTokCredentials(env);
+  const detail = (client: boolean, token: boolean, platform: string) =>
+    !client
+      ? 'not set (only needed for publish; see docs/publishing.md)'
+      : token
+        ? 'client and refresh token set (from environment or .env)'
+        : `client set; run "npm run cli -- publish-auth ${platform}" for the refresh token`;
+  const youtubeClient = Boolean(youtube.clientId && youtube.clientSecret);
+  const tiktokClient = Boolean(tiktok.clientKey && tiktok.clientSecret);
+  return [
+    {
+      id: 'youtube-publish',
+      name: 'YouTube publishing',
+      ok: youtubeClient && Boolean(youtube.refreshToken),
+      detail: detail(youtubeClient, Boolean(youtube.refreshToken), 'youtube'),
+      required: false,
+      group: 'credentials',
+    },
+    {
+      id: 'tiktok-publish',
+      name: 'TikTok publishing',
+      ok: tiktokClient && Boolean(tiktok.refreshToken),
+      detail: detail(tiktokClient, Boolean(tiktok.refreshToken), 'tiktok'),
+      required: false,
+      group: 'credentials',
+    },
+  ];
+}
+
 export async function runDoctor(root: string, options: DoctorOptions = {}): Promise<DoctorResult> {
   loadWorkspaceEnv(root);
   const higgsfield = resolveHiggsfieldCredentials();
@@ -140,6 +177,7 @@ export async function runDoctor(root: string, options: DoctorOptions = {}): Prom
       required: false,
       group: 'credentials',
     },
+    ...publishChecks(),
     ...detectTools(root).map(toolCheck),
     ...(await comfyUIChecks(root)),
   ];

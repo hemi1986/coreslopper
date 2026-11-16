@@ -2,12 +2,14 @@ import { existsSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import {
   ProjectConfigSchema,
+  PublishLogSchema,
   SeriesSchema,
   SeriesStateSchema,
   SetBibleSchema,
   StateSchema,
   StyleBibleSchema,
   CharacterBibleSchema,
+  ChannelConfigSchema,
   ValidationError,
   loadProject,
   loadDefaults,
@@ -16,6 +18,7 @@ import {
   seriesDir,
   validateScript,
 } from '@coreslopper/core';
+import { loadUploadData } from './upload-text.js';
 import { assertKindMatches, validateProject } from './validate.js';
 
 interface ArtifactRoot {
@@ -86,6 +89,11 @@ async function validateSeriesFile(seriesRoot: string, name: string): Promise<str
 }
 
 export async function validateChangedFile(file: string): Promise<string | undefined> {
+  // The workspace's channel configuration lives outside projects and series.
+  if (basename(file) === 'channel.yaml' && basename(dirname(resolve(file))) === 'config') {
+    await readYamlFile(resolve(file), ChannelConfigSchema);
+    return 'channel';
+  }
   const root = findArtifactRoot(file);
   const name = basename(file);
   if (root.type === 'series') return validateSeriesFile(root.dir, name);
@@ -152,6 +160,14 @@ export async function validateChangedFile(file: string): Promise<string | undefi
   if (name === 'style.yaml') {
     await readYamlFile(join(projectDir, 'style.yaml'), StyleBibleSchema);
     return 'style';
+  }
+  if (name === 'upload.yaml' && basename(dirname(resolve(file))) === 'review') {
+    await loadUploadData(projectDir);
+    return 'upload data';
+  }
+  if (name === 'publish.json' && basename(dirname(resolve(file))) === 'review') {
+    await readJsonFile(join(projectDir, 'review', 'publish.json'), PublishLogSchema);
+    return 'publish log';
   }
   if (name === 'characters.yaml') {
     await readYamlFile(join(projectDir, 'characters.yaml'), CharacterBibleSchema);

@@ -10,9 +10,10 @@ import {
   type VisualProvider,
 } from './init.js';
 import { onboard } from './onboarding.js';
+import { checkPublishClients, pendingPublishAuth, publishClientEnv, type PublishClientOptions } from './publish-setup.js';
 import { validateFalKey, validateHiggsfieldKey, validateTopviewKey } from './tools.js';
 
-export interface InitCommandOptions {
+export interface InitCommandOptions extends PublishClientOptions {
   yes?: boolean;
   force?: boolean;
   install?: boolean;
@@ -77,6 +78,10 @@ export async function runInitCommand(targetArg: string | undefined, options: Ini
       falKey: options.falKey,
       higgsfieldKey: options.higgsfieldKey,
       topviewKey: options.topviewKey,
+      youtubeClientId: options.youtubeClientId,
+      youtubeClientSecret: options.youtubeClientSecret,
+      tiktokClientKey: options.tiktokClientKey,
+      tiktokClientSecret: options.tiktokClientSecret,
       noProject: options.skipProject,
     });
     return;
@@ -126,6 +131,9 @@ export async function runInitCommand(targetArg: string | undefined, options: Ini
     }
   }
 
+  const publishEnv = publishClientEnv(options);
+  for (const problem of await checkPublishClients(publishEnv)) console.warn(`! ${problem}`);
+
   const projectSlug = options.project ?? defaultProjectSlug(target);
   const project: FirstProjectOptions | null = options.skipProject
     ? null
@@ -148,7 +156,9 @@ export async function runInitCommand(targetArg: string | undefined, options: Ini
     falKey,
     higgsfieldKey,
     topviewKey,
+    publishEnv,
   });
   printInitSummary(result);
+  for (const command of pendingPublishAuth(publishEnv)) console.log(`  ${command}   # once, opens the browser`);
   if (!result.installed && options.install !== false) process.exitCode = 1;
 }

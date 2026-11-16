@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { createReadStream } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 
 export function sha256(input: string | Uint8Array): string {
@@ -8,6 +9,13 @@ export function sha256(input: string | Uint8Array): string {
 export async function hashFile(path: string): Promise<string> {
   const data = await readFile(path);
   return sha256(data);
+}
+
+/** SHA-256 of a file, streamed: for renders and songs too large to read at once. */
+export async function hashFileStream(path: string): Promise<string> {
+  const hash = createHash('sha256');
+  for await (const chunk of createReadStream(path)) hash.update(chunk as Buffer);
+  return hash.digest('hex');
 }
 
 /**

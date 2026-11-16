@@ -3,9 +3,12 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import {
   CharacterBibleSchema,
+  ChannelConfigSchema,
   BrandKitSchema,
   ModelsConfigSchema,
   ProjectConfigSchema,
+  PublishLogSchema,
+  ReleaseManifestSchema,
   ScriptSchema,
   SeriesSchema,
   SeriesStateSchema,
@@ -16,6 +19,7 @@ import {
   TakesSchema,
   TimingOverridesSchema,
   TimingSchema,
+  UploadDataSchema,
 } from '../packages/core/src/schema.js';
 import { BenchCaseSchema, BenchConfigSchema, BenchTargetsFileSchema } from '../packages/core/src/bench.js';
 
@@ -34,6 +38,10 @@ const schemas = {
   sets: SetBibleSchema,
   script: ScriptSchema,
   takes: TakesSchema,
+  upload: UploadDataSchema,
+  'publish-log': PublishLogSchema,
+  channel: ChannelConfigSchema,
+  'release-manifest': ReleaseManifestSchema,
   'bench-case': BenchCaseSchema,
   'bench-targets': BenchTargetsFileSchema,
   'bench-config': BenchConfigSchema,

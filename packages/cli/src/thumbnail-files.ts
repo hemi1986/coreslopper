@@ -1,13 +1,27 @@
 import { existsSync } from 'node:fs';
 import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { THUMBNAIL_MAX_BYTES, thumbnailSize, type ThumbnailFormat } from '../../remotion/src/lib/thumbnail.js';
+import { THUMBNAIL_FORMAT_MAX_BYTES, thumbnailSize, type ThumbnailFormat } from '../../remotion/src/lib/thumbnail.js';
 
 // Thumbnail file checks without the renderer, so status (also in the npx bundle) can list them.
 
 /** The thumbnails folder of a project. */
 export function thumbnailsDir(renders: string): string {
   return join(renders, 'thumbnails');
+}
+
+/** Width, height, and colour components (3 = RGB/YCbCr, 1 = grey, 4 = CMYK) of a JPEG, from its SOF marker. */
+export function jpegInfo(buffer: Buffer): { width: number; height: number; components: number } | undefined {
+  const size = jpegSize(buffer);
+  if (!size) return undefined;
+  let offset = 2;
+  while (offset + 9 < buffer.length) {
+    const marker = buffer[offset + 1]!;
+    const length = buffer.readUInt16BE(offset + 2);
+    if (marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker)) return { ...size, components: buffer[offset + 9]! };
+    offset += 2 + length;
+  }
+  return undefined;
 }
 
 /** Width and height of a baseline or progressive JPEG, from its SOF marker. */
@@ -35,7 +49,11 @@ export async function thumbnailProblems(path: string, format: ThumbnailFormat = 
   else if (size.width !== expected.width || size.height !== expected.height) {
     problems.push(`${size.width}x${size.height}, expected ${expected.width}x${expected.height}`);
   }
-  if (buffer.length >= THUMBNAIL_MAX_BYTES) problems.push(`${(buffer.length / 1024 / 1024).toFixed(2)} MB, limit 2 MB`);
+  const limit = THUMBNAIL_FORMAT_MAX_BYTES[format];
+  if (buffer.length >= limit) problems.push(`${(buffer.length / 1024 / 1024).toFixed(2)} MB, limit ${limit / 1024 / 1024} MB`);
+  if (format === '1x1' && jpegInfo(buffer)?.components !== undefined && jpegInfo(buffer)!.components !== 3) {
+    problems.push(`${jpegInfo(buffer)!.components} colour components, expected RGB`);
+  }
   return problems;
 }
 

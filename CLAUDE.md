@@ -12,6 +12,7 @@
 - `/model-bench` — skill that compares models, workflows, or ComfyUI servers on the bench cases in `bench/` and scores them with `art-director` agents.
 - `npm run cli -- review <slug>` — the user opens a render in the review player; notes land in `review/notes/`. On a fix pass, follow the review-notes section of `assembly-render`.
 - `/series-status <series>` — read-only series overview: canon, episodes, stages, spend, length.
+- `npm run cli -- publish <slug>` — uploads a finished release package (YouTube private, TikTok drafts); a user command, not a stage. See `docs/publishing.md`.
 
 `/video-next` dispatches one `stage-runner` subagent per stage. Do not inline a whole stage into the main context.
 
@@ -27,13 +28,13 @@ Create a workspace with `npx coreslopper init <dir>` (or `npx coreslopper@latest
 
 ## Hooks
 
-`.claude/settings.json` registers a `PostToolUse` hook for `Write|Edit`. It validates changes to `storyboard.yaml`, `timing.json`, `timing.overrides.json`, `project.yaml`, `state.json`, `style.yaml`, `characters.yaml`, `script.yaml`, `series.yaml`, and `sets.yaml`, in projects and in series canons. Exit code 2 blocks the edit and returns the validation message.
+`.claude/settings.json` registers a `PostToolUse` hook for `Write|Edit`. It validates changes to `storyboard.yaml`, `timing.json`, `timing.overrides.json`, `project.yaml`, `state.json`, `style.yaml`, `characters.yaml`, `script.yaml`, `series.yaml`, `sets.yaml`, and `review/upload.yaml` in projects and series canons, and the workspace's `config/channel.yaml`. Exit code 2 blocks the edit and returns the validation message.
 
 The hook calls `npm run cli -- validate-file <file>`, which is also runnable by hand.
 
 ## MCP
 
-The pipeline needs no MCP server. The song is always supplied by the user. fal.ai, Higgsfield, and Topview are used through the pipeline adapters (`FAL_KEY`, `HIGGSFIELD_API_KEY`, `TOPVIEW_API_PLATFORM_KEY`), not through MCP. If you want to explore fal.ai models interactively, see `docs/mcp.md` and add a project-scoped MCP server for fal.ai; keep it out of the pipeline.
+The pipeline and `publish` need no MCP server. The song is always supplied by the user. fal.ai, Higgsfield, and Topview are used through the pipeline adapters (`FAL_KEY`, `HIGGSFIELD_API_KEY`, `TOPVIEW_API_PLATFORM_KEY`), YouTube and TikTok through the publish adapters, not through MCP. If you want to explore fal.ai models interactively, see `docs/mcp.md` and add a project-scoped MCP server for fal.ai; keep it out of the pipeline.
 
 ## Permissions and safety
 
@@ -42,6 +43,7 @@ The pipeline needs no MCP server. The song is always supplied by the user. fal.a
 - Generated media belongs to the project, not the workflow repo.
 - Do not overwrite `timing.overrides.json` or `project.yaml` from a stage runner.
 - A paid batch must pass the cost estimate and the project budget before the first call.
+- `publish` and `publish-auth` run only when the user asks for them; `/video-next` and stage runners never run them. Uploads stay private or drafts.
 
 ## Skill frontmatter
 

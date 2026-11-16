@@ -103,7 +103,7 @@ export function Thumbnail(props: ThumbnailProps) {
 
   const { colors } = props;
   const scrim =
-    format === '9x16'
+    format === '9x16' || format === '1x1'
       ? `linear-gradient(to top, ${colors.background}f0 0%, ${colors.background}c0 22%, ${colors.background}00 58%)`
       : props.layout === 'bottom'
       ? `linear-gradient(to top, ${colors.background}e6 0%, ${colors.background}b3 18%, ${colors.background}00 46%)`
@@ -124,7 +124,7 @@ export function Thumbnail(props: ThumbnailProps) {
         />
       ) : null}
       <AbsoluteFill style={{ background: scrim }} />
-      {props.layout === 'bottom' || format === '9x16' ? null : (
+      {props.layout === 'bottom' || format !== '16x9' ? null : (
         <AbsoluteFill
           style={{ background: `linear-gradient(to bottom, ${colors.background}00 72%, ${colors.background}8c 100%)` }}
         />

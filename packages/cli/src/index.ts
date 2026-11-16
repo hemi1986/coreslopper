@@ -24,8 +24,12 @@ import { validateChangedFile } from './validate-file.js';
 import { writeContactSheet } from './contact-sheet.js';
 import { renderProject } from './render.js';
 import { renderThumbnail } from './thumbnail.js';
-import { cutShort } from './short.js';
+import { cutShort, probeVideo } from './short.js';
 import { openReview } from './review.js';
+import { publishProject, type PlatformChoice } from './publish.js';
+import { publishAuth, saveEnvValue } from './publish-auth.js';
+import { writeUploadText } from './upload-text.js';
+import { runRelease } from './release.js';
 import { createProject } from './new-project.js';
 import { linkProjectMedia } from './media-dir.js';
 import { generateBatch } from './generate.js';
@@ -214,13 +218,13 @@ program
 
 program
   .command('thumbnail [project]')
-  .description('Compose a JPEG thumbnail (1280x720, or 1080x1920 for a Short) from a still, the hook text, and the style bible.')
+  .description('Compose a JPEG thumbnail (1280x720, 1080x1920 for a Short, or the 3000x3000 streaming cover) from a still, the hook text, and the style bible.')
   .requiredOption('--still <path>', 'Source still (png, jpg, webp, svg); relative to the working directory or the project')
   .requiredOption('--text <lines>', 'Hook text; separate lines with "|" (at most 3 lines of 4 words)')
   .requiredOption('--out <file>', 'Output JPEG, e.g. projects/<slug>/renders/thumbnails/thumb-1-hero.jpg')
   .option('--tag <text>', 'Small mono tag in a top corner, e.g. SATIRE')
   .option('--layout <side>', 'Text side: left | right | bottom; the face goes opposite (default left; 9x16 is always vertical)')
-  .option('--format <id>', '16x9 (1280x720, main video) or 9x16 (1080x1920, Short)', '16x9')
+  .option('--format <id>', '16x9 (1280x720, main video), 9x16 (1080x1920, Short), or 1x1 (3000x3000 cover: artist and title only)', '16x9')
   .option('--accent <token>', 'Palette key or role for the slabs after the first line and the tag', 'accent')
   .option('--focus <x,y>', 'Point of the still (fractions 0-1) placed on the face side', '0.5,0.4')
   .option('--zoom <factor>', 'Extra zoom on the still, 1-4', (value) => Number(value), 1)
@@ -271,6 +275,79 @@ program
   );
 
 program
+  .command('upload-text [project]')
+  .description('Render review/upload.md from review/upload.yaml.')
+  .action((project: string | undefined) =>
+    run(async () => {
+      const path = await writeUploadText(projectDirFromArg(project), (file) => {
+        try {
+          return probeVideo(file).duration;
+        } catch {
+          return undefined;
+        }
+      });
+      console.log(`✔ Upload text: ${path}`);
+    }),
+  );
+
+program
+  .command('release [project]')
+  .description(
+    'Collect and build renders/release/: every format, thumbnails, Shorts, the song as WAV, cover, Spotify canvas, lyrics, ' +
+      'platform texts, README, and manifest. Renders only missing or stale formats; rewrites only its own files.',
+  )
+  .option('--no-render', 'List missing or stale renders as TODOs instead of rendering them')
+  .option('--canvas-from <time>', 'Canvas start: seconds or an anchor, e.g. section:chorus_1 (default: a lyric-free window near the first chorus)')
+  .option('--canvas-seconds <n>', 'Canvas length, 3-8 s (default 6)', (value) => Number(value))
+  .action((project: string | undefined, options: { render: boolean; canvasFrom?: string; canvasSeconds?: number }) =>
+    run(async () => {
+      await runRelease({ projectDir: projectDirFromArg(project), render: options.render, canvasFrom: options.canvasFrom, canvasSeconds: options.canvasSeconds });
+    }),
+  );
+
+program
+  .command('publish [project]')
+  .description(
+    'Upload the release package from review/upload.yaml: YouTube as private (or scheduled) videos, TikTok as inbox drafts. ' +
+      'A user command, never a pipeline stage; nothing is made public.',
+  )
+  .option('--platform <platform>', 'youtube | tiktok | all', 'all')
+  .option('--only <item>', 'main | shorts | <short name>')
+  .option('--schedule <iso-date>', 'YouTube: publish at this time (ISO 8601 with time zone); the video stays private until then')
+  .option('--dry-run', 'Validate upload.yaml, files, limits, and quota, and print the plan; no network calls')
+  .option('--force', 'Upload again even when review/publish.json has the same file')
+  .option('--mock', 'Use the mock adapters (no network); entries are marked as mock')
+  .action(
+    (
+      project: string | undefined,
+      options: { platform: string; only?: string; schedule?: string; dryRun?: boolean; force?: boolean; mock?: boolean },
+    ) =>
+      run(async () => {
+        await publishProject({
+          projectDir: projectDirFromArg(project),
+          platform: validateChoice(options.platform, ['youtube', 'tiktok', 'all'] as const, 'platform') as PlatformChoice,
+          only: options.only,
+          schedule: options.schedule,
+          dryRun: options.dryRun,
+          force: options.force,
+          mock: options.mock,
+          probe: probeVideo,
+          onTikTokRefreshToken: (token) => saveEnvValue('TIKTOK_REFRESH_TOKEN', token),
+        });
+      }),
+  );
+
+program
+  .command('publish-auth <platform>')
+  .description('One-time OAuth consent for publish: youtube | tiktok. Stores the refresh token in .env.')
+  .option('--redirect-uri <uri>', 'Loopback redirect URI (TikTok: the one registered in the developer portal)')
+  .action((platform: string, options: { redirectUri?: string }) =>
+    run(async () => {
+      await publishAuth(validateChoice(platform, ['youtube', 'tiktok'] as const, 'platform'), { redirectUri: options.redirectUri });
+    }),
+  );
+
+program
   .command('init [dir]')
   .description('Create a new workspace from the bundled runtime.')
   .option('-y, --yes', 'Use defaults and skip prompts')
@@ -288,6 +365,10 @@ program
   .option('--fal-key <key>', 'fal.ai API key (prefer FAL_KEY in the environment)')
   .option('--higgsfield-key <key>', 'Higgsfield credential (prefer HIGGSFIELD_API_KEY in the environment)')
   .option('--topview-key <key>', 'Topview platform key (prefer TOPVIEW_API_PLATFORM_KEY in the environment)')
+  .option('--youtube-client-id <id>', 'YouTube OAuth client ID for publish (prefer YOUTUBE_CLIENT_ID in the environment)')
+  .option('--youtube-client-secret <secret>', 'YouTube OAuth client secret (prefer YOUTUBE_CLIENT_SECRET in the environment)')
+  .option('--tiktok-client-key <key>', 'TikTok client key for publish (prefer TIKTOK_CLIENT_KEY in the environment)')
+  .option('--tiktok-client-secret <secret>', 'TikTok client secret (prefer TIKTOK_CLIENT_SECRET in the environment)')
   .option('--skip-project', 'Create the workspace without a first project')
   .action((dir: string | undefined, options: InitCommandOptions) =>
     run(async () => {

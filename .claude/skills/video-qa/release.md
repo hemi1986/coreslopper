@@ -1,8 +1,8 @@
 # Release package
 
-Everything the user needs to publish the video: the main video's upload texts and three thumbnails, three Shorts with their own vertical thumbnails and texts, and one upload file, `review/upload.md`. You choose the moments, stills, and words; `npm run cli -- short`, `thumbnail`, and `qa` do the cutting, composing, and checking.
+Everything the user needs to publish, in one folder: `renders/release/` (on the media drive when `renders/` is linked there). The user only uploads files and pastes texts. You choose the moments, stills, and words and write them into `review/upload.yaml`; `npm run cli -- short`, `thumbnail`, `release`, `upload-text`, and `qa` cut, compose, assemble, lay out, and check.
 
-Write every text in the project's language (`song.json` `language`, the language of the brief) and in the tone of the brief: a satire sounds like the song, not like a press release. Facts come from the project files only: spend from `state.json`, models from `assets/manifest.jsonl`, credits from `song.json` and the brief. A tool, model, cost, or person that is not in those files does not go into the texts.
+Write every text in the project's language (`song.json` `language`, the language of the brief) and in the tone of the brief: a satire sounds like the song, not like a press release. Facts come from the project files only: spend from `state.json`, models from `assets/manifest.jsonl`, credits from `song.json`, the brief, and the `release:` block of `project.yaml`, and links, footer lines, and hashtag sets from `config/channel.yaml` when it exists. A tool, model, cost, person, name, ISRC, or right that is not in those files does not go into the texts; `release` marks the gap as a TODO for the user.
 
 ## 1. Main video thumbnails
 
@@ -47,69 +47,102 @@ npm run cli -- thumbnail projects/<slug> --format 9x16 \
 
 The vertical layout is fixed: the face in the upper middle, the hook in the lower part above the Shorts buttons, its first line inside the central square that grid views show. Name each file `<short-name>-thumb.jpg` beside its video.
 
-## 5. Review the thumbnails
+## 5. Streaming cover
 
-Run the `art-director` agent on all six JPEGs with the rules in [thumbnails.md](thumbnails.md); for the vertical ones also: the hook reads at a quarter size, the face sits above the text and inside the central square, nothing important lies in the bottom 15 %. Re-compose until each passes.
+One 3000x3000 cover for the distributor, from the strongest still (the rules in [thumbnails.md](thumbnails.md), section "Cover"). The text is the artist and the title, nothing else:
 
-## 6. Write `review/upload.md`
+```bash
+npm run cli -- thumbnail projects/<slug> --format 1x1 \
+  --still assets/image/keyframe/<hash>-0.png --text "<ARTIST>|<TITLE>" --focus 0.5,0.4 \
+  --out projects/<slug>/renders/cover-3000x3000.jpg
+```
 
-Gather the facts first:
+## 6. Review the images
+
+Run the `art-director` agent on all six thumbnails and the cover with the rules in [thumbnails.md](thumbnails.md); for the vertical ones also: the hook reads at a quarter size, the face sits above the text and inside the central square, nothing important lies in the bottom 15 %. Re-compose until each passes.
+
+## 7. Write `review/upload.yaml`
+
+Run `npm run cli -- release projects/<slug> --no-render` once first: its `renders/release/README.md` lists the TODOs, and `texts/` shows the chapters, footer, and limits your texts land in.
+
+Gather the facts:
 
 - **Spend:** `budget.spentUsd` in `state.json`.
 - **Models:** group `assets/manifest.jsonl` by `provider`, `model`, and `role`; a `comfyui` provider ran locally, every other provider in the cloud. Name each model as `config/models.yaml` or the ComfyUI workflow names it, by what it made (keyframes, clips, lip-sync).
-- **Credits:** artist, song source, and notes in `song.json`; idea, cameo, and disclosure wishes in the brief.
+- **Credits:** artist, song source, and notes in `song.json` and `release:`; idea, cameo, and disclosure wishes in the brief.
+- **Channel:** handles, footer lines, and hashtag sets in `config/channel.yaml`. Its footer is appended to the YouTube description for you; leave links out of your own text.
 
-Then write the file in this structure. The headings are free text; the bold labels are in the project's language (`qa` reads Title/Titel, Description/Beschreibung, Tags and their equivalents).
+Then write the upload data. `schema/upload.schema.json` is the contract; the PostToolUse hook validates the file on every write. Paths are relative to the project.
 
-```markdown
-# Upload-Paket — <Titel>
+```yaml
+version: 1
+language: de                       # the project's language (BCP-47)
+main:
+  file: renders/16x9.mp4
+  title: "<title, at most 100 characters>"
+  thumbnail: renders/thumbnails/thumb-1-hero.jpg     # becomes thumbnails/thumb-1.jpg
+  alternate_thumbnails: [renders/thumbnails/thumb-2-cameo.jpg, renders/thumbnails/thumb-3-ensemble.jpg]
+  description: |
+    <3–6 narrative sentences in the voice of the song, built from the lyrics and the treatment>
 
-## Hauptvideo
+    <⚠️ satire or AI disclosure, if the brief calls for it>
 
-**Datei:** `<path the user uploads from>`
-**Titel:** <title, at most 100 characters>
-**Thumbnails:** `<thumb-1>`, `<thumb-2>`, `<thumb-3>`
-
-**Beschreibung:**
-
-<3–6 narrative sentences in the voice of the song, built from the lyrics and the treatment>
-
-<⚠️ satire or AI disclosure, if the brief calls for it>
-
-🎬 <how it was made: the agent and coreslopper, https://www.npmjs.com/package/coreslopper>
-🖥️ <what ran locally and what in the cloud, with the cloud spend from state.json>
-🛠️ <model list from the manifest, one line per job>
-
-💡 <idea> · 🎵 <song credits> · <cameo, if any>
-
-<8–12 hashtags on one line>
-
-**Tags:** <studio tags, comma-separated, at most 500 characters>
-
-## Shorts
-
-### Z1 — <moment> (<length> s)
-
-**Datei:** `<renders/shorts/Z1-intro-9x16.mp4>`
-**Thumbnail:** `<renders/shorts/Z1-intro-thumb.jpg>`
-**Titel:** <the Short's line> <one emoji> #<topic> #shorts
-
-**Beschreibung:**
-<one or two lines on the moment, with the emoji>
-Ganzes Video: Link oben ☝️
-<the disclosure line, short, if the brief calls for it>
-<credits on one line: song & idea, cameo if they appear in this Short, the tool>
-
-<4–6 hashtags on one line, ending with #shorts>
-
-- [ ] Verwandtes Video = Hauptvideo
-- [ ] „Veränderte oder synthetische Inhalte“: Ja
-- [ ] Nicht speziell für Kinder
-- [ ] Beschreibung, Hashtags und Tags eingefügt
+    🎬 <how it was made: the agent and coreslopper>
+    🖥️ <what ran locally and what in the cloud, with the cloud spend from state.json>
+    🛠️ <model list from the manifest, one line per job>
+  hashtags: ['#tag1', '#tag2']     # 8–12; release appends them after chapters and footer
+  tags: [studio tag, another tag]  # at most 500 characters together
+  pinned_comment: "<a question or a line from the song that invites replies>"
+  community_post: "<two or three lines announcing the video>"
+  # summary_en: { title: "...", description: "..." }   # only when the brief names an international audience
+  made_for_kids: false
+  synthetic_media: true            # "altered or synthetic content"
+  platforms: [youtube]
+shorts:
+  - name: Z1-intro                 # as in renders/shorts/Z1-intro-9x16.mp4
+    moment: Intro
+    file: renders/shorts/Z1-intro-9x16.mp4
+    thumbnail: renders/shorts/Z1-intro-thumb.jpg
+    title: "<the Short's line> <one emoji> #<topic> #shorts"
+    description: |
+      <one or two lines on the moment, with the emoji>
+      <"Full video: link above ☝️" in the project's language>
+      <the disclosure line, short, if the brief calls for it>
+    hashtags: ['#topic', '#shorts']  # 4–6, ending with #shorts
+    instagram:
+      caption: "<the Reel's own hook and one line of context; no #shorts>"
+      hashtags: ['#topic']           # at most 5, counting those in the caption
+      cover_frame: 1.5               # second of the Reel with the hook visible
+      story: "<one line for the story with the link sticker>"
+    tiktok:
+      caption: "<short, spoken-sounding, a question or a dare>"
+      hashtags: ['#topic']
+      overlay: "<'Full video on YouTube: @handle' in the project's language>"
+      pinned_comment: "<optional>"
+    platforms: [youtube, tiktok]
+# instagram_post: { caption: "...", hashtags: [...] }   # optional feed post for the release
+spotify:
+  artist_pick: "<one line pinned on the artist profile>"
+  pitch: "<at most 500 characters: mood, genre, instruments, story>"
 ```
 
-Translate the pointer ("Full video: link above ☝️") and the checklist into the project's language. Use the media-drive path for `**Datei:**` when `renders/` is a symlink to `CORESLOPPER_MEDIA_DIR` (the user uploads from there), else the project path. Every Short's file name appears in its section.
+- Write each platform's text for that platform: YouTube explains, Instagram hooks in the first line, TikTok talks. Identical Instagram and TikTok captions fail the check.
+- Quote every value that contains `#`: unquoted, YAML reads `#…` as a comment and drops it.
+- Every Short in `renders/shorts/` gets an entry; `related: main` becomes a checklist item, since YouTube sets the related video only by hand.
+- `made_for_kids` and `synthetic_media` follow the brief; `config/channel.yaml` sets the disclosure defaults of the other platforms.
+- Episodes have no `spotify` block.
+
+## 8. Build the release folder
+
+```bash
+npm run cli -- release projects/<slug>
+npm run cli -- upload-text projects/<slug>
+```
+
+`release` renders only formats that are missing or stale, copies (hardlinks) everything else, converts the song to a deliverable WAV only when needed, cuts the Spotify canvas, writes the lyrics files, lays out `texts/` and `README.md`, and records `manifest.json`. A `✖` line is a broken limit: fix `upload.yaml` and run it again. When it reports that the canvas window shows lyrics, run it again with `--canvas-from <seconds or anchor>` on a part without lyrics (an instrumental or the drop) and check a frame of `streaming/canvas-9x16.mp4` with the art director: no text, no logos. `upload-text` keeps `review/upload.md` as a pointer to the folder.
+
+`npm run cli -- publish projects/<slug> --dry-run` also checks the YouTube and TikTok limits; uploading stays the user's command.
 
 ## Completion
 
-`npm run cli -- qa projects/<slug>` reports `Thumbnails`, `Shorts`, `Short thumbnails`, and `Upload text` as PASS: three 16:9 thumbnails, three Shorts at most 60 s in 9:16 with a 1080x1920 thumbnail each, and an upload file with a title, description, and hashtags for the main video and every Short.
+`npm run cli -- qa projects/<slug>` reports no FAIL in `Thumbnails`, `Shorts`, `Short thumbnails`, `Upload text`, `Upload data`, and every `Release …` check, and `Release texts` is PASS: every text written, every limit kept. TODO remains only where the user still has to supply a fact (`Release metadata`, a `<ID>` link) or choose a canvas window; `renders/release/README.md` lists them. The art director passed the six thumbnails and the cover.

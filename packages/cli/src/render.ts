@@ -9,6 +9,9 @@ import {
   ValidationError,
   ensureDir,
   formatId,
+  hashFileStream,
+  loadProject,
+  saveState,
   loadBrand,
   projectAudioPath,
   repoRoot,
@@ -259,6 +262,33 @@ function runFfmpeg(args: string[]): Promise<void> {
   });
 }
 
+/** The state.json artifact keys of a format's render: what it was made from, and the file it produced. */
+export function renderArtifactKeys(file: string): { inputs: string; file: string } {
+  return { inputs: `render:${file}:inputs`, file: `render:${file}:sha256` };
+}
+
+/**
+ * A hash of everything that decides a full render's pixels and sound: the
+ * props (storyboard, timing, style, assets, fonts) and the audio file's bytes.
+ */
+export async function renderInputsHash(props: VideoProps, root = repoRoot()): Promise<string> {
+  const audio = props.audioSrc ? join(root, props.audioSrc) : undefined;
+  const audioHash = audio && existsSync(audio) ? await hashFileStream(audio) : null;
+  return createHash('sha256').update(JSON.stringify({ props, audioHash, crf: 18 })).digest('hex');
+}
+
+/** Record a finished full render in state.json, so `release` can tell a current render from a stale one. */
+async function recordRender(projectDir: string, output: string, inputs: string): Promise<void> {
+  const project = await loadProject(projectDir);
+  const key = relative(project.paths.root, output).split(sep).join('/');
+  if (key.startsWith('..')) return;
+  const keys = renderArtifactKeys(key);
+  project.state.artifacts[keys.inputs] = inputs;
+  project.state.artifacts[keys.file] = await hashFileStream(output);
+  project.state.updatedAt = new Date().toISOString();
+  await saveState(project.paths.state, project.state);
+}
+
 export async function renderProject(options: RenderOptions): Promise<string> {
   const { props, paths } = await buildVideoProps(options);
   const root = repoRoot();
@@ -392,6 +422,9 @@ export async function renderProject(options: RenderOptions): Promise<string> {
     await rm(outputLocation, { force: true });
     await copyFile(tempOutput, outputLocation);
     await rm(workDir, { recursive: true, force: true });
+    if (!preview && !options.frames && !options.out) {
+      await recordRender(options.projectDir, outputLocation, await renderInputsHash(props, root));
+    }
     console.log(`Render written to ${outputLocation}`);
     return outputLocation;
   } finally {

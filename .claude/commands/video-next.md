@@ -55,3 +55,7 @@ Repeat until the project is done or a hard stop occurs:
 - A required user-owned file would be overwritten (`timing.overrides.json`, `project.yaml`, an imported take, or the series canon).
 
 Report the hard stop with the exact command the user can run to continue.
+
+## After the pipeline
+
+The pipeline ends with `qa-export`. Uploading is the user's step: `publish` reaches YouTube and TikTok, so this command never runs `publish` or `publish-auth`, and neither does a stage runner. When the project is done, point the user to `npm run cli -- publish projects/<slug> --dry-run` and [docs/publishing.md](../../docs/publishing.md).

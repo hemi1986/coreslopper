@@ -47,6 +47,8 @@ export interface InitOptions {
   falKey?: string;
   higgsfieldKey?: string;
   topviewKey?: string;
+  /** Publish OAuth clients (`YOUTUBE_CLIENT_ID`, ...) written to `.env`. */
+  publishEnv?: Record<string, string>;
   onProgress?: (message: string) => void;
 }
 
@@ -130,6 +132,7 @@ async function ensureEnvFile(
   falKey?: string,
   higgsfieldKey?: string,
   topviewKey?: string,
+  extra: Record<string, string> = {},
 ): Promise<void> {
   const envPath = join(target, '.env');
   let content: string;
@@ -151,6 +154,7 @@ async function ensureEnvFile(
   if (!/^TOPVIEW_API_PLATFORM_KEY=/m.test(content)) {
     content = `${content.trimEnd()}\nTOPVIEW_API_PLATFORM_KEY=\n`;
   }
+  for (const [key, value] of Object.entries(extra)) content = upsertEnv(content, key, value.trim());
   await writeFile(envPath, content, { encoding: 'utf8', mode: 0o600 });
   await chmod(envPath, 0o600).catch(() => undefined);
 }
@@ -237,6 +241,8 @@ function gettingStarted(target: string, result: InitResult, options: InitOptions
     '- fal.ai: `FAL_KEY` in `.env` (gitignored).',
     '- Higgsfield: `HIGGSFIELD_API_KEY` (or `HF_API_KEY_ID` + `HF_API_KEY_SECRET`) in `.env`.',
     '- Topview: `TOPVIEW_API_PLATFORM_KEY` in `.env`.',
+    '- Publishing (optional): `YOUTUBE_CLIENT_ID`/`YOUTUBE_CLIENT_SECRET` and `TIKTOK_CLIENT_KEY`/`TIKTOK_CLIENT_SECRET` in `.env`,',
+    '  then `npm run cli -- publish-auth youtube|tiktok` once; see `docs/publishing.md`.',
     '',
     'Bring a finished song: `/new-video` tells you where to put the mix and the vocal stem.',
     '',
@@ -302,7 +308,7 @@ export async function initWorkspace(options: InitOptions): Promise<InitResult> {
   await copyRuntime(runtime, target);
 
   options.onProgress?.('Writing credentials...');
-  await ensureEnvFile(target, options.falKey, options.higgsfieldKey, options.topviewKey);
+  await ensureEnvFile(target, options.falKey, options.higgsfieldKey, options.topviewKey, options.publishEnv);
 
   if (options.tools) {
     options.onProgress?.('Installing missing tools...');

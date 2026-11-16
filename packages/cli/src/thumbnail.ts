@@ -14,8 +14,9 @@ import {
 } from '@coreslopper/core';
 import {
   THUMBNAIL_FORMAT_IDS,
+  THUMBNAIL_FORMAT_MAX_BYTES,
   THUMBNAIL_LAYOUTS,
-  THUMBNAIL_MAX_BYTES,
+  coverTextProblem,
   parseFocus,
   parseThumbnailText,
   readableOn,
@@ -38,7 +39,7 @@ export interface ThumbnailOptions {
   zoom?: number;
   /** Typography key of style.yaml for the hook (default `display`). */
   font?: string;
-  /** `16x9` (default, 1280x720) or `9x16` (1080x1920, a Short). */
+  /** `16x9` (default, 1280x720), `9x16` (1080x1920, a Short), or `1x1` (3000x3000, the streaming cover). */
   format?: string;
 }
 
@@ -95,12 +96,21 @@ export async function buildThumbnailProps(
     throw new ValidationError(`Unknown thumbnail format "${options.format}". Use ${THUMBNAIL_FORMAT_IDS.join(', ')}.`);
   }
   // A Short thumbnail has one vertical layout: text in the lower part, face above.
-  const layout = (options.layout ?? (format === '9x16' ? 'bottom' : 'left')) as ThumbnailLayout;
+  const layout = (options.layout ?? (format === '16x9' ? 'left' : 'bottom')) as ThumbnailLayout;
   if (!THUMBNAIL_LAYOUTS.includes(layout)) {
     throw new ValidationError(`Unknown layout "${options.layout}". Use ${THUMBNAIL_LAYOUTS.join(', ')}.`);
   }
-  if (format === '9x16' && layout !== 'bottom') {
-    throw new ValidationError('A 9x16 thumbnail has a fixed vertical layout (text below, face above); omit --layout.');
+  if (format !== '16x9' && layout !== 'bottom') {
+    throw new ValidationError(
+      format === '9x16'
+        ? 'A 9x16 thumbnail has a fixed vertical layout (text below, face above); omit --layout.'
+        : 'A 1x1 cover has a fixed layout (artist and title below, image above); omit --layout.',
+    );
+  }
+  if (format === '1x1') {
+    const problem = coverTextProblem(`${options.text} ${options.tag ?? ''}`);
+    if (problem) throw new ValidationError(problem);
+    if (options.tag) throw new ValidationError('A streaming cover shows only artist and title; omit --tag.');
   }
   let lines: string[];
   let focus: { x: number; y: number };
@@ -150,7 +160,7 @@ export async function buildThumbnailProps(
   return { props, slug: project.config.slug };
 }
 
-/** Render one JPEG thumbnail (1280x720, or 1080x1920 for `--format 9x16`); returns its path. */
+/** Render one JPEG thumbnail (1280x720; 1080x1920 for `--format 9x16`; the 3000x3000 cover for `1x1`); returns its path. */
 export async function renderThumbnail(options: ThumbnailOptions): Promise<string> {
   const root = repoRoot();
   const { props, slug } = await buildThumbnailProps(options, root);
@@ -174,7 +184,7 @@ export async function renderThumbnail(options: ThumbnailOptions): Promise<string
         jpegQuality: quality,
         overwrite: true,
       });
-      if ((await stat(output)).size < THUMBNAIL_MAX_BYTES) break;
+      if ((await stat(output)).size < THUMBNAIL_FORMAT_MAX_BYTES[props.format ?? '16x9']) break;
     }
     const problems = await thumbnailProblems(output, props.format);
     if (problems.length) throw new ValidationError(`Thumbnail ${output} failed its checks`, problems);

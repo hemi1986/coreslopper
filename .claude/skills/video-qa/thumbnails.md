@@ -1,6 +1,6 @@
 # Thumbnails
 
-Three YouTube thumbnails per video, made after the master passes. You choose the stills and the words; `npm run cli -- thumbnail` composes the pixels, so the same inputs always give the same JPEG. The vertical thumbnails of the Shorts follow the same rules with `--format 9x16`; [release.md](release.md) covers them.
+Three YouTube thumbnails per video, made after the master passes. You choose the stills and the words; `npm run cli -- thumbnail` composes the pixels, so the same inputs always give the same JPEG. The vertical thumbnails of the Shorts follow the same rules with `--format 9x16`, the streaming cover with `--format 1x1`; [release.md](release.md) covers when to make them.
 
 ## The three thumbnails
 
@@ -52,6 +52,15 @@ Run the `art-director` agent on the three JPEGs with these rules, and re-compose
 - Colors come from the style bible; the text never covers the face.
 - No real logos, no real likeness, no banknotes.
 
+## Cover
+
+The 3000x3000 cover goes to Spotify, Apple Music, and every other store, and is shown as small as 64 px in lists.
+
+- The strongest still of the main character or the central image, with room at the bottom for two lines.
+- `--text "<ARTIST>|<TITLE>"`: artist and title only. URLs, handles, prices, platform names and logos, and the tag are refused by the command and by the stores.
+- The layout is fixed: the image above, artist and title centred below, untilted. The command writes an RGB JPEG of exactly 3000x3000.
+- The art director checks it like a thumbnail and also at 64x64: the image still reads, the text may blur, nothing looks like a logo.
+
 ## Completion
 
-Three JPEGs in `renders/thumbnails/`, three different subjects, each passed by the art director, and `npm run cli -- qa` reports `Thumbnails: PASS`.
+Three JPEGs in `renders/thumbnails/`, three different subjects, each passed by the art director, and `npm run cli -- qa` reports `Thumbnails: PASS`. For the cover: `renders/cover-3000x3000.jpg` passed by the art director, and `Release cover: PASS` after `release`.

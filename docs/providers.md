@@ -63,6 +63,8 @@ HF_API_KEY_SECRET=...
 TOPVIEW_API_PLATFORM_KEY=...
 ```
 
+Publishing to YouTube and TikTok uses separate OAuth credentials (`YOUTUBE_CLIENT_ID`, `TIKTOK_CLIENT_KEY`, ...) and its own publish adapters, not these providers; see [publishing.md](publishing.md).
+
 ## The adapter interface
 
 ```ts

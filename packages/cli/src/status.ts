@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import {
   effectiveBatchCap,
   formatUsd,
@@ -44,6 +44,15 @@ export async function printStatus(projectDir: string): Promise<void> {
   }
   const upload = join(loaded.paths.review, 'upload.md');
   if (existsSync(upload)) console.log(`Upload text: ${relative(loaded.paths.root, upload)}`);
+  const releaseManifest = join(loaded.paths.renders, 'release', 'manifest.json');
+  if (existsSync(releaseManifest)) {
+    try {
+      const manifest = JSON.parse(readFileSync(releaseManifest, 'utf8')) as { files?: unknown[]; todos?: unknown[] };
+      console.log(`Release: renders/release/ · ${manifest.files?.length ?? 0} files · ${manifest.todos?.length ?? 0} TODO(s)`);
+    } catch {
+      console.log('Release: renders/release/manifest.json is unreadable; run release');
+    }
+  }
   console.log(`Next: ${next ? `${next.id} (${next.skills.join(', ')})${interactive ? ' · interactive' : ''}` : 'done'}`);
   if (!existsSync(loaded.paths.state)) console.log('Note: state.json does not exist yet; showing the initial state.');
 }

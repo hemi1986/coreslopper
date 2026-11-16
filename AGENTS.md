@@ -11,6 +11,7 @@ An open-source, Claude Code-native workflow for producing music videos for an ex
 - **Local or cloud generation.** `comfyui` renders from tagged workflow exports in `comfyui/workflows/`: stills and edits (`providers.image`), clips (`providers.video`), lip-sync (`providers.lipsync`), and stingers, SFX, and voice-overs (`audio.*` roles). Each provider is chosen separately.
 - **Resumable and thrifty.** `state.json` tracks stages, hashes, attempts, and spend. Generated assets are cached by a hash of model, prompt, seed, references, and params.
 - **No secrets.** API keys live in environment variables; `.env.example` documents them. Generated media and copyrighted material are gitignored.
+- **Nothing goes public by itself.** `publish` is the user's command; it uploads private videos and drafts only.
 - **Open source.** MIT for our code and docs. Remotion is source-available and documented separately.
 
 ## Quickstart
@@ -61,7 +62,8 @@ comfyui/           README + workflows/ for local ComfyUI generation (tagged API 
 docs/              glossary.md, architecture.md, pipeline.md, ADRs, third-party notices
 packages/
   core/            Zod schemas, state, timing resolver, hash, cost, project loader
-  providers/       image, video, lip-sync, and audio operations; fal.ai + Higgsfield + Topview + ComfyUI + mock; cache/manifest runner
+  providers/       image, video, lip-sync, and audio operations; fal.ai + Higgsfield + Topview + ComfyUI + mock; cache/manifest runner;
+                   publish adapters (YouTube, TikTok, mock)
   cli/             validate, status, new, render, contact-sheet, stage-*, estimate, doctor
                    npx entry, onboarding, tool checks, workspace init
   remotion/        MusicVideo composition, motion components, effects, 3D
@@ -70,6 +72,7 @@ scripts/           Audio analysis and review player (Python/uv), fixture generat
 templates/project/ Project template used by the new-video skill
 templates/episode/ Episode template used by the new-episode skill
 templates/series/  Series canon template used by the new-series skill
+templates/channel/ Optional config/channel.yaml template and example (links, footer, hashtag sets)
 brand/example/     Neutral synthwave/cyberpunk brand kit with OFL fonts
 bench/             Model bench: cases, targets, budget (fixtures and runs gitignored)
 projects/          Video projects and episodes (media gitignored)
@@ -90,7 +93,7 @@ dist/              Generated npx bundle (gitignored)
 | 6 | `storyboard` | `storyboard` | `storyboard.yaml`, `storyboard.md`, contact sheet | Schema, anchors, coverage, refs, source rules |
 | 7 | `assets` | `remotion-motion`, `ai-clips`, `footage` | Components, keyframes, clips, footage | Per-batch cost + QA; cache |
 | 8 | `assembly` | `assembly-render` | `renders/preview-16x9.mp4` | Preview; sync/legibility |
-| 9 | `qa-export` | `video-qa` | `review/report.md`, all formats, release package (3 thumbnails, 3 Shorts, `review/upload.md`) | Sync, readability, determinism; art director on thumbnails; release-package checks |
+| 9 | `qa-export` | `video-qa` | `review/report.md`, `review/upload.yaml`, release folder `renders/release/` (all formats, 3 thumbnails, 3 Shorts, WAV, cover, canvas, lyrics, platform texts, release plan) | Sync, readability, determinism; art director on thumbnails and cover; release checks (PASS/FAIL/TODO) |
 
 The song always exists already; the workflow never writes lyrics or generates music. ✋ marks the **interactive stages**: the `new-video` skill runs them in the main session with the user (project data, lyrics, song import, grilling). `/video-next` refuses to start while one is open.
 
@@ -107,6 +110,8 @@ A project with `kind: episode` is one episode of a series ([ADR 0016](docs/adr/0
 | 5–8 | `storyboard`, `assets`, `assembly`, `qa-export` | as above | renders in the master format, `renders/<slug>.en.srt` |
 
 From `audio-analysis` (or `voice-track`) on, no stage waits for a human. A stage can stop the pipeline only on a hard stop: budget exceeded, missing credentials, or a validation/QA failure that cannot be fixed after its retries.
+
+Publishing is not a stage. The user runs `publish` after `qa-export`; it uploads YouTube videos as private and TikTok videos as inbox drafts, and never makes anything public ([ADR 0023](docs/adr/0023-publish-command.md), [docs/publishing.md](docs/publishing.md)).
 
 ## Context discipline
 
@@ -138,7 +143,7 @@ npm run schema
 | `npm run cli -- status <project>` | Show stage state and budget. |
 | `npm run cli -- contact-sheet <project>` | Write `review/contact-sheet.svg`. |
 | `npm run cli -- render <project> [--format <id>]` | Render with Remotion in segments; the default is the master format. `--frames <a>-<b>` renders a test range; `--subtitles en` burns in episode subtitles. |
-| `npm run cli -- thumbnail <project> --still <file> --text "<a\|b>" --out <file>` | Compose a 1280x720 JPEG thumbnail with the brand fonts and palette; `--format 9x16` for a 1080x1920 Short thumbnail; `--tag`, `--layout left\|right\|bottom`, `--accent <role>`, `--focus x,y`. |
+| `npm run cli -- thumbnail <project> --still <file> --text "<a\|b>" --out <file>` | Compose a 1280x720 JPEG thumbnail with the brand fonts and palette; `--format 9x16` for a 1080x1920 Short thumbnail, `--format 1x1` for the 3000x3000 streaming cover (artist and title only); `--tag`, `--layout left\|right\|bottom`, `--accent <role>`, `--focus x,y`. |
 | `npm run cli -- short <project> --from <anchor\|s> --to <anchor\|s> --name <stem>` | Cut a Short (at most 60 s) from `renders/9x16.mp4` into `renders/shorts/<stem>-9x16.mp4`; anchors like `section:chorus_1:end-0.5`. |
 | `npm run cli -- review <project> [--format <id>] [--video <file>]` | Open a render in the review player (play, step frames, type notes); notes go to `review/notes/<video>.json`. |
 | `npm run cli -- media-link <project> [--move]` | Move `assets/` and `renders/` to `CORESLOPPER_MEDIA_DIR` and symlink them. |
@@ -153,6 +158,10 @@ npm run schema
 | `npm run cli -- generate --series <series> --batch <file>` | Run a canon generation batch against the series budget. |
 | `npm run cli -- generate <project> --batch <file> [--provider <p>]` | Run a cached, budget-checked generation batch; `--provider` overrides the project provider for one batch (lip-sync keeps its own). |
 | `npm run cli -- qa <project> [--determinism <frame>]` | Write `review/report.md`; optionally check frame hashes. |
+| `npm run cli -- release <project> [--no-render] [--canvas-from <anchor\|s>] [--canvas-seconds <n>]` | Build `renders/release/`: every format, thumbnails, Shorts, WAV, cover, canvas, lyrics, platform texts, README, manifest; renders only missing or stale formats; idempotent. |
+| `npm run cli -- upload-text <project>` | Render `review/upload.md` (a pointer to the release folder) from `review/upload.yaml`. |
+| `npm run cli -- publish <project> [--platform youtube\|tiktok\|all] [--only main\|shorts\|<name>] [--schedule <iso>] [--dry-run] [--force]` | User command, never a stage: upload the release package to YouTube (private or scheduled) and TikTok (inbox drafts); idempotent through `review/publish.json`. |
+| `npm run cli -- publish-auth youtube\|tiktok` | One-time OAuth consent; stores the refresh token in `.env`. |
 | `npm run cli -- import-song <project>` | Register `audio/song.wav` and `audio/stems/vocals.wav` in `song.json`; converts other formats. |
 | `npm run cli -- normalize-audio <project> --input <file>` | Normalize audio to −14 LUFS / −1 dBTP. |
 | `npm run cli -- footage <project> --input <file> --name <name>` | Normalize a footage proxy. |
@@ -212,6 +221,8 @@ CI runs without API keys and uses the mock provider. GPU tests are opt-in.
 - `docs/adr/` — architecture decision records.
 - `docs/THIRD_PARTY.md` — vendored skills, licenses, fonts, providers.
 - `docs/mcp.md` — optional exploration MCP servers; provider adapters.
+- `docs/publishing.md` — `publish`: YouTube and TikTok setup, limits, quota.
+- `docs/adr/0024-release-folder-manual-distribution.md` — the release folder and the manual distributor upload.
 
 ## License
 

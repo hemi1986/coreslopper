@@ -65,6 +65,10 @@ Add `--install-tools` to let the non-interactive run install missing uv, Python,
 | `--fal-key <key>` | `FAL_KEY` | fal.ai API key. |
 | `--higgsfield-key <key>` | `HIGGSFIELD_API_KEY` | Higgsfield credential (`key_id:key_secret`). |
 | `--topview-key <key>` | `TOPVIEW_API_PLATFORM_KEY` | Topview platform API key. |
+| `--youtube-client-id <id>` | `YOUTUBE_CLIENT_ID` | Optional: YouTube OAuth client for `publish` ([publishing.md](publishing.md)). |
+| `--youtube-client-secret <secret>` | `YOUTUBE_CLIENT_SECRET` | Optional: its secret. |
+| `--tiktok-client-key <key>` | `TIKTOK_CLIENT_KEY` | Optional: TikTok client for `publish`. |
+| `--tiktok-client-secret <secret>` | `TIKTOK_CLIENT_SECRET` | Optional: its secret. |
 | `--skip-project` | off | Create the workspace without a first project. |
 
 Run `npx coreslopper init --help` for the current list.
@@ -107,7 +111,15 @@ HF_API_KEY_SECRET=...
 
 # Topview: platform API key from platform.topview.ai/api-keys (TOPVIEW_API_KEY also works)
 TOPVIEW_API_PLATFORM_KEY=...
+
+# Optional, for publish: OAuth clients; the refresh tokens come from `publish-auth`
+YOUTUBE_CLIENT_ID=...
+YOUTUBE_CLIENT_SECRET=...
+TIKTOK_CLIENT_KEY=...
+TIKTOK_CLIENT_SECRET=...
 ```
+
+The interactive onboarding asks whether to set up publishing; it checks each client against the platform's token endpoint, writes it to `.env`, and lists the `publish-auth` commands to run once (they open the browser). `doctor` reports whether each client and its refresh token are set. Setup in Google Cloud and the TikTok developer portal: [publishing.md](publishing.md).
 
 The song needs no credential; you bring it yourself. The mock provider and the motion-only demo need no credentials.
 
