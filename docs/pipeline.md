@@ -124,6 +124,17 @@ npm run cli -- render projects/my-video --format 1x1
 
 Completion: preview plays with the song; master is 1080p30 H.264; derivatives use designed layouts; no clipping.
 
+### Review notes
+
+The user can watch any render in the review player and leave notes on exact frames ([ADR 0022](adr/0022-review-player.md), [scripts/review-player](../scripts/review-player/README.md)):
+
+```bash
+npm run cli -- review projects/my-video                 # newer of preview and master
+npm run cli -- review projects/my-video --format 9x16
+```
+
+Notes land in `review/notes/<video-stem>.json`. No stage waits for them; on a fix pass, `assembly-render` maps each note to its shot and works through them.
+
 ## 9. QA & export
 
 - Skill: `video-qa`

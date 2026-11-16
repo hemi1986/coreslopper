@@ -46,6 +46,12 @@ jobs:
           uv sync --group dev
           uv run pytest -q
 
+      - name: Review player tests
+        working-directory: scripts/review-player
+        run: |
+          uv sync --group dev
+          uv run pytest -q
+
       - name: Generate demo audio
         run: npm run demo:audio
 
