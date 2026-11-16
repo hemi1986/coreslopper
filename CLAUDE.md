@@ -28,7 +28,7 @@ Create a workspace with `npx coreslopper init <dir>` (or `npx coreslopper@latest
 
 ## Hooks
 
-`.claude/settings.json` registers a `PostToolUse` hook for `Write|Edit`. It validates changes to `storyboard.yaml`, `timing.json`, `timing.overrides.json`, `project.yaml`, `state.json`, `style.yaml`, `characters.yaml`, `script.yaml`, `series.yaml`, `sets.yaml`, and `review/upload.yaml`, in projects and in series canons. Exit code 2 blocks the edit and returns the validation message.
+`.claude/settings.json` registers a `PostToolUse` hook for `Write|Edit`. It validates changes to `storyboard.yaml`, `timing.json`, `timing.overrides.json`, `project.yaml`, `state.json`, `style.yaml`, `characters.yaml`, `script.yaml`, `series.yaml`, `sets.yaml`, and `review/upload.yaml` in projects and series canons, and the workspace's `config/channel.yaml`. Exit code 2 blocks the edit and returns the validation message.
 
 The hook calls `npm run cli -- validate-file <file>`, which is also runnable by hand.
 

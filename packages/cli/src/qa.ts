@@ -31,6 +31,7 @@ import {
 } from './release-files.js';
 import { probeVideo } from './short.js';
 import { loadUploadData, uploadPaths } from './upload-text.js';
+import { releaseChecks } from './release-qa.js';
 
 export interface QaOptions {
   projectDir: string;
@@ -39,7 +40,7 @@ export interface QaOptions {
 
 interface Check {
   name: string;
-  result: 'PASS' | 'FAIL' | 'WARN' | 'N/A';
+  result: 'PASS' | 'FAIL' | 'WARN' | 'TODO' | 'N/A';
   evidence: string;
 }
 
@@ -320,6 +321,7 @@ export async function runQa(options: QaOptions): Promise<string> {
   checks.push(...shorts.checks);
   checks.push(await checkUploadText(project.paths.review, project.paths.root, shorts.names));
   checks.push(await checkUploadData(project.paths.root, shorts.names));
+  checks.push(...(await releaseChecks(project.paths.root)));
 
   if (options.determinismFrame !== undefined) {
     const { props } = await buildVideoProps({ projectDir: options.projectDir });
@@ -357,7 +359,9 @@ export async function runQa(options: QaOptions): Promise<string> {
     checks.push({ name: 'Determinism', result: 'N/A', evidence: 'run with --determinism <frame>' });
   }
 
+  // TODO marks what the user still fills in (release metadata, texts); it never blocks delivery.
   const ready = checks.every((check) => check.result !== 'FAIL');
+  const todos = checks.filter((check) => check.result === 'TODO').length;
   const report = [
     `# QA Report — ${project.config.title}`,
     '',
@@ -369,7 +373,7 @@ export async function runQa(options: QaOptions): Promise<string> {
     '|---|---|---|',
     ...checks.map((check) => `| ${check.name} | ${check.result} | ${check.evidence.replaceAll('|', '\\|')} |`),
     '',
-    `READY: ${ready ? 'yes' : 'no'}`,
+    `READY: ${ready ? 'yes' : 'no'}${todos ? ` · ${todos} TODO(s) for the user, see renders/release/README.md` : ''}`,
     '',
     ...(thumbnails.files.length ? ['## Thumbnails', '', ...thumbnails.files.map((file) => `- \`${file}\``), ''] : []),
     ...(shorts.files.length ? ['## Shorts', '', ...shorts.files.map((file) => `- \`${file}\``), ''] : []),

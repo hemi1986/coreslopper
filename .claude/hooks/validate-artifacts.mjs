@@ -3,8 +3,8 @@
  * Claude Code PostToolUse hook.
  *
  * Reads the hook payload from stdin, finds the edited file, and validates
- * project artifacts (below `projects/`) and series canon files (below
- * `series/`) with the same CLI the user runs. Exit code 2 blocks the
+ * project artifacts (below `projects/`), series canon files (below
+ * `series/`), and `config/channel.yaml` with the same CLI the user runs. Exit code 2 blocks the
  * tool call and shows stderr to the agent.
  */
 import { execFileSync } from 'node:child_process';
@@ -23,6 +23,7 @@ const TRACKED = new Set([
   'series.yaml',
   'sets.yaml',
   'upload.yaml',
+  'channel.yaml',
 ]);
 
 function readStdin() {
@@ -78,8 +79,10 @@ const file = payload?.tool_input?.file_path ?? payload?.tool_input?.path;
 if (!file) process.exit(0);
 if (!TRACKED.has(basename(file))) process.exit(0);
 
-const artifactRoot = findArtifactRoot(file);
-if (!artifactRoot || !artifactRoot.dir.split(sep).includes(artifactRoot.folder)) process.exit(0);
+// config/channel.yaml belongs to the workspace, not to a project or series.
+const isChannel = basename(file) === 'channel.yaml' && basename(dirname(resolve(file))) === 'config';
+const artifactRoot = isChannel ? undefined : findArtifactRoot(file);
+if (!isChannel && (!artifactRoot || !artifactRoot.dir.split(sep).includes(artifactRoot.folder))) process.exit(0);
 
 const repoRoot = findRepoRoot(file) ?? process.cwd();
 try {

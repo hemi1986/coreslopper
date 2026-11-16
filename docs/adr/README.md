@@ -27,5 +27,6 @@ Short records of decisions that are hard to reverse, surprising without context,
 | [0021](0021-topview-provider.md) | Topview as a third cloud adapter for stills and clips; one endpoint pattern, two request formats, no lip-sync. |
 | [0022](0022-review-player.md) | A review player writes frame-accurate notes on renders to `review/notes/`; outside the pipeline, read on a fix pass. |
 | [0023](0023-publish-command.md) | `publish` is a user command, not a stage: YouTube private or scheduled, TikTok inbox drafts, from `upload.yaml`, idempotent by file hash; no Instagram, no MCP. |
+| [0024](0024-release-folder-manual-distribution.md) | `release` builds one folder `renders/release/` with every file and text to publish; distributor facts only from the user; manual distributor upload, API distributors later. |
 
 Status values: `Accepted`, `Deprecated`, `Superseded by ADR-NNNN`.

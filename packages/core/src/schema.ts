@@ -46,6 +46,53 @@ export const ProvidersSchema = z
   })
   .default({ image: 'mock', video: 'mock' });
 
+/** How much of a song part an AI tool made, as distributors ask for it. */
+export const AiShareSchema = z.enum(['none', 'partial', 'full']);
+
+/**
+ * `release:` in project.yaml: the facts a distributor form asks for. Optional;
+ * every field the user has not given is reported as a TODO, never invented.
+ */
+export const ReleaseMetadataSchema = z.object({
+  /** Where the song goes to streaming services; `manual` for any distributor without a form layout here. */
+  distributor: z.enum(['distrokid', 'manual']).default('manual'),
+  artist: z.string().min(1).optional(),
+  title: z.string().min(1).optional(),
+  featured_artists: z.array(z.string().min(1)).default([]),
+  primary_genre: z.string().min(1).optional(),
+  secondary_genre: z.string().min(1).optional(),
+  /** BCP-47 language of the lyrics; `instrumental` for none. */
+  language: z.string().min(2).optional(),
+  explicit: z.boolean().optional(),
+  /** ISO date (YYYY-MM-DD). A fixed date and an editorial pitch need at least three weeks' lead time. */
+  release_date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'use YYYY-MM-DD')
+    .optional(),
+  /** Legal names of the songwriters, as the user gives them. */
+  songwriters: z.array(z.string().min(1)).default([]),
+  producer: z.string().min(1).optional(),
+  label: z.string().min(1).optional(),
+  /** Reuse the ISRC of an earlier release of the same recording. */
+  isrc: z
+    .string()
+    .regex(/^[A-Z]{2}-?[A-Z0-9]{3}-?\d{2}-?\d{5}$/, 'an ISRC looks like DE-ABC-26-00001')
+    .optional(),
+  /** What an AI tool made: lyrics, music (composition), vocals, instrumental. */
+  ai_credits: z
+    .object({
+      lyrics: AiShareSchema.optional(),
+      music: AiShareSchema.optional(),
+      vocals: AiShareSchema.optional(),
+      instrumental: AiShareSchema.optional(),
+    })
+    .optional(),
+  /** The tool that made the AI parts, e.g. Suno. */
+  ai_tool: z.string().min(1).optional(),
+  /** The licence basis, e.g. the paid plan the song was made with. */
+  license_note: z.string().min(1).optional(),
+});
+
 export const ProjectConfigSchema = z
   .object({
     version: z.literal(1),
@@ -71,6 +118,8 @@ export const ProjectConfigSchema = z
     providers: ProvidersSchema,
     brand: z.string().min(1).default('example'),
     models: z.record(z.string(), z.unknown()).default({}),
+    /** Distributor facts for the release package; music videos only. */
+    release: ReleaseMetadataSchema.optional(),
   })
   .superRefine((config, ctx) => {
     if (config.kind !== 'episode') return;
@@ -629,8 +678,18 @@ const UploadItemFields = {
   category_id: z.string().regex(/^\d+$/).default('10'),
 };
 
+/** A short English version of an item's texts, for an international audience. */
+const EnglishSummarySchema = z.object({ title: z.string().min(1), description: z.string().min(1) });
+
 export const UploadMainSchema = z.object({
   ...UploadItemFields,
+  /** YouTube chapters; without them they come from the timing's sections. */
+  chapters: z.array(z.object({ start: z.number().nonnegative(), title: z.string().min(1) })).optional(),
+  /** The comment to pin under the main video. */
+  pinned_comment: z.string().min(1).optional(),
+  /** The YouTube community post announcing the video. */
+  community_post: z.string().min(1).optional(),
+  summary_en: EnglishSummarySchema.optional(),
   /** Further thumbnails for YouTube's Test & compare, set by hand in YouTube Studio. */
   alternate_thumbnails: z.array(z.string().min(1)).default([]),
   platforms: z.array(PublishPlatformSchema).min(1).default(['youtube']),
@@ -648,6 +707,26 @@ export const UploadShortSchema = z.object({
   /** The video this Short points to; YouTube's "related video" is set by hand. */
   related: z.literal('main').default('main'),
   platforms: z.array(PublishPlatformSchema).min(1).default(['youtube', 'tiktok']),
+  /** The Short as an Instagram Reel: its own caption, at most five hashtags, the cover frame, and a story text. */
+  instagram: z
+    .object({
+      caption: z.string().min(1),
+      hashtags: z.array(HashtagSchema).default([]),
+      /** Second of the Short shown as the Reel cover. */
+      cover_frame: z.number().nonnegative().optional(),
+      story: z.string().min(1).optional(),
+    })
+    .optional(),
+  /** The Short on TikTok: caption, hashtags, the on-screen pointer to the full video, and a comment to pin. */
+  tiktok: z
+    .object({
+      caption: z.string().min(1),
+      hashtags: z.array(HashtagSchema).default([]),
+      overlay: z.string().min(1).optional(),
+      pinned_comment: z.string().min(1).optional(),
+    })
+    .optional(),
+  summary_en: EnglishSummarySchema.optional(),
 });
 
 /**
@@ -662,6 +741,10 @@ export const UploadDataSchema = z
     language: z.string().min(2),
     main: UploadMainSchema,
     shorts: z.array(UploadShortSchema).default([]),
+    /** An Instagram feed post announcing the release. */
+    instagram_post: z.object({ caption: z.string().min(1), hashtags: z.array(HashtagSchema).default([]) }).optional(),
+    /** Spotify for Artists: the Artist Pick message and the editorial pitch. */
+    spotify: z.object({ artist_pick: z.string().min(1).optional(), pitch: z.string().min(1).optional() }).optional(),
   })
   .superRefine((data, ctx) => {
     const seen = new Set<string>(['main']);
@@ -703,6 +786,109 @@ export const PublishEntrySchema = z.object({
 export const PublishLogSchema = z.object({
   version: z.literal(1),
   entries: z.array(PublishEntrySchema).default([]),
+});
+
+/**
+ * Text limits per platform, checked by `release` and `qa`. `config/channel.yaml`
+ * may override them when a platform changes its rules.
+ */
+export const PLATFORM_LIMITS = {
+  youtube: { title: 100, description_bytes: 5000, tags: 500, hashtags: 15 },
+  /** Instagram allows five hashtags per post and Reel since December 2025. */
+  instagram: { caption: 2200, hashtags: 5 },
+  /** TikTok's caption limit for an upload through its API; the app allows more. */
+  tiktok: { caption: 2200, hashtags: 10 },
+  /** Spotify for Artists: the editorial pitch. */
+  spotify: { pitch: 500 },
+} as const;
+
+const LimitOverrides = <T extends Record<string, number>>(limits: T) =>
+  z.object(Object.fromEntries(Object.keys(limits).map((key) => [key, z.number().int().positive().optional()])) as Record<keyof T, z.ZodOptional<z.ZodNumber>>);
+
+/** A channel's presence on one platform. A URL may hold the placeholder `<ID>`, reported as a TODO. */
+export const ChannelLinkSchema = z.object({
+  handle: z.string().min(1).optional(),
+  url: z.string().min(1).optional(),
+});
+
+/**
+ * `config/channel.yaml`: the workspace's channel, optional. Release texts take
+ * links, footer, hashtag sets, and disclosure defaults from it.
+ */
+export const ChannelConfigSchema = z.object({
+  version: z.literal(1),
+  name: z.string().min(1),
+  tagline: z.string().min(1).optional(),
+  /** BCP-47 language of the channel's own texts (footer, bios). */
+  language: z.string().min(2),
+  /** Keyed by platform: youtube, instagram, tiktok, spotify, or any other. */
+  links: z.record(z.string(), ChannelLinkSchema).default({}),
+  /** Building blocks appended to descriptions. */
+  footer: z
+    .object({
+      /** E.g. "Made with coreslopper: https://www.npmjs.com/package/coreslopper". */
+      tool_credit: z.string().min(1).optional(),
+      /** Template with {artist}, {title}, and {ai_tool}. */
+      song_credit: z.string().min(1).optional(),
+      /** Link keys listed below a description, in order. */
+      links: z.array(z.string().min(1)).default([]),
+    })
+    .prefault({}),
+  /** Named hashtag sets, e.g. always, tech, satire, international. */
+  hashtag_sets: z.record(z.string(), z.array(HashtagSchema)).default({}),
+  limits: z
+    .object({
+      youtube: LimitOverrides(PLATFORM_LIMITS.youtube).optional(),
+      instagram: LimitOverrides(PLATFORM_LIMITS.instagram).optional(),
+      tiktok: LimitOverrides(PLATFORM_LIMITS.tiktok).optional(),
+      spotify: LimitOverrides(PLATFORM_LIMITS.spotify).optional(),
+    })
+    .prefault({}),
+  /** AI disclosure defaults: YouTube "altered or synthetic content", TikTok AI label, Instagram "AI info", distributor AI credits. */
+  disclosure: z
+    .object({
+      youtube_synthetic: z.boolean().default(true),
+      tiktok_ai_label: z.boolean().default(true),
+      instagram_ai_label: z.boolean().default(true),
+      distributor_ai_credits: z.boolean().default(true),
+    })
+    .prefault({}),
+});
+
+export const ReleaseFileKindSchema = z.enum([
+  'video',
+  'subtitles',
+  'thumbnail',
+  'short',
+  'short-thumbnail',
+  'audio',
+  'cover',
+  'canvas',
+  'lyrics',
+  'text',
+  'readme',
+]);
+
+/** One file of the release folder. */
+export const ReleaseFileSchema = z.object({
+  /** Relative to `renders/release/`. */
+  path: z.string().min(1),
+  kind: ReleaseFileKindSchema,
+  bytes: z.number().int().nonnegative(),
+  sha256: z.string().regex(/^[0-9a-f]{64}$/),
+  /** What the file must meet: size, duration, codec, limits. */
+  spec: z.record(z.string(), z.unknown()).default({}),
+  /** The project file it came from, or `generated`. */
+  source: z.string().min(1),
+});
+
+/** `renders/release/manifest.json`: every file `release` wrote, and the open TODOs. */
+export const ReleaseManifestSchema = z.object({
+  version: z.literal(1),
+  project: z.string().min(1),
+  generated_at: z.string().min(1),
+  files: z.array(ReleaseFileSchema).default([]),
+  todos: z.array(z.string()).default([]),
 });
 
 export type ProjectConfig = z.infer<typeof ProjectConfigSchema>;
@@ -750,3 +936,9 @@ export type UploadData = z.infer<typeof UploadDataSchema>;
 export type PublishStatus = z.infer<typeof PublishStatusSchema>;
 export type PublishEntry = z.infer<typeof PublishEntrySchema>;
 export type PublishLog = z.infer<typeof PublishLogSchema>;
+export type AiShare = z.infer<typeof AiShareSchema>;
+export type ReleaseMetadata = z.infer<typeof ReleaseMetadataSchema>;
+export type ChannelConfig = z.infer<typeof ChannelConfigSchema>;
+export type ReleaseFile = z.infer<typeof ReleaseFileSchema>;
+export type ReleaseFileKind = z.infer<typeof ReleaseFileKindSchema>;
+export type ReleaseManifest = z.infer<typeof ReleaseManifestSchema>;

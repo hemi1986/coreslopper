@@ -24,6 +24,8 @@ const SKIPPED_FILES = new Set([
   '.github/workflows/release.yml',
   'release-please-config.json',
   '.release-please-manifest.json',
+  // A workspace's own channel; init and update never create or replace it.
+  'config/channel.yaml',
 ]);
 
 const SKIPPED_DIRECTORIES = new Set([

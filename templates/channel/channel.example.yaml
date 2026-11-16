@@ -1,0 +1,34 @@
+# Example of a filled-in config/channel.yaml (a fictional channel).
+version: 1
+name: Neon Static
+tagline: Synthwave satire about life with machines
+language: de
+links:
+  youtube:
+    handle: "@neonstatic"
+    url: https://www.youtube.com/@neonstatic
+  instagram:
+    handle: "@neonstatic.music"
+    url: https://www.instagram.com/neonstatic.music
+  tiktok:
+    handle: "@neonstatic"
+    url: https://www.tiktok.com/@neonstatic
+  spotify:
+    url: https://open.spotify.com/artist/<ID>   # known after the first release: a TODO until then
+footer:
+  tool_credit: "🎬 Gemacht mit coreslopper: https://www.npmjs.com/package/coreslopper"
+  song_credit: "🎵 {artist} – {title} · Musik mit {ai_tool}"
+  links: [spotify, instagram, tiktok]
+hashtag_sets:
+  always: ["#neonstatic", "#synthwave"]
+  tech: ["#ki", "#technik"]
+  satire: ["#satire", "#humor"]
+  international: ["#aimusic", "#synthwavemusic"]
+limits:
+  instagram:
+    hashtags: 5
+disclosure:
+  youtube_synthetic: true
+  tiktok_ai_label: true
+  instagram_ai_label: true
+  distributor_ai_credits: true

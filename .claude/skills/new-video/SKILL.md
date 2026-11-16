@@ -1,6 +1,6 @@
 ---
 name: new-video
-description: Create a new music-video project for an existing song, or resume one whose setup, brief, or treatment is unfinished. Asks for the project data and lyrics, imports the song and vocal stem, then grills the user into the brief and treatment.
+description: Create a new music-video project for an existing song, or resume one whose setup, brief, or treatment is unfinished. Asks for the project data, lyrics, and optional release data, imports the song and vocal stem, then grills the user into the brief and treatment.
 license: MIT
 ---
 
@@ -12,7 +12,7 @@ Talk to the user in their language. Write every project file in English, except 
 
 ## Start or resume
 
-1. If the user named a slug and `projects/<slug>/project.yaml` exists, run `npm run cli -- status projects/<slug>` and jump to the first stage that is not `done`: `setup` → step 1 below (skip project creation), `brief` → step 5, `treatment` → step 6. If all three are done, go to step 7.
+1. If the user named a slug and `projects/<slug>/project.yaml` exists, run `npm run cli -- status projects/<slug>` and jump to the first stage that is not `done`: `setup` → step 1 below (skip project creation), `brief` → step 6, `treatment` → step 7. If all three are done, go to step 8. When `setup` is done and `project.yaml` has no `release:` block, offer step 4 first; the user may skip it.
 2. Otherwise start at step 1.
 
 ## Steps
@@ -70,28 +70,45 @@ Wait until the user confirms the files are in place. Then:
 
 Done when `import-song` succeeded and `setup` is `done`.
 
-### 4. Hand-over to grilling
+### 4. Release data (optional)
+
+The release package at the end of the pipeline fills a distributor form (DistroKid or any other) from the `release:` block of `project.yaml`. Ask in one round; the user may answer "later" to any field or to the whole block:
+
+- **Distributor**: `distrokid` or `manual`.
+- **Artist** and **title** as they appear in stores (default: song.json), **featured artists**.
+- **Primary and secondary genre**, **lyrics language**, **explicit** (yes/no).
+- **Release date** (`YYYY-MM-DD`). A fixed date and an editorial pitch need at least three weeks' lead time; on DistroKid a chosen date needs Musician Plus or higher.
+- **Songwriters**: legal names, exactly as the user gives them. **Producer**, **label**, and an **ISRC** only when the recording was released before.
+- **AI credits**: for lyrics, music, vocals, and instrumental each `none`, `partial`, or `full`; the **AI tool** (e.g. Suno) and the **licence note** (e.g. the paid plan the song was made with).
+
+Write only what the user said into `project.yaml` under `release:` (schema: `schema/project.schema.json`; the hook validates the file). Names, credits, ISRCs, and rights come from the user alone; a field they leave open stays out, and `release` lists it as a TODO in `renders/release/README.md`.
+
+If `config/channel.yaml` does not exist, mention once that the user can copy `templates/channel/channel.yaml` there for channel links, footer lines, and hashtag sets in the release texts; it is optional.
+
+Done when the user has answered or deferred each field and `npm run cli -- validate-file projects/<slug>/project.yaml` passes.
+
+### 5. Hand-over to grilling
 
 Tell the user the song is in and that you now interview them about the video. Mention the song duration from `song.json`.
 
-### 5. Brief
+### 6. Brief
 
 Use the `grilling` skill to interview the user about the video, then follow `.claude/skills/video-brief/SKILL.md` to write `brief.md`. You already know title, artist, budget, language, rights, and the lyrics, so do not ask for them again; read `lyrics.txt` and ground your questions in it. Typical open branches: what the video is about versus what the song is about, audience and platform, look and references, performers or characters on screen, real footage the user has, formats, and what must be avoided.
 
 Done when the grilling frontier is empty, the user has confirmed shared understanding, `brief.md` is written, and `npm run cli -- stage-done projects/<slug> brief --outputs brief.md` succeeded.
 
-### 6. Treatment
+### 7. Treatment
 
 Follow `.claude/skills/video-treatment/SKILL.md`, using `grilling` only for decisions the brief left open (core idea, visual world, shot mix per section). Summarize the treatment in a few lines and ask whether it fits; revise once if the user wants changes.
 
 Done when `treatment.md` is written, the user has accepted it, and `npm run cli -- stage-done projects/<slug> treatment --outputs treatment.md` succeeded.
 
-### 7. Hand-over to the pipeline
+### 8. Hand-over to the pipeline
 
 Report the project path, budget, providers, and song duration. Tell the user that `/video-next <slug>` now runs the rest without further questions: audio analysis, style and character bible, storyboard, assets, assembly, and QA. Ask whether to start it now; if yes, run `/video-next <slug>`.
 
 ## Rules
 
-- Do not edit `project.yaml` by hand after creation, and never overwrite `timing.overrides.json`.
+- Edit `project.yaml` after creation only to add the `release:` block of step 4, and never overwrite `timing.overrides.json`.
 - Do not copy audio into the repository outside `projects/<slug>/audio/`, and never commit it.
 - Never echo API keys.

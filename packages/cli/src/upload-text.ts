@@ -37,6 +37,7 @@ interface Labels {
   synthetic: (yes: boolean) => string;
   kids: (yes: boolean) => string;
   pasted: string;
+  pointer: string;
 }
 
 const LABELS: Record<string, Labels> = {
@@ -55,6 +56,7 @@ const LABELS: Record<string, Labels> = {
     synthetic: (yes) => `"Altered or synthetic content": ${yes ? 'Yes' : 'No'}`,
     kids: (yes) => (yes ? 'Made for kids' : 'Not made for kids'),
     pasted: 'Description, hashtags, and tags pasted',
+    pointer: 'The complete package, with texts for every platform, is in `renders/release/` (`npm run cli -- release`); start with its README.md.',
   },
   de: {
     heading: 'Upload-Paket',
@@ -71,6 +73,7 @@ const LABELS: Record<string, Labels> = {
     synthetic: (yes) => `„Veränderte oder synthetische Inhalte“: ${yes ? 'Ja' : 'Nein'}`,
     kids: (yes) => (yes ? 'Speziell für Kinder' : 'Nicht speziell für Kinder'),
     pasted: 'Beschreibung, Hashtags und Tags eingefügt',
+    pointer: 'Das vollständige Paket mit den Texten für jede Plattform liegt in `renders/release/` (`npm run cli -- release`); am besten mit dessen README.md beginnen.',
   },
 };
 
@@ -118,6 +121,8 @@ export function renderUploadText(
   const main = data.main;
   const lines = [
     `# ${labels.heading} — ${main.title}`,
+    '',
+    `> ${labels.pointer}`,
     '',
     `## ${labels.main}`,
     '',

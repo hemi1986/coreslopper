@@ -16,6 +16,8 @@ main:
     🎵 "Neon Rain (Demo)" by coreslopper fixture, CC0-1.0
   hashtags: ['#synthwave', '#cyberpunk', '#neon', '#musicvideo', '#motiongraphics', '#coreslopper']
   tags: [synthwave, cyberpunk, neon rain, music video, motion graphics, remotion, coreslopper]
+  pinned_comment: "Which city would you walk through in the neon rain? 🌧️"
+  community_post: "New: twelve seconds of neon rain. Headphones on, lights off."
   platforms: [youtube]
 shorts:
   - name: N1-rain
@@ -28,4 +30,16 @@ shorts:
       Demo of coreslopper, motion graphics only.
     hashtags: ['#synthwave', '#neon', '#cyberpunk', '#shorts']
     tags: [synthwave, neon, shorts]
+    instagram:
+      caption: "Twelve seconds of a city that never switches its lights off 🌆"
+      hashtags: ['#synthwave', '#neon', '#cyberpunk']
+      cover_frame: 5.5
+      story: "Neon Rain is out — full video on YouTube"
+    tiktok:
+      caption: "POV: the rain is neon and so are you"
+      hashtags: ['#synthwave', '#neon']
+      overlay: "Full video on YouTube"
     platforms: [youtube, tiktok]
+spotify:
+  artist_pick: "Neon Rain — the demo that started it all"
+  pitch: "A short, neon-soaked synthwave sketch: warm analog pads, a gated drum pulse, and a night walk through a rain-lit city."

@@ -9,6 +9,7 @@ import {
   StateSchema,
   StyleBibleSchema,
   CharacterBibleSchema,
+  ChannelConfigSchema,
   ValidationError,
   loadProject,
   loadDefaults,
@@ -88,6 +89,11 @@ async function validateSeriesFile(seriesRoot: string, name: string): Promise<str
 }
 
 export async function validateChangedFile(file: string): Promise<string | undefined> {
+  // The workspace's channel configuration lives outside projects and series.
+  if (basename(file) === 'channel.yaml' && basename(dirname(resolve(file))) === 'config') {
+    await readYamlFile(resolve(file), ChannelConfigSchema);
+    return 'channel';
+  }
   const root = findArtifactRoot(file);
   const name = basename(file);
   if (root.type === 'series') return validateSeriesFile(root.dir, name);

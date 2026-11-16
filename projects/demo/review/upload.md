@@ -1,5 +1,7 @@
 # Upload package — Neon Rain — a night walk through a rain-lit city
 
+> The complete package, with texts for every platform, is in `renders/release/` (`npm run cli -- release`); start with its README.md.
+
 ## Main video
 
 **File:** `renders/16x9.mp4`

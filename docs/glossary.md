@@ -141,16 +141,48 @@ A vertical excerpt of the finished video for YouTube Shorts and similar feeds: 9
 _Avoid_: clip (an AI clip is a generated shot), teaser, reel
 
 **Upload Data**:
-`review/upload.yaml`: the structured upload facts of the main video and of every Short: file, title, description, tags, hashtags, thumbnail, language, the made-for-kids and synthetic-content declarations, and target platforms. The source of the upload text and of every publish.
+`review/upload.yaml`: the structured upload texts of the main video and of every Short, per platform (YouTube, Instagram, TikTok, Spotify for Artists), with file, thumbnail, language, and the made-for-kids and synthetic-content declarations. The source of the upload text, the release texts, and every publish.
 _Avoid_: metadata, upload manifest
 
 **Upload Text**:
-`review/upload.md`: the upload data rendered for people, with labels and checklists in the project's language. It is generated, never edited by hand.
+`review/upload.md`: the YouTube part of the upload data rendered for people, with a pointer to the release folder. It is generated, never edited by hand.
 _Avoid_: metadata, copy
 
 **Release Package**:
-What `qa-export` hands over for publishing: the master, three thumbnails, three Shorts with their thumbnails, the upload data, and the upload text.
+Everything a finished song and video need to be published, collected in the **Release Folder**: every format, thumbnails, Shorts, the song as WAV, cover, canvas, lyrics, the platform texts, and the release plan.
 _Avoid_: deliverables, export bundle
+
+**Release Folder**:
+`renders/release/`, the one place the user uploads from. Its manifest records every file with size, hash, specification, and source.
+_Avoid_: export folder, output
+
+**Release Metadata**:
+The `release:` block of a project: the facts a distributor asks for, such as artist, genres, songwriters, release date, and AI credits. Only the user supplies them; a missing one is a TODO.
+_Avoid_: tags, song info
+
+**AI Credits**:
+How much of the lyrics, music, vocals, and instrumental an AI tool made (none, partial, or full), with the tool and the licence basis, as distributors and platforms ask for it.
+_Avoid_: AI tag, disclaimer
+
+**Cover**:
+The square 3000x3000 image a song carries in streaming stores, showing artist and title only.
+_Avoid_: artwork, thumbnail (a **Thumbnail** represents a video)
+
+**Canvas**:
+The silent 3–8 s vertical loop Spotify plays behind a song, cut from the 9:16 render.
+_Avoid_: loop, visualizer
+
+**Channel Config**:
+`config/channel.yaml`: the workspace's channel with its handles, links, footer lines, hashtag sets, limit overrides, and AI disclosure defaults. Optional.
+_Avoid_: brand kit (a **Brand Kit** is visual), profile
+
+**Distributor**:
+The service that delivers a song to streaming stores, such as DistroKid. Its upload stays manual.
+_Avoid_: label, aggregator
+
+**TODO**:
+A gap in the release package that only the user can close, such as a missing songwriter or an `<ID>` link. It never fails QA.
+_Avoid_: warning, error
 
 ## Publishing
 

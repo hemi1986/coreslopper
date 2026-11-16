@@ -1,0 +1,44 @@
+# Channel configuration (optional). Copy to config/channel.yaml in the workspace:
+#   cp templates/channel/channel.yaml config/channel.yaml
+# `release` takes links, footer lines, hashtag sets, and disclosure defaults from
+# it. Without the file, release texts have no channel links. Schema:
+# schema/channel.schema.json; the Claude Code hook validates config/channel.yaml.
+version: 1
+name: My Channel           # your channel or artist name
+# tagline: ""
+language: en             # BCP-47 language of the footer and bios
+
+# Handles and links per platform. A URL may hold <ID> until you know it;
+# release reports it as a TODO.
+links:
+  youtube:
+    handle: "@<ID>"
+    url: https://www.youtube.com/@<ID>
+  instagram:
+    handle: "@<ID>"
+    url: https://www.instagram.com/<ID>
+  tiktok:
+    handle: "@<ID>"
+    url: https://www.tiktok.com/@<ID>
+  spotify:
+    url: https://open.spotify.com/artist/<ID>
+
+# Lines appended to descriptions.
+footer:
+  # tool_credit: "🎬 Made with coreslopper: https://www.npmjs.com/package/coreslopper"
+  # song_credit: "🎵 {artist} – {title} (made with {ai_tool})"
+  links: [youtube, instagram, tiktok, spotify]
+
+# Named hashtag sets the skill picks from.
+hashtag_sets:
+  always: []
+
+# Platform limits, only when a platform changes its rules (defaults in code).
+limits: {}
+
+# AI disclosure defaults per platform.
+disclosure:
+  youtube_synthetic: true      # YouTube "altered or synthetic content"
+  tiktok_ai_label: true        # TikTok "AI-generated content"
+  instagram_ai_label: true     # Instagram "AI info"
+  distributor_ai_credits: true # AI credits in the distributor form

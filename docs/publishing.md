@@ -16,6 +16,8 @@ npm run cli -- publish projects/<slug>                # upload what is not uploa
 | `--force` | Upload again although `review/publish.json` has the same file. |
 | `--mock` | Use the mock adapters: no network, entries marked `mock`. |
 
+Everything else of the release, including the files and texts for Instagram, Spotify, and the distributor, lies in `renders/release/` (`npm run cli -- release`, [ADR 0024](adr/0024-release-folder-manual-distribution.md)); those uploads stay manual.
+
 ## What it reads and writes
 
 - **`review/upload.yaml`** — the upload data `qa-export` writes ([schema](../schema/upload.schema.json)): per item the file, title, description, tags, hashtags, thumbnail, language, `made_for_kids` (default `false`), `synthetic_media` (default `true`), and `platforms` (main: `[youtube]`, Shorts: `[youtube, tiktok]`). Shorts carry `related: main`. `npm run cli -- upload-text projects/<slug>` renders `review/upload.md` from it.

@@ -29,6 +29,7 @@ import { openReview } from './review.js';
 import { publishProject, type PlatformChoice } from './publish.js';
 import { publishAuth, saveEnvValue } from './publish-auth.js';
 import { writeUploadText } from './upload-text.js';
+import { runRelease } from './release.js';
 import { createProject } from './new-project.js';
 import { linkProjectMedia } from './media-dir.js';
 import { generateBatch } from './generate.js';
@@ -217,13 +218,13 @@ program
 
 program
   .command('thumbnail [project]')
-  .description('Compose a JPEG thumbnail (1280x720, or 1080x1920 for a Short) from a still, the hook text, and the style bible.')
+  .description('Compose a JPEG thumbnail (1280x720, 1080x1920 for a Short, or the 3000x3000 streaming cover) from a still, the hook text, and the style bible.')
   .requiredOption('--still <path>', 'Source still (png, jpg, webp, svg); relative to the working directory or the project')
   .requiredOption('--text <lines>', 'Hook text; separate lines with "|" (at most 3 lines of 4 words)')
   .requiredOption('--out <file>', 'Output JPEG, e.g. projects/<slug>/renders/thumbnails/thumb-1-hero.jpg')
   .option('--tag <text>', 'Small mono tag in a top corner, e.g. SATIRE')
   .option('--layout <side>', 'Text side: left | right | bottom; the face goes opposite (default left; 9x16 is always vertical)')
-  .option('--format <id>', '16x9 (1280x720, main video) or 9x16 (1080x1920, Short)', '16x9')
+  .option('--format <id>', '16x9 (1280x720, main video), 9x16 (1080x1920, Short), or 1x1 (3000x3000 cover: artist and title only)', '16x9')
   .option('--accent <token>', 'Palette key or role for the slabs after the first line and the tag', 'accent')
   .option('--focus <x,y>', 'Point of the still (fractions 0-1) placed on the face side', '0.5,0.4')
   .option('--zoom <factor>', 'Extra zoom on the still, 1-4', (value) => Number(value), 1)
@@ -286,6 +287,21 @@ program
         }
       });
       console.log(`✔ Upload text: ${path}`);
+    }),
+  );
+
+program
+  .command('release [project]')
+  .description(
+    'Collect and build renders/release/: every format, thumbnails, Shorts, the song as WAV, cover, Spotify canvas, lyrics, ' +
+      'platform texts, README, and manifest. Renders only missing or stale formats; rewrites only its own files.',
+  )
+  .option('--no-render', 'List missing or stale renders as TODOs instead of rendering them')
+  .option('--canvas-from <time>', 'Canvas start: seconds or an anchor, e.g. section:chorus_1 (default: a lyric-free window near the first chorus)')
+  .option('--canvas-seconds <n>', 'Canvas length, 3-8 s (default 6)', (value) => Number(value))
+  .action((project: string | undefined, options: { render: boolean; canvasFrom?: string; canvasSeconds?: number }) =>
+    run(async () => {
+      await runRelease({ projectDir: projectDirFromArg(project), render: options.render, canvasFrom: options.canvasFrom, canvasSeconds: options.canvasSeconds });
     }),
   );
 
