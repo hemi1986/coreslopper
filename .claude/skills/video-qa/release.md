@@ -47,6 +47,16 @@ npm run cli -- thumbnail projects/<slug> --format 9x16 \
 
 The vertical layout is fixed: the face in the upper middle, the hook in the lower part above the Shorts buttons, its first line inside the central square that grid views show. Name each file `<short-name>-thumb.jpg` beside its video.
 
+### TikTok covers
+
+TikTok shows a cover only as a 3:4 tile in the profile grid and crops a 9:16 upload to its middle, so each Short also gets a 1080x1440 TikTok cover: the same still and hook as its Short thumbnail, composed again with `--format 3x4` (the hook sits in the lower part, above the view count). Name it `<short-name>-tiktok.jpg` beside its video:
+
+```bash
+npm run cli -- thumbnail projects/<slug> --format 3x4 \
+  --still assets/image/keyframe/<hash>-0.png --text "EIN KLICK|UND AUS" --focus 0.5,0.35 \
+  --out projects/<slug>/renders/shorts/Z3-klick-tiktok.jpg
+```
+
 ## 5. Streaming cover
 
 One 3000x3000 cover for the distributor, from the strongest still (the rules in [thumbnails.md](thumbnails.md), section "Cover"). The text is the artist and the title, nothing else:
@@ -59,7 +69,7 @@ npm run cli -- thumbnail projects/<slug> --format 1x1 \
 
 ## 6. Review the images
 
-Run the `art-director` agent on all six thumbnails and the cover with the rules in [thumbnails.md](thumbnails.md); for the vertical ones also: the hook reads at a quarter size, the face sits above the text and inside the central square, nothing important lies in the bottom 15 %. Re-compose until each passes.
+Run the `art-director` agent on all six thumbnails, the three TikTok covers, and the cover with the rules in [thumbnails.md](thumbnails.md). For the 9:16 Short thumbnails also: the hook reads at a quarter size, the face sits above the text and inside the central square, nothing important lies in the bottom 15 % (the Shorts UI). For the 3:4 TikTok covers: the hook reads in a 120x160 grid tile, the face sits above the text, nothing important lies in the bottom 12 % (the view count). Re-compose until each passes.
 
 ## 7. Write `review/upload.yaml`
 
@@ -117,7 +127,7 @@ shorts:
     tiktok:
       caption: "<short, spoken-sounding, a question or a dare>"
       hashtags: ['#topic']
-      overlay: "<'Full video on YouTube: @handle' in the project's language>"
+      overlay: "<'Full video on YouTube: @handle' in the project's language>"  # pointer line in the description; TikTok Studio has no text overlay
       pinned_comment: "<optional>"
     platforms: [youtube, tiktok]
 # instagram_post: { caption: "...", hashtags: [...] }   # optional feed post for the release

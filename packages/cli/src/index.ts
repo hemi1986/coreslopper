@@ -224,7 +224,7 @@ program
   .requiredOption('--out <file>', 'Output JPEG, e.g. projects/<slug>/renders/thumbnails/thumb-1-hero.jpg')
   .option('--tag <text>', 'Small mono tag in a top corner, e.g. SATIRE')
   .option('--layout <side>', 'Text side: left | right | bottom; the face goes opposite (default left; 9x16 is always vertical)')
-  .option('--format <id>', '16x9 (1280x720, main video), 9x16 (1080x1920, Short), or 1x1 (3000x3000 cover: artist and title only)', '16x9')
+  .option('--format <id>', '16x9 (1280x720, main video), 9x16 (1080x1920, Short), 3x4 (1080x1440, TikTok cover of a Short), or 1x1 (3000x3000 cover: artist and title only)', '16x9')
   .option('--accent <token>', 'Palette key or role for the slabs after the first line and the tag', 'accent')
   .option('--focus <x,y>', 'Point of the still (fractions 0-1) placed on the face side', '0.5,0.4')
   .option('--zoom <factor>', 'Extra zoom on the still, 1-4', (value) => Number(value), 1)

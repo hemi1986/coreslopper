@@ -267,10 +267,10 @@ export function platformTextProblems(
     }
     if (!short.tiktok) missing.push(`shorts.${short.name}.tiktok`);
     else {
-      const caption = [short.tiktok.caption, short.tiktok.hashtags.join(' ')].filter(Boolean).join(' ');
+      // The description holds the caption, the pointer to the full video, and the hashtags.
+      const caption = [short.tiktok.caption, short.tiktok.overlay ?? '', short.tiktok.hashtags.join(' ')].filter(Boolean).join('\n\n');
       if (chars(caption) > limits.tiktok.caption) errors.push(`tiktok ${short.name}: caption has ${chars(caption)} characters, limit ${limits.tiktok.caption}`);
       if (short.tiktok.hashtags.length > limits.tiktok.hashtags) errors.push(`tiktok ${short.name}: ${short.tiktok.hashtags.length} hashtags, limit ${limits.tiktok.hashtags}`);
-      if (!short.tiktok.overlay) missing.push(`shorts.${short.name}.tiktok.overlay`);
     }
     if (short.instagram && short.tiktok && short.instagram.caption.trim() === short.tiktok.caption.trim()) {
       errors.push(`${short.name}: the Instagram and TikTok captions are identical; write one per platform`);

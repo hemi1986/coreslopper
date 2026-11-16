@@ -103,7 +103,7 @@ export function Thumbnail(props: ThumbnailProps) {
 
   const { colors } = props;
   const scrim =
-    format === '9x16' || format === '1x1'
+    format === '9x16' || format === '3x4' || format === '1x1'
       ? `linear-gradient(to top, ${colors.background}f0 0%, ${colors.background}c0 22%, ${colors.background}00 58%)`
       : props.layout === 'bottom'
       ? `linear-gradient(to top, ${colors.background}e6 0%, ${colors.background}b3 18%, ${colors.background}00 46%)`

@@ -280,6 +280,11 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
       entry.thumbnail = `shorts/${name}-thumb.jpg`;
       await writer.place(thumb, entry.thumbnail, 'short-thumbnail', { width: 1080, height: 1920 });
     } else todos.push(`Short ${name} has no thumbnail: thumbnail --format 9x16`);
+    const tiktok = shortPaths(project.paths.renders, name).tiktok;
+    if (existsSync(tiktok)) {
+      entry.tiktokCover = `shorts/${name}-tiktok.jpg`;
+      await writer.place(tiktok, entry.tiktokCover, 'tiktok-cover', { width: 1080, height: 1440 });
+    } else todos.push(`Short ${name} has no TikTok cover: thumbnail --format 3x4 --out renders/shorts/${name}-tiktok.jpg`);
     files.shorts.push(entry);
   }
   if (shorts.length < 3) todos.push(`${shorts.length} of 3 Shorts: cut them with short (release.md)`);

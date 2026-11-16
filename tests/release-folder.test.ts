@@ -154,6 +154,7 @@ async function fixture(options: { release?: boolean; upload?: boolean } = {}): P
   for (const name of ['Z1-intro', 'Z2-chorus', 'Z3-outro']) {
     await writeFile(join(dir, 'renders', 'shorts', `${name}-9x16.mp4`), `short ${name}`);
     await writeFile(join(dir, 'renders', 'shorts', `${name}-thumb.jpg`), Buffer.concat([jpeg(1080, 1920), Buffer.from(name)]));
+    await writeFile(join(dir, 'renders', 'shorts', `${name}-tiktok.jpg`), Buffer.concat([jpeg(1080, 1440), Buffer.from(name)]));
   }
   await writeFile(join(dir, 'renders', 'cover-3000x3000.jpg'), jpeg(3000, 3000));
   await writeFile(join(dir, 'audio', 'song.wav'), 'RIFF song');
@@ -343,7 +344,9 @@ describe('TODO detection and text limits', () => {
     expect(texts['youtube.md']).toMatch(/spotify: https:\/\/open\.spotify\.com\/artist\/<ID> TODO/);
     expect(texts['instagram.md']).toContain('2/5 Hashtags');
     expect(texts['instagram.md']).toContain('Link-Sticker');
-    expect(texts['tiktok.md']).toContain('KI-generierter Inhalt');
+    expect(texts['tiktok.md']).toContain('KI-generierte Inhalte');
+    expect(texts['tiktok.md']).toContain('Cover bearbeiten');
+    expect(texts['tiktok.md']).not.toContain('Text-Overlay');
     expect(texts['spotify.md']).toMatch(/1\. \*\*Künstler:\*\* Neon Static/);
     expect(texts['spotify.md']).toContain('Musik: vollständig KI');
     expect(texts['release-plan.md']).toContain('| -21 | 2026-11-20 |');
@@ -418,10 +421,13 @@ describe('release folder', () => {
       'audio/Neon Static - Neon Rain.wav',
       'shorts/Z1-intro-9x16.mp4',
       'shorts/Z1-intro-thumb.jpg',
+      'shorts/Z1-intro-tiktok.jpg',
       'shorts/Z2-chorus-9x16.mp4',
       'shorts/Z2-chorus-thumb.jpg',
+      'shorts/Z2-chorus-tiktok.jpg',
       'shorts/Z3-outro-9x16.mp4',
       'shorts/Z3-outro-thumb.jpg',
+      'shorts/Z3-outro-tiktok.jpg',
       'streaming/canvas-9x16.mp4',
       'streaming/cover-3000x3000.jpg',
       'streaming/lyrics.lrc',

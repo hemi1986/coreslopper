@@ -102,8 +102,8 @@ export async function buildThumbnailProps(
   }
   if (format !== '16x9' && layout !== 'bottom') {
     throw new ValidationError(
-      format === '9x16'
-        ? 'A 9x16 thumbnail has a fixed vertical layout (text below, face above); omit --layout.'
+      format === '9x16' || format === '3x4'
+        ? `A ${format} thumbnail has a fixed vertical layout (text below, face above); omit --layout.`
         : 'A 1x1 cover has a fixed layout (artist and title below, image above); omit --layout.',
     );
   }
@@ -148,7 +148,8 @@ export async function buildThumbnailProps(
     format,
     still: relative(root, staged).split('\\').join('/'),
     lines,
-    ...(tag ? { tag } : {}),
+    // An empty tag, not a missing one: Remotion would fill a missing prop with the 'DEMO' default.
+    tag: tag ?? '',
     layout,
     focus,
     zoom,

@@ -32,7 +32,7 @@ export interface ReleaseTextInput {
     master?: string;
     subtitles?: string;
     thumbnails: string[];
-    shorts: { name: string; video: string; thumbnail?: string }[];
+    shorts: { name: string; video: string; thumbnail?: string; tiktokCover?: string }[];
     audio?: string;
     cover?: string;
     canvas?: string;
@@ -50,6 +50,7 @@ interface Labels {
   title: string;
   description: string;
   hashtags: string;
+  hashtagsComma: string;
   tags: string;
   chapters: string;
   noChapters: string;
@@ -81,7 +82,7 @@ interface Labels {
     post: string;
     postImage: string;
   };
-  tt: { heading: string; caption: string; overlay: string; overlayDefault: (handle: string) => string; aiLabel: string; pinned: string; sound: string };
+  tt: { heading: string; description: string; cover: string; coverUpload: (file: string) => string; coverFrame: string; settings: string; visibility: string; aiLabel: string; schedule: string; overlayDefault: (handle: string) => string; afterPost: string; pinned: string };
   sp: {
     heading: string;
     form: (distributor: string) => string;
@@ -118,6 +119,7 @@ const EN: Labels = {
   title: 'Title',
   description: 'Description',
   hashtags: 'Hashtags',
+  hashtagsComma: 'Hashtags, comma-separated',
   tags: 'Tags',
   chapters: 'Chapters',
   noChapters: 'No chapters: YouTube needs at least three of at least 10 s each.',
@@ -151,12 +153,17 @@ const EN: Labels = {
   },
   tt: {
     heading: 'TikTok',
-    caption: 'Caption',
-    overlay: 'Text overlay (first seconds)',
+    description: 'Description',
+    cover: 'Cover',
+    coverUpload: (file) => `Edit cover → Upload: \`${file}\``,
+    coverFrame: 'Edit cover → pick the frame with the hook',
+    settings: 'Settings',
+    visibility: 'Who can watch: Everyone',
+    aiLabel: 'Show more → turn on "AI-generated content"',
+    schedule: 'When to post: now, or scheduled as in release-plan.md',
     overlayDefault: (handle) => (handle === 'YouTube' ? 'Full video on YouTube' : `Full video on YouTube: ${handle}`),
-    aiLabel: 'Turn on "AI-generated content" under More options',
-    pinned: 'Comment to pin',
-    sound: 'Keep the original sound; name it after the song',
+    afterPost: 'After posting',
+    pinned: 'Post this comment and pin it',
   },
   sp: {
     heading: 'Streaming release',
@@ -240,6 +247,7 @@ const DE: Labels = {
   title: 'Titel',
   description: 'Beschreibung',
   hashtags: 'Hashtags',
+  hashtagsComma: 'Hashtags, kommagetrennt',
   tags: 'Tags',
   chapters: 'Kapitel',
   noChapters: 'Keine Kapitel: YouTube braucht mindestens drei mit je mindestens 10 s.',
@@ -273,12 +281,17 @@ const DE: Labels = {
   },
   tt: {
     heading: 'TikTok',
-    caption: 'Caption',
-    overlay: 'Text-Overlay (erste Sekunden)',
+    description: 'Beschreibung',
+    cover: 'Cover',
+    coverUpload: (file) => `Cover bearbeiten → Hochladen: \`${file}\``,
+    coverFrame: 'Cover bearbeiten → das Bild mit dem Hook wählen',
+    settings: 'Einstellungen',
+    visibility: 'Wer kann das ansehen: Alle',
+    aiLabel: '„Mehr anzeigen“ → „KI-generierte Inhalte“ einschalten',
+    schedule: 'Veröffentlichen: sofort oder geplant laut release-plan.md',
     overlayDefault: (handle) => (handle === 'YouTube' ? 'Ganzes Video auf YouTube' : `Ganzes Video auf YouTube: ${handle}`),
-    aiLabel: '„KI-generierter Inhalt“ unter Weitere Optionen einschalten',
-    pinned: 'Kommentar zum Anpinnen',
-    sound: 'Originalton behalten und nach dem Song benennen',
+    afterPost: 'Nach dem Posten',
+    pinned: 'Diesen Kommentar posten und anpinnen',
   },
   sp: {
     heading: 'Streaming-Release',
@@ -418,6 +431,7 @@ function youtubeText(input: ReleaseTextInput, l: Labels): string {
   lines.push('', `## ${l.title} (${l.chars(count(main?.title ?? ''), input.limits.youtube.title)})`, '', ...block(main?.title ?? l.todo('main.title')));
   lines.push('', `## ${l.description} (${l.bytes(Buffer.byteLength(description), input.limits.youtube.description_bytes)})`, '', ...block(description));
   if (!input.chapters.length) lines.push('', `_${l.noChapters}_`);
+  if (main?.hashtags.length) lines.push('', `## ${l.hashtagsComma}`, '', ...block(main.hashtags.join(', ')));
   lines.push('', `## ${l.tags} (${l.chars(tags.length, input.limits.youtube.tags)})`, '', ...block(tags || l.todo('main.tags')));
   lines.push('', `## ${l.pinned}`, '', ...block(main?.pinned_comment ?? l.todo('main.pinned_comment in review/upload.yaml')));
   lines.push('', `## ${l.community}`, '', ...block(main?.community_post ?? l.todo('main.community_post in review/upload.yaml')));
@@ -443,6 +457,7 @@ function shortsText(input: ReleaseTextInput, l: Labels): string {
     lines.push(`### ${l.title} (${l.chars(count(short?.title ?? ''), input.limits.youtube.title)})`, '', ...block(short?.title ?? l.todo(`shorts.${file.name}.title`)), '');
     const description = short ? [short.description.trim(), short.hashtags.join(' ')].join('\n\n') : l.todo(`shorts.${file.name} in review/upload.yaml`);
     lines.push(`### ${l.description}`, '', ...block(description), '');
+    if (short?.hashtags.length) lines.push(`### ${l.hashtagsComma}`, '', ...block(short.hashtags.join(', ')), '');
     lines.push(`### ${l.checklist}`, '', checkbox(l.shorts.relatedStep), checkbox(l.yt.synthetic(synthetic)), checkbox(l.yt.kids(short?.made_for_kids ?? false)), '');
   }
   if (input.files.shorts.length === 0) lines.push(l.todo('no Shorts in renders/shorts/'), '');
@@ -471,20 +486,29 @@ function instagramText(input: ReleaseTextInput, l: Labels): string {
 }
 
 function tiktokText(input: ReleaseTextInput, l: Labels): string {
+  // Laid out like the TikTok Studio upload form: description, cover, settings.
   const lines = [`# ${l.tt.heading}`, ''];
   const youtube = channelLink(input.channel, 'youtube', l);
   for (const file of input.files.shorts) {
     const tt = shortFor(input, file.name)?.tiktok;
     lines.push(`## ${file.name}`, '', `**${l.file}:** \`${file.video}\``, '');
-    const caption = tt ? [tt.caption.trim(), tt.hashtags.join(' ')].filter(Boolean).join(' ') : l.todo(`shorts.${file.name}.tiktok in review/upload.yaml`);
-    lines.push(`### ${l.tt.caption} (${l.chars(count(caption), input.limits.tiktok.caption)})`, '', ...block(caption), '');
-    lines.push(`### ${l.tt.overlay}`, '', ...block(tt?.overlay ?? l.tt.overlayDefault(youtube ?? 'YouTube')), '');
-    if (tt?.pinned_comment) lines.push(`### ${l.tt.pinned}`, '', ...block(tt.pinned_comment), '');
-    lines.push(`### ${l.checklist}`, '');
+    const description = tt
+      ? tiktokDescription(tt, l.tt.overlayDefault(youtube ?? 'YouTube'))
+      : l.todo(`shorts.${file.name}.tiktok in review/upload.yaml`);
+    lines.push(`### ${l.tt.description} (${l.chars(count(description), input.limits.tiktok.caption)})`, '', ...block(description), '');
+    const cover = file.tiktokCover ?? file.thumbnail;
+    lines.push(`### ${l.tt.cover}`, '', cover ? l.tt.coverUpload(cover) : l.tt.coverFrame, '');
+    lines.push(`### ${l.tt.settings}`, '', checkbox(l.tt.visibility));
     if (input.channel?.disclosure.tiktok_ai_label ?? true) lines.push(checkbox(l.tt.aiLabel));
-    lines.push(checkbox(l.tt.sound), '');
+    lines.push(checkbox(l.tt.schedule), '');
+    if (tt?.pinned_comment) lines.push(`### ${l.tt.afterPost}`, '', checkbox(l.tt.pinned), '', ...block(tt.pinned_comment), '');
   }
   return `${lines.join('\n').trimEnd()}\n`;
+}
+
+/** The TikTok description: caption, the pointer to the full video (TikTok Studio has no text overlay), hashtags. */
+export function tiktokDescription(tt: { caption: string; hashtags: string[]; overlay?: string }, pointer: string): string {
+  return [tt.caption.trim(), (tt.overlay ?? pointer).trim(), tt.hashtags.join(' ')].filter(Boolean).join('\n\n');
 }
 
 function spotifyText(input: ReleaseTextInput, l: Labels): string {
