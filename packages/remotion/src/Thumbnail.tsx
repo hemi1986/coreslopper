@@ -5,6 +5,7 @@ import {
   coverPlacement,
   faceAnchor,
   layoutThumbnail,
+  scrimGradient,
   thumbnailSize,
   type LineMetrics,
   type ThumbnailLayoutResult,
@@ -102,12 +103,8 @@ export function Thumbnail(props: ThumbnailProps) {
   }, []);
 
   const { colors } = props;
-  const scrim =
-    format === '9x16' || format === '3x4' || format === '1x1'
-      ? `linear-gradient(to top, ${colors.background}f0 0%, ${colors.background}c0 22%, ${colors.background}00 58%)`
-      : props.layout === 'bottom'
-      ? `linear-gradient(to top, ${colors.background}e6 0%, ${colors.background}b3 18%, ${colors.background}00 46%)`
-      : `linear-gradient(to ${props.layout === 'left' ? 'right' : 'left'}, ${colors.background}e0 11%, ${colors.background}00 50%)`;
+  const scrim = scrimGradient(colors.background, props.layout, format, props.scrim ?? 1);
+  const textOffset = props.textOffset ?? 0;
 
   return (
     <AbsoluteFill style={{ backgroundColor: colors.background }}>
@@ -149,7 +146,7 @@ export function Thumbnail(props: ThumbnailProps) {
             const cx = slab.x + slab.width / 2;
             const cy = slab.y + slab.height / 2;
             return (
-              <g key={index} filter="url(#slab-shadow)">
+              <g key={index} filter="url(#slab-shadow)" transform={textOffset ? `translate(0 ${textOffset})` : undefined}>
                 <g transform={`rotate(${slab.rotate} ${cx} ${cy})`}>
                   <rect x={slab.x} y={slab.y} width={slab.width} height={slab.height} fill={first ? colors.slab : colors.accent} />
                   <text

@@ -16,6 +16,9 @@ import {
   THUMBNAIL_FORMAT_IDS,
   THUMBNAIL_FORMAT_MAX_BYTES,
   THUMBNAIL_LAYOUTS,
+  THUMBNAIL_MAX_BYTES,
+  SCRIM_RANGE,
+  TEXT_OFFSET_MAX,
   coverTextProblem,
   parseFocus,
   parseThumbnailText,
@@ -41,6 +44,10 @@ export interface ThumbnailOptions {
   font?: string;
   /** `16x9` (default, 1280x720), `9x16` (1080x1920, a Short), or `1x1` (3000x3000, the streaming cover). */
   format?: string;
+  /** Scrim strength 0–1 (default 1): lower gives a shorter, fainter fade towards the text. */
+  scrim?: number;
+  /** Vertical shift of the hook in pixels, positive = down (default 0). */
+  textOffset?: number;
 }
 
 const STILL_TYPES = new Set(['.png', '.jpg', '.jpeg', '.webp', '.svg']);
@@ -123,6 +130,14 @@ export async function buildThumbnailProps(
   const zoom = options.zoom ?? 1;
   if (!Number.isFinite(zoom) || zoom < 1 || zoom > 4) throw new ValidationError(`Invalid zoom ${options.zoom}; use 1–4.`);
   const tag = options.tag?.trim().toUpperCase() || undefined;
+  const scrim = options.scrim ?? 1;
+  if (!Number.isFinite(scrim) || scrim < SCRIM_RANGE[0] || scrim > SCRIM_RANGE[1]) {
+    throw new ValidationError(`Invalid scrim ${options.scrim}; use ${SCRIM_RANGE[0]}–${SCRIM_RANGE[1]}.`);
+  }
+  const textOffset = options.textOffset ?? 0;
+  if (!Number.isFinite(textOffset) || Math.abs(textOffset) > TEXT_OFFSET_MAX) {
+    throw new ValidationError(`Invalid text offset ${options.textOffset}; use -${TEXT_OFFSET_MAX} to ${TEXT_OFFSET_MAX} px.`);
+  }
 
   // A still path is taken from the working directory first, then from the project.
   const candidates = [resolve(process.cwd(), options.still), resolve(project.paths.root, options.still)];
@@ -153,6 +168,8 @@ export async function buildThumbnailProps(
     layout,
     focus,
     zoom,
+    ...(scrim !== 1 ? { scrim } : {}),
+    ...(textOffset !== 0 ? { textOffset } : {}),
     hookFont: { family: hookFont.family, weight: Math.max(700, hookFont.weight) },
     tagFont: { family: tagFont.family, weight: Math.max(600, tagFont.weight) },
     colors: thumbnailColors(style, options.accent),

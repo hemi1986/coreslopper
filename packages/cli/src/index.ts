@@ -229,6 +229,8 @@ program
   .option('--focus <x,y>', 'Point of the still (fractions 0-1) placed on the face side', '0.5,0.4')
   .option('--zoom <factor>', 'Extra zoom on the still, 1-4', (value) => Number(value), 1)
   .option('--font <key>', 'Typography key of style.yaml for the hook', 'display')
+  .option('--scrim <strength>', 'Fade towards the text, 0-1: lower is shorter and fainter (default 1)', (value) => Number(value))
+  .option('--text-offset <px>', 'Move the hook up (negative) or down (positive) in pixels (default 0)', (value) => Number(value))
   .action(
     (
       project: string | undefined,
@@ -243,6 +245,8 @@ program
         focus: string;
         zoom: number;
         font: string;
+        scrim?: number;
+        textOffset?: number;
       },
     ) =>
       run(async () => {
