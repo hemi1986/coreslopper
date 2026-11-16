@@ -11,6 +11,7 @@ license: MIT
 - The storyboard is validated and all required assets exist.
 - The user asks for a preview, a master, or a 9:16/1:1 derivative.
 - A render needs to be resumed after a fix.
+- The user left review notes in `review/notes/` and asks for a fix pass.
 
 ## Inputs
 
@@ -33,6 +34,16 @@ license: MIT
    The render runs in segments and resumes from the last finished segment if it is interrupted. Use `--frames <start>-<end>` for a quick test render of one passage.
 7. Update the state with `npm run cli -- stage-done <project> assembly --outputs renders/preview-16x9.mp4`.
 8. Hand off to `video-qa` for the final report.
+
+## Review notes
+
+The user may review a render with `npm run cli -- review projects/<slug>` and leave notes in `review/notes/<video-stem>.json`. When asked for a fix pass:
+
+1. Read every notes file whose `video` is a current render. Frames and seconds refer to that file; offset a Short or a `--frames` render to the song time before mapping.
+2. Map each note's `seconds` to the shot on screen through `storyboard.yaml` and `timing.effective.json`; a note on a cut belongs to both shots.
+3. Sort the notes into timing (anchors in `storyboard.yaml`, never `timing.overrides.json`), motion or text (Remotion components), and generated media (a new batch through `ai-clips`, with its cost estimate). Notes that ask for a provider ("Higgsfield if needed") set the `--provider` of that batch.
+4. Fix, re-render only the affected range with `--frames <start>-<end>` first, then the preview.
+5. Report which notes were fixed and which were not, with the reason. Do not edit or delete the notes files; they belong to the user.
 
 ## Episodes
 

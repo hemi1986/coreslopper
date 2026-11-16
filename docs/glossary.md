@@ -232,6 +232,10 @@ _Avoid_: boilerplate
 The final step that produces all format renders, the review report, and the release package; also the optional extraction of a project into its own repository.
 _Avoid_: render
 
+**Review Note**:
+A user's free-text remark on one frame of a render, saved by the review player in `review/notes/<video-stem>.json` with its frame and time.
+_Avoid_: annotation, comment, feedback
+
 ## Series and episodes
 
 **Series**:

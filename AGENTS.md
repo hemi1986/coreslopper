@@ -66,7 +66,7 @@ packages/
                    npx entry, onboarding, tool checks, workspace init
   remotion/        MusicVideo composition, motion components, effects, 3D
 schema/            Generated JSON Schema for cross-language validation
-scripts/           Audio analysis (Python/uv), fixture generators, runtime build
+scripts/           Audio analysis and review player (Python/uv), fixture generators, runtime build
 templates/project/ Project template used by the new-video skill
 templates/episode/ Episode template used by the new-episode skill
 templates/series/  Series canon template used by the new-series skill
@@ -140,6 +140,7 @@ npm run schema
 | `npm run cli -- render <project> [--format <id>]` | Render with Remotion in segments; the default is the master format. `--frames <a>-<b>` renders a test range; `--subtitles en` burns in episode subtitles. |
 | `npm run cli -- thumbnail <project> --still <file> --text "<a\|b>" --out <file>` | Compose a 1280x720 JPEG thumbnail with the brand fonts and palette; `--format 9x16` for a 1080x1920 Short thumbnail; `--tag`, `--layout left\|right\|bottom`, `--accent <role>`, `--focus x,y`. |
 | `npm run cli -- short <project> --from <anchor\|s> --to <anchor\|s> --name <stem>` | Cut a Short (at most 60 s) from `renders/9x16.mp4` into `renders/shorts/<stem>-9x16.mp4`; anchors like `section:chorus_1:end-0.5`. |
+| `npm run cli -- review <project> [--format <id>] [--video <file>]` | Open a render in the review player (play, step frames, type notes); notes go to `review/notes/<video>.json`. |
 | `npm run cli -- media-link <project> [--move]` | Move `assets/` and `renders/` to `CORESLOPPER_MEDIA_DIR` and symlink them. |
 | `npm run cli -- new <slug> --budget <usd>` | Create a project from the template. |
 | `npm run cli -- new <slug> --kind episode --series <s> --episode <n> --budget <usd>` | Create an episode of a series. |
@@ -197,7 +198,7 @@ Use `grilling` before briefs, treatments, and storyboards. Use `writing-for-agen
 ```bash
 npm test              # Vitest: schemas, timing, state, providers, contact sheet
 npm run typecheck     # TypeScript
-npm run python:test   # pytest for the pure audio-analysis helpers
+npm run python:test   # pytest for the pure audio-analysis and review-notes helpers
 ```
 
 CI runs without API keys and uses the mock provider. GPU tests are opt-in.
