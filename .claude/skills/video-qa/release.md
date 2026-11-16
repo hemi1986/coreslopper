@@ -69,7 +69,7 @@ npm run cli -- thumbnail projects/<slug> --format 1x1 \
 
 ## 6. Review the images
 
-Run the `art-director` agent on all six thumbnails, the three TikTok covers, and the cover with the rules in [thumbnails.md](thumbnails.md); for the vertical ones also: the hook reads at a quarter size, the face sits above the text and inside the central square, nothing important lies in the bottom 15 %. Re-compose until each passes.
+Run the `art-director` agent on all six thumbnails, the three TikTok covers, and the cover with the rules in [thumbnails.md](thumbnails.md). For the 9:16 Short thumbnails also: the hook reads at a quarter size, the face sits above the text and inside the central square, nothing important lies in the bottom 15 % (the Shorts UI). For the 3:4 TikTok covers: the hook reads in a 120x160 grid tile, the face sits above the text, nothing important lies in the bottom 12 % (the view count). Re-compose until each passes.
 
 ## 7. Write `review/upload.yaml`
 
