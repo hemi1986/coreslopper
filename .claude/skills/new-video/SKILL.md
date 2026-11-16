@@ -44,6 +44,7 @@ Ask the user to paste the complete lyrics. Then write `projects/<slug>/lyrics.tx
 - Keep the user's words, spelling, and line breaks exactly. Do not rewrite, correct, or translate.
 - Every line must sit under a section tag: `[Intro]`, `[Verse 1]`, `[Pre-Chorus]`, `[Chorus]`, `[Bridge]`, `[Outro]`, and so on. Repeated sections repeat their tag. Keep tags the user already wrote; add missing ones by structure and repetition.
 - Instrumental parts get a tag with no lines (`[Intro]`, `[Instrumental]`), so the analyzer can place them.
+- Keep Suno parentheses as written, as in `My Machine (my machine)`. They mark backing vocals for Suno; the words are sung and timed, and the render shows them without the parentheses.
 - Show the tagged section list (tags plus first line of each) and ask the user to confirm or correct it.
 
 Done when the user has confirmed the section list and `lyrics.txt` contains every pasted line.
