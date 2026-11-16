@@ -861,6 +861,7 @@ export const ReleaseFileKindSchema = z.enum([
   'thumbnail',
   'short',
   'short-thumbnail',
+  'tiktok-cover',
   'audio',
   'cover',
   'canvas',

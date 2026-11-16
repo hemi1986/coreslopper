@@ -32,7 +32,7 @@ export interface ReleaseTextInput {
     master?: string;
     subtitles?: string;
     thumbnails: string[];
-    shorts: { name: string; video: string; thumbnail?: string }[];
+    shorts: { name: string; video: string; thumbnail?: string; tiktokCover?: string }[];
     audio?: string;
     cover?: string;
     canvas?: string;
@@ -50,6 +50,7 @@ interface Labels {
   title: string;
   description: string;
   hashtags: string;
+  hashtagsComma: string;
   tags: string;
   chapters: string;
   noChapters: string;
@@ -118,6 +119,7 @@ const EN: Labels = {
   title: 'Title',
   description: 'Description',
   hashtags: 'Hashtags',
+  hashtagsComma: 'Hashtags, comma-separated',
   tags: 'Tags',
   chapters: 'Chapters',
   noChapters: 'No chapters: YouTube needs at least three of at least 10 s each.',
@@ -245,6 +247,7 @@ const DE: Labels = {
   title: 'Titel',
   description: 'Beschreibung',
   hashtags: 'Hashtags',
+  hashtagsComma: 'Hashtags, kommagetrennt',
   tags: 'Tags',
   chapters: 'Kapitel',
   noChapters: 'Keine Kapitel: YouTube braucht mindestens drei mit je mindestens 10 s.',
@@ -428,6 +431,7 @@ function youtubeText(input: ReleaseTextInput, l: Labels): string {
   lines.push('', `## ${l.title} (${l.chars(count(main?.title ?? ''), input.limits.youtube.title)})`, '', ...block(main?.title ?? l.todo('main.title')));
   lines.push('', `## ${l.description} (${l.bytes(Buffer.byteLength(description), input.limits.youtube.description_bytes)})`, '', ...block(description));
   if (!input.chapters.length) lines.push('', `_${l.noChapters}_`);
+  if (main?.hashtags.length) lines.push('', `## ${l.hashtagsComma}`, '', ...block(main.hashtags.join(', ')));
   lines.push('', `## ${l.tags} (${l.chars(tags.length, input.limits.youtube.tags)})`, '', ...block(tags || l.todo('main.tags')));
   lines.push('', `## ${l.pinned}`, '', ...block(main?.pinned_comment ?? l.todo('main.pinned_comment in review/upload.yaml')));
   lines.push('', `## ${l.community}`, '', ...block(main?.community_post ?? l.todo('main.community_post in review/upload.yaml')));
@@ -453,6 +457,7 @@ function shortsText(input: ReleaseTextInput, l: Labels): string {
     lines.push(`### ${l.title} (${l.chars(count(short?.title ?? ''), input.limits.youtube.title)})`, '', ...block(short?.title ?? l.todo(`shorts.${file.name}.title`)), '');
     const description = short ? [short.description.trim(), short.hashtags.join(' ')].join('\n\n') : l.todo(`shorts.${file.name} in review/upload.yaml`);
     lines.push(`### ${l.description}`, '', ...block(description), '');
+    if (short?.hashtags.length) lines.push(`### ${l.hashtagsComma}`, '', ...block(short.hashtags.join(', ')), '');
     lines.push(`### ${l.checklist}`, '', checkbox(l.shorts.relatedStep), checkbox(l.yt.synthetic(synthetic)), checkbox(l.yt.kids(short?.made_for_kids ?? false)), '');
   }
   if (input.files.shorts.length === 0) lines.push(l.todo('no Shorts in renders/shorts/'), '');
@@ -491,7 +496,8 @@ function tiktokText(input: ReleaseTextInput, l: Labels): string {
       ? tiktokDescription(tt, l.tt.overlayDefault(youtube ?? 'YouTube'))
       : l.todo(`shorts.${file.name}.tiktok in review/upload.yaml`);
     lines.push(`### ${l.tt.description} (${l.chars(count(description), input.limits.tiktok.caption)})`, '', ...block(description), '');
-    lines.push(`### ${l.tt.cover}`, '', file.thumbnail ? l.tt.coverUpload(file.thumbnail) : l.tt.coverFrame, '');
+    const cover = file.tiktokCover ?? file.thumbnail;
+    lines.push(`### ${l.tt.cover}`, '', cover ? l.tt.coverUpload(cover) : l.tt.coverFrame, '');
     lines.push(`### ${l.tt.settings}`, '', checkbox(l.tt.visibility));
     if (input.channel?.disclosure.tiktok_ai_label ?? true) lines.push(checkbox(l.tt.aiLabel));
     lines.push(checkbox(l.tt.schedule), '');

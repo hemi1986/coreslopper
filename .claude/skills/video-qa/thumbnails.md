@@ -1,6 +1,6 @@
 # Thumbnails
 
-Three YouTube thumbnails per video, made after the master passes. You choose the stills and the words; `npm run cli -- thumbnail` composes the pixels, so the same inputs always give the same JPEG. The vertical thumbnails of the Shorts follow the same rules with `--format 9x16`, the streaming cover with `--format 1x1`; [release.md](release.md) covers when to make them.
+Three YouTube thumbnails per video, made after the master passes. You choose the stills and the words; `npm run cli -- thumbnail` composes the pixels, so the same inputs always give the same JPEG. The vertical thumbnails of the Shorts follow the same rules with `--format 9x16`, their TikTok covers with `--format 3x4`, the streaming cover with `--format 1x1`; [release.md](release.md) covers when to make them.
 
 ## The three thumbnails
 

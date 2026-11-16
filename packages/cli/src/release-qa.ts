@@ -130,6 +130,8 @@ export async function releaseChecks(projectDir: string, probe: Prober = probeMed
     const thumb = file.path.replace(/-9x16\.mp4$/, '-thumb.jpg');
     if (!existsSync(at(thumb))) problems.push('no thumbnail');
     else problems.push(...(await thumbnailProblems(at(thumb), '9x16')).map((problem) => `thumbnail ${problem}`));
+    const tiktok = file.path.replace(/-9x16\.mp4$/, '-tiktok.jpg');
+    if (existsSync(at(tiktok))) problems.push(...(await thumbnailProblems(at(tiktok), '3x4')).map((problem) => `TikTok cover ${problem}`));
     if (problems.length) badShorts.push(`${file.path}: ${problems.join(', ')}`);
   }
   checks.push(

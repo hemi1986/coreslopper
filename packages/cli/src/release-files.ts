@@ -14,16 +14,22 @@ export const SHORT_TARGET_SECONDS = { min: 30, max: 50 } as const;
 /** Suffixes of a Short's video and thumbnail in `renders/shorts/`. */
 export const SHORT_VIDEO_SUFFIX = '-9x16.mp4';
 export const SHORT_THUMB_SUFFIX = '-thumb.jpg';
+/** The 3:4 TikTok cover of a Short (TikTok shows covers only as 3:4 tiles). */
+export const SHORT_TIKTOK_SUFFIX = '-tiktok.jpg';
 
 /** The Shorts folder of a project. */
 export function shortsDir(renders: string): string {
   return join(renders, 'shorts');
 }
 
-/** `renders/shorts/<name>-9x16.mp4` and `<name>-thumb.jpg` for a Short name. */
-export function shortPaths(renders: string, name: string): { video: string; thumbnail: string } {
+/** `renders/shorts/<name>-9x16.mp4`, `<name>-thumb.jpg`, and `<name>-tiktok.jpg` for a Short name. */
+export function shortPaths(renders: string, name: string): { video: string; thumbnail: string; tiktok: string } {
   const dir = shortsDir(renders);
-  return { video: join(dir, `${name}${SHORT_VIDEO_SUFFIX}`), thumbnail: join(dir, `${name}${SHORT_THUMB_SUFFIX}`) };
+  return {
+    video: join(dir, `${name}${SHORT_VIDEO_SUFFIX}`),
+    thumbnail: join(dir, `${name}${SHORT_THUMB_SUFFIX}`),
+    tiktok: join(dir, `${name}${SHORT_TIKTOK_SUFFIX}`),
+  };
 }
 
 /** The Short name of a video file (`Z1-intro-9x16.mp4` → `Z1-intro`), or undefined for any other file. */

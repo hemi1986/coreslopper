@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { loadProject } from '@coreslopper/core';
 import {
   SHORT_UI_TOP,
+  TIKTOK_GRID_UI_TOP,
   VERTICAL_TEXT_TOP,
   centralSquare,
   coverPlacement,
@@ -97,7 +98,11 @@ describe('Short files', () => {
   it('names videos and thumbnails in renders/shorts/', () => {
     expect(shortName('Z1-intro-9x16.mp4')).toBe('Z1-intro');
     expect(shortName('9x16.mp4')).toBeUndefined();
-    expect(shortPaths('/r', 'Z1-intro')).toEqual({ video: '/r/shorts/Z1-intro-9x16.mp4', thumbnail: '/r/shorts/Z1-intro-thumb.jpg' });
+    expect(shortPaths('/r', 'Z1-intro')).toEqual({
+      video: '/r/shorts/Z1-intro-9x16.mp4',
+      thumbnail: '/r/shorts/Z1-intro-thumb.jpg',
+      tiktok: '/r/shorts/Z1-intro-tiktok.jpg',
+    });
   });
 
   it('flags a wrong aspect or a Short over 60 s', () => {
@@ -128,6 +133,27 @@ describe('Short files', () => {
 
     result = await checkShorts(renders, root, () => ({ width: 1920, height: 1080, duration: 70 }));
     expect(result.checks[0]!.result).toBe('FAIL');
+  });
+});
+
+describe('3:4 TikTok cover layout', () => {
+  const frame = thumbnailSize('3x4');
+
+  it('keeps the whole hook inside the tile, in the lower part, above the view count of the grid', () => {
+    expect(frame).toEqual({ width: 1080, height: 1440 });
+    for (const words of [['NEON'], ['ZUKUNFT', 'AUF KREDIT'], ['EIN KLICK', 'UND', 'AUS!'], ['AUSSERORDENTLICH', 'SCHULDENBREMSE']]) {
+      const layout = layoutThumbnail(words.map(metrics), 'bottom', metrics('SATIRE'), '3x4');
+      expect(new Set(layout.slabs.map((slab) => slab.fontSize)).size).toBe(1);
+      for (const slab of layout.slabs) {
+        expect(slab.x).toBeGreaterThanOrEqual(0);
+        expect(slab.x + slab.width).toBeLessThanOrEqual(frame.width);
+        expect(slab.y).toBeGreaterThanOrEqual(frame.height * VERTICAL_TEXT_TOP - 1e-9);
+        expect(slab.y + slab.height).toBeLessThanOrEqual(frame.height * TIKTOK_GRID_UI_TOP);
+      }
+      expect(layout.tag!.y).toBeGreaterThanOrEqual(0);
+      expect(layout.tag!.x + layout.tag!.width).toBeLessThanOrEqual(frame.width);
+    }
+    expect(faceAnchor('bottom', '3x4').y).toBeLessThan(frame.height * VERTICAL_TEXT_TOP);
   });
 });
 

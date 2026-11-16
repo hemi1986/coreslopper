@@ -8,10 +8,11 @@
 export const THUMBNAIL_WIDTH = 1280;
 export const THUMBNAIL_HEIGHT = 720;
 
-/** Thumbnail sizes: 16:9 for the main video, 9:16 for a Short, 1:1 for the streaming cover. */
+/** Thumbnail sizes: 16:9 for the main video, 9:16 for a Short, 3:4 for a TikTok cover, 1:1 for the streaming cover. */
 export const THUMBNAIL_FORMATS = {
   '16x9': { width: THUMBNAIL_WIDTH, height: THUMBNAIL_HEIGHT },
   '9x16': { width: 1080, height: 1920 },
+  '3x4': { width: 1080, height: 1440 },
   '1x1': { width: 3000, height: 3000 },
 } as const;
 export type ThumbnailFormat = keyof typeof THUMBNAIL_FORMATS;
@@ -34,6 +35,11 @@ export function thumbnailSize(format: ThumbnailFormat = '16x9'): FrameSize {
  */
 export const SHORT_UI_TOP = 0.85;
 export const VERTICAL_TEXT_TOP = 0.5;
+/**
+ * TikTok shows a cover only as a 3:4 tile in the profile grid (it crops a
+ * 9:16 upload to its middle 3:4); the view count covers the bottom 12 %.
+ */
+export const TIKTOK_GRID_UI_TOP = 0.88;
 
 /** The central square of a vertical frame, which grid views show. */
 export function centralSquare(frame: FrameSize): { top: number; bottom: number } {
@@ -47,6 +53,7 @@ export const THUMBNAIL_MAX_BYTES = 2 * 1024 * 1024;
 export const THUMBNAIL_FORMAT_MAX_BYTES: Record<ThumbnailFormat, number> = {
   '16x9': THUMBNAIL_MAX_BYTES,
   '9x16': THUMBNAIL_MAX_BYTES,
+  '3x4': THUMBNAIL_MAX_BYTES,
   '1x1': 10 * 1024 * 1024,
 };
 
@@ -179,6 +186,10 @@ export function faceAnchor(layout: ThumbnailLayout, format: ThumbnailFormat = '1
     const frame = thumbnailSize(format);
     return { x: frame.width * 0.5, y: frame.height * 0.32 };
   }
+  if (format === '3x4') {
+    const frame = thumbnailSize(format);
+    return { x: frame.width * 0.5, y: frame.height * 0.28 };
+  }
   if (layout === 'left') return { x: THUMBNAIL_WIDTH * 0.72, y: THUMBNAIL_HEIGHT * 0.42 };
   if (layout === 'right') return { x: THUMBNAIL_WIDTH * 0.28, y: THUMBNAIL_HEIGHT * 0.42 };
   return { x: THUMBNAIL_WIDTH * 0.5, y: THUMBNAIL_HEIGHT * 0.36 };
@@ -244,8 +255,9 @@ function tagBox(metrics: LineMetrics | undefined, layout: ThumbnailLayout, forma
   const height = (metrics.ascent + metrics.descent) * k + 2 * TAG_PAD_Y;
   const frame = thumbnailSize(format);
   // The tag sits in a top corner on the face side, away from the hook; on 9:16 below the top UI.
-  const x = format === '16x9' && layout === 'right' ? TAG_MARGIN : frame.width - (format === '9x16' ? VERTICAL_MARGIN : TAG_MARGIN) - width;
-  const y = format === '9x16' ? Math.round(frame.height * 0.09) : TAG_MARGIN;
+  const vertical = format === '9x16' || format === '3x4';
+  const x = format === '16x9' && layout === 'right' ? TAG_MARGIN : frame.width - (vertical ? VERTICAL_MARGIN : TAG_MARGIN) - width;
+  const y = format === '9x16' ? Math.round(frame.height * 0.09) : format === '3x4' ? VERTICAL_MARGIN : TAG_MARGIN;
   return { x, y, width, height, textX: x + TAG_PAD_X + metrics.left * k, textY: y + TAG_PAD_Y + metrics.ascent * k, fontSize: TAG_SIZE };
 }
 
@@ -257,7 +269,7 @@ function tagBox(metrics: LineMetrics | undefined, layout: ThumbnailLayout, forma
  *   slabs tilt 2° and step in a little on every other row.
  * - `bottom`: the lines sit side by side along the bottom edge, untilted,
  *   centred, with a slight vertical stagger.
- * - 9:16 (any layout): see `layoutVertical`.
+ * - 9:16 and 3:4 (any layout): see `layoutVertical`.
  */
 export function layoutThumbnail(
   lines: LineMetrics[],
@@ -266,7 +278,7 @@ export function layoutThumbnail(
   format: ThumbnailFormat = '16x9',
 ): ThumbnailLayoutResult {
   if (lines.length === 0) return { fontSize: 0, slabs: [], tag: tagBox(tag, layout, format) };
-  if (format === '9x16') return layoutVertical(lines, layout, tag);
+  if (format === '9x16' || format === '3x4') return layoutVertical(lines, layout, tag, format);
   if (format === '1x1') return layoutSquare(lines);
 
   if (layout === 'bottom') {
@@ -314,11 +326,20 @@ export function layoutThumbnail(
  * below the middle, at one shared font size that fits the widest line. The
  * first line always lies inside the central square, so the hook survives a
  * square crop; the face sits above it.
+ *
+ * The 3:4 TikTok cover uses the same stack, above the view count of the
+ * profile grid instead of the Shorts UI; TikTok shows the whole tile, so the
+ * stack is not lifted into a central square.
  */
-export function layoutVertical(lines: LineMetrics[], layout: ThumbnailLayout, tag?: LineMetrics): ThumbnailLayoutResult {
-  const frame = thumbnailSize('9x16');
+export function layoutVertical(
+  lines: LineMetrics[],
+  layout: ThumbnailLayout,
+  tag?: LineMetrics,
+  format: '9x16' | '3x4' = '9x16',
+): ThumbnailLayoutResult {
+  const frame = thumbnailSize(format);
   const zoneTop = frame.height * VERTICAL_TEXT_TOP;
-  const zoneBottom = frame.height * SHORT_UI_TOP - VERTICAL_UI_GAP;
+  const zoneBottom = frame.height * (format === '3x4' ? TIKTOK_GRID_UI_TOP : SHORT_UI_TOP) - VERTICAL_UI_GAP;
   const maxWidth = frame.width - 2 * VERTICAL_MARGIN - VERTICAL_STEP;
   const stackHeight = (size: number) =>
     lines.reduce((sum, metrics) => sum + slabSize(metrics, size).height, 0) - ROW_OVERLAP * (lines.length - 1);
@@ -331,7 +352,7 @@ export function layoutVertical(lines: LineMetrics[], layout: ThumbnailLayout, ta
   const square = centralSquare(frame);
   const firstHeight = slabSize(lines[0]!, size).height;
   let y = zoneBottom - stackHeight(size);
-  if (y + firstHeight > square.bottom) y = Math.max(zoneTop, square.bottom - firstHeight);
+  if (format === '9x16' && y + firstHeight > square.bottom) y = Math.max(zoneTop, square.bottom - firstHeight);
   const slabs = lines.map((metrics, index) => {
     const { width } = slabSize(metrics, size);
     const step = index % 2 === 0 ? -VERTICAL_STEP / 2 : VERTICAL_STEP / 2;
@@ -339,7 +360,7 @@ export function layoutVertical(lines: LineMetrics[], layout: ThumbnailLayout, ta
     y += slab.height - ROW_OVERLAP;
     return slab;
   });
-  return { fontSize: size, slabs, tag: tagBox(tag, layout, '9x16') };
+  return { fontSize: size, slabs, tag: tagBox(tag, layout, format) };
 }
 
 /** Cover margins and the largest type, as fractions of the 3000 px side. */
