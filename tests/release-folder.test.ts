@@ -69,14 +69,16 @@ const wavProbe = (codec = 'pcm_s24le', rate = '48000', channels = 2, duration = 
   format: { duration: String(duration), format_name: 'wav' },
 });
 
+/** Probes by file name and folder only: the random temp directory must never decide the result. */
 function fixtureProbe(overrides: Record<string, MediaProbe> = {}) {
   return (path: string): MediaProbe => {
-    for (const [key, probe] of Object.entries(overrides)) if (path.includes(key)) return probe;
-    if (path.endsWith('.wav')) return wavProbe();
-    if (path.includes('canvas')) return videoProbe(1080, 1920, 6, false);
-    if (path.includes('shorts') || path.includes('-9x16.mp4') && path.includes('Z')) return videoProbe(1080, 1920, 40);
-    if (path.includes('9x16')) return videoProbe(1080, 1920, 12);
-    if (path.includes('1x1')) return videoProbe(1080, 1080, 12);
+    const [folder = '', name = ''] = path.split('/').slice(-2);
+    for (const [key, probe] of Object.entries(overrides)) if (name.includes(key)) return probe;
+    if (name.endsWith('.wav')) return wavProbe();
+    if (name.startsWith('canvas')) return videoProbe(1080, 1920, 6, false);
+    if (folder === 'shorts') return videoProbe(1080, 1920, 40);
+    if (name.includes('9x16')) return videoProbe(1080, 1920, 12);
+    if (name.includes('1x1')) return videoProbe(1080, 1080, 12);
     return videoProbe(1920, 1080, 12);
   };
 }
