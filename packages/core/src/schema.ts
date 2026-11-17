@@ -530,6 +530,8 @@ export const ScriptLineSchema = z.discriminatedUnion('kind', [
     ...ScriptLineBase,
     prompt: z.string().min(1),
     duration: z.number().positive(),
+    /** Optional English subtitle for on-screen text seen during this sound (a label, a sign); not spoken. */
+    text_en: z.string().optional(),
     pause_after: PauseAfterSchema,
   }),
   z.object({

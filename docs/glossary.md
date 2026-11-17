@@ -373,7 +373,7 @@ The episode track reduced to one speaker's takes, at full length; the driving au
 _Avoid_: voice track, dialogue stem
 
 **Subtitles**:
-The translated text of the spoken and chat lines, timed by the effective timing.
+The translated text of the spoken and chat lines, plus on-screen text an sfx line names (a label, a sign), timed by the effective timing.
 _Avoid_: captions, lyrics
 
 ## Model bench
