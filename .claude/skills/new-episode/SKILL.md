@@ -6,7 +6,7 @@ license: MIT
 
 # New Episode
 
-This skill runs the two **interactive stages** of an episode in the main session, with the user: `setup` and `script`. The series and its canon (`series/<series>/`: `series.yaml`, `bible.md`, `style.yaml`, `characters.yaml`, `sets.yaml`) exist already; an episode reads the canon and never writes it.
+This skill runs the two **interactive stages** of an episode in the main session, with the user: `setup` and `script`. The series and its canon (`series/<series>/`: `series.yaml`, `bible.md`, `style.yaml`, `characters.yaml`, `sets.yaml`) exist already; an episode reads the canon and never changes it; its storyboard may only append plates, props, and character states (ADR 0025).
 
 Talk to the user in their language. Write every project file in English, except `text_de`, which is the German spoken or on-screen text.
 

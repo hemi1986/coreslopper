@@ -77,22 +77,24 @@ Completion: timing validates; sections cover the song; low-confidence boundaries
 
 - Skills: `style-bible`, `character-bible`
 - Input: brief, treatment, brand kit, model config
-- Output: `style.yaml`, `characters.yaml`, character sheets/refs
+- Output: `style.yaml`, `characters.yaml`, character sheets/refs, character states; `sets.yaml` with sets, plates, and props when AI shots return to the same place or object
 
-Completion: style validates; every storyboard style key exists; every recurring character has a sheet and reference image; art-director passes.
+Completion: style validates; every storyboard style key exists; every recurring character has a sheet and reference image; every plate, prop, and character state has a reference image; art-director passes each on its own.
+
+Plates, prop references, and character states are the continuity references ([ADR 0025](adr/0025-plates-props-character-states.md)): a plate is an empty frame of a set from one fixed camera angle, a prop reference the one look of a recurring object, a character state a named look the story puts a character in (hatch open, cable plugged in). Shots name them in `refs.plate`, `refs.props`, and `refs.states`, and keyframes in a plate are edits of it.
 
 ## 6. Storyboard
 
 - Skill: `storyboard`
-- Input: treatment, effective timing, style, characters
-- Output: `storyboard.yaml`, `storyboard.md`, `review/contact-sheet.svg`
+- Input: treatment, effective timing, style, characters, sets
+- Output: `storyboard.yaml`, `storyboard.md`, `review/contact-sheet.svg`; new plates, props, or character states the story needs, appended to `sets.yaml` and `characters.yaml`
 
 ```bash
 npm run cli -- validate projects/my-video
 npm run cli -- contact-sheet projects/my-video
 ```
 
-Completion: schema, anchors, coverage, references, source rules, highlights, and chaining all pass; contact sheet exists.
+Completion: schema, anchors, coverage, references (including plates, props, and states), source rules, highlights, and chaining all pass; contact sheet exists.
 
 ## 7. Asset production
 
@@ -107,7 +109,7 @@ npm run cli -- generate projects/my-video --batch assets/batches/scene-01.json
 
 Roles resolve to the project's provider. A Higgsfield project uses the `alternatives.higgsfield` entries in `config/models.yaml`; lip-sync stays on fal.ai via `providers.lipsync: fal`. With `providers.video: comfyui`, clips render locally from `comfyui/workflows/` at $0 and lip-sync falls back to fal.ai ([comfyui/README.md](../comfyui/README.md)).
 
-Completion: every shot has its source asset or a documented reason; every character shot used references; manifest and budget reconciled; art-director passes.
+Completion: every shot has its source asset or a documented reason; every character shot used references; a shot with `refs.plate` has a keyframe edited from its plate, with its states and props as references; manifest and budget reconciled; art-director passes.
 
 ## 8. Assembly
 
@@ -243,6 +245,7 @@ npm run cli -- qa projects/night-desk-02
 - **Takes.** `takes.json` (tracked) records each take's source, duration, text hash, and file hash. `voice-track` generates only missing or stale generated takes; a recording the user swapped in, or an imported take whose text changed, stops the stage until the user runs `import-takes` or deletes the file.
 - **Re-timing.** Change `pause_after` in the script or add a line or section to `timing.overrides.json`, then run `episode-track` again. The mix follows the effective timing, so sound and picture move together.
 - **Lip-sync.** A lip-sync shot is driven by the character's speaker stem; cut its segment with `npm run cli -- audio-segment <project> --start <s> --end <s> --name <shot-id> --character <id>`. Characters with the display rule `silhouette` or `voice-only` cannot have one, and `validate` rejects a shot longer than `maxDuration` of `video.lipsync` for the selected provider or `limits.lipsync_seconds_max` of the series.
+- **Continuity references.** Plates, props, and character states live in the canon. An episode's storyboard may append new ones when its story needs them (a hatch opens, headphones go on); it never changes an existing entry.
 - **QA** adds the episode checks: complete `text_en`, canon references, `limits.episode_seconds` of the series, and the SRT.
 
 A series starts with the `new-series` skill. It creates the canon and generates its references through the series budget:

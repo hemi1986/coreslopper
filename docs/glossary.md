@@ -353,8 +353,20 @@ How a character may appear on screen: full face, silhouette, on a screen only, o
 _Avoid_: visibility
 
 **Set**:
-A recurring location of a series with a description and reference frames. A scene plays in exactly one set.
+A recurring location of a series or a music video with a description, reference frames, and plates. A scene plays in exactly one set.
 _Avoid_: location, background, stage (a **Stage** is a pipeline step)
+
+**Plate**:
+An empty frame of a set from one fixed camera angle, in the set's light. A keyframe in that framing is an edit of the plate with characters and props inserted.
+_Avoid_: background plate, backdrop, location shot
+
+**Prop Reference**:
+The one look of a recurring object (shape, colour, what is attached), with reference images every shot showing it uses.
+_Avoid_: prop asset, item
+
+**Character State**:
+A named look the story puts a character in from some shot on, such as an open hatch, a plugged-in cable, or headphones, with the reference image every such keyframe derives from.
+_Avoid_: outfit, variant, pose
 
 **Take**:
 The audio of one script line, generated or recorded by the user.

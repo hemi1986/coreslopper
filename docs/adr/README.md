@@ -28,5 +28,6 @@ Short records of decisions that are hard to reverse, surprising without context,
 | [0022](0022-review-player.md) | A review player writes frame-accurate notes on renders to `review/notes/`; outside the pipeline, read on a fix pass. |
 | [0023](0023-publish-command.md) | `publish` is a user command, not a stage: YouTube private or scheduled, TikTok inbox drafts, from `upload.yaml`, idempotent by file hash; no Instagram, no MCP. |
 | [0024](0024-release-folder-manual-distribution.md) | `release` builds one folder `renders/release/` with every file and text to publish; distributor facts only from the user; manual distributor upload, API distributors later. |
+| [0025](0025-plates-props-character-states.md) | Plates (empty set frames per camera angle), prop references, and character states are reviewed references that shots name in `refs`; keyframes in a plate are edits of it; music videos may have `sets.yaml`; episodes only append to the canon. |
 
 Status values: `Accepted`, `Deprecated`, `Superseded by ADR-NNNN`.
