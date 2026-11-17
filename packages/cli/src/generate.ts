@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
-import { basename, dirname, join, resolve } from 'node:path';
+import { readFile, readdir, rm, rmdir } from 'node:fs/promises';
+import { basename, dirname, extname, join, relative, resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
 import {
@@ -37,7 +37,16 @@ import {
   type Operation,
   type Provider,
 } from '@coreslopper/providers';
-import { probeDuration } from './media.js';
+import {
+  halfSize,
+  imageSize,
+  replaceCharacterNames,
+  seedvr2Scale,
+  takeClipOptions,
+  wanSize,
+  type ClipOptions,
+} from './clip-options.js';
+import { muxOriginalAudio, probeDuration } from './media.js';
 
 export const BatchItemSchema = z
   .object({
@@ -105,6 +114,8 @@ function checkVocalSource(audio: string, projectRoot: string): void {
   }
 }
 
+const VIDEO_OPERATIONS = new Set(['textToVideo', 'imageToVideo', 'firstLastFrameToVideo', 'lipSync']);
+
 export const BatchSchema = z.array(BatchItemSchema).min(1);
 
 export interface GenerateOptions {
@@ -128,6 +139,14 @@ export interface ResolvedItem {
   audio?: string;
   audioStartSeconds?: number;
   durationSeconds?: number;
+  /** The prompt sent to the provider; Wan gets character descriptions instead of names. */
+  prompt?: string;
+  /** Local clip options (video_model, quality, SeedVR2) and what they resolved to, for the log. */
+  clip?: ClipOptions;
+  /** SeedVR2 pass after a final local clip. */
+  restore?: { mode: 'restore' | 'upscale'; scale: number; colorCorrection: string; model: string; params: Record<string, unknown> };
+  /** Log lines: backend, quality, size, SeedVR2 mode. */
+  notes?: string[];
 }
 
 /** The configuration a batch needs: providers, model overrides, master size, and the batch cap. */
@@ -142,6 +161,8 @@ export interface BatchTarget {
   config: BatchConfig;
   state: { budget: { totalUsd: number; spentUsd: number; reservedUsd: number }; updatedAt: string };
   paths: { root: string; assets: string; manifest: string };
+  /** Characters whose names Wan prompts replace with their descriptions. */
+  characters?: { id: string; name: string; description: string }[];
   saveState(): Promise<void>;
 }
 
@@ -151,6 +172,7 @@ export function projectTarget(project: LoadedProject): BatchTarget {
     config: project.config,
     state: project.state,
     paths: project.paths,
+    characters: project.characters?.characters ?? [],
     saveState: () => saveState(project.paths.state, project.state),
   };
 }
@@ -189,6 +211,7 @@ function resolveItem(
   models: Awaited<ReturnType<typeof loadModelsConfig>>,
   projectRoot: string,
   providerOverride?: ProviderKind,
+  characters: { id: string; name: string; description: string }[] = [],
 ): ResolvedItem {
   const role = models.roles[item.role];
   if (!role) throw new ValidationError(`Unknown model role "${item.role}". Add it to config/models.yaml.`);
@@ -214,7 +237,27 @@ function resolveItem(
     );
   }
   const resolved = resolveModelRole(role, provider, override, item.role);
-  const params = { ...resolved.params, ...item.params };
+  const { workflow, ...merged } = { ...resolved.params, ...item.params };
+  const { options: clip, rest } = takeClipOptions(merged);
+  let params = rest;
+  if (provider === 'comfyui' && clip.videoModel === 'wan') {
+    if (item.operation === 'lipSync') {
+      throw new ValidationError(
+        'Lip-sync shots always run on LTX: Wan 2.2 makes no sound and cannot follow a vocal. Remove video_model: "wan".',
+      );
+    }
+    if (VIDEO_OPERATIONS.has(item.operation) && item.operation !== 'imageToVideo') {
+      throw new ValidationError(
+        `Wan 2.2 is image-to-video only; ${item.operation} needs LTX. Remove video_model: "wan" or give one start frame.`,
+      );
+    }
+  }
+  // `workflow` picks another local workflow for this item (e.g. a slower quality
+  // variant). It only applies on ComfyUI; cloud providers keep the role's model.
+  if (workflow !== undefined && (typeof workflow !== 'string' || workflow.trim() === '')) {
+    throw new ValidationError('params.workflow must be the name of a workflow in comfyui/workflows/.');
+  }
+  if (provider === 'comfyui' && typeof workflow === 'string') resolved.model = workflow;
   const pricing =
     resolved.pricing ??
     (provider === 'mock' || provider === 'comfyui' ? ({ unit: 'request', usd: 0 } satisfies ModelPricing) : undefined);
@@ -274,6 +317,80 @@ function resolveItem(
     }
   }
 
+  // Local clips: pick LTX or Wan, the render size for draft/final, and the SeedVR2 pass.
+  let prompt = item.prompt;
+  let restore: ResolvedItem['restore'];
+  const notes: string[] = [];
+  const localVideo = provider === 'comfyui' && VIDEO_OPERATIONS.has(item.operation);
+  const setOptions = Object.keys(item.params).filter((key) =>
+    ['video_model', 'quality', 'seedvr2', 'color_correction', 'turbo'].includes(key),
+  );
+  if (!localVideo && setOptions.length > 0) {
+    notes.push(`${setOptions.join(', ')} ignored: only local clips (comfyui) use them`);
+  }
+  if (localVideo) {
+    const master = config.formats.master;
+    const own = Object.fromEntries(
+      Object.entries(item.params).filter(
+        ([key]) => key !== 'workflow' && !['video_model', 'quality', 'seedvr2', 'color_correction', 'turbo'].includes(key),
+      ),
+    );
+    const ownSize = ['width', 'height', 'megapixels'].some((key) => key in own);
+    let render: { width: number; height: number };
+    if (clip.videoModel === 'wan') {
+      const wanRole = models.roles['video.wan'];
+      if (!wanRole) throw new ConfigError('Role "video.wan" is missing from config/models.yaml.');
+      const wan = resolveModelRole(wanRole, 'comfyui', roleOverride(config, 'video.wan'), 'video.wan');
+      resolved.model = typeof workflow === 'string' ? workflow : wan.model;
+      const start = imageSize(references[0]!);
+      const size = wanSize(start.width / start.height, clip.quality);
+      // The shot role's LTX params (megapixels, 8n+1 frames, 24 fps) do not apply to Wan.
+      params = { ...wan.params, width: size.width, height: size.height, turbo: clip.turbo, ...own };
+      render = { width: Number(params.width), height: Number(params.height) };
+      prompt = replaceCharacterNames(item.prompt, characters);
+      notes.push(
+        `video_model wan · quality ${clip.quality} · turbo ${clip.turbo ? 'on' : 'off'} · ${render.width}x${render.height}` +
+          ' · 16 fps, RIFE x3 to 48 fps, no sound',
+      );
+    } else {
+      if (clip.quality === 'final' && !ownSize) {
+        const target =
+          clip.seedvr2 === 'upscale'
+            ? halfSize(master)
+            : { width: Math.ceil(master.width / 64) * 64, height: Math.ceil(master.height / 64) * 64 };
+        if (item.operation === 'lipSync') {
+          // The lip-sync graph sizes itself with a ResolutionSelector: aspect + megapixels.
+          params = { ...params, megapixels: Number(((target.width * target.height) / 1_000_000).toFixed(3)) };
+        } else {
+          const { megapixels: _drop, ...withoutMegapixels } = params;
+          params = { ...withoutMegapixels, width: target.width, height: target.height };
+        }
+        render = target;
+      } else if (params.width !== undefined && params.height !== undefined) {
+        render = { width: Number(params.width), height: Number(params.height) };
+      } else {
+        const megapixels = Number(params.megapixels ?? (master.width * master.height) / 1_000_000);
+        const factor = Math.sqrt((megapixels * 1_000_000) / (master.width * master.height));
+        render = { width: Math.round(master.width * factor), height: Math.round(master.height * factor) };
+      }
+      notes.push(`video_model ltx · quality ${clip.quality} · about ${render.width}x${render.height}`);
+    }
+    if (clip.seedvr2 !== 'off') {
+      const upscaleRole = models.roles['video.upscale'];
+      if (!upscaleRole) throw new ConfigError('Role "video.upscale" is missing from config/models.yaml.');
+      const upscale = resolveModelRole(upscaleRole, 'comfyui', roleOverride(config, 'video.upscale'), 'video.upscale');
+      const scale = seedvr2Scale(clip.seedvr2, render, master);
+      restore = {
+        mode: clip.seedvr2,
+        scale,
+        colorCorrection: clip.colorCorrection,
+        model: upscale.model,
+        params: { ...upscale.params, scale, color_correction: clip.colorCorrection },
+      };
+      notes.push(`seedvr2 ${clip.seedvr2} x${scale} · color_correction ${clip.colorCorrection}`);
+    }
+  }
+
   return {
     item,
     provider,
@@ -283,6 +400,10 @@ function resolveItem(
     cost,
     references,
     audio,
+    prompt,
+    notes,
+    ...(localVideo ? { clip } : {}),
+    ...(restore ? { restore } : {}),
     ...(item.audioStartSeconds !== undefined ? { audioStartSeconds: item.audioStartSeconds } : {}),
     // A local lip-sync workflow sets its clip length from the driving audio.
     durationSeconds:
@@ -308,7 +429,7 @@ export function toRequest(
     operation: item.item.operation as Operation,
     role: item.item.role,
     model: item.model,
-    prompt: item.item.prompt,
+    prompt: item.prompt ?? item.item.prompt,
     seed: item.item.seed,
     references: item.references,
     audio: item.audio,
@@ -341,6 +462,8 @@ export interface BatchRunResult {
   resolved: ResolvedItem;
   /** Undefined on a dry run. */
   result?: GenerationResult;
+  /** The SeedVR2 result next to the clip (`<clip>_upscaled.mp4`), when one ran. */
+  upscaled?: string;
 }
 
 /**
@@ -356,7 +479,7 @@ export async function runBatch(
   const log = options.log === false ? () => undefined : (...args: unknown[]) => console.log(...args);
   const models = await loadModelsConfig();
   const resolved = batch.map((item) => {
-    const value = resolveItem(item, project.config, models, project.paths.root, options.provider);
+    const value = resolveItem(item, project.config, models, project.paths.root, options.provider, project.characters);
     return value.provider === 'mock' || value.provider === 'comfyui' ? { ...value, cost: 0 } : value;
   });
   const totalEstimate = resolved.reduce((sum, item) => sum + item.cost, 0);
@@ -373,6 +496,7 @@ export async function runBatch(
       log(
         `  ${item.item.operation} ${item.item.role} -> ${item.provider}/${item.model} (${formatUsd(item.cost)})`,
       );
+      for (const note of item.notes ?? []) log(`    ${note}`);
     }
     return resolved.map((item) => ({ resolved: item }));
   }
@@ -400,8 +524,17 @@ export async function runBatch(
     const outputDir = join(project.paths.assets, item.item.role.replaceAll('.', '/'));
     await ensureDir(outputDir);
     const request = toRequest(item, project.config.formats.master, outputDir, project.paths.root);
+    for (const note of item.notes ?? []) log(`[${index + 1}/${resolved.length}] ${item.item.role}: ${note} · seed ${request.seed ?? 'auto'}`);
     const result = await runner.run(request);
-    results.push({ resolved: item, result });
+    let upscaled: string | undefined;
+    if (item.restore) {
+      upscaled = await restoreClip(runner, item, result, outputDir, project.paths.root);
+      log(
+        `[${index + 1}/${resolved.length}] ${item.item.role}: seedvr2 ${item.restore.mode} x${item.restore.scale}, ` +
+          `color_correction ${item.restore.colorCorrection}, seed ${result.seed} -> ${relative(project.paths.root, upscaled)}`,
+      );
+    }
+    results.push({ resolved: item, result, ...(upscaled ? { upscaled } : {}) });
     if (result.cached) {
       cacheHits += 1;
       log(`[${index + 1}/${resolved.length}] ${item.item.role}: cache hit ${result.hash.slice(0, 12)}`);
@@ -421,6 +554,44 @@ export async function runBatch(
     )}`,
   );
   return results;
+}
+
+/**
+ * SeedVR2 pass for a final local clip. The restored clip goes next to the
+ * original as `<clip>_upscaled.mp4` with the original's audio stream copied back;
+ * the original is never touched. The pass runs through the same cache and manifest.
+ */
+async function restoreClip(
+  runner: GenerationRunner,
+  item: ResolvedItem,
+  clip: GenerationResult,
+  outputDir: string,
+  projectRoot: string,
+): Promise<string> {
+  const restore = item.restore!;
+  const source = clip.files.find((file) => ['.mp4', '.webm', '.mov', '.mkv'].includes(extname(file).toLowerCase()));
+  if (!source) throw new Error(`SeedVR2: the clip for ${item.item.role} produced no video file.`);
+  const rawDir = join(outputDir, 'seedvr2');
+  const pass = await runner.run({
+    operation: 'upscaleVideo',
+    role: 'video.upscale',
+    model: restore.model,
+    prompt: `SeedVR2 ${restore.mode}`,
+    // The clip's seed, so a re-render reproduces the same restore.
+    seed: clip.seed,
+    references: [source],
+    params: restore.params,
+    outputDir: rawDir,
+    projectDir: projectRoot,
+    estimatedCostUsd: 0,
+  });
+  const raw = pass.files[0];
+  if (!raw) throw new Error('SeedVR2 returned no file.');
+  const target = join(dirname(source), `${basename(source, extname(source))}_upscaled.mp4`);
+  muxOriginalAudio(raw, source, target);
+  await rm(raw, { force: true });
+  if ((await readdir(rawDir).catch(() => ['keep'])).length === 0) await rmdir(rawDir).catch(() => undefined);
+  return target;
 }
 
 export async function generateBatch(options: GenerateOptions): Promise<void> {

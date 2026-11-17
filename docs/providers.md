@@ -34,6 +34,8 @@ providers:
 
 Set `providers.video: comfyui` to render clips on your own GPU. Stills stay on `providers.image`; lip-sync falls back to fal.ai. Each video role's `alternatives.comfyui.model` names a workflow in `comfyui/workflows/`, exported with Export (API) and tagged by node title. A local clip costs $0 against the budget. Setup, title tags, params, and server variables are in [comfyui/README.md](../comfyui/README.md).
 
+Per batch item, `params` choose how a local clip is made: `video_model` (`ltx` or `wan`; Wan 2.2 is image-to-video only and never lip-syncs), `quality` (`draft` or `final`), and after a final clip the **Restore Pass** (`seedvr2`: `restore`, `upscale`, or `off`; `color_correction`: `lab` or `wavelet`). `params.workflow` runs one item on another workflow, such as a slower `-quality` variant. Cloud providers ignore these keys.
+
 ## Audio roles and episode speech
 
 `providers.audio` selects the provider for the `audio.*` roles: `comfyui` (the default) or `mock`. A song is never generated; these roles make stingers, effects, ambience, and, for episodes, speech:

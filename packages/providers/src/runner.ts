@@ -127,6 +127,9 @@ export class GenerationRunner {
       else if (request.operation === 'generateAudio') {
         if (!provider.generateAudio) throw new Error(`The ${provider.name} provider cannot generate audio.`);
         output = await provider.generateAudio(input);
+      } else if (request.operation === 'upscaleVideo') {
+        if (!provider.upscaleVideo) throw new Error(`The ${provider.name} provider cannot restore or upscale video.`);
+        output = await provider.upscaleVideo(input);
       }
       else output = await provider.imageToVideo(input);
     } catch (error) {

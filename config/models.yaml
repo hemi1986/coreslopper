@@ -42,6 +42,11 @@
 #   width/height       override the project's master size
 #   lyrics: "..."      lyrics for music workflows (cs_lyrics); empty means none
 #   node_inputs        {"<node title or id>.<input>": value} for anything else
+#   workflow: <name>   run one batch item (or a project role override) on another
+#                      workflow, e.g. a slower -quality variant: qwen-t2i-quality,
+#                      qwen-edit-quality, ltx-i2v-quality, ltx-t2v-quality,
+#                      ltx-flf2v-quality, ltx25-lipsync-flf2v-quality. Ignored on
+#                      cloud providers.
 # See comfyui/README.md for the node titles.
 version: 1
 last_verified: "2026-11-08 (planning estimates; verify before paid use)"
@@ -523,6 +528,33 @@ roles:
         maxDuration: 30
         notes: Wan 3.0 with first_frame and last_frame media at 1080P. Output is 30 fps.
 
+  video.wan:
+    provider: comfyui
+    model: wan22-i2v
+    params:
+      fps: 16
+      frame_step: 4
+      size_multiple: 16
+    maxDuration: 10
+    notes: >-
+      Wan 2.2 14B image-to-video with RIFE x3 interpolation (16 fps native, saved
+      at 48 fps, so a 24 fps edit takes every second frame). Not a shot role: a
+      batch item keeps its imageToVideo role and sets params.video_model: wan.
+      Size follows the start frame's aspect (draft 832x480, final 1280x720, multiples
+      of 16); params.turbo (default true) switches the 4-step Lightning LoRAs. No
+      sound, no lip-sync. Character names in the prompt are replaced by their
+      characters.yaml description.
+    alternatives: {}
+  video.upscale:
+    provider: comfyui
+    model: seedvr2-upscale
+    notes: >-
+      SeedVR2 3B restore/upscale (upscaleVideo). Not a shot role: runs after a
+      local clip with params.quality: final unless params.seedvr2 is "off".
+      restore = scale 1 at full size; upscale = render at half size (LTX, multiples
+      of 64) or 720p (Wan) and scale to the master. color_correction lab (default)
+      or wavelet. Writes <clip>_upscaled.mp4 with the original audio copied back.
+    alternatives: {}
   video.lipsync:
     provider: fal
     model: fal-ai/bytedance/omnihuman/v1.5

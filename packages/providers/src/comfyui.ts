@@ -46,6 +46,11 @@ export const COMFYUI_TITLES = {
   references: 'cs_references',
   lyrics: 'cs_lyrics',
   transcript: 'cs_transcript',
+  video: 'cs_video',
+  scale: 'cs_scale',
+  colorCorrection: 'cs_color_correction',
+  splitLatent: 'cs_split',
+  turbo: 'cs_turbo',
   output: 'cs_output',
 } as const;
 
@@ -69,6 +74,11 @@ const INPUT_CANDIDATES: Record<ComfyTag, string[]> = {
   references: [],
   lyrics: ['lyrics', 'text', 'value'],
   transcript: ['prompt_text', 'transcript', 'reference_text', 'text', 'value'],
+  video: ['file', 'video'],
+  scale: ['resize_type.multiplier', 'scale_by', 'multiplier', 'value'],
+  colorCorrection: ['color_correction_method', 'color_correction', 'value'],
+  splitLatent: ['value'],
+  turbo: ['value'],
   output: [],
 };
 
@@ -82,8 +92,21 @@ const ADAPTER_PARAMS = new Set([
   'height',
   'lyrics',
   'transcript',
+  'scale',
+  'color_correction',
+  'split_latent',
+  'turbo',
   'node_inputs',
 ]);
+
+/** Loader inputs that name a model file; checked against GET /object_info before a run. */
+const MODEL_FILE_INPUTS = ['unet_name', 'vae_name', 'clip_name', 'lora_name', 'ckpt_name', 'model_name'];
+
+/** A ComfyUI failure that means the GPU ran out of memory. */
+export function isOutOfMemory(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /out of memory|OutOfMemory|\bOOM\b|Allocation on device/i.test(message);
+}
 
 /** What a workflow produces, judged by the class of its cs_output node. */
 export type ComfyOutputKind = 'image' | 'video' | 'audio';
@@ -110,6 +133,8 @@ export interface ComfyUploads {
   /** Extra edit references after the first, for cs_references. */
   references?: string[];
   audio?: string;
+  /** The clip to restore or upscale (cs_video). */
+  video?: string;
 }
 
 export interface ComfyUIProviderOptions {
@@ -203,6 +228,8 @@ export function inspectWorkflow(workflow: ComfyWorkflow): WorkflowInspection {
   const kind = outputKind(workflow, titles.output);
   const operations: Operation[] = [];
   if (kind === 'audio') operations.push('generateAudio');
+  // A video workflow that loads a video restores or upscales it.
+  else if (kind === 'video' && titles.video) operations.push('upscaleVideo');
   else if (kind === 'image') operations.push(titles.startImage ? 'editImage' : 'generateImage');
   // A video workflow with driving audio lip-syncs a start (and optional end) frame.
   else if (titles.audio) operations.push('lipSync');
@@ -211,7 +238,7 @@ export function inspectWorkflow(workflow: ComfyWorkflow): WorkflowInspection {
   else operations.push('textToVideo');
 
   const warnings: string[] = [];
-  if (!titles.prompt) warnings.push(`no node titled ${COMFYUI_TITLES.prompt}; the prompt cannot be set`);
+  if (!titles.prompt && !titles.video) warnings.push(`no node titled ${COMFYUI_TITLES.prompt}; the prompt cannot be set`);
   if (titles.endImage && !titles.startImage) {
     warnings.push(`${COMFYUI_TITLES.endImage} without ${COMFYUI_TITLES.startImage}`);
   }
@@ -219,7 +246,7 @@ export function inspectWorkflow(workflow: ComfyWorkflow): WorkflowInspection {
     warnings.push(`${COMFYUI_TITLES.audio} without ${COMFYUI_TITLES.startImage}; lip-sync needs a face frame`);
   }
   if (!titles.seed) warnings.push(`no node titled ${COMFYUI_TITLES.seed}; every run uses the workflow's seed`);
-  if (kind === 'video' && !titles.frames && !titles.duration) {
+  if (kind === 'video' && !titles.video && !titles.frames && !titles.duration) {
     warnings.push(
       `no node titled ${COMFYUI_TITLES.frames} or ${COMFYUI_TITLES.duration}; clip length cannot follow the shot`,
     );
@@ -439,6 +466,29 @@ export class ComfyUIProvider implements Provider {
     return this.run(input, 'generateAudio');
   }
 
+  /**
+   * Restore or upscale a clip (`references[0]`). On an out-of-memory failure the
+   * run is repeated once with the latent split into temporal chunks.
+   */
+  async upscaleVideo(input: ProviderInput): Promise<ProviderOutput> {
+    if (!input.references?.[0]) throw new Error('upscaleVideo requires the clip as the first reference.');
+    try {
+      return await this.run(input, 'upscaleVideo');
+    } catch (error) {
+      if (!isOutOfMemory(error) || input.params?.split_latent === true) throw error;
+      console.warn(`ComfyUI ran out of GPU memory on ${input.model}; retrying once with split_latent: true.`);
+      try {
+        return await this.run({ ...input, params: { ...input.params, split_latent: true } }, 'upscaleVideo');
+      } catch (retry) {
+        if (!isOutOfMemory(retry)) throw retry;
+        throw new Error(
+          `ComfyUI ran out of GPU memory on ${input.model} even with split_latent: true. ` +
+            'Turn the restore off for this shot (seedvr2: "off"), use restore instead of upscale, or free VRAM.',
+        );
+      }
+    }
+  }
+
   async textToVideo(input: ProviderInput): Promise<ProviderOutput> {
     return this.run(input, 'textToVideo');
   }
@@ -496,8 +546,29 @@ export class ComfyUIProvider implements Provider {
       );
     }
 
-    if (!setTitled(workflow, 'prompt', input.prompt, label)) {
+    // A restore/upscale workflow has no prompt; everything else needs one.
+    if (!setTitled(workflow, 'prompt', input.prompt, label) && operation !== 'upscaleVideo') {
       throw new ConfigError(`ComfyUI workflow ${label} needs a node titled ${COMFYUI_TITLES.prompt}.`);
+    }
+    if (uploads.video) setTitled(workflow, 'video', uploads.video, label);
+    if (params.scale !== undefined) {
+      setTitled(workflow, 'scale', positiveNumber(params.scale, 'scale', 1), label);
+    }
+    if (params.color_correction !== undefined) {
+      if (typeof params.color_correction !== 'string' || params.color_correction.trim() === '') {
+        throw new ConfigError('ComfyUI param color_correction must be a method name, e.g. "lab" or "wavelet".');
+      }
+      setTitled(workflow, 'colorCorrection', params.color_correction, label);
+    }
+    for (const [param, tag] of [
+      ['split_latent', 'splitLatent'],
+      ['turbo', 'turbo'],
+    ] as const) {
+      if (params[param] === undefined) continue;
+      if (typeof params[param] !== 'boolean') throw new ConfigError(`ComfyUI param ${param} must be true or false.`);
+      if (!setTitled(workflow, tag, params[param], label)) {
+        throw new ConfigError(`ComfyUI workflow ${label} has no node titled ${COMFYUI_TITLES[tag]} for param ${param}.`);
+      }
     }
     if (input.negativePrompt) setTitled(workflow, 'negative', input.negativePrompt, label);
     if (uploads.start) setTitled(workflow, 'startImage', uploads.start, label);
@@ -598,7 +669,11 @@ export class ComfyUIProvider implements Provider {
 
   private async run(input: ProviderInput, operation: Operation): Promise<ProviderOutput> {
     const references = input.references ?? [];
-    const takesStart = operation !== 'textToVideo' && operation !== 'generateImage' && operation !== 'generateAudio';
+    const takesStart =
+      operation !== 'textToVideo' &&
+      operation !== 'generateImage' &&
+      operation !== 'generateAudio' &&
+      operation !== 'upscaleVideo';
     const extra = operation === 'editImage' ? references.slice(1) : [];
     // Validate the workflow before uploading anything.
     const check = await this.buildPrompt(input, operation, {
@@ -606,8 +681,10 @@ export class ComfyUIProvider implements Provider {
       end: 'check.png',
       references: extra.map(() => 'check.png'),
       audio: 'check.wav',
+      video: 'check.mp4',
     });
     const inspection = inspectWorkflow(check);
+    await this.checkModelFiles(check, basename(this.workflowPath(input.model)));
     const [startPath, endPath] = references;
     const start = takesStart && startPath ? await this.upload(startPath) : undefined;
     // Lip-sync with a single keyframe uses it as start and end frame.
@@ -621,6 +698,7 @@ export class ComfyUIProvider implements Provider {
       start,
       end,
       references: await Promise.all(extra.map((path) => this.upload(path))),
+      ...(operation === 'upscaleVideo' && startPath ? { video: await this.upload(startPath) } : {}),
     };
     if (inspection.titles.audio) {
       // Lip-sync: the driving vocals. Voice clone: the reference voice.
@@ -667,6 +745,67 @@ export class ComfyUIProvider implements Provider {
       );
     }
     return { files: await this.download(wanted, input.outputDir, promptId), raw: { prompt_id: promptId, outputs } };
+  }
+
+  private readonly modelOptions = new Map<string, Promise<Record<string, string[]> | undefined>>();
+
+  /** Model-file choices per loader input of a node class, from GET /object_info; undefined when unknown. */
+  private async loaderOptions(classType: string): Promise<Record<string, string[]> | undefined> {
+    let pending = this.modelOptions.get(classType);
+    if (!pending) {
+      pending = (async () => {
+        try {
+          const info = await fetchJsonWithRetry(
+            'ComfyUI',
+            `${this.baseUrl}/object_info/${encodeURIComponent(classType)}`,
+            { method: 'GET' },
+            this.requestTimeoutMs,
+            this.fetchImpl,
+          );
+          const node = info[classType] as { input?: Record<string, Record<string, unknown>> } | undefined;
+          if (!node?.input) return undefined;
+          const options: Record<string, string[]> = {};
+          for (const group of Object.values(node.input)) {
+            for (const [name, spec] of Object.entries(group ?? {})) {
+              if (!MODEL_FILE_INPUTS.includes(name) || !Array.isArray(spec)) continue;
+              const [first, second] = spec as [unknown, unknown];
+              const list = Array.isArray(first)
+                ? first
+                : (second as { options?: unknown } | undefined)?.options;
+              if (Array.isArray(list)) options[name] = list.filter((value): value is string => typeof value === 'string');
+            }
+          }
+          return options;
+        } catch {
+          // An older server or a test double without /object_info: let the run report problems.
+          return undefined;
+        }
+      })();
+      this.modelOptions.set(classType, pending);
+    }
+    return pending;
+  }
+
+  /** Stop before queueing when a model file the workflow loads is not installed. */
+  private async checkModelFiles(workflow: ComfyWorkflow, label: string): Promise<void> {
+    const missing: string[] = [];
+    for (const node of Object.values(workflow)) {
+      const inputs = MODEL_FILE_INPUTS.filter((name) => typeof node.inputs[name] === 'string');
+      if (inputs.length === 0) continue;
+      const options = await this.loaderOptions(node.class_type);
+      if (!options) continue;
+      for (const name of inputs) {
+        const value = node.inputs[name] as string;
+        const list = options[name];
+        if (list && list.length > 0 && !list.includes(value)) missing.push(`${value} (${node.class_type}.${name})`);
+      }
+    }
+    if (missing.length > 0) {
+      throw new ConfigError(
+        `ComfyUI at ${this.baseUrl} is missing model files for ${label}: ${[...new Set(missing)].join(', ')}. ` +
+          'Install them into the matching ComfyUI models folder and restart ComfyUI.',
+      );
+    }
   }
 
   private connectionError(error: unknown): Error {
@@ -839,7 +978,7 @@ export async function inspectWorkflowDir(dir = defaultWorkflowsDir()): Promise<W
       const inspection = inspectWorkflow(parseWorkflow(await readFile(join(dir, name), 'utf8'), name));
       reports.push({
         name: name.replace(/\.json$/, ''),
-        ok: Boolean(inspection.titles.prompt),
+        ok: Boolean(inspection.titles.prompt) || inspection.operations.includes('upscaleVideo'),
         operations: inspection.operations,
         warnings: inspection.warnings,
       });
