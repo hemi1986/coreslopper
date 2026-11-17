@@ -132,10 +132,25 @@ class Audio:
         self.offset = round(((first or video_start_seconds) - video_start_seconds) * self.rate)
         self.pos = 0
         self.playing = False
-        self.stream = sd.OutputStream(
-            samplerate=self.rate, channels=2, dtype="int16", callback=self._callback
-        )
-        self.stream.start()
+        self.stream = self._open_stream()
+
+    def _open_stream(self, attempts=4):
+        # WSLg's ALSA -> PulseAudio bridge sometimes times out on start; retry with a
+        # roomier buffer before giving up.
+        error = None
+        for attempt in range(attempts):
+            stream = sd.OutputStream(
+                samplerate=self.rate, channels=2, dtype="int16", latency="high",
+                callback=self._callback,
+            )
+            try:
+                stream.start()
+                return stream
+            except sd.PortAudioError as exc:
+                error = exc
+                stream.close()
+                time.sleep(0.5 * (attempt + 1))
+        raise error
 
     def _callback(self, outdata, frames, time_info, status):
         outdata.fill(0)
@@ -234,7 +249,11 @@ def main():
     if video.container.streams.audio:
         screen.blit(font.render("Loading audio …", True, (230, 230, 230)), (12, 12))
         pygame.display.flip()
-        timer = Audio(path, video.start_seconds)
+        try:
+            timer = Audio(path, video.start_seconds)
+        except sd.PortAudioError as exc:
+            print(f"Audio output failed ({exc}); playing without sound.", file=sys.stderr)
+            timer = WallClock()
     else:
         timer = WallClock()
 
