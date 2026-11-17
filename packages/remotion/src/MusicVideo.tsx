@@ -44,19 +44,6 @@ export function MusicVideo(input: VideoProps) {
       {props.subtitles?.length ? (
         <Subtitles cues={props.subtitles} style={props.style} width={props.width} height={props.height} />
       ) : null}
-      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-        <div
-          style={{
-            position: 'absolute',
-            left: 0,
-            right: 0,
-            bottom: 0,
-            height: Math.round(props.height * 0.035),
-            background: `linear-gradient(to right, transparent, ${props.style.palette.primary}55, transparent)`,
-            opacity: 0.35,
-          }}
-        />
-      </div>
     </AbsoluteFill>
   );
 }
