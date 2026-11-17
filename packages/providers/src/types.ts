@@ -5,7 +5,8 @@ export type Operation =
   | 'imageToVideo'
   | 'firstLastFrameToVideo'
   | 'lipSync'
-  | 'generateAudio';
+  | 'generateAudio'
+  | 'upscaleVideo';
 
 export interface ProviderInput {
   model: string;
@@ -48,6 +49,11 @@ export interface Provider {
    * local backends implement it. It never replaces the song a video is made for.
    */
   generateAudio?(input: ProviderInput): Promise<ProviderOutput>;
+  /**
+   * Restore or upscale a clip (`references[0]`), e.g. with SeedVR2. Optional:
+   * only local backends implement it.
+   */
+  upscaleVideo?(input: ProviderInput): Promise<ProviderOutput>;
   /**
    * Extra cache-key material that is not in the request, such as the content of
    * a local workflow file. Return undefined when the model name is enough.

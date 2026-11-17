@@ -104,6 +104,14 @@ _Avoid_: completeness
 A still image that establishes a shot's look and serves as the start frame for image-to-video.
 _Avoid_: still, frame
 
+**Restore Pass**:
+A SeedVR2 run on a finished local clip at `quality: final`: `restore` sharpens at the same size, `upscale` scales a half-size render up to the master. The result sits next to the clip as `<clip>_upscaled.mp4` with the clip's audio; the clip itself stays unchanged.
+_Avoid_: upscale step, enhancer
+
+**Video Model**:
+The local clip backend of a shot: `ltx` (default; every operation, including lip-sync) or `wan` (Wan 2.2 image-to-video, silent, no lip-sync).
+_Avoid_: engine, backend
+
 **AI Clip**:
 A generated video segment made from a keyframe and prompt, silent by default.
 _Avoid_: generation, render

@@ -28,6 +28,28 @@ export function resolveBinary(name: 'ffmpeg' | 'ffprobe'): string {
   }
 }
 
+/**
+ * Put the original clip's audio back on a processed video (e.g. SeedVR2, which
+ * re-encodes or drops the sound). Both streams are copied, nothing is re-encoded;
+ * a silent original gives a silent result.
+ */
+export function muxOriginalAudio(video: string, original: string, output: string): void {
+  execFileSync(
+    resolveBinary('ffmpeg'),
+    [
+      '-y', '-v', 'error',
+      '-i', video,
+      '-i', original,
+      '-map', '0:v:0',
+      '-map', '1:a:0?',
+      '-c', 'copy',
+      '-threads', '6',
+      output,
+    ],
+    { stdio: 'inherit' },
+  );
+}
+
 export function probeDuration(path: string): number {
   const ffprobe = resolveBinary('ffprobe');
   const duration = Number(

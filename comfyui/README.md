@@ -15,6 +15,10 @@ The repository ships no graphs: node names change between ComfyUI and model rele
 | `ltx-i2v.json` | `imageToVideo` | `video.image_to_video.*`, `video.premium.veo` (comfyui alternative) | LTX 2.5 official image-to-video template |
 | `ltx-t2v.json` | `textToVideo` | `video.text_to_video` | LTX 2.5 official text-to-video template |
 | `ltx-flf2v.json` | `firstLastFrameToVideo` | `video.first_last_frame` | LTX 2.5 official first/last-frame template |
+| `qwen-t2i-quality.json`, `qwen-edit-quality.json` | `generateImage`, `editImage` | none; pick per item with `params.workflow` | Templates *Qwen Image 2.1 t2i* and *image edit* (non-turbo): `KSampler`, 40 steps |
+| `ltx-i2v-quality.json`, `ltx-t2v-quality.json`, `ltx-flf2v-quality.json`, `ltx25-lipsync-flf2v-quality.json` | as their base workflow | none; pick per item with `params.workflow` | The same graphs with the int8 UNet (`…-comfy-int8-convrot`) and the full video VAE (`ltx-2.5-video-vae-bf16`) instead of nvfp4 and the conv VAE |
+| `wan22-i2v.json` | `imageToVideo` | `video.wan`, picked per item with `params.video_model: "wan"` | Template *Wan2.2 14B I2V* plus a RIFE VFI node (×3) before the save |
+| `seedvr2-upscale.json` | `upscaleVideo` | `video.upscale`, runs after a clip with `params.quality: "final"` | Template *Video Upscale: SeedVR2 3B Int8* |
 | `music-minimax.json` | `generateAudio` | `audio.music` | Template *MiniMax Music 3* |
 | `music-ace.json` | `generateAudio` | (set `models.audio.music.model: music-ace`) | Template *ACE-Step 1.5 XL Turbo* |
 | `voxcpm-clone.json` | `generateAudio` (reference voice + transcript) | `audio.voice` | A VoxCPM2 voice-cloning graph (ComfyUI-VoxCPM nodes); default for all speech |
@@ -27,6 +31,9 @@ How they were tagged:
 - **Qwen background removal:** `LoadImage` `cs_start_image`, the text encoder `cs_prompt cs_negative`, the `KSampler` `cs_seed`, the save node `cs_output`.
 - **LTX official templates (t2v, i2v, flf2v):** the prompt primitive `cs_prompt`, the width/height primitives `cs_width`/`cs_height` (full output size; i2v and t2v halve it for the latent and upscale ×2), the duration primitive `cs_frames` with its math node set to `a` so the value is the frame count, the frame-rate primitive `cs_fps`, every `RandomNoise` `cs_seed`, the `LoadImage` nodes `cs_start_image`/`cs_end_image`, the save node `cs_output`. Leave the prompt enhancer off. The templates also generate sound, which the edit discards.
 - **LTX FLF2V lip-sync** (`LTX2.5_FLF2V_Lipsync_SinglePass_HQ`): `LoadImage` first/last frame `cs_start_image`/`cs_end_image`, `LoadAudio` `cs_audio`, the `ResolutionSelector` `cs_resolution` (multiple 64), the duration primitive `cs_frames` with its math node changed from `a * b + 1` to `a`, the frame-rate primitive `cs_fps`, `RandomNoise` `cs_seed`, the prompt primitive `cs_prompt`, `TrimAudioDuration` `cs_audio_start` (its duration stays linked to frames / fps), the save node `cs_output`. Empty the negative text encoder: the model is distilled and runs at CFG 1, so a negative prompt has no effect.
+- **Quality variants:** the LTX and lip-sync `-quality` files are the tagged base graphs with only the UNet and VAE loaders swapped. The Qwen `-quality` files are tagged like their turbo versions; the tags sit on the `KSampler` (`cs_seed`) instead of `RandomNoise`, the edit's If/Else latent switch is off so `references[0]` sets the output size, and the template's second example `LoadImage` and its compare node are removed.
+- **Wan 2.2 I2V:** `LoadImage` `cs_start_image`, the positive and negative `CLIPTextEncode` `cs_prompt`/`cs_negative`, `WanImageToVideo` `cs_width cs_height`, the duration and FPS float primitives `cs_duration`/`cs_fps`, the boolean *Enable 4steps LoRA?* `cs_turbo`, the high-noise `KSamplerAdvanced` (the one with `add_noise: enable`) `cs_seed`, the save node `cs_output`. The graph computes `floor(duration × 16 + 1)` frames; `WanImageToVideo` uses 4n+1 of them, so the adapter (`frame_step: 4`) writes a duration that lands on 4n+1 and covers the shot. RIFE interpolates ×3 and the `CreateVideo` before the save writes 48 fps, so a 24 fps edit takes every second frame. The output has no audio.
+- **SeedVR2:** `LoadVideo` `cs_video`, `Resize Image/Mask` `cs_scale` (`resize_type.multiplier`), `Post-Process SeedVR2 Output` `cs_color_correction`, the boolean *Split Latent* `cs_split`, the `KSampler` `cs_seed`, the save node `cs_output`. Denoise, sampler, and scheduler stay as in the template. The graph needs no prompt.
 - **MiniMax Music 3:** the text encoder `cs_prompt cs_lyrics cs_duration`, the seed node `cs_seed`, the audio save node `cs_output`.
 - **ACE-Step 1.5:** the `TextEncodeAceStepAudio1.5` node `cs_prompt cs_lyrics cs_duration` (prompt goes into `tags`), the `EmptyAceStep1.5LatentAudio` node `cs_duration`, the seed `PrimitiveInt` `cs_seed`, the audio save node `cs_output`.
 - **VoxCPM clone:** the `VoxCPM_TTS` node `cs_prompt cs_seed`, the `LoadAudio` with the reference voice `cs_audio`, the `VoxCPM_VoiceCloning` node `cs_transcript`, the save node `cs_output`. Design: the same without `cs_audio` and `cs_transcript`.
@@ -35,6 +42,14 @@ How they were tagged:
 Notes from test runs on a 16 GB GPU:
 
 - `qwen-t2i` and `qwen-edit` take about 10–20 s per image. Put the image to edit first (`references[0]` sets the output size), then the other references.
+- The `-quality` workflows are slower but cleaner (measured 2026-11-17): `qwen-t2i-quality` about 17 s for 1 MP, `qwen-edit-quality` about 25–30 s (turbo 10–15 s) with visibly more natural textures, `ltx-i2v-quality` about 40 s for a 2 s clip at 0.8 MP including model load. Use them for character references, face close-ups, hero keyframes, clip start frames, and final clip renders; keep the turbo/nvfp4 workflows for drafts and background stills. The 8-step sigma override (`node_inputs` on `459:502`/`459:484`) does not apply to the Qwen quality graphs; set `"459:458.steps"` there instead.
+- **Local clip options** (batch item `params`, ComfyUI only; cloud providers ignore them):
+  - `video_model`: `ltx` (default) or `wan`. Wan is image-to-video only, makes no sound, and never lip-syncs; a lip-sync or first/last-frame item with `wan` is rejected. Character names and ids in a Wan prompt are replaced by their `characters.yaml` description.
+  - `quality`: `draft` (default) or `final`. LTX draft keeps the role's 0.8 MP; LTX final renders at the master size in multiples of 64 (1920×1088). Wan follows the start frame's aspect: draft 832×480, final 1280×720 (swapped for 9:16), multiples of 16; `turbo` (default `true`) switches the 4-step Lightning LoRAs, and `turbo: false` runs 20 steps at CFG 3.5, very slow on 16 GB.
+  - `seedvr2`: after a `final` clip, `restore` (default, scale 1), `upscale` (LTX renders at half size, 960×576 for 1920×1080, and SeedVR2 scales ×2; Wan scales its 720p ×1.5), or `off` for a shot that looks oversharpened. `color_correction`: `lab` (default) or `wavelet`.
+  - The SeedVR2 result lands next to the clip as `<clip>_upscaled.mp4`, with the clip's audio stream copied back (`-c copy`), so lip-sync clips keep their sound. The original is never overwritten. It uses the clip's seed and runs through the same cache and manifest. On an out-of-memory error it retries once with `split_latent: true`, then stops.
+  - `generate` logs `video_model`, `quality`, turbo, size, seed, the SeedVR2 mode, and `color_correction` per item; `--dry-run` shows the same.
+- Before queueing, the adapter checks every model file a workflow loads (`unet_name`, `vae_name`, `clip_name`, `lora_name`, `ckpt_name`) against `GET /object_info` and stops with a list of the missing files.
 - `qwen-bg-remove` works on a clear subject. On dark, low-contrast scenes it can return a fully transparent image, so generate cutouts on a plain background.
 - `ltx25-lipsync-flf2v` takes about 48 s for a 4.7 s clip at 0.8 MP, `ltx-i2v` about 31 s for 4 s, `ltx-flf2v` about 45 s for 5 s. The lip-sync graph cuts the vocal stem itself: `audio` is `audio/stems/vocals.wav`, `audioStartSeconds` the line's start, `durationSeconds` the line plus about 0.3 s of the following pause. Frames round down to 8n+1, so the clip never outruns the audio and only that silent tail is dropped. The graph has no vocal separator; `generate` rejects the full mix. With one keyframe, the adapter uploads it as start and end frame.
 - LTX prompts are short and concrete and say what should happen ("her mouth stays closed", "static camera"). Drafts render at 0.8 MP, finals at 1.9 MP (`megapixels`), in multiples of 64.
@@ -84,6 +99,11 @@ A single batch can also run on ComfyUI with `npm run cli -- generate <project> -
 | `cs_duration` | A seconds input | `seconds` / `duration` / `max_duration` / `value` |
 | `cs_fps` | Frame-rate node | `frame_rate` / `fps` / `value` |
 | `cs_lyrics` | Music text encoder | `lyrics`, set to the `lyrics` param (empty when unset, so demo lyrics never leak) |
+| `cs_video` | `LoadVideo` for the clip to restore or upscale | `file` (uploaded by the adapter) |
+| `cs_scale` | Resize node | `resize_type.multiplier`, set to the `scale` param |
+| `cs_color_correction` | SeedVR2 post-processing | `color_correction_method`, set to the `color_correction` param |
+| `cs_split` | Boolean primitive that splits the latent into temporal chunks | `value`, set to the `split_latent` param |
+| `cs_turbo` | Boolean primitive that switches a fast-sampling LoRA | `value`, set to the `turbo` param |
 | `cs_output` | The save node | Only its outputs are downloaded. Its class decides the output kind: `Save…Image` = image, `Save…Audio` = audio, anything else = video. |
 
 A node can carry several tags separated by spaces, for example `cs_width cs_height cs_frames` on an LTX latent node. Tag the node that holds the value. If the input is connected to another node, tag that source node instead.
@@ -101,6 +121,7 @@ The output kind and the input tags decide which operations a workflow fits:
 | video | `cs_start_image` | `imageToVideo` |
 | video | `cs_start_image`, `cs_end_image` | `firstLastFrameToVideo` |
 | video | `cs_start_image`, `cs_audio` (+ `cs_end_image`) | `lipSync` |
+| video | `cs_video` | `upscaleVideo` (no prompt needed) |
 
 A batch item for another operation is rejected before anything is queued.
 
@@ -117,6 +138,9 @@ Set these under `params` in `config/models.yaml`, or in a project override (`mod
 | `width`, `height` | Override the project's master size, e.g. render at 1280×704 for drafts. |
 | `lyrics` | Lyrics for `cs_lyrics` (music workflows). |
 | `transcript` | Exact text of the reference voice for `cs_transcript` (voice clone). |
+| `workflow` | Run this item on another workflow file, e.g. `"workflow": "ltx-i2v-quality"`. Applies only when the item runs on ComfyUI; on a cloud provider it is dropped and the role's model is used. Works per batch item or as `models.<role>.params.workflow` in `project.yaml`. |
+| `scale`, `color_correction`, `split_latent` | SeedVR2: resize multiplier, color transfer method, temporal chunking. Set by `generate` from the clip options. |
+| `turbo` | Boolean for `cs_turbo`, e.g. Wan's 4-step LoRAs. |
 | `node_inputs` | Set any other value: `{"cs_sampler.steps": 30, "12.cfg": 3.5}`. Keys are `<node title tag or node id>.<input>`. |
 
 Any other param is an error, so typos do not pass silently.
