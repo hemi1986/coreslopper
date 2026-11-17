@@ -290,27 +290,78 @@ function validateLipSync(shot: Shot, seconds: number, characters: CharacterBible
 }
 
 /**
- * A shot may name sets of the canon. Each named set must exist and be the set
- * of the shot's scene; a cutaway to another place is its own scene.
+ * A shot may name sets of sets.yaml. Each named set must exist; in an episode
+ * it must be the set of the shot's scene, since a cutaway to another place is
+ * its own scene.
  */
-function validateSets(shot: Shot, episode: EpisodeContext | undefined): void {
+function validateSets(shot: Shot, sets: SetBible | undefined, episode: EpisodeContext | undefined): void {
   if (shot.refs.sets.length === 0) return;
-  if (!episode) {
-    throw new ValidationError(`Shot "${shot.id}" names sets in refs.sets; sets exist only in episode projects.`);
+  if (!sets) {
+    throw new ValidationError(`Shot "${shot.id}" names sets in refs.sets, but there is no sets.yaml.`);
   }
-  const scene = episode.script.scenes.find((candidate) => candidate.id === shot.section);
+  const scene = episode?.script.scenes.find((candidate) => candidate.id === shot.section);
   for (const set of shot.refs.sets) {
-    if (!episode.sets.sets.some((candidate) => candidate.id === set)) {
+    if (!sets.sets.some((candidate) => candidate.id === set)) {
       throw new ValidationError(
-        `Shot "${shot.id}" references missing set "${set}". Known sets: ${episode.sets.sets.map((s) => s.id).join(', ') || 'none'}.`,
+        `Shot "${shot.id}" references missing set "${set}". Known sets: ${sets.sets.map((s) => s.id).join(', ') || 'none'}.`,
       );
     }
+    if (!episode) continue;
     if (!scene) {
       throw new ValidationError(`Shot "${shot.id}" is in section "${shot.section}", which is no scene of the script.`);
     }
     if (scene.set !== set) {
       throw new ValidationError(
         `Shot "${shot.id}" references set "${set}", but its scene "${scene.id}" plays in set "${scene.set}". A cutaway to another set is its own scene.`,
+      );
+    }
+  }
+}
+
+/**
+ * Continuity references: the plate (`<set>/<plate>`) and props exist in
+ * sets.yaml, the plate belongs to a set the shot may show, and every state
+ * names a character of the shot and one of that character's states.
+ */
+function validateContinuity(shot: Shot, characters: CharacterBible, sets: SetBible | undefined, episode: EpisodeContext | undefined): void {
+  const { plate, props, states } = shot.refs;
+  if ((plate || props.length > 0) && !sets) {
+    throw new ValidationError(`Shot "${shot.id}" names a plate or props, but there is no sets.yaml.`);
+  }
+  if (plate && sets) {
+    const [setId, plateId] = plate.split('/');
+    const set = sets.sets.find((candidate) => candidate.id === setId);
+    if (!set) throw new ValidationError(`Shot "${shot.id}" names plate "${plate}" of missing set "${setId}".`);
+    if (!set.plates.some((candidate) => candidate.id === plateId)) {
+      throw new ValidationError(
+        `Shot "${shot.id}" names missing plate "${plate}". Plates of "${set.id}": ${set.plates.map((p) => p.id).join(', ') || 'none'}.`,
+      );
+    }
+    if (shot.refs.sets.length > 0 && !shot.refs.sets.includes(set.id)) {
+      throw new ValidationError(`Shot "${shot.id}" names plate "${plate}", but refs.sets is ${shot.refs.sets.join(', ')}.`);
+    }
+    const scene = episode?.script.scenes.find((candidate) => candidate.id === shot.section);
+    if (scene && scene.set !== set.id) {
+      throw new ValidationError(`Shot "${shot.id}" names plate "${plate}", but its scene "${scene.id}" plays in set "${scene.set}".`);
+    }
+  }
+  for (const prop of props) {
+    if (!sets?.props.some((candidate) => candidate.id === prop)) {
+      throw new ValidationError(
+        `Shot "${shot.id}" references missing prop "${prop}". Known props: ${sets?.props.map((p) => p.id).join(', ') || 'none'}.`,
+      );
+    }
+  }
+  const onScreen = new Set([...shot.refs.characters, ...(shot.lipSync ? [shot.lipSync.character] : [])]);
+  for (const [characterId, stateId] of Object.entries(states)) {
+    const character = characters.characters.find((candidate) => candidate.id === characterId);
+    if (!character) throw new ValidationError(`Shot "${shot.id}" names a state for missing character "${characterId}".`);
+    if (!onScreen.has(characterId)) {
+      throw new ValidationError(`Shot "${shot.id}" names a state for "${characterId}", who is not in its refs.characters.`);
+    }
+    if (!character.states.some((candidate) => candidate.id === stateId)) {
+      throw new ValidationError(
+        `Shot "${shot.id}" names missing state "${stateId}" of "${characterId}". Known states: ${character.states.map((c) => c.id).join(', ') || 'none'}.`,
       );
     }
   }
@@ -409,7 +460,10 @@ export function resolveStoryboard(
   fps: number,
   toleranceFrames = 1,
   episode?: EpisodeContext,
+  /** sets.yaml of a music video; an episode's sets come from `episode`. */
+  projectSets?: SetBible,
 ): ResolvedStoryboard {
+  const sets = episode?.sets ?? projectSets;
   const warnings: string[] = [];
   const resolved: ResolvedShot[] = [];
   const ids = new Set<string>();
@@ -439,7 +493,8 @@ export function resolveStoryboard(
     }
 
     validateRefs(shot, style, characters);
-    validateSets(shot, episode);
+    validateSets(shot, sets, episode);
+    validateContinuity(shot, characters, sets, episode);
     validateSource(shot);
     validateChatWindow(shot, episode);
     validateLipSync(shot, endSeconds - startSeconds, characters, episode);

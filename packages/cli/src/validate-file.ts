@@ -173,5 +173,10 @@ export async function validateChangedFile(file: string): Promise<string | undefi
     await readYamlFile(join(projectDir, 'characters.yaml'), CharacterBibleSchema);
     return 'characters';
   }
+  if (name === 'sets.yaml') {
+    // A music video's own sets, plates, and props (an episode uses the canon's).
+    await readYamlFile(join(projectDir, 'sets.yaml'), SetBibleSchema);
+    return 'sets';
+  }
   return undefined;
 }

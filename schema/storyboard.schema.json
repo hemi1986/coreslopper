@@ -404,7 +404,9 @@
             "default": {
               "style": [],
               "characters": [],
-              "sets": []
+              "sets": [],
+              "props": [],
+              "states": {}
             },
             "type": "object",
             "properties": {
@@ -426,6 +428,27 @@
                 "default": [],
                 "type": "array",
                 "items": {
+                  "type": "string"
+                }
+              },
+              "plate": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9_-]*\\/[a-z0-9][a-z0-9_-]*$"
+              },
+              "props": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "states": {
+                "default": {},
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
                   "type": "string"
                 }
               }

@@ -78,7 +78,9 @@ export interface SeriesStatus {
   budget: SeriesBudget;
   dir: string;
   characters: { id: string; face: string; voice: 'ok' | 'missing' | 'none'; refs: number }[];
-  sets: { id: string; refs: number }[];
+  sets: { id: string; refs: number; plates: number }[];
+  /** Prop references and how many of their reference images exist. */
+  props: { id: string; refs: number }[];
   episodes: EpisodeStatus[];
 }
 
@@ -113,12 +115,16 @@ export async function collectSeriesStatus(seriesDir: string): Promise<SeriesStat
         refs: character.refs.filter((ref) => existsSync(resolve(seriesDir, ref))).length,
       }))
     : [];
-  const sets = existsSync(setsPath)
-    ? (await readYamlFile(setsPath, SetBibleSchema)).sets.map((set) => ({
-        id: set.id,
-        refs: set.refs.filter((ref) => existsSync(resolve(seriesDir, ref))).length,
-      }))
-    : [];
+  const setBible = existsSync(setsPath) ? await readYamlFile(setsPath, SetBibleSchema) : undefined;
+  const sets = (setBible?.sets ?? []).map((set) => ({
+    id: set.id,
+    refs: set.refs.filter((ref) => existsSync(resolve(seriesDir, ref))).length,
+    plates: set.plates.filter((plate) => plate.ref && existsSync(resolve(seriesDir, plate.ref))).length,
+  }));
+  const props = (setBible?.props ?? []).map((prop) => ({
+    id: prop.id,
+    refs: prop.refs.filter((ref) => existsSync(resolve(seriesDir, ref))).length,
+  }));
 
   const found = new Map<number, EpisodeStatus>();
   for (const { dir, config } of await episodeConfigs(seriesDir, series.slug)) {
@@ -147,7 +153,7 @@ export async function collectSeriesStatus(seriesDir: string): Promise<SeriesStat
     if (!series.episodes.some((planned) => planned.episode === episode)) episodes.push(status);
   }
   episodes.sort((a, b) => a.episode - b.episode);
-  return { series, budget: await seriesBudget(seriesDir), dir: seriesDir, characters, sets, episodes };
+  return { series, budget: await seriesBudget(seriesDir), dir: seriesDir, characters, sets, props, episodes };
 }
 
 export async function printSeriesStatus(seriesArg: string): Promise<void> {
@@ -167,7 +173,10 @@ export async function printSeriesStatus(seriesArg: string): Promise<void> {
         ? ` · ${status.characters.map((c) => `${c.id} [${c.face}, voice ${c.voice}, ${c.refs} ref(s)]`).join('; ')}`
         : ''),
   );
-  if (status.sets.length) console.log(`Sets: ${status.sets.map((set) => `${set.id} [${set.refs} ref(s)]`).join('; ')}`);
+  if (status.sets.length) {
+    console.log(`Sets: ${status.sets.map((set) => `${set.id} [${set.refs} ref(s), ${set.plates} plate(s)]`).join('; ')}`);
+  }
+  if (status.props.length) console.log(`Props: ${status.props.map((prop) => `${prop.id} [${prop.refs} ref(s)]`).join('; ')}`);
   const budget = status.budget;
   console.log(
     budget.totalUsd === undefined

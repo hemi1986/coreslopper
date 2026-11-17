@@ -63,7 +63,7 @@ export interface ProjectPaths {
   series?: string;
   /** Episode only: `series.yaml` of the series. */
   seriesConfig?: string;
-  /** Episode only: the canon's set bible. */
+  /** sets.yaml: the canon's set bible for an episode, the project's own (optional) for a music video. */
   sets?: string;
   review: string;
   contactSheet: string;
@@ -104,9 +104,8 @@ export function projectPaths(projectDir: string, config?: Pick<ProjectConfig, 'k
     storyboardMd: join(root, 'storyboard.md'),
     style: join(canon ?? root, 'style.yaml'),
     characters: join(canon ?? root, 'characters.yaml'),
-    ...(canon
-      ? { series: canon, seriesConfig: join(canon, 'series.yaml'), sets: join(canon, 'sets.yaml') }
-      : {}),
+    sets: join(canon ?? root, 'sets.yaml'),
+    ...(canon ? { series: canon, seriesConfig: join(canon, 'series.yaml') } : {}),
     review: join(root, 'review'),
     contactSheet: join(root, 'review', 'contact-sheet.svg'),
     renders: join(root, 'renders'),
@@ -215,7 +214,7 @@ export interface LoadedProject {
   characters?: CharacterBible;
   /** Episode only: the series config of the canon. */
   series?: Series;
-  /** Episode only: the canon's sets. */
+  /** The sets, plates, and props: the canon's sets.yaml for an episode, the project's optional sets.yaml for a music video. */
   sets?: SetBible;
   /** Episode only. */
   script?: Script;
@@ -248,8 +247,10 @@ export async function loadProject(projectDir: string): Promise<LoadedProject> {
     ? await readYamlFile(paths.characters, CharacterBibleSchema)
     : undefined;
 
+  const sets = paths.sets && pathExists(paths.sets) ? await readYamlFile(paths.sets, SetBibleSchema) : undefined;
+
   if (config.kind !== 'episode') {
-    return { config, state, timing, overrides, effectiveTiming, storyboard, style, characters, paths };
+    return { config, state, timing, overrides, effectiveTiming, storyboard, style, characters, sets, paths };
   }
 
   if (!paths.seriesConfig || !pathExists(paths.seriesConfig)) {
@@ -258,7 +259,6 @@ export async function loadProject(projectDir: string): Promise<LoadedProject> {
     );
   }
   const series = await readYamlFile(paths.seriesConfig, SeriesSchema);
-  const sets = paths.sets && pathExists(paths.sets) ? await readYamlFile(paths.sets, SetBibleSchema) : undefined;
   const script = pathExists(paths.script) ? await readYamlFile(paths.script, ScriptSchema) : undefined;
   const takes = pathExists(paths.takes) ? await readJsonFile(paths.takes, TakesSchema) : undefined;
 
