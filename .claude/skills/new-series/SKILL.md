@@ -47,7 +47,8 @@ Done when the grilling frontier is empty, the user confirmed shared understandin
 Write the machine-readable canon from the bible; the hook validates each file on write.
 
 - `characters.yaml`: per character `id`, `name`, `description` (what never changes), `prompt`, and `face`: `full`, `silhouette`, `screen-only` (appears only on a screen), or `voice-only` (never on screen).
-- `sets.yaml`: per set `id`, `name`, `description`, and `prompt`, the anchor every keyframe in that set starts from.
+- `sets.yaml`: per set `id`, `name`, `description`, and `prompt`, the anchor every keyframe in that set starts from; per set its `plates` (`id`, `angle`), the fixed camera angles episodes return to; and at the top level `props` (`id`, `name`, `description`), the recurring objects. See "Sets, plates, and props" in `.claude/skills/style-bible/SKILL.md`.
+- Character states (`states` in `characters.yaml`) that are part of the canon from episode 1 on; episodes append later ones.
 - `style.yaml`: refine the starter style from the brand kit with the `style-bible` skill.
 - `series.yaml`: the episode plan under `episodes` (`episode`, `title`, `logline`) and the creative limits under `limits` (`episode_seconds: { min, max }`, optionally `lipsync_seconds_max`) that the bible names. Leave `budget_usd` as created; when the user changes it, change `budget.totalUsd` in `state.json` together with it.
 
@@ -59,11 +60,14 @@ Generate through the series budget: `npm run cli -- generate --series <slug> --b
 
 - **Characters** shown on screen (`full`, `screen-only`, `silhouette`): a character sheet with `image.character_sheet`, then 2–4 references with `image.edit` from the sheet. Follow `.claude/skills/character-bible/SKILL.md` for descriptions and review. A `silhouette` character gets a silhouette sheet with no readable face.
 - **Sets**: one or more start frames per set with `image.keyframe` from the set's `prompt` plus the style's look keywords, at the master format's size.
+- **Plates**: one empty frame per plate, as an `image.edit` of the set's start frame that moves the camera to the plate's `angle` (same room, same light, nobody in it), saved as `sets/<id>/plates/<plate>.png` and recorded in `ref`.
+- **Props**: one reference per prop alone on a neutral ground, saved under `props/<id>/` and recorded in `refs`.
+- **Character states** of the canon: an `image.edit` of the sheet per state, saved as `characters/<id>/states/<state>.png` and recorded in `ref` (see `.claude/skills/character-bible/SKILL.md`).
 - **Reference voices** for every character with speech: a recording by the user, or, with `providers.audio: comfyui`, an `audio.voice_design` take ("(voice description)text"). Save it as `characters/<id>/voice.wav` and record `voice.ref` and the exact `voice.transcript` in `characters.yaml`.
 
-Copy the chosen files from `assets/` into `characters/<id>/` and `sets/<id>/`, and record them in `sheet` and `refs`. Have the `art-director` review every sheet and set frame against the bible and the style; regenerate what fails.
+Copy the chosen files from `assets/` into `characters/<id>/` and `sets/<id>/`, and record them in `sheet` and `refs`. Have the `art-director` review every sheet, set frame, plate, prop, and state against the bible and the style; regenerate what fails.
 
-Done when every on-screen character has a sheet and at least one reference, every set has at least one reference frame, every speaking character has a reference voice with its transcript, and the art director passed them.
+Done when every on-screen character has a sheet and at least one reference, every set has at least one reference frame and every plate its image, every prop and state its reference, every speaking character has a reference voice with its transcript, and the art director passed them.
 
 ### 5. Hand-over
 
@@ -71,6 +75,6 @@ Report the series path, the series budget with canon spend (`series-status`), an
 
 ## Rules
 
-- References, voices, and generations stay under `series/<slug>/characters/`, `sets/`, and `assets/`, which are gitignored; the YAML canon and `state.json` are tracked.
-- Change a character or set only before its first episode is generated: canon files are shared by every episode, and a changed reference changes the cache keys of every later generation.
+- References, voices, and generations stay under `series/<slug>/characters/`, `sets/`, `props/`, and `assets/`, which are gitignored; the YAML canon and `state.json` are tracked.
+- Change a character or set only before its first episode is generated: canon files are shared by every episode, and a changed reference changes the cache keys of every later generation. Episodes may append plates, props, and character states; they never change existing ones.
 - Never echo API keys.

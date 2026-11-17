@@ -385,12 +385,15 @@ function channelLink(channel: ChannelConfig | undefined, platform: string, l: La
   return /<ID>/.test(value) ? `${value} ${l.todo(`links.${platform} in config/channel.yaml`)}` : value;
 }
 
-/** Footer lines from config/channel.yaml: song credit, tool credit, links. */
-export function footerLines(input: Pick<ReleaseTextInput, 'channel' | 'artist' | 'title' | 'release'>, l: Labels): string[] {
+/** Footer lines from config/channel.yaml: song credit (music videos only; an episode has no song), tool credit, links. */
+export function footerLines(
+  input: Pick<ReleaseTextInput, 'channel' | 'artist' | 'title' | 'release'> & { kind?: ReleaseTextInput['kind'] },
+  l: Labels,
+): string[] {
   const channel = input.channel;
   if (!channel) return [];
   const lines: string[] = [];
-  if (channel.footer.song_credit) {
+  if (channel.footer.song_credit && input.kind !== 'episode') {
     lines.push(
       channel.footer.song_credit
         .replaceAll('{artist}', input.artist ?? l.todo('artist'))

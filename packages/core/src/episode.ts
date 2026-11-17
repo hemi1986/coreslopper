@@ -251,12 +251,16 @@ function wrapSubtitle(text: string, width = 42): string {
 
 /**
  * The English subtitles: one cue per dialogue, voice-over, announcement, and
- * chat line, timed by the (effective) timing, in playing order.
+ * chat line, plus sfx lines that carry a `text_en` for on-screen text, timed by
+ * the (effective) timing, in playing order.
  */
 export function subtitleCues(script: Script, timing: Timing): SubtitleCue[] {
   const cues: SubtitleCue[] = [];
   for (const { line } of scriptLines(script)) {
-    if (!isSubtitledLine(line)) continue;
+    if (line.kind === 'sfx') {
+      // An sfx line carries a subtitle only for on-screen text (a label, a sign).
+      if (!line.text_en?.trim()) continue;
+    } else if (!isSubtitledLine(line)) continue;
     const timed = timing.lines.find((candidate) => candidate.id === line.id);
     if (!timed) throw new ValidationError(`Script line "${line.id}" is not in the timing; re-run episode-track.`);
     if (!line.text_en?.trim()) throw new ValidationError(`Script line "${line.id}" has no text_en.`);

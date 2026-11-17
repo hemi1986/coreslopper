@@ -89,7 +89,7 @@ dist/              Generated npx bundle (gitignored)
 | 2 | `brief` ✋ | `grilling`, `video-brief` | `brief.md` | Budget/formats present; grilling frontier empty |
 | 3 | `treatment` ✋ | `grilling`, `video-treatment` | `treatment.md` | Critic vs. brief; user accepts |
 | 4 | `audio-analysis` | `audio-analysis` | `timing.json`, `timing.report.md` | Schema; confidence flags |
-| 5 | `style-character` | `style-bible`, `character-bible` | `style.yaml`, `characters.yaml`, refs | Schema; image QA |
+| 5 | `style-character` | `style-bible`, `character-bible` | `style.yaml`, `characters.yaml`, `sets.yaml` (plates, props), refs, character states | Schema; image QA per reference |
 | 6 | `storyboard` | `storyboard` | `storyboard.yaml`, `storyboard.md`, contact sheet | Schema, anchors, coverage, refs, source rules |
 | 7 | `assets` | `remotion-motion`, `ai-clips`, `footage` | Components, keyframes, clips, footage | Per-batch cost + QA; cache |
 | 8 | `assembly` | `assembly-render` | `renders/preview-16x9.mp4` | Preview; sync/legibility |

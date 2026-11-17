@@ -35,6 +35,10 @@ projects/*/assets/*
 !projects/*/assets/.gitkeep
 projects/*/characters/*
 !projects/*/characters/.gitkeep
+projects/*/sets/*
+!projects/*/sets/.gitkeep
+projects/*/props/*
+!projects/*/props/.gitkeep
 projects/*/renders/*
 !projects/*/renders/.gitkeep
 projects/*/timing.effective.json
@@ -44,6 +48,8 @@ series/*/characters/*
 !series/*/characters/.gitkeep
 series/*/sets/*
 !series/*/sets/.gitkeep
+series/*/props/*
+!series/*/props/.gitkeep
 series/*/assets/*
 !series/*/assets/.gitkeep
 

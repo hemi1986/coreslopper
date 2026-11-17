@@ -251,6 +251,9 @@
                       "type": "number",
                       "exclusiveMinimum": 0
                     },
+                    "text_en": {
+                      "type": "string"
+                    },
                     "pause_after": {
                       "default": 0,
                       "type": "number",

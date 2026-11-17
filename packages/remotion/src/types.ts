@@ -76,7 +76,7 @@ const fixtureShot: ResolvedShot = {
   text: 'CORESLOPPER',
   highlights: ['CORESLOPPER'],
   transition: { type: 'cut', duration: 0 },
-  refs: { style: [], characters: [], sets: [] },
+  refs: { style: [], characters: [], sets: [], props: [], states: {} },
   motion: { component: 'TitleCard', props: {} },
   startSeconds: 0,
   endSeconds: 2,

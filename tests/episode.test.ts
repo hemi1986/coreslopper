@@ -294,12 +294,12 @@ describe('set rule', () => {
     expect(resolve).toThrow(/scene "s01_office" plays in set "office"/);
   });
 
-  it('rejects sets outside an episode', async () => {
+  it('rejects sets without a sets.yaml', async () => {
     const project = await loadProject(episodeDir);
     const storyboard = structuredClone(project.storyboard!);
     expect(() =>
       resolveStoryboard(storyboard, project.effectiveTiming!, project.style!, project.characters!, 30),
-    ).toThrow(/only in episode projects/);
+    ).toThrow(/there is no sets\.yaml/);
   });
 });
 

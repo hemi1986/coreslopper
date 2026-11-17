@@ -1,7 +1,7 @@
 import { existsSync, statSync } from 'node:fs';
 import { readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { isAbsolute, join, relative, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { renderStill, selectComposition } from '@remotion/renderer';
 import {
   ValidationError,
@@ -68,6 +68,39 @@ function checkAssets(project: Awaited<ReturnType<typeof loadProject>>, assetsDon
   return missing.length
     ? { name: 'Assets', result: 'FAIL', evidence: `missing: ${missing.join(', ')}` }
     : { name: 'Assets', result: 'PASS', evidence: 'all referenced assets exist' };
+}
+
+/**
+ * Continuity references: every plate, prop, and character state a shot names
+ * has a reference image on disk (relative to sets.yaml and characters.yaml).
+ */
+export function checkContinuityRefs(
+  project: Pick<Awaited<ReturnType<typeof loadProject>>, 'storyboard' | 'sets' | 'characters' | 'paths'>,
+): Check {
+  const shots = project.storyboard?.shots ?? [];
+  const setsRoot = dirname(project.paths.sets ?? project.paths.root);
+  const charactersRoot = dirname(project.paths.characters);
+  const named = new Map<string, string | undefined>();
+  for (const shot of shots) {
+    if (shot.refs.plate) {
+      const [setId, plateId] = shot.refs.plate.split('/');
+      const plate = project.sets?.sets.find((set) => set.id === setId)?.plates.find((candidate) => candidate.id === plateId);
+      named.set(`plate ${shot.refs.plate}`, plate?.ref && resolve(setsRoot, plate.ref));
+    }
+    for (const id of shot.refs.props) {
+      const ref = project.sets?.props.find((prop) => prop.id === id)?.refs[0];
+      named.set(`prop ${id}`, ref && resolve(setsRoot, ref));
+    }
+    for (const [characterId, stateId] of Object.entries(shot.refs.states)) {
+      const state = project.characters?.characters.find((c) => c.id === characterId)?.states.find((s) => s.id === stateId);
+      named.set(`state ${characterId}/${stateId}`, state?.ref && resolve(charactersRoot, state.ref));
+    }
+  }
+  if (named.size === 0) return { name: 'Continuity references', result: 'N/A', evidence: 'no shot names a plate, prop, or state' };
+  const missing = [...named].filter(([, path]) => !path || !existsSync(path)).map(([label]) => label);
+  return missing.length
+    ? { name: 'Continuity references', result: 'FAIL', evidence: `no reference image: ${missing.join(', ')}` }
+    : { name: 'Continuity references', result: 'PASS', evidence: `${named.size} plate/prop/state reference(s) exist` };
 }
 
 /** Three 1280x720 JPEGs under 2 MB in renders/thumbnails/; fewer is a warning, a bad file a failure. */
@@ -258,12 +291,16 @@ function episodeChecks(project: Awaited<ReturnType<typeof loadProject>>, duratio
 
   const characterIds = new Set(project.characters?.characters.map((character) => character.id));
   const setIds = new Set(project.sets?.sets.map((set) => set.id));
+  const propIds = new Set(project.sets?.props.map((prop) => prop.id));
+  const plateIds = new Set(project.sets?.sets.flatMap((set) => set.plates.map((plate) => `${set.id}/${plate.id}`)));
   const unknown = [
     ...subtitled.filter((line) => !characterIds.has(line.speaker)).map((line) => `speaker ${line.speaker}`),
     ...(project.script?.scenes ?? []).filter((scene) => !setIds.has(scene.set)).map((scene) => `set ${scene.set}`),
     ...(project.storyboard?.shots ?? []).flatMap((shot) => [
       ...shot.refs.characters.filter((id) => !characterIds.has(id)).map((id) => `${shot.id} character ${id}`),
       ...shot.refs.sets.filter((id) => !setIds.has(id)).map((id) => `${shot.id} set ${id}`),
+      ...shot.refs.props.filter((id) => !propIds.has(id)).map((id) => `${shot.id} prop ${id}`),
+      ...(shot.refs.plate && !plateIds.has(shot.refs.plate) ? [`${shot.id} plate ${shot.refs.plate}`] : []),
     ]),
   ];
   checks.push({
@@ -303,6 +340,7 @@ export async function runQa(options: QaOptions): Promise<string> {
     evidence: `${resolved.shots.length} shots, ${resolved.durationInFrames} frames, no gaps`,
   });
   checks.push(checkAssets(project, project.state.stages.assets?.status === 'done'));
+  checks.push(checkContinuityRefs(project));
   const audio = projectAudioPath(project.config);
   checks.push({
     name: 'Audio',

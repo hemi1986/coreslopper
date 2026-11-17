@@ -111,6 +111,7 @@ export async function validateProject(projectDir: string, options: { write?: boo
     config.formats.master.fps,
     1,
     episodeContext,
+    project.sets,
   );
 
   if (options.write !== false) {

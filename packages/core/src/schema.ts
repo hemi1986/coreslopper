@@ -303,10 +303,19 @@ export const ShotSchema = z.object({
     .object({
       style: z.array(z.string()).default([]),
       characters: z.array(z.string()).default([]),
-      /** Episode only: sets of the series canon; each must be the set of the shot's scene. */
+      /** Sets of sets.yaml (series canon or project); in an episode each must be the set of the shot's scene. */
       sets: z.array(z.string()).default([]),
+      /**
+       * Plate the keyframe starts from, as `<set>/<plate>`: an empty frame of the set
+       * from a fixed camera angle (sets.yaml). The keyframe is an edit of it.
+       */
+      plate: z.string().regex(/^[a-z0-9][a-z0-9_-]*\/[a-z0-9][a-z0-9_-]*$/, 'plate must look like <set>/<plate>').optional(),
+      /** Prop references (sets.yaml `props`) visible in the shot. */
+      props: z.array(z.string()).default([]),
+      /** Character state per character id (characters.yaml `states`): how the character looks in this shot. */
+      states: z.record(z.string(), z.string()).default({}),
     })
-    .default({ style: [], characters: [], sets: [] }),
+    .default({ style: [], characters: [], sets: [], props: [], states: {} }),
   motion: z
     .object({
       component: z.string().optional(),
@@ -408,6 +417,33 @@ export const StyleBibleSchema = z
     }
   });
 
+/** Report duplicate ids in a list of objects with an `id`. */
+function duplicateIds(items: { id: string }[], ctx: z.RefinementCtx, path: (string | number)[], what: string): void {
+  const seen = new Set<string>();
+  for (const [index, item] of items.entries()) {
+    if (seen.has(item.id)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: [...path, index, 'id'], message: `duplicate ${what} id "${item.id}"` });
+    }
+    seen.add(item.id);
+  }
+}
+
+/**
+ * A continuity state of a character: a named look the story puts the character
+ * in from some shot on, with the reference image every such keyframe derives from.
+ */
+export const CharacterStateSchema = z.object({
+  id: ScriptIdSchema,
+  /** What differs from the character sheet, concretely (what is open, attached, worn, and where it leads). */
+  description: z.string().min(1),
+  /** Prompt sentence that keyframes of this state include. */
+  prompt: z.string().optional(),
+  /** Reference image, relative to the canon or project; an edit of the sheet or of another state's ref. */
+  ref: z.string().optional(),
+  /** The state this one derives from; the sheet when absent. */
+  from: z.string().optional(),
+});
+
 /** How a character may appear on screen. */
 export const DisplayRuleSchema = z.enum(['full', 'silhouette', 'screen-only', 'voice-only']);
 
@@ -426,14 +462,41 @@ export const CharacterSchema = z.object({
     })
     .optional(),
   face: DisplayRuleSchema.default('full'),
+  /**
+   * Continuity states: how the character looks after the story changed it
+   * (an open hatch, a cable attached, headphones on). Shots name a state in
+   * `refs.states`; its `ref` is the reference every such keyframe derives from.
+   */
+  states: z.array(CharacterStateSchema).default([]),
 });
 
-export const CharacterBibleSchema = z.object({
-  version: z.literal(1).default(1),
-  characters: z.array(CharacterSchema).default([]),
+export const CharacterBibleSchema = z
+  .object({
+    version: z.literal(1).default(1),
+    characters: z.array(CharacterSchema).default([]),
+  })
+  .superRefine((bible, ctx) => {
+    for (const [index, character] of bible.characters.entries()) {
+      duplicateIds(character.states, ctx, ['characters', index, 'states'], `state of "${character.id}"`);
+    }
+  });
+
+/**
+ * A plate: an empty frame of a set from one fixed camera angle, in the set's
+ * light. Keyframes in that framing are edits of the plate with the characters
+ * and props inserted, so geometry and light stay the same from shot to shot.
+ */
+export const PlateSchema = z.object({
+  id: ScriptIdSchema,
+  /** Camera position and framing, e.g. "shelf, frontal, waist height, medium". */
+  angle: z.string().min(1),
+  /** Prompt for the plate; the set's prompt plus the angle when absent. */
+  prompt: z.string().optional(),
+  /** The plate image, relative to the canon or project (`sets/<set>/plates/<id>.png`). */
+  ref: z.string().optional(),
 });
 
-/** A recurring location of a series. */
+/** A recurring location of a series or a music video. */
 export const SetSchema = z.object({
   id: ScriptIdSchema,
   name: z.string().min(1),
@@ -442,12 +505,33 @@ export const SetSchema = z.object({
   prompt: z.string().min(1),
   /** Reference start frames, relative to the series folder (`sets/<id>/...`). */
   refs: z.array(z.string()).default([]),
+  /** Plates: empty frames of this set from fixed camera angles. */
+  plates: z.array(PlateSchema).default([]),
 });
 
-export const SetBibleSchema = z.object({
-  version: z.literal(1).default(1),
-  sets: z.array(SetSchema).default([]),
+/** A recurring object with one look: the reference every shot showing it uses. */
+export const PropSchema = z.object({
+  id: ScriptIdSchema,
+  name: z.string().min(1),
+  /** Look, material, colour, size, and what is attached to it. */
+  description: z.string().min(1),
+  prompt: z.string().optional(),
+  /** Reference images, relative to the canon or project (`props/<id>/...`). */
+  refs: z.array(z.string()).default([]),
 });
+
+export const SetBibleSchema = z
+  .object({
+    version: z.literal(1).default(1),
+    sets: z.array(SetSchema).default([]),
+    /** Prop references shared by every shot (and episode) that shows the prop. */
+    props: z.array(PropSchema).default([]),
+  })
+  .superRefine((bible, ctx) => {
+    duplicateIds(bible.sets, ctx, ['sets'], 'set');
+    duplicateIds(bible.props, ctx, ['props'], 'prop');
+    for (const [index, set] of bible.sets.entries()) duplicateIds(set.plates, ctx, ['sets', index, 'plates'], `plate of "${set.id}"`);
+  });
 
 export const SeriesSchema = z.object({
   version: z.literal(1),
@@ -530,6 +614,8 @@ export const ScriptLineSchema = z.discriminatedUnion('kind', [
     ...ScriptLineBase,
     prompt: z.string().min(1),
     duration: z.number().positive(),
+    /** Optional English subtitle for on-screen text seen during this sound (a label, a sign); not spoken. */
+    text_en: z.string().optional(),
     pause_after: PauseAfterSchema,
   }),
   z.object({
@@ -896,6 +982,8 @@ export type ProjectConfig = z.infer<typeof ProjectConfigSchema>;
 export type ProjectKind = z.infer<typeof ProjectKindSchema>;
 export type DisplayRule = z.infer<typeof DisplayRuleSchema>;
 export type SetDefinition = z.infer<typeof SetSchema>;
+export type Plate = z.infer<typeof PlateSchema>;
+export type Prop = z.infer<typeof PropSchema>;
 export type SetBible = z.infer<typeof SetBibleSchema>;
 export type Series = z.infer<typeof SeriesSchema>;
 export type ScriptLine = z.infer<typeof ScriptLineSchema>;
@@ -921,6 +1009,7 @@ export type Shot = z.infer<typeof ShotSchema>;
 export type Storyboard = z.infer<typeof StoryboardSchema>;
 export type StyleBible = z.infer<typeof StyleBibleSchema>;
 export type Character = z.infer<typeof CharacterSchema>;
+export type CharacterState = z.infer<typeof CharacterStateSchema>;
 export type CharacterBible = z.infer<typeof CharacterBibleSchema>;
 export type BrandKit = z.infer<typeof BrandKitSchema>;
 export type ModelPricing = z.infer<typeof ModelPricingSchema>;

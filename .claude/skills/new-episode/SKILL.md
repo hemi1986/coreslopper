@@ -6,7 +6,7 @@ license: MIT
 
 # New Episode
 
-This skill runs the two **interactive stages** of an episode in the main session, with the user: `setup` and `script`. The series and its canon (`series/<series>/`: `series.yaml`, `bible.md`, `style.yaml`, `characters.yaml`, `sets.yaml`) exist already; an episode reads the canon and never writes it.
+This skill runs the two **interactive stages** of an episode in the main session, with the user: `setup` and `script`. The series and its canon (`series/<series>/`: `series.yaml`, `bible.md`, `style.yaml`, `characters.yaml`, `sets.yaml`) exist already; an episode reads the canon and never changes it; its storyboard may only append plates, props, and character states (ADR 0025).
 
 Talk to the user in their language. Write every project file in English, except `text_de`, which is the German spoken or on-screen text.
 
@@ -67,6 +67,7 @@ scenes:
 - Line IDs are unique across the script and stay stable: they name the take files and the storyboard anchors.
 - Spoken `text_de` (`dialogue`, `voiceover`, `announcement`) spells out every number, year, time, abbreviation, and symbol in words ("2077" → "zweitausendsiebenundsiebzig", "z. B." → "zum Beispiel"). Chat text is shown, not spoken, and may keep digits.
 - Every `dialogue`, `voiceover`, `announcement`, and `chat` line has `text_en`: it is the English subtitle.
+- An `sfx` line may carry `text_en` when the picture shows readable non-English text during it (a label, a sign); it becomes a subtitle for that text and is never spoken.
 - Lines play strictly one after another; leave `with` out.
 
 Run `npm run cli -- validate-file projects/<slug>/script.yaml` and fix every reported issue. Then show the user the scene list (set, line count, speakers) and an estimate of the length (speech at about 14 characters per second, plus chat, effect, and pause durations and every `pause_after`), and ask them to confirm or correct it.

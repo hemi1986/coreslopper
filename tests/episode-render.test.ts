@@ -102,6 +102,18 @@ describe('subtitles', () => {
     expect(cue.text.split('\n')).toHaveLength(2);
     expect(buildSrt(script, timing)).toContain('01:01:01,500 --> 01:01:03,000');
   });
+
+  it('adds a cue for an sfx line with text_en (on-screen text) and skips sfx lines without it', async () => {
+    const project = await loadProject(episodeDir);
+    const script = structuredClone(project.script!);
+    const sfx = script.scenes.flatMap((scene) => scene.lines).find((line) => line.kind === 'sfx');
+    expect(sfx).toBeDefined();
+    const before = subtitleCues(script, project.effectiveTiming!).length;
+    (sfx as { text_en?: string }).text_en = 'DIARY';
+    const cues = subtitleCues(script, project.effectiveTiming!);
+    expect(cues).toHaveLength(before + 1);
+    expect(cues.find((cue) => cue.id === sfx!.id)!.text).toBe('DIARY');
+  });
 });
 
 describe('ChatWindow validation', () => {

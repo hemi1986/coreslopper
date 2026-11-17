@@ -44,7 +44,7 @@ import {
   wavProblems,
   type MediaProbe,
 } from '../packages/cli/src/release-media.ts';
-import { releaseTexts, type ReleaseTextInput } from '../packages/cli/src/release-texts.ts';
+import { footerLines, releaseLabels, releaseTexts, type ReleaseTextInput } from '../packages/cli/src/release-texts.ts';
 import { thumbnailProblems } from '../packages/cli/src/thumbnail-files.ts';
 import { validateChangedFile } from '../packages/cli/src/validate-file.ts';
 import { coverTextProblem, layoutSquare, thumbnailSize, type LineMetrics } from '../packages/remotion/src/lib/thumbnail.ts';
@@ -359,6 +359,8 @@ describe('TODO detection and text limits', () => {
     expect(texts['release-plan.md']).toContain('| -21 | 2026-11-20 |');
     for (const text of Object.values(texts)) expect(unmarkedPlaceholders(text)).toEqual([]);
     expect(texts['instagram.md']).not.toBe(texts['tiktok.md']);
+    expect(footerLines({ ...input, kind: 'episode' }, releaseLabels('de'))).not.toContain('Neon Static – Neon Rain (Suno)');
+    expect(footerLines({ ...input, kind: 'episode' }, releaseLabels('de'))).toContain('Gemacht mit coreslopper');
   });
 });
 

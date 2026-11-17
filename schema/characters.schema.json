@@ -64,6 +64,37 @@
               "screen-only",
               "voice-only"
             ]
+          },
+          "states": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^[a-z0-9][a-z0-9_-]*$"
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "prompt": {
+                  "type": "string"
+                },
+                "ref": {
+                  "type": "string"
+                },
+                "from": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "description"
+              ]
+            }
           }
         },
         "required": [

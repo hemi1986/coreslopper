@@ -1,5 +1,5 @@
-import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   ValidationError,
@@ -49,10 +49,12 @@ interface MixInput {
 
 /**
  * Mix inputs into one 48 kHz stereo WAV of exactly `duration` seconds. A silent
- * base input sets the length, so a mix without takes is valid silence.
+ * base input sets the length, so a mix without takes is valid silence. With a
+ * loudness target the raw mix is brought to it by `levelToTarget`.
  */
 function mix(inputs: MixInput[], duration: number, destination: string, loudness?: { lufs: number; peak: number }): void {
   const ffmpeg = resolveBinary('ffmpeg');
+  const raw = loudness ? `${destination}.raw.wav` : destination;
   const args = ['-y', '-loglevel', 'error', '-f', 'lavfi', '-t', duration.toFixed(3), '-i', `anullsrc=r=${SAMPLE_RATE}:cl=stereo`];
   const filters: string[] = [];
   const labels = ['[0:a]'];
@@ -68,15 +70,67 @@ function mix(inputs: MixInput[], duration: number, destination: string, loudness
     labels.push(label);
   }
   filters.push(`${labels.join('')}amix=inputs=${labels.length}:duration=first:normalize=0:dropout_transition=0[mix]`);
-  const tail = loudness ? `loudnorm=I=${loudness.lufs}:TP=${loudness.peak}:LRA=11,` : '';
-  // loudnorm shifts timestamps and drops a few milliseconds at the end, so the
-  // exact length is set by sample count, not by time.
-  const samples = Math.round(duration * SAMPLE_RATE);
-  filters.push(
-    `[mix]${tail}aresample=${SAMPLE_RATE},asetpts=N/SR/TB,apad=whole_len=${samples},atrim=end_sample=${samples}[out]`,
-  );
-  args.push('-filter_complex', filters.join(';'), '-map', '[out]', '-ar', String(SAMPLE_RATE), '-ac', '2', '-c:a', 'pcm_s16le', '-bitexact', destination);
+  filters.push(`[mix]${exactLength(duration)}[out]`);
+  args.push('-filter_complex', filters.join(';'), '-map', '[out]', '-ar', String(SAMPLE_RATE), '-ac', '2', '-c:a', 'pcm_s16le', '-bitexact', raw);
   execFileSync(ffmpeg, args, { stdio: 'inherit' });
+  if (loudness) {
+    levelToTarget(raw, duration, destination, loudness);
+    rmSync(raw, { force: true });
+  }
+}
+
+/** Pad or trim to an exact sample count, so the length never drifts by a few milliseconds. */
+function exactLength(duration: number): string {
+  const samples = Math.round(duration * SAMPLE_RATE);
+  return `aresample=${SAMPLE_RATE},asetpts=N/SR/TB,apad=whole_len=${samples},atrim=end_sample=${samples}`;
+}
+
+/** Integrated loudness of a file in LUFS, from ffmpeg's loudnorm analysis. */
+export function measureLoudness(file: string): { lufs: number; truePeak: number } {
+  const ffmpeg = resolveBinary('ffmpeg');
+  const result = spawnSync(ffmpeg, ['-hide_banner', '-nostats', '-i', file, '-af', 'loudnorm=print_format=json', '-f', 'null', '-'], {
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  const json = /\{[^{}]*"input_i"[^{}]*\}/.exec(result.stderr ?? '');
+  if (!json) throw new ValidationError(`Could not measure the loudness of ${file}.`);
+  const stats = JSON.parse(json[0]) as { input_i: string; input_tp: string };
+  return { lufs: Number(stats.input_i), truePeak: Number(stats.input_tp) };
+}
+
+/**
+ * Bring a mix to the loudness target with a static gain and a 4x-oversampled
+ * peak limiter half a dB under the true-peak ceiling. Single-pass loudnorm
+ * falls back to dynamic mode on wide-range episode mixes (sfx hits, quiet
+ * pauses) and lands about 2 LU short; a measured gain does not. The limiter
+ * eats a little loudness, so the gain is corrected until it is within 0.2 LU
+ * (at most four passes).
+ */
+function levelToTarget(raw: string, duration: number, destination: string, target: { lufs: number; peak: number }): void {
+  const ffmpeg = resolveBinary('ffmpeg');
+  const measured = measureLoudness(raw).lufs;
+  if (!Number.isFinite(measured)) {
+    execFileSync(ffmpeg, ['-y', '-loglevel', 'error', '-i', raw, '-c:a', 'pcm_s16le', '-bitexact', destination], { stdio: 'inherit' });
+    return;
+  }
+  const ceiling = Math.pow(10, (target.peak - 0.5) / 20).toFixed(4);
+  const apply = (gain: number) =>
+    execFileSync(
+      ffmpeg,
+      [
+        '-y', '-loglevel', 'error', '-i', raw, '-af',
+        `aresample=${SAMPLE_RATE * 4},volume=${gain.toFixed(2)}dB,alimiter=limit=${ceiling}:attack=2:release=50:level=false:asc=1,${exactLength(duration)}`,
+        '-ar', String(SAMPLE_RATE), '-ac', '2', '-c:a', 'pcm_s16le', '-bitexact', destination,
+      ],
+      { stdio: 'inherit' },
+    );
+  let gain = target.lufs - measured;
+  for (let pass = 0; pass < 4; pass += 1) {
+    apply(gain);
+    const error = target.lufs - measureLoudness(destination).lufs;
+    if (Math.abs(error) <= 0.2) break;
+    gain += error;
+  }
 }
 
 /** Mono samples of a WAV, decoded by ffmpeg. */
