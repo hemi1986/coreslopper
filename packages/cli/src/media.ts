@@ -14,6 +14,7 @@ import {
   writeJsonAtomic,
 } from '@coreslopper/core';
 import { lineTakePath, loadTakes, requireEpisode, saveTakes, textHash } from './takes.js';
+import { backingSpans, muteFilter, segmentMutes, type Span } from './lipsync-audio.js';
 
 export function resolveBinary(name: 'ffmpeg' | 'ffprobe'): string {
   const local = join(repoRoot(), '.tools', 'ffmpeg', name);
@@ -67,11 +68,14 @@ export function probeDuration(path: string): number {
 
 /**
  * The audio a lip-sync segment is cut from: an explicit source, else the
- * speaker stem of an episode character, else the vocal stem of a music video.
+ * speaker stem of an episode character, else the lead-vocal stem of a music
+ * video when one exists (`audio/stems/lead.wav`, without backing vocals), else
+ * its vocal stem.
  */
 export function segmentSource(
   kind: 'music-video' | 'episode',
   options: { source?: string; character?: string },
+  hasLeadStem = false,
 ): string {
   if (options.source) return options.source;
   if (kind === 'episode') {
@@ -80,24 +84,40 @@ export function segmentSource(
     }
     return `audio/stems/${options.character}.wav`;
   }
-  return 'audio/stems/vocals.wav';
+  return hasLeadStem ? 'audio/stems/lead.wav' : 'audio/stems/vocals.wav';
+}
+
+export interface AudioSegmentOptions {
+  source?: string;
+  character?: string;
+  /** Extra spans to silence, in song seconds. */
+  mute?: Span[];
+  /** Keep the backing words (parenthesized lyrics) audible; default false. */
+  keepBacking?: boolean;
+  /** Output format: mp3 (default) or wav (Higgsfield Speak takes WAV only). */
+  format?: 'mp3' | 'wav';
 }
 
 /**
  * Cut a time range from the vocal stem (or the mix) for a lip-sync shot.
- * Output is a small mono MP3 under assets/audio-segments/<name>.mp3, so the
- * generated clip lines up exactly with the song at the shot's start time.
+ * Output is a small mono MP3 (or WAV) under assets/audio-segments/<name>.<ext>,
+ * so the generated clip lines up exactly with the song at the shot's start time.
+ *
+ * A lip-sync segment is lead-only: backing words from the timing (parenthesized
+ * lyrics) and every `mute` span are silenced with short fades, so the face does
+ * not mouth echoes it does not sing.
  */
 export async function extractAudioSegment(
   projectDir: string,
   start: number,
   end: number,
   name: string,
-  options: { source?: string; character?: string } = {},
+  options: AudioSegmentOptions = {},
 ): Promise<string> {
   const ffmpeg = resolveBinary('ffmpeg');
   const project = await loadProject(projectDir);
-  const source = segmentSource(project.config.kind, options);
+  const hasLead = existsSync(resolve(project.paths.root, 'audio/stems/lead.wav'));
+  const source = segmentSource(project.config.kind, options, hasLead);
   if (!(Number.isFinite(start) && Number.isFinite(end)) || start < 0 || end <= start) {
     throw new ValidationError(`Invalid segment ${start}s–${end}s.`);
   }
@@ -106,8 +126,14 @@ export async function extractAudioSegment(
   }
   const input = resolve(project.paths.root, source);
   if (!existsSync(input)) throw new ValidationError(`Missing audio source: ${input}`);
-  const destination = resolve(project.paths.assets, 'audio-segments', `${name}.mp3`);
+  const format = options.format ?? 'mp3';
+  const destination = resolve(project.paths.assets, 'audio-segments', `${name}.${format}`);
   await ensureDir(dirname(destination));
+
+  const timing = project.effectiveTiming ?? project.timing;
+  const backing = options.keepBacking || !timing ? [] : backingSpans(timing);
+  const mutes = segmentMutes([...backing, ...(options.mute ?? [])], start, end);
+  const filter = muteFilter(mutes);
   execFileSync(
     ffmpeg,
     [
@@ -120,17 +146,23 @@ export async function extractAudioSegment(
       (end - start).toFixed(3),
       '-i',
       input,
+      ...(filter ? ['-af', filter] : []),
       '-ac',
       '1',
       '-ar',
       '44100',
-      '-b:a',
-      '128k',
+      ...(format === 'wav' ? ['-c:a', 'pcm_s16le'] : ['-b:a', '128k']),
+      '-threads',
+      '6',
       destination,
     ],
     { stdio: 'inherit' },
   );
-  console.log(`Audio segment ${start.toFixed(3)}s–${end.toFixed(3)}s written to ${destination}`);
+  console.log(`Audio segment ${start.toFixed(3)}s–${end.toFixed(3)}s from ${source} written to ${destination}`);
+  for (const span of mutes) {
+    console.log(`  muted ${(start + span.start).toFixed(3)}s–${(start + span.end).toFixed(3)}s (backing or --mute)`);
+  }
+  if (mutes.length === 0) console.log('  no backing spans in this segment');
   return destination;
 }
 

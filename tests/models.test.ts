@@ -85,7 +85,11 @@ describe('provider-specific model roles', () => {
     expect(models.roles['video.image_to_video.quality']?.alternatives.higgsfield?.pricing?.unit).toBe(
       'second',
     );
-    expect(models.roles['video.lipsync']?.alternatives.higgsfield).toBeUndefined();
+    const lipsync = models.roles['video.lipsync']?.alternatives;
+    expect(lipsync?.higgsfield?.model).toBe('higgsfield-ai/speak');
+    expect(lipsync?.higgsfield?.pricing?.unit).toBe('second');
+    expect(lipsync?.topview?.model).toBe('avatar4');
+    expect(lipsync?.topview?.pricing?.unit).toBe('second');
   });
 });
 

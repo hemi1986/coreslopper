@@ -75,8 +75,9 @@ license: MIT
    and pass it as the first reference of the next clip. To land on a planned frame, use `firstLastFrameToVideo` with that keyframe as the second reference.
 8. **Lip-sync shots** (`lipSync` set on the shot):
    1. Generate a dedicated keyframe with `editImage` from the character sheet: face frontal or slight 3/4, evenly lit, mouth slightly open, face filling at least a third of the frame, modest clothing (high neckline, covered shoulders). Never feed the multi-view sheet itself. Keep the prompt neutral; words such as "sexy", "intimate", or "seductive" trigger the provider's content moderation.
-   2. Resolve the shot's start and end anchors to seconds from `timing.effective.json`. Place the start just before the first word and the end in the pause after the last word, about 0.3 s past it. The vocals always come from `audio/stems/vocals.wav`; `generate` rejects the full mix (`audio/song.*`).
-   3. Add a batch item. Local (`providers.lipsync: comfyui`) cuts the stem in the workflow; add the end keyframe as a second reference when the shot has one:
+   2. Resolve the shot's start and end anchors to seconds from `timing.effective.json`. Place the start just before the first word and the end in the pause after the last word, about 0.3 s past it. The vocals always come from the vocal stem (`audio/stems/lead.wav` when it exists, else `audio/stems/vocals.wav`); `generate` rejects the full mix (`audio/song.*`).
+   3. **Lead only.** The face mouths only what the lead singer sings, never backing vocals or echoes (a choir "Prompt" after "Ihr seid der Prompt" that is not in the lyrics). Before generating, list the echo spans of every lip-sync shot in the batch notes: the parenthesized words of its lines (`audio-segment` mutes these by default), the passages in the "Unwritten vocals" table of `timing.report.md` inside the shot (or run `cd scripts/audio-analysis && uv run python echo_scan.py --project ../../projects/<slug> --start <s> --end <s>`), and any span the user's review notes name. Pass the extra spans as `audio-segment --mute <start>-<end>,...` (song seconds). An echo that overlaps a lead word (it stretches the word in the timing) cannot be muted cleanly: run `separate_lead.py` (see `scripts/audio-analysis/README.md`) so `audio-segment` cuts from `lead.wav`, or move the shot's end before the echo. Check the muted spans that `audio-segment` prints against this list before generating.
+   4. Add a batch item. Local (`providers.lipsync: comfyui`) cuts the stem in the workflow; add the end keyframe as a second reference when the shot has one. When the window holds an echo span, cut a muted segment with `audio-segment` instead and use it as `"audio"` with `"audioStartSeconds": 0`:
       ```json
       {
         "operation": "lipSync",
@@ -89,10 +90,13 @@ license: MIT
       }
       ```
       In an episode, use the speaker stem that `episode-track` wrote (`audio/stems/<id>.wav`) instead of `vocals.wav`; with fal.ai, cut it with `audio-segment --character <id>`.
-      fal.ai takes a cut segment instead: `npm run cli -- audio-segment projects/<slug> --start <s> --end <s> --name <shot-id>`, then `"audio": "assets/audio-segments/<shot-id>.mp3"` without `audioStartSeconds`.
-      Cost is billed by the audio length; keep each segment ≤ 30 s and as tight as the sung line.
+      Cloud lip-sync takes a cut segment instead: `npm run cli -- audio-segment projects/<slug> --start <s> --end <s> --name <shot-id> [--mute <spans>]`, then `"audio": "assets/audio-segments/<shot-id>.mp3"` without `audioStartSeconds`. Providers (`providers.lipsync`, or `generate --lipsync-provider <p>` for one batch):
+      - `fal` (OmniHuman 1.5): billed per second of audio, up to 30 s.
+      - `higgsfield` (Speak v2, `higgsfield-ai/speak`): WAV only, so cut with `--format wav` and use the `.wav` segment. It renders 5, 10, or 15 s and bills the selected length (a 3 s segment costs one 5 s generation, about $1.13), so it is the expensive option for short lines. Output is 1280×704 at 16 fps. Kling Avatar and audio-driven Wan are project overrides (see the role's `notes`).
+      - `topview` (Avatar 4): needs `TOPVIEW_UID` and `TOPVIEW_OPENAPI_KEY`, not the platform key; billed in Topview plan credits per generated second. The prompt becomes the motion prompt.
+      Keep each segment as tight as the sung line and under the role's `maxDuration` for the provider.
       A `422 content_policy_violation` (`partner_validation_failed` or a `sexual` category) means moderation rejected the image or prompt; the call is not billed. Retry once with a more covered close-up and a neutral prompt. If it fails again, stop retrying that shot, because repeated rejections can flag the account. Use a non-lip-synced clip as a stand-in and report it.
-   4. The clip must start exactly at the shot start; do not trim its head in Remotion. Its audio is muted; the song stays the only audio source. Check sync at first/middle/last frame against the lyric word timestamps.
+   5. The clip must start exactly at the shot start; do not trim its head in Remotion. Its audio is muted; the song stays the only audio source. Check sync at first/middle/last frame against the lyric word timestamps.
 9. Update the storyboard's `asset` path or layer asset. Re-run `npm run cli -- validate projects/<slug>`.
 10. Update the state when the asset batch is complete.
 
@@ -113,5 +117,6 @@ license: MIT
 - Expecting 1080p from Kling 3.0 Standard: it returns 1280×720, so check `notes` in `config/models.yaml` for the output resolution before choosing a hero-shot role.
 - Re-generating a cached shot because the prompt was reworded without changing the hash inputs.
 - Lip-syncing from the full mix instead of the vocal stem, or with a segment that is offset from the shot start.
+- A lip-sync face mouthing an echo or backing line the lead does not sing, because the segment was cut without muting the echo spans.
 - Ignoring native audio in the generated clip; the song is the only audio source.
 - Forgetting to record the spend and exceeding the budget silently.

@@ -28,11 +28,14 @@ const UPLOAD_CONTENT_TYPES = new Map<string, string>([
   ['.webp', 'image/webp'],
   ['.gif', 'image/gif'],
   ['.wav', 'audio/wav'],
+  ['.mp3', 'audio/mpeg'],
   ['.mp4', 'video/mp4'],
 ]);
 
 const TERMINAL_FAILURES = new Set(['failed', 'nsfw', 'canceled', 'cancelled']);
 const COMPLETED = 'completed';
+/** Statuses of a legacy job set (`/v1/job-sets/<id>`). */
+const JOB_PENDING = new Set(['queued', 'in_progress', 'pending', 'running']);
 const OUTPUT_KEYS = ['images', 'image', 'video', 'videos', 'audio', 'audios', 'output', 'outputs', 'files'];
 
 /**
@@ -67,6 +70,20 @@ function normalizeSeed(seed: number): number {
 function takeSwitch(params: Record<string, unknown>, key: string): [boolean, Record<string, unknown>] {
   const { [key]: value, ...rest } = params;
   return [value === true, rest];
+}
+
+function takeSwitchDefault(
+  params: Record<string, unknown>,
+  key: string,
+  fallback: boolean,
+): [boolean, Record<string, unknown>] {
+  const { [key]: value, ...rest } = params;
+  return [typeof value === 'boolean' ? value : fallback, rest];
+}
+
+function takeString(params: Record<string, unknown>, key: string): [string | undefined, Record<string, unknown>] {
+  const { [key]: value, ...rest } = params;
+  return [typeof value === 'string' && value.length > 0 ? value : undefined, rest];
 }
 
 function takeReferenceField(
@@ -208,11 +225,117 @@ export class HiggsfieldProvider implements Provider {
     });
   }
 
-  async lipSync(_input: ProviderInput): Promise<ProviderOutput> {
-    throw new ConfigError(
-      'The Higgsfield adapter does not support lip-sync yet. Set providers.lipsync to "fal" ' +
-        'and provide FAL_KEY, or keep providers.video on fal for lip-sync shots.',
+  /**
+   * Animate a face (`references[0]`) with a vocal segment (`input.audio`).
+   *
+   * Two request shapes, chosen with the adapter-only `request_format` param:
+   * - `flat` (default): the current model routes, e.g. `higgsfield-ai/speak`
+   *   (Speak v2) or a Wan image-to-video model with `audio_url`. The face goes to
+   *   `reference_field` (default `image_url`), the audio to `audio_field`
+   *   (default `audio_url`), plus `prompt` and `duration`.
+   * - `job_set`: the legacy `v1/speak/<model>` routes (e.g. `v1/speak/kling`,
+   *   Kling Avatar), which take `{ params: { input_image, input_audio, prompt } }`
+   *   and are polled at `/v1/job-sets/<id>`.
+   *
+   * `duration` is the driving audio rounded up to the model's allowed lengths
+   * (`durations`); Speak cuts audio that is longer than the selected duration.
+   * `send_duration: false` omits it. `model_quality` is sent as `quality`.
+   */
+  async lipSync(input: ProviderInput): Promise<ProviderOutput> {
+    const reference = input.references?.[0];
+    if (!reference) throw new Error('lipSync requires a face reference image.');
+    if (!input.audio) throw new Error('lipSync requires an audio file.');
+    const [format, afterFormat] = takeString(input.params ?? {}, 'request_format');
+    if (format !== undefined && format !== 'flat' && format !== 'job_set') {
+      throw new ConfigError(`Higgsfield request_format must be "flat" or "job_set", got ${JSON.stringify(format)}.`);
+    }
+    const [audioField, afterAudio] = takeString(afterFormat, 'audio_field');
+    const [field, afterReference] = takeReferenceField(takeEndField(afterAudio)[1], 'image_url');
+    const [sendSeed, afterSeedSwitch] = takeSwitch(afterReference, 'send_seed');
+    const [sendDuration, afterDurationSwitch] = takeSwitchDefault(afterSeedSwitch, 'send_duration', true);
+    const [sendNegative, afterNegative] = takeSwitch(afterDurationSwitch, 'send_negative_prompt');
+    // `quality` is the local clip option (draft/final) in a batch item, so the
+    // model's own quality field is set as `model_quality`.
+    const { model_quality: modelQuality, ...params } = afterNegative;
+    const [imageUrl, audioUrl] = await Promise.all([this.uploadReference(reference), this.uploadReference(input.audio)]);
+    const shared = {
+      prompt: input.prompt,
+      ...(sendSeed ? { seed: normalizeSeed(input.seed) } : {}),
+      ...(sendNegative && input.negativePrompt ? { negative_prompt: input.negativePrompt } : {}),
+      ...(modelQuality !== undefined ? { quality: modelQuality } : {}),
+      ...withoutDurationOptions(params),
+      ...(sendDuration ? { duration: clipDurationSeconds(input.durationSeconds, params) } : {}),
+    };
+
+    if (format === 'job_set') {
+      return this.runJobSet(input, {
+        params: {
+          input_image: { type: 'image_url', image_url: imageUrl },
+          input_audio: { type: 'audio_url', audio_url: audioUrl },
+          ...shared,
+        },
+      });
+    }
+    return this.runModel(input, { [field]: imageUrl, [audioField ?? 'audio_url']: audioUrl, ...shared });
+  }
+
+  /** Legacy job-set routes: submit, poll `/v1/job-sets/<id>`, download each job's `raw` result. */
+  private async runJobSet(input: ProviderInput, body: Record<string, unknown>): Promise<ProviderOutput> {
+    const model = input.model.replace(/^\/+/, '');
+    const headers: Record<string, string> = {
+      Authorization: `Key ${this.credentials}`,
+      'Content-Type': 'application/json',
+    };
+    if (input.idempotencyKey) headers['Idempotency-Key'] = input.idempotencyKey;
+    const accepted = await fetchJsonWithRetry(
+      'Higgsfield',
+      `${this.baseUrl}/${model}`,
+      { method: 'POST', headers, body: JSON.stringify(body) },
+      this.requestTimeoutMs,
+      this.fetchImpl,
     );
+    const id = typeof accepted.id === 'string' ? accepted.id : undefined;
+    if (!id || !/^[A-Za-z0-9-]+$/.test(id)) {
+      throw new Error(`Higgsfield returned no job set for ${model}: ${JSON.stringify(accepted).slice(0, 500)}`);
+    }
+
+    const started = Date.now();
+    let interval = this.pollIntervalMs;
+    let jobSet = accepted;
+    for (;;) {
+      const jobs = Array.isArray(jobSet.jobs) ? (jobSet.jobs as Record<string, unknown>[]) : [];
+      const statuses = jobs.map((job) => String(job.status ?? '').toLowerCase());
+      const failed = statuses.find((status) => TERMINAL_FAILURES.has(status));
+      if (failed) throw new Error(`Higgsfield job ${failed}: ${JSON.stringify(jobSet).slice(0, 500)}`);
+      if (jobs.length > 0 && statuses.every((status) => status === COMPLETED)) {
+        const urls = jobs.flatMap((job) => {
+          const results = (job.results ?? {}) as Record<string, { url?: unknown } | undefined>;
+          const best = results.raw?.url ?? results.min?.url;
+          return typeof best === 'string' ? [best] : [];
+        });
+        if (urls.length === 0) {
+          throw new Error(`Higgsfield returned no output URLs for ${model}: ${JSON.stringify(jobSet).slice(0, 500)}`);
+        }
+        return {
+          files: await downloadOutputs('higgsfield', urls, input.outputDir, this.requestTimeoutMs, this.fetchImpl),
+          raw: jobSet,
+        };
+      }
+      const unknown = statuses.find((status) => status !== COMPLETED && !JOB_PENDING.has(status));
+      if (unknown) throw new Error(`Higgsfield job set ${id} has unexpected status ${unknown}.`);
+      if (Date.now() - started >= this.requestTimeoutMs) {
+        throw new Error(`Higgsfield job set ${id} timed out after ${this.requestTimeoutMs}ms.`);
+      }
+      await delay(interval);
+      interval = Math.min(Math.round(interval * 1.5), 10_000);
+      jobSet = await fetchJsonWithRetry(
+        'Higgsfield',
+        `${this.baseUrl}/v1/job-sets/${id}`,
+        { method: 'GET', headers: { Authorization: `Key ${this.credentials}` } },
+        this.requestTimeoutMs,
+        this.fetchImpl,
+      );
+    }
   }
 
   private async runModel(input: ProviderInput, body: Record<string, unknown>): Promise<ProviderOutput> {
@@ -290,7 +413,7 @@ export class HiggsfieldProvider implements Provider {
     const contentType = UPLOAD_CONTENT_TYPES.get(extname(path).toLowerCase());
     if (!contentType) {
       throw new ConfigError(
-        `Higgsfield cannot upload ${path}: unsupported content type. Use JPEG, PNG, WebP, GIF, WAV, or MP4.`,
+        `Higgsfield cannot upload ${path}: unsupported content type. Use JPEG, PNG, WebP, GIF, WAV, MP3, or MP4.`,
       );
     }
 

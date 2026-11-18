@@ -6,6 +6,7 @@ import {
   resolveHiggsfieldCredentials,
   resolveTikTokCredentials,
   resolveTopviewApiKey,
+  resolveTopviewAvatarCredentials,
   resolveYouTubeCredentials,
 } from '@coreslopper/providers';
 import { detectTools, type ToolCheck } from './tools.js';
@@ -136,6 +137,7 @@ export async function runDoctor(root: string, options: DoctorOptions = {}): Prom
   loadWorkspaceEnv(root);
   const higgsfield = resolveHiggsfieldCredentials();
   const topview = resolveTopviewApiKey();
+  const topviewAvatar = resolveTopviewAvatarCredentials();
 
   const checks: DoctorCheck[] = [
     {
@@ -174,6 +176,14 @@ export async function runDoctor(root: string, options: DoctorOptions = {}): Prom
       name: 'TOPVIEW_API_PLATFORM_KEY',
       ok: Boolean(topview),
       detail: topview ? 'set (from environment or .env)' : 'not set (mock works without it)',
+      required: false,
+      group: 'credentials',
+    },
+    {
+      id: 'topview-avatar',
+      name: 'TOPVIEW_UID + TOPVIEW_OPENAPI_KEY',
+      ok: Boolean(topviewAvatar),
+      detail: topviewAvatar ? 'set (Topview Avatar 4 lip-sync)' : 'not set (only needed for providers.lipsync: topview)',
       required: false,
       group: 'credentials',
     },

@@ -156,7 +156,7 @@ npm run schema
 | `npm run cli -- series-status <series>` | Series canon, budget, planned and created episodes, stages, spend, length. |
 | `npm run cli -- new-series <slug> --budget <usd> [--format <id>]` | Create a series canon in `series/<slug>/`. |
 | `npm run cli -- generate --series <series> --batch <file>` | Run a canon generation batch against the series budget. |
-| `npm run cli -- generate <project> --batch <file> [--provider <p>]` | Run a cached, budget-checked generation batch; `--provider` overrides the project provider for one batch (lip-sync keeps its own). |
+| `npm run cli -- generate <project> --batch <file> [--provider <p>] [--lipsync-provider <p>]` | Run a cached, budget-checked generation batch; `--provider` overrides the project provider for one batch (lip-sync keeps its own), `--lipsync-provider` the lip-sync provider. |
 | `npm run cli -- qa <project> [--determinism <frame>]` | Write `review/report.md`; optionally check frame hashes. |
 | `npm run cli -- release <project> [--no-render] [--canvas-from <anchor\|s>] [--canvas-seconds <n>]` | Build `renders/release/`: every format, thumbnails, Shorts, WAV, cover, canvas, lyrics, platform texts, README, manifest; renders only missing or stale formats; idempotent. |
 | `npm run cli -- upload-text <project>` | Render `review/upload.md` (a pointer to the release folder) from `review/upload.yaml`. |
@@ -166,7 +166,7 @@ npm run schema
 | `npm run cli -- normalize-audio <project> --input <file>` | Normalize audio to −14 LUFS / −1 dBTP. |
 | `npm run cli -- footage <project> --input <file> --name <name>` | Normalize a footage proxy. |
 | `npm run cli -- frame <project> --input <clip> --position last` | Extract a review or chaining frame. |
-| `npm run cli -- audio-segment <project> --start <s> --end <s> --name <shot-id>` | Cut a vocal segment for a lip-sync shot. |
+| `npm run cli -- audio-segment <project> --start <s> --end <s> --name <shot-id> [--mute <a-b,...>] [--format wav]` | Cut a lead-only vocal segment for a lip-sync shot: backing words (parenthesized lyrics) and `--mute` spans are silenced; cuts from `audio/stems/lead.wav` when it exists. |
 | `npm run cli -- stage-start/-done/-fail/-skip/-reset` | Update `state.json` from the orchestrator. |
 | `npm run cli -- estimate --role <role> --units <n>` | Check a generation cost against the budget. |
 | `npm run cli -- validate-file <file>` | Validate one changed artifact (used by the hook). |

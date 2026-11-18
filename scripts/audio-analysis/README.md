@@ -5,7 +5,7 @@ Local, reproducible timing extraction for a coreslopper project.
 ## What it produces
 
 - `timing.json` — BPM, beats, downbeats, onsets, frame-level energy, sections, lyric lines, and word timestamps.
-- `timing.report.md` — section table, confidence flags, unmatched lyric lines, and the ASR/Demucs status.
+- `timing.report.md` — section table, confidence flags, unmatched lyric lines, the ASR/Demucs status, and the **unwritten vocals**: sung passages in the vocal stem that no lyric word covers (likely echoes or ad-libs that a lip-sync face must not mouth).
 
 It never writes `timing.overrides.json`; that file is user-owned and is merged by the TypeScript resolver.
 
@@ -50,6 +50,26 @@ Lyrics-first: `lyrics.txt` is authoritative for text, order, and section tags; A
 9. Write per-line confidence (`meta.lineConfidence`) and the report. Lines below 0.6 are listed for a listen.
 
 With `--skip-asr`, sections come from energy changes and lines are spread evenly inside them; use this only for fixtures and motion-only demos.
+
+## Lead-only vocals for lip-sync
+
+A lip-sync face sings only the lead line. Two helpers find and remove backing vocals:
+
+- `echo_scan.py` lists the unwritten vocals of an analyzed project, optionally for one time range, as in `timing.report.md`:
+
+  ```bash
+  uv run python echo_scan.py --project ../../projects/my-video --start 44 --end 56
+  ```
+
+  It compares the vocal stem's loudness with the word timestamps, so it finds an echo in a pause, not one that overlaps a lead word (that echo stretches the lead word in the timing instead). It also lists notes held past the aligned word end; check each span by ear. Mute the real echoes with `npm run cli -- audio-segment <project> ... --mute <start>-<end>`.
+
+- `separate_lead.py` (optional, heavy) splits `audio/stems/vocals.wav` into `lead.wav` and `backing.wav` with the MelBand-Roformer karaoke model through python-audio-separator. `audio-segment` then cuts lip-sync segments from `lead.wav`. It is not in `uv sync`; run it in an ad-hoc environment (PyTorch, and about 900 MB of model weights on first use, cached in `.cache/audio-separator/`):
+
+  ```bash
+  uv run --with "audio-separator[gpu]" python separate_lead.py --project ../../projects/my-video
+  ```
+
+  audio-separator depends on `diffq`, which has no Linux wheel and needs a C compiler; without one, install it with `diffq` overridden (`printf 'diffq ; sys_platform == "never"\n' > /tmp/no-diffq.txt` and `uv pip install --override /tmp/no-diffq.txt "audio-separator[gpu]" audioread` in a separate venv). A 12 s excerpt takes about a minute on CPU. Karaoke models separate a lead from a different backing voice; an echo sung in the lead's own voice (common in generated songs) mostly stays in `lead.wav`, so keep muting those spans. Listen to `lead.wav` before relying on it.
 
 ## Tests
 

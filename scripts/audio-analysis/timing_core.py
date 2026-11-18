@@ -672,3 +672,83 @@ def distribute_lines(
             }
         )
     return lines, cues
+
+
+# ---------------------------------------------------------------------------
+# Unwritten vocals: sung passages in the vocal stem that no lyric word covers,
+# such as a Suno choir echo ("Prompt" after "Ihr seid der Prompt") that is not
+# in lyrics.txt. A lip-sync face must not mouth them, so the report lists them
+# and the ai-clips skill mutes them in the lip-sync segments.
+# ---------------------------------------------------------------------------
+
+
+def unwritten_vocal_spans(
+    rms: list[float],
+    fps: float,
+    lines: list[dict[str, Any]],
+    *,
+    threshold_db: float = -26.0,
+    min_seconds: float = 0.3,
+    margin: float = 0.25,
+    merge_gap: float = 0.15,
+) -> list[dict[str, Any]]:
+    """Return voiced spans of the vocal stem that no lyric word covers.
+
+    `rms` is the frame RMS of the vocal stem at `fps` frames per second. A frame
+    is voiced when it is within `threshold_db` of the stem's loudest frame.
+    Every word, widened by `margin` on both sides (alignment cuts sustained
+    vowels short), covers its frames. Voiced runs that are left, merged across
+    gaps up to `merge_gap` and at least `min_seconds` long, are returned with
+    their start, end, peak level (dB below the peak), and the nearest line.
+    """
+    if not rms or fps <= 0:
+        return []
+    peak = max(rms)
+    if peak <= 0:
+        return []
+    floor = peak * 10 ** (threshold_db / 20)
+    count = len(rms)
+    covered = [False] * count
+    for line in lines:
+        for word in line.get("words", []):
+            first = max(0, int((float(word["start"]) - margin) * fps))
+            last = min(count, int((float(word["end"]) + margin) * fps) + 1)
+            for index in range(first, last):
+                covered[index] = True
+
+    runs: list[list[int]] = []
+    for index, value in enumerate(rms):
+        if value < floor or covered[index]:
+            continue
+        if runs and index - runs[-1][1] <= max(1, int(merge_gap * fps)):
+            runs[-1][1] = index
+        else:
+            runs.append([index, index])
+
+    import math
+
+    spans: list[dict[str, Any]] = []
+    for first, last in runs:
+        start, end = first / fps, (last + 1) / fps
+        if end - start < min_seconds:
+            continue
+        loudest = max(rms[first : last + 1])
+        timed = [line for line in lines if line.get("words")]
+        nearest = min(
+            timed,
+            key=lambda line: min(
+                abs(float(line.get("start", line["words"][0]["start"])) - start),
+                abs(float(line.get("end", line["words"][-1]["end"])) - start),
+            ),
+            default=None,
+        )
+        spans.append(
+            {
+                "start": round(start, 3),
+                "end": round(end, 3),
+                "level_db": round(20 * math.log10(loudest / peak), 1),
+                "after_line": nearest.get("id") if nearest else None,
+                "after_text": nearest.get("text") if nearest else None,
+            }
+        )
+    return spans

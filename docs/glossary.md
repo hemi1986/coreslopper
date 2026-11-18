@@ -40,6 +40,14 @@ _Avoid_: approval gate
 An isolated audio part such as vocals, drums, bass, or other, used for analysis and mixing.
 _Avoid_: track (except in **Episode Track**)
 
+**Lead Stem**:
+The vocal stem without backing vocals (`audio/stems/lead.wav`), split off by the optional `separate_lead.py`. Lip-sync segments of a music video are cut from it when it exists.
+_Avoid_: lead track, dry vocal
+
+**Echo Span**:
+A time range of backing vocals that the lead singer does not sing: parenthesized lyric words (Suno backing markup) or an unwritten echo found in the vocal stem. `audio-segment` silences echo spans so a lip-sync face does not mouth them.
+_Avoid_: ad-lib (when the lead sings it), backing track
+
 **Timing**:
 The relationship between a project's audio and time: sections, lines, words, and energy, plus BPM, beats, downbeats, and onsets for a song. Measured for a music video, constructed for an episode.
 _Avoid_: sync data
@@ -231,7 +239,7 @@ A JSON or YAML array of one or more generation requests executed with budget, ca
 _Avoid_: job
 
 **Provider Adapter**:
-The small implementation behind `generateImage`, `editImage`, `textToVideo`, `imageToVideo`, `firstLastFrameToVideo`, and `lipSync`; fal.ai, Higgsfield, and Topview are the cloud adapters, ComfyUI is the local video adapter, and mock is the deterministic test adapter.
+The small implementation behind `generateImage`, `editImage`, `textToVideo`, `imageToVideo`, `firstLastFrameToVideo`, and `lipSync`; fal.ai, Higgsfield, and Topview are the cloud adapters (all three lip-sync), ComfyUI is the local video adapter, and mock is the deterministic test adapter.
 _Avoid_: client, SDK
 
 **Provider Alternative**:
