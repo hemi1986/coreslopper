@@ -124,6 +124,7 @@
           "enum": [
             "fal",
             "higgsfield",
+            "topview",
             "comfyui",
             "mock"
           ]

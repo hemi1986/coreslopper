@@ -87,7 +87,8 @@ export function resolveModelRole(
 export function providerForRole(config: Pick<ProjectConfig, 'providers'>, role: string): ProviderKind {
   if (role === 'video.lipsync') {
     if (config.providers.lipsync) return config.providers.lipsync;
-    // ComfyUI projects keep lip-sync on fal unless they opt in; Topview has no lip-sync.
+    // ComfyUI and Topview projects keep lip-sync on fal unless they opt in: local lip-sync is
+    // slower, and Topview's Avatar 4 needs separate OpenAPI credentials (TOPVIEW_UID, TOPVIEW_OPENAPI_KEY).
     const video = config.providers.video;
     return video === 'comfyui' || video === 'topview' ? 'fal' : video;
   }

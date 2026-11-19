@@ -14,7 +14,7 @@ export const ImageProviderKindSchema = z.enum(['fal', 'higgsfield', 'topview', '
 /** Providers that can generate video clips. */
 export const VideoProviderKindSchema = z.enum(['fal', 'higgsfield', 'topview', 'comfyui', 'mock']);
 /** Providers that can lip-sync a face to a vocal segment. */
-export const LipSyncProviderKindSchema = z.enum(['fal', 'higgsfield', 'comfyui', 'mock']);
+export const LipSyncProviderKindSchema = z.enum(['fal', 'higgsfield', 'topview', 'comfyui', 'mock']);
 /** Providers that can generate music, stingers, and sound effects (`audio.*` roles). */
 export const AudioProviderKindSchema = z.enum(['comfyui', 'mock']);
 
@@ -38,7 +38,8 @@ export const ProvidersSchema = z
     video: VideoProviderKindSchema.default('mock'),
     /**
      * Lip-sync can use a different provider from the rest of the video.
-     * Defaults to `video`, or to `fal` when `video` is `comfyui` or `topview`.
+     * Defaults to `video`, or to `fal` when `video` is `comfyui` or `topview`
+     * (Topview lip-sync needs its separate OpenAPI credentials, so it is opt-in).
      */
     lipsync: LipSyncProviderKindSchema.optional(),
     /** `audio.*` roles (stingers, SFX, voices, extra music; never the song itself). Defaults to `comfyui`. */
@@ -1019,6 +1020,7 @@ export type ModelsConfig = z.infer<typeof ModelsConfigSchema>;
 export type ProviderKind = z.infer<typeof ProviderKindSchema>;
 export type ImageProviderKind = z.infer<typeof ImageProviderKindSchema>;
 export type VideoProviderKind = z.infer<typeof VideoProviderKindSchema>;
+export type LipSyncProviderKind = z.infer<typeof LipSyncProviderKindSchema>;
 export type PublishPlatform = z.infer<typeof PublishPlatformSchema>;
 export type UploadMain = z.infer<typeof UploadMainSchema>;
 export type UploadShort = z.infer<typeof UploadShortSchema>;

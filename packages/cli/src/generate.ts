@@ -24,6 +24,7 @@ import {
   writeJsonAtomic,
   type LoadedProject,
   type LoadedSeries,
+  type LipSyncProviderKind,
   type ModelPricing,
   type ProjectConfig,
   type ProviderKind,
@@ -114,6 +115,9 @@ function checkVocalSource(audio: string, projectRoot: string): void {
   }
 }
 
+/** Lip-sync providers that are told the length of the driving audio as durationSeconds. */
+const LENGTH_FROM_AUDIO = new Set<ProviderKind>(['comfyui', 'higgsfield', 'topview']);
+
 const VIDEO_OPERATIONS = new Set(['textToVideo', 'imageToVideo', 'firstLastFrameToVideo', 'lipSync']);
 
 export const BatchSchema = z.array(BatchItemSchema).min(1);
@@ -126,6 +130,8 @@ export interface GenerateOptions {
   dryRun?: boolean;
   /** Override the project provider for this batch (lip-sync keeps its own provider). */
   provider?: ProviderKind;
+  /** Override `providers.lipsync` for the lipSync items of this batch. */
+  lipsyncProvider?: LipSyncProviderKind;
 }
 
 export interface ResolvedItem {
@@ -212,20 +218,15 @@ function resolveItem(
   projectRoot: string,
   providerOverride?: ProviderKind,
   characters: { id: string; name: string; description: string }[] = [],
+  lipsyncOverride?: LipSyncProviderKind,
 ): ResolvedItem {
   const role = models.roles[item.role];
   if (!role) throw new ValidationError(`Unknown model role "${item.role}". Add it to config/models.yaml.`);
   const override = roleOverride(config, item.role);
   const provider =
-    providerOverride && item.operation !== 'lipSync' ? providerOverride : providerForRole(config, item.role);
-  if (item.operation === 'lipSync' && provider === 'higgsfield') {
-    throw new ConfigError(
-      'The Higgsfield adapter does not support lip-sync. Set providers.lipsync to "fal" and provide FAL_KEY, or keep providers.video on fal.',
-    );
-  }
-  if (item.operation === 'lipSync' && provider === 'topview') {
-    throw new ConfigError('The Topview adapter does not support lip-sync. Set providers.lipsync to "fal" or "comfyui".');
-  }
+    item.operation === 'lipSync'
+      ? (lipsyncOverride ?? providerForRole(config, item.role))
+      : (providerOverride ?? providerForRole(config, item.role));
   if (item.operation === 'generateAudio' && provider !== 'comfyui' && provider !== 'mock') {
     throw new ConfigError(`Only the ComfyUI backend generates audio, but role "${item.role}" resolved to ${provider}.`);
   }
@@ -300,9 +301,17 @@ function resolveItem(
     );
   }
 
+  // A lip-sync model with fixed clip lengths (`durations`, `min_duration`) bills
+  // the clip it renders, which can be longer than the driving audio.
+  const lipSyncSeconds =
+    item.operation === 'lipSync' && audioSeconds !== undefined
+      ? 'durations' in params || 'min_duration' in params
+        ? clipDurationSeconds(exactAudioSeconds, params)
+        : audioSeconds
+      : undefined;
   const units =
     pricing.unit === 'second'
-      ? (item.operation === 'lipSync' ? audioSeconds : undefined) ?? clipDurationSeconds(item.durationSeconds, params)
+      ? lipSyncSeconds ?? clipDurationSeconds(item.durationSeconds, params)
       : pricing.unit === 'image'
         ? Number(params.num_images ?? params.batch_size ?? 1)
         : 1;
@@ -405,10 +414,11 @@ function resolveItem(
     ...(localVideo ? { clip } : {}),
     ...(restore ? { restore } : {}),
     ...(item.audioStartSeconds !== undefined ? { audioStartSeconds: item.audioStartSeconds } : {}),
-    // A local lip-sync workflow sets its clip length from the driving audio.
+    // A local lip-sync workflow sets its clip length from the driving audio, and
+    // Higgsfield and Topview pick their clip length from it (fal reads the audio itself).
     durationSeconds:
       item.durationSeconds ??
-      (provider === 'comfyui' && item.operation === 'lipSync' && exactAudioSeconds !== undefined
+      (LENGTH_FROM_AUDIO.has(provider) && item.operation === 'lipSync' && exactAudioSeconds !== undefined
         ? Number(exactAudioSeconds.toFixed(3))
         : undefined),
   };
@@ -450,6 +460,8 @@ export interface BatchRunOptions {
   dryRun?: boolean;
   /** Override the project provider for this batch (lip-sync keeps its own provider). */
   provider?: ProviderKind;
+  /** Override `providers.lipsync` for the lipSync items of this batch. */
+  lipsyncProvider?: LipSyncProviderKind;
   /** Build the provider adapter, e.g. for another ComfyUI server; default `createProvider`. */
   providerFactory?: (kind: ProviderKind) => Provider;
   /** Extra cache-key material (see GenerationRunnerOptions.cacheKey). */
@@ -479,7 +491,15 @@ export async function runBatch(
   const log = options.log === false ? () => undefined : (...args: unknown[]) => console.log(...args);
   const models = await loadModelsConfig();
   const resolved = batch.map((item) => {
-    const value = resolveItem(item, project.config, models, project.paths.root, options.provider, project.characters);
+    const value = resolveItem(
+      item,
+      project.config,
+      models,
+      project.paths.root,
+      options.provider,
+      project.characters,
+      options.lipsyncProvider,
+    );
     return value.provider === 'mock' || value.provider === 'comfyui' ? { ...value, cost: 0 } : value;
   });
   const totalEstimate = resolved.reduce((sum, item) => sum + item.cost, 0);
@@ -606,5 +626,9 @@ export async function generateBatch(options: GenerateOptions): Promise<void> {
     batchData = parseYaml(batchRaw);
   }
   const batch = BatchSchema.parse(batchData);
-  await runBatch(project, batch, { dryRun: options.dryRun, provider: options.provider });
+  await runBatch(project, batch, {
+    dryRun: options.dryRun,
+    provider: options.provider,
+    lipsyncProvider: options.lipsyncProvider,
+  });
 }

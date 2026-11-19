@@ -29,5 +29,6 @@ Short records of decisions that are hard to reverse, surprising without context,
 | [0023](0023-publish-command.md) | `publish` is a user command, not a stage: YouTube private or scheduled, TikTok inbox drafts, from `upload.yaml`, idempotent by file hash; no Instagram, no MCP. |
 | [0024](0024-release-folder-manual-distribution.md) | `release` builds one folder `renders/release/` with every file and text to publish; distributor facts only from the user; manual distributor upload, API distributors later. |
 | [0025](0025-plates-props-character-states.md) | Plates (empty set frames per camera angle), prop references, and character states are reviewed references that shots name in `refs`; keyframes in a plate are edits of it; music videos may have `sets.yaml`; episodes only append to the canon. |
+| [0026](0026-cloud-lipsync-and-lead-only-audio.md) | Higgsfield (Speak v2, legacy job-set routes) and Topview (Avatar 4 on the OpenAPI) lip-sync; `generate --lipsync-provider`; lip-sync segments are lead-only: backing words and `--mute` spans are silenced, `lead.wav` is preferred, unwritten vocals are reported. |
 
 Status values: `Accepted`, `Deprecated`, `Superseded by ADR-NNNN`.

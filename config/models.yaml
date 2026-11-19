@@ -568,8 +568,54 @@ roles:
       Image + audio -> singing/talking clip (OmniHuman 1.5). Billed per second of
       driving audio. fal docs list $0.14/s (2026-11-08); third-party pages say
       $0.16/s, so the estimate is conservative. Audio max 30 s at 1080p.
-      Higgsfield has no lip-sync adapter yet; set providers.lipsync to fal.
+      Higgsfield (Speak v2) and Topview (Avatar 4) have their own alternatives below.
     alternatives:
+      higgsfield:
+        model: higgsfield-ai/speak
+        params:
+          model_quality: high
+          durations: [5, 10, 15]
+          send_seed: true
+        pricing:
+          unit: second
+          usd: 0.225
+        maxDuration: 15
+        notes: >-
+          Higgsfield Speak v2 (Wan-based speech-to-video): image_url + audio_url +
+          prompt, model_quality high|mid (sent as quality; a plain `quality` param
+          is the local draft/final option), seed, duration 5|10|15 s. WAV audio
+          only: MP3 is rejected with invalid_audio_format, so cut the segment with
+          `audio-segment --format wav`. The clip follows the audio length (a 3 s
+          segment gave a 3 s clip, 1280x704, 16 fps), but billing is per selected
+          duration: a 3 s segment at high quality cost $1.125 (one 5 s
+          generation, GET /models/usage, 2026-11-18), so the estimate snaps to
+          5/10/15 s at $0.225/s. Speak is not on the public price list; mid
+          quality is unpriced. Other Higgsfield lip-sync models via a project
+          override of models.video.lipsync (model, params, pricing): Kling Avatar
+          on the legacy route, model v1/speak/kling with params {request_format:
+          job_set, mode: std|pro, send_duration: false} (price unverified);
+          audio-driven Wan, model wan/v2.7/image-to-video with params
+          {resolution: 720p, min_duration: 2, send_seed: true} at $0.075/s (720p,
+          public price list) or wan/v2.6/image-to-video with {durations: [5, 10,
+          15]} at $0.0752/s (both unpiloted for lip-sync). InfiniteTalk and a
+          separate Wan 2.5 Speak route are not exposed on the API.
+      topview:
+        model: avatar4
+        params: {}
+        pricing:
+          unit: second
+          usd: 0.02
+        maxDuration: 60
+        notes: >-
+          Topview Avatar 4 (photo avatar) on the Topview OpenAPI (api.topview.ai):
+          needs TOPVIEW_UID and TOPVIEW_OPENAPI_KEY, not the platform key. The model
+          is the mode: avatar4, avatar4Fast, or avatar2. The prompt becomes
+          customMotion (max 600 characters); params.offPeak: true halves the credits
+          (24 h fallback timeout). Billed in plan credits per generated second:
+          avatar4 0.1, avatar4Fast 0.06, avatar2 0.4 credits/s (Topview API docs,
+          2026-06-26). PRICE UNVERIFIED in USD: a credit costs about $0.10-0.16
+          depending on the plan, so $0.02/s is a conservative planning estimate.
+          maxDuration is a planning limit, not a documented one.
       comfyui:
         model: ltx25-lipsync-flf2v
         params:

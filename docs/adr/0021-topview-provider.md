@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — 2026-11-15
+Accepted — 2026-11-15. The lip-sync part is revised by [ADR 0026](0026-cloud-lipsync-and-lead-only-audio.md): Avatar 4 runs through the same adapter with separate OpenAPI credentials.
 
 ## Context
 

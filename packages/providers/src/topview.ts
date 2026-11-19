@@ -16,8 +16,12 @@ import type { Provider, ProviderInput, ProviderOutput } from './types.js';
 import { clipDurationSeconds, withoutDurationOptions } from './duration.js';
 
 export interface TopviewProviderOptions {
+  /** Platform key (`platform-backend.topview.ai`) for images and clips. */
   apiKey?: string;
   baseUrl?: string;
+  /** Topview OpenAPI credentials (`api.topview.ai`) for Avatar 4 lip-sync. */
+  avatar?: TopviewAvatarCredentials;
+  avatarBaseUrl?: string;
   requestTimeoutMs?: number;
   pollIntervalMs?: number;
   fetchImpl?: FetchLike;
@@ -37,6 +41,26 @@ const UPLOAD_LIMIT_BYTES = 20 * 1024 * 1024;
 /** Signed upload URLs live at most one hour; reuse one for a shorter time. */
 const UPLOAD_REUSE_MS = 45 * 60 * 1000;
 const PENDING = new Set(['created', 'processing']);
+
+/** Topview OpenAPI credentials: the `Topview-Uid` header and the API key from topview.ai API Settings. */
+export interface TopviewAvatarCredentials {
+  uid: string;
+  apiKey: string;
+}
+
+/** Avatar 4 task states (`/v1/photo_avatar/task/query`). */
+const AVATAR_PENDING = new Set(['init', 'running', 'processing', 'queued']);
+
+/**
+ * Resolve the Topview OpenAPI credentials for Avatar 4 from the environment:
+ * `TOPVIEW_UID` and `TOPVIEW_OPENAPI_KEY`. They are separate from the platform
+ * key: Avatar 4 runs on `api.topview.ai` and bills plan credits.
+ */
+export function resolveTopviewAvatarCredentials(env: NodeJS.ProcessEnv = process.env): TopviewAvatarCredentials | undefined {
+  const uid = env.TOPVIEW_UID?.trim();
+  const apiKey = env.TOPVIEW_OPENAPI_KEY?.trim().replace(/^Bearer\s+/i, '');
+  return uid && apiKey ? { uid, apiKey } : undefined;
+}
 
 /** Resolve the Topview platform key from the environment. */
 export function resolveTopviewApiKey(env: NodeJS.ProcessEnv = process.env): string | undefined {
@@ -101,8 +125,10 @@ function record(value: unknown): Record<string, unknown> {
 
 export class TopviewProvider implements Provider {
   readonly name = 'topview';
-  private readonly apiKey: string;
+  private readonly key: string | undefined;
+  private readonly avatar: TopviewAvatarCredentials | undefined;
   private readonly baseUrl: string;
+  private readonly avatarBaseUrl: string;
   private readonly requestTimeoutMs: number;
   private readonly pollIntervalMs: number;
   private readonly fetchImpl: FetchLike;
@@ -110,14 +136,17 @@ export class TopviewProvider implements Provider {
 
   constructor(options: TopviewProviderOptions = {}) {
     const apiKey = options.apiKey ?? resolveTopviewApiKey();
-    if (!apiKey) {
+    const avatar = options.avatar ?? resolveTopviewAvatarCredentials();
+    if (!apiKey && !avatar) {
       throw new ConfigError(
         'Topview credentials are not set. Add TOPVIEW_API_PLATFORM_KEY to .env (platform.topview.ai/api-keys), ' +
-          'or use the mock provider.',
+          'or TOPVIEW_UID and TOPVIEW_OPENAPI_KEY for Avatar 4 lip-sync, or use the mock provider.',
       );
     }
-    this.apiKey = apiKey;
+    this.key = apiKey || undefined;
+    this.avatar = avatar;
     this.baseUrl = (options.baseUrl ?? 'https://platform-backend.topview.ai/api/v1').replace(/\/+$/, '');
+    this.avatarBaseUrl = (options.avatarBaseUrl ?? 'https://api.topview.ai').replace(/\/+$/, '');
     this.requestTimeoutMs = options.requestTimeoutMs ?? 1_800_000;
     this.pollIntervalMs = options.pollIntervalMs ?? 3_000;
     this.fetchImpl = options.fetchImpl ?? fetch;
@@ -160,10 +189,149 @@ export class TopviewProvider implements Provider {
     return this.runVideo(input, [start, end]);
   }
 
-  async lipSync(_input: ProviderInput): Promise<ProviderOutput> {
-    throw new ConfigError(
-      'The Topview adapter does not support lip-sync. Set providers.lipsync to "fal" (or "comfyui").',
+  /**
+   * Avatar 4 (photo avatar) lip-sync on the Topview OpenAPI: upload the face
+   * (`references[0]`) and the vocal segment, submit a `scriptMode: audio` task,
+   * poll it, and download `finishedVideoUrl`. The model is the Avatar mode
+   * (`avatar4`, `avatar4Fast`, or `avatar2`); the prompt goes to `customMotion`.
+   * Remaining params (e.g. `offPeak`) are sent as they are.
+   */
+  async lipSync(input: ProviderInput): Promise<ProviderOutput> {
+    const reference = input.references?.[0];
+    if (!reference) throw new Error('lipSync requires a face reference image.');
+    if (!input.audio) throw new Error('lipSync requires an audio file.');
+    const avatar = this.avatar;
+    if (!avatar) {
+      throw new ConfigError(
+        'Topview lip-sync (Avatar 4) needs the Topview OpenAPI credentials: add TOPVIEW_UID and TOPVIEW_OPENAPI_KEY ' +
+          '(topview.ai > API Settings) to .env. The platform key does not cover Avatar 4.',
+      );
+    }
+    const mode = input.model.replace(/^.*\//, '');
+    if (!['avatar4', 'avatar4Fast', 'avatar2'].includes(mode)) {
+      throw new ConfigError(`Topview lip-sync model must be avatar4, avatar4Fast, or avatar2, got ${JSON.stringify(input.model)}.`);
+    }
+    const { request_format: _format, ...params } = input.params ?? {};
+    const [imageFileId, audioFileId] = await Promise.all([
+      this.avatarUpload(reference, avatar),
+      this.avatarUpload(input.audio, avatar),
+    ]);
+    const prompt = input.prompt.trim();
+    const submitted = this.avatarResult(
+      await fetchJsonWithRetry(
+        'Topview Avatar',
+        `${this.avatarBaseUrl}/v1/photo_avatar/task/submit`,
+        {
+          method: 'POST',
+          headers: { ...this.avatarHeaders(avatar), 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            templateImageFileId: imageFileId,
+            mode,
+            scriptMode: 'audio',
+            audioFileId,
+            ...(prompt ? { customMotion: prompt.slice(0, 600) } : {}),
+            ...params,
+          }),
+        },
+        this.requestTimeoutMs,
+        this.fetchImpl,
+        1,
+      ),
     );
+    const taskId = typeof submitted.taskId === 'string' ? submitted.taskId : undefined;
+    if (!taskId || !/^[A-Za-z0-9_-]+$/.test(taskId)) {
+      throw new Error(`Topview Avatar returned no task id: ${JSON.stringify(submitted).slice(0, 500)}`);
+    }
+
+    const started = Date.now();
+    let interval = this.pollIntervalMs;
+    for (;;) {
+      const task = this.avatarResult(
+        await fetchJsonWithRetry(
+          'Topview Avatar',
+          `${this.avatarBaseUrl}/v1/photo_avatar/task/query?taskId=${taskId}`,
+          { method: 'GET', headers: this.avatarHeaders(avatar) },
+          Math.min(this.requestTimeoutMs, 60_000),
+          this.fetchImpl,
+          8,
+        ),
+      );
+      const status = String(task.status ?? '').toLowerCase();
+      if (status === 'success') {
+        const url = typeof task.finishedVideoUrl === 'string' ? task.finishedVideoUrl : undefined;
+        if (!url) throw new Error(`Topview Avatar task ${taskId} has no finishedVideoUrl: ${JSON.stringify(task).slice(0, 500)}`);
+        return {
+          files: await downloadOutputs('topview', [url], input.outputDir, this.requestTimeoutMs, this.fetchImpl),
+          raw: task,
+        };
+      }
+      if (status === 'fail' || status === 'failed') {
+        throw new Error(`Topview Avatar task ${taskId} failed: ${String(task.errorMsg || JSON.stringify(task).slice(0, 500))}`);
+      }
+      if (!AVATAR_PENDING.has(status)) throw new Error(`Topview Avatar task ${taskId} has unexpected status ${status}.`);
+      if (Date.now() - started >= this.requestTimeoutMs) {
+        throw new Error(`Topview Avatar task ${taskId} timed out after ${this.requestTimeoutMs}ms. Query it before submitting again.`);
+      }
+      await delay(interval);
+      interval = Math.min(Math.round(interval * 1.25), 15_000);
+    }
+  }
+
+  private avatarHeaders(avatar: TopviewAvatarCredentials): Record<string, string> {
+    return { Authorization: `Bearer ${avatar.apiKey}`, 'Topview-Uid': avatar.uid };
+  }
+
+  /** Check the OpenAPI `{ code, message, result }` envelope; return `result`. */
+  private avatarResult(body: Record<string, unknown>): Record<string, unknown> {
+    if (body.error !== undefined || (body.code !== undefined && String(body.code) !== '200')) {
+      const message = `Topview Avatar ${String(body.code ?? 'error')}: ${JSON.stringify(body).slice(0, 500)}`;
+      // Credentials and credits are hard stops, not retryable failures.
+      if (/unauthori|credit|balance|insufficient/i.test(message)) throw new ConfigError(message);
+      throw new Error(message);
+    }
+    return record(body.result);
+  }
+
+  /** Upload a local file through an OpenAPI upload credential; return its fileId. */
+  private async avatarUpload(path: string, avatar: TopviewAvatarCredentials): Promise<string> {
+    const format = extname(path).slice(1).toLowerCase();
+    const kind = mediaKind(path);
+    const allowed = kind === 'audio' ? ['mp3', 'wav', 'm4a'] : kind === 'image' ? ['png', 'jpg', 'jpeg', 'bmp', 'webp'] : [];
+    if (!allowed.includes(format)) {
+      throw new ConfigError(`Topview Avatar cannot upload ${path}: use PNG, JPG, BMP, or WebP images and MP3, WAV, or M4A audio.`);
+    }
+    const credential = this.avatarResult(
+      await fetchJsonWithRetry(
+        'Topview Avatar upload',
+        `${this.avatarBaseUrl}/v1/upload/credential?format=${format}`,
+        { method: 'GET', headers: this.avatarHeaders(avatar) },
+        this.requestTimeoutMs,
+        this.fetchImpl,
+      ),
+    );
+    const fileId = typeof credential.fileId === 'string' ? credential.fileId : undefined;
+    const uploadUrl = typeof credential.uploadUrl === 'string' ? credential.uploadUrl : undefined;
+    if (!fileId || !uploadUrl) {
+      throw new Error(`Topview Avatar returned no upload credential for ${path}: ${JSON.stringify(credential).slice(0, 500)}`);
+    }
+    const data = await readFile(path);
+    const upload = await this.fetchImpl(uploadUrl, {
+      method: 'PUT',
+      body: new Uint8Array(data),
+      signal: AbortSignal.timeout(this.requestTimeoutMs),
+    });
+    if (!upload.ok) throw new Error(`Topview Avatar upload failed for ${path}: ${upload.status}`);
+    const check = await fetchJsonWithRetry(
+      'Topview Avatar upload',
+      `${this.avatarBaseUrl}/v1/upload/check?fileId=${encodeURIComponent(fileId)}`,
+      { method: 'GET', headers: this.avatarHeaders(avatar) },
+      this.requestTimeoutMs,
+      this.fetchImpl,
+    );
+    if (String(check.code) !== '200' || check.result !== true) {
+      throw new Error(`Topview Avatar upload check failed for ${path}: ${JSON.stringify(check).slice(0, 300)}`);
+    }
+    return fileId;
   }
 
   private promptFields(input: ProviderInput, options: AdapterOptions): Record<string, unknown> {
@@ -222,7 +390,12 @@ export class TopviewProvider implements Provider {
   }
 
   private authHeaders(): Record<string, string> {
-    return { Authorization: `Bearer ${this.apiKey}` };
+    if (!this.key) {
+      throw new ConfigError(
+        'Topview images and clips need the platform key. Add TOPVIEW_API_PLATFORM_KEY to .env (platform.topview.ai/api-keys).',
+      );
+    }
+    return { Authorization: `Bearer ${this.key}` };
   }
 
   private async runModel(input: ProviderInput, body: Record<string, unknown>): Promise<ProviderOutput> {

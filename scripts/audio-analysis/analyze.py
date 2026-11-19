@@ -25,6 +25,7 @@ from timing_core import (
     distribute_lines,
     estimate_section_boundaries,
     parse_lyrics,
+    unwritten_vocal_spans,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -246,6 +247,7 @@ def write_report(
     unmatched: list[str],
     *,
     low_lines: list[str] | None = None,
+    unwritten: list[dict[str, Any]] | None = None,
     asr_status: str,
     vocals_status: str,
     overrides_present: bool,
@@ -286,6 +288,23 @@ def write_report(
             lines.append(f"  - {line}")
     else:
         lines.append("- Every lyric line has at least one ASR anchor.")
+    if unwritten is not None:
+        lines.extend(["", "## Unwritten vocals", ""])
+        if unwritten:
+            lines.append(
+                f"- {len(unwritten)} sung passage(s) in the vocal stem without a lyric word: unwritten echoes, "
+                "ad-libs, or notes held past the aligned word end. A lip-sync face must not mouth an echo; "
+                "check each by ear and mute it with `audio-segment --mute <start>-<end>`. An echo that overlaps "
+                "a lead word (it stretches that word) is not listed; `separate_lead.py` handles those."
+            )
+            lines.extend(["", "| Start | End | Level | Near line |", "|---:|---:|---:|---|"])
+            for span in unwritten:
+                lines.append(
+                    f"| {span['start']:.2f} | {span['end']:.2f} | {span['level_db']:.1f} dB | "
+                    f"{span['after_line'] or ''} {span['after_text'] or ''} |"
+                )
+        else:
+            lines.append("- No sung passage without a lyric word.")
     lines.extend(
         [
             "",
@@ -411,6 +430,15 @@ def main() -> int:
     output = Path(args.output).resolve() if args.output else project / "timing.json"
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(timing, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    unwritten = None
+    if vocals_path and lines:
+        try:
+            librosa = require_librosa()
+            stem, stem_sr = librosa.load(str(vocals_path), sr=22_050, mono=True)
+            stem_rms = librosa.feature.rms(y=stem, frame_length=2048, hop_length=512)[0]
+            unwritten = unwritten_vocal_spans([float(value) for value in stem_rms], stem_sr / 512, lines)
+        except Exception as error:  # pragma: no cover - depends on the stem
+            print(f"Unwritten-vocal scan skipped ({error}).", file=sys.stderr)
     report = Path(args.report).resolve() if args.report else project / "timing.report.md"
     report.parent.mkdir(parents=True, exist_ok=True)
     write_report(
@@ -418,6 +446,7 @@ def main() -> int:
         sections,
         unmatched,
         low_lines=low_lines,
+        unwritten=unwritten,
         asr_status=asr_status,
         vocals_status=vocals_status,
         overrides_present=(project / "timing.overrides.json").exists(),

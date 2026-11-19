@@ -35,6 +35,7 @@ import { linkProjectMedia } from './media-dir.js';
 import { generateBatch } from './generate.js';
 import { runQa } from './qa.js';
 import { importFootage, importSong, importTakes, normalizeAudio, extractFrame, extractAudioSegment } from './media.js';
+import { parseMuteSpans } from './lipsync-audio.js';
 import { voiceTrack } from './voice-track.js';
 import { episodeTrack } from './episode-track.js';
 import { writeSubtitles } from './subtitles.js';
@@ -573,7 +574,8 @@ program
   .option('--series <series>', 'Run the batch for a series canon (budget and manifest of series/<series>/) instead of a project')
   .option('--dry-run', 'Estimate and print the batch without generating')
   .option('--provider <provider>', 'Provider override for this batch: fal | higgsfield | topview | comfyui | mock (lip-sync keeps its own provider)')
-  .action((project: string | undefined, options: { batch: string; series?: string; dryRun?: boolean; provider?: string }) =>
+  .option('--lipsync-provider <provider>', 'Lip-sync provider override for the lipSync items of this batch: fal | higgsfield | topview | comfyui | mock')
+  .action((project: string | undefined, options: { batch: string; series?: string; dryRun?: boolean; provider?: string; lipsyncProvider?: string }) =>
     run(async () => {
       await generateBatch({
         projectDir: projectDirFromArg(project),
@@ -582,6 +584,9 @@ program
         dryRun: options.dryRun,
         provider: options.provider
           ? validateChoice(options.provider, ['fal', 'higgsfield', 'topview', 'comfyui', 'mock'] as const, 'provider')
+          : undefined,
+        lipsyncProvider: options.lipsyncProvider
+          ? validateChoice(options.lipsyncProvider, ['fal', 'higgsfield', 'topview', 'comfyui', 'mock'] as const, 'lipsync-provider')
           : undefined,
       });
     }),
@@ -688,22 +693,29 @@ program
 
 program
   .command('audio-segment [project]')
-  .description('Cut a vocal segment (seconds) for a lip-sync shot into assets/audio-segments/<name>.mp3.')
+  .description('Cut a lead-only vocal segment (seconds) for a lip-sync shot into assets/audio-segments/<name>.mp3; backing words are muted.')
   .requiredOption('--start <seconds>', 'Segment start in song seconds')
   .requiredOption('--end <seconds>', 'Segment end in song seconds')
   .requiredOption('--name <name>', 'Output name (lowercase, dashes), e.g. shot-012')
-  .option('--source <path>', 'Audio source relative to the project (default: audio/stems/vocals.wav, or the speaker stem of --character for an episode)')
+  .option('--source <path>', 'Audio source relative to the project (default: audio/stems/lead.wav if present, else audio/stems/vocals.wav, or the speaker stem of --character for an episode)')
   .option('--character <id>', 'Episode: cut from the speaker stem audio/stems/<id>.wav')
-  .action((project: string | undefined, options: { start: string; end: string; name: string; source?: string; character?: string }) =>
-    run(async () => {
-      await extractAudioSegment(
-        projectDirFromArg(project),
-        Number(options.start),
-        Number(options.end),
-        options.name,
-        { source: options.source, character: options.character },
-      );
-    }),
+  .option('--mute <spans>', 'Also silence these spans, in song seconds: <start>-<end>[,<start>-<end>...] (e.g. unwritten echoes)')
+  .option('--keep-backing', 'Do not mute the backing words (parenthesized lyrics) from the timing')
+  .option('--format <format>', 'mp3 | wav (Higgsfield Speak takes WAV only)', 'mp3')
+  .action(
+    (
+      project: string | undefined,
+      options: { start: string; end: string; name: string; source?: string; character?: string; mute?: string; keepBacking?: boolean; format: string },
+    ) =>
+      run(async () => {
+        await extractAudioSegment(projectDirFromArg(project), Number(options.start), Number(options.end), options.name, {
+          source: options.source,
+          character: options.character,
+          mute: parseMuteSpans(options.mute),
+          keepBacking: options.keepBacking,
+          format: validateChoice(options.format, ['mp3', 'wav'] as const, 'format'),
+        });
+      }),
   );
 
 program
