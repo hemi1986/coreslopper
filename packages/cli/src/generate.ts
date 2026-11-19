@@ -5,8 +5,11 @@ import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
 import {
   ConfigError,
+  FlexPromptSchema,
+  REF2VA_LIMITS,
   ValidationError,
   assertAffordable,
+  checkFlexPrompt,
   checkSpokenText,
   effectiveBatchCap,
   ensureDir,
@@ -18,6 +21,7 @@ import {
   providerForRole,
   recordSpend,
   remainingBudget,
+  renderFlexPrompt,
   repoRoot,
   resolveModelRole,
   saveState,
@@ -57,11 +61,15 @@ export const BatchItemSchema = z
       'textToVideo',
       'imageToVideo',
       'firstLastFrameToVideo',
+      'referenceToVideo',
       'lipSync',
       'generateAudio',
     ]),
     role: z.string().min(1),
-    prompt: z.string().min(1),
+    /** The prompt text. A referenceToVideo item can give `flex` instead. */
+    prompt: z.string().min(1).optional(),
+    /** referenceToVideo: a structured Flex prompt, rendered into `prompt` (see core/flex.ts). */
+    flex: FlexPromptSchema.optional(),
     references: z.array(z.string()).default([]),
     /**
      * Vocals for lipSync: the vocal stem (`audio/stems/vocals.wav`) with
@@ -100,7 +108,23 @@ export const BatchItemSchema = z
   })
   .refine((item) => item.operation !== 'lipSync' || item.references.length <= 2, {
     message: 'lipSync takes a start frame and an optional end frame.',
-  });
+  })
+  .refine((item) => (item.prompt === undefined) !== (item.flex === undefined), {
+    message: 'Give either "prompt" or "flex", not both and not neither.',
+  })
+  .refine((item) => item.flex === undefined || item.operation === 'referenceToVideo', {
+    message: '"flex" prompts are only for referenceToVideo.',
+  })
+  .refine(
+    (item) =>
+      item.operation !== 'referenceToVideo' ||
+      (item.references.length >= 1 && item.references.length <= REF2VA_LIMITS.images),
+    { message: `referenceToVideo needs 1 to ${REF2VA_LIMITS.images} reference images (<Picture 1> first).` },
+  )
+  .refine((item) => item.operation !== 'referenceToVideo' || item.audio === undefined, {
+    message: 'referenceToVideo takes no audio reference: it breaks identity. Describe the sound in overall_soundscape.',
+  })
+  .transform((item) => ({ ...item, prompt: item.prompt ?? renderFlexPrompt(item.flex!) }));
 
 /** Lip-sync must be driven by isolated vocals, never by the full mix. */
 function checkVocalSource(audio: string, projectRoot: string): void {
@@ -118,7 +142,10 @@ function checkVocalSource(audio: string, projectRoot: string): void {
 /** Lip-sync providers that are told the length of the driving audio as durationSeconds. */
 const LENGTH_FROM_AUDIO = new Set<ProviderKind>(['comfyui', 'higgsfield', 'topview']);
 
-const VIDEO_OPERATIONS = new Set(['textToVideo', 'imageToVideo', 'firstLastFrameToVideo', 'lipSync']);
+const VIDEO_OPERATIONS = new Set(['textToVideo', 'imageToVideo', 'firstLastFrameToVideo', 'referenceToVideo', 'lipSync']);
+
+/** Reference-to-video aspect by project kind: music videos are 16:9, episodes 9:16. */
+const REF2VA_ASPECT = { 'music-video': { label: '16:9', ratio: 16 / 9 }, episode: { label: '9:16', ratio: 9 / 16 } } as const;
 
 export const BatchSchema = z.array(BatchItemSchema).min(1);
 
@@ -156,7 +183,8 @@ export interface ResolvedItem {
 }
 
 /** The configuration a batch needs: providers, model overrides, master size, and the batch cap. */
-export type BatchConfig = Pick<ProjectConfig, 'providers' | 'models' | 'formats' | 'batch_cap_usd'>;
+export type BatchConfig = Pick<ProjectConfig, 'providers' | 'models' | 'formats' | 'batch_cap_usd'> &
+  Partial<Pick<ProjectConfig, 'kind'>>;
 
 /**
  * Where a batch runs: a project, or a series canon. It owns the budget the
@@ -223,10 +251,12 @@ function resolveItem(
   const role = models.roles[item.role];
   if (!role) throw new ValidationError(`Unknown model role "${item.role}". Add it to config/models.yaml.`);
   const override = roleOverride(config, item.role);
-  const provider =
+  const chosen =
     item.operation === 'lipSync'
       ? (lipsyncOverride ?? providerForRole(config, item.role))
       : (providerOverride ?? providerForRole(config, item.role));
+  // Reference-to-video exists only as the local Pika H3 Flex workflow; the mock keeps CI offline.
+  const provider: ProviderKind = item.operation === 'referenceToVideo' && chosen !== 'mock' ? 'comfyui' : chosen;
   if (item.operation === 'generateAudio' && provider !== 'comfyui' && provider !== 'mock') {
     throw new ConfigError(`Only the ComfyUI backend generates audio, but role "${item.role}" resolved to ${provider}.`);
   }
@@ -326,6 +356,20 @@ function resolveItem(
     }
   }
 
+  if (item.operation === 'referenceToVideo') {
+    checkFlexPrompt(item.prompt, references.length);
+    if (config.kind) {
+      const want = REF2VA_ASPECT[config.kind];
+      const { width, height } = { width: item.width ?? config.formats.master.width, height: item.height ?? config.formats.master.height };
+      if (Math.abs(width / height - want.ratio) / want.ratio > 0.02) {
+        throw new ValidationError(
+          `referenceToVideo renders ${want.label} for ${config.kind === 'episode' ? 'an episode' : 'a music video'}, but the item asks for ${width}x${height}. ` +
+            `Drop width/height or fix formats.master.`,
+        );
+      }
+    }
+  }
+
   // Local clips: pick LTX or Wan, the render size for draft/final, and the SeedVR2 pass.
   let prompt = item.prompt;
   let restore: ResolvedItem['restore'];
@@ -360,6 +404,18 @@ function resolveItem(
       notes.push(
         `video_model wan · quality ${clip.quality} · turbo ${clip.turbo ? 'on' : 'off'} · ${render.width}x${render.height}` +
           ' · 16 fps, RIFE x3 to 48 fps, no sound',
+      );
+    } else if (item.operation === 'referenceToVideo') {
+      // The graph sizes itself with a ResolutionSelector: the aspect of the request and ~1 MP.
+      const megapixels = Number(params.megapixels ?? 0.98);
+      const width = item.width ?? master.width;
+      const height = item.height ?? master.height;
+      const factor = Math.sqrt((megapixels * 1_000_000) / (width * height));
+      render = { width: Math.round(width * factor), height: Math.round(height * factor) };
+      const max = Number(params.max_references ?? REF2VA_LIMITS.defaultImages);
+      notes.push(
+        `pika-h3 ref2va · ${references.length}/${max} reference(s) · quality ${clip.quality} · about ` +
+          `${render.width}x${render.height} · 24 fps, 17n+5 frames · clip sound (SFX, dialogue), no score`,
       );
     } else {
       if (clip.quality === 'final' && !ownSize) {

@@ -98,14 +98,17 @@ describe('ComfyUI model roles', () => {
     const models = await loadModelsConfig();
     for (const [name, videoRole] of Object.entries(models.roles)) {
       if (!name.startsWith('video.') || name === 'video.lipsync') continue;
-      // Wan and SeedVR2 are local-only helper roles, not shot roles.
-      if (name === 'video.wan' || name === 'video.upscale') continue;
+      // Wan and SeedVR2 are local-only helper roles, not shot roles; reference-to-video is Pika H3 only.
+      if (name === 'video.wan' || name === 'video.upscale' || name === 'video.reference_to_video') continue;
       const resolved = resolveModelRole(videoRole, 'comfyui', {}, name);
       expect(resolved.model, name).toMatch(/^ltx-/);
       expect(resolved.params, name).not.toHaveProperty('reference_field');
     }
     expect(resolveModelRole(models.roles['video.wan']!, 'comfyui', {}, 'video.wan').model).toBe('wan22-i2v');
     expect(resolveModelRole(models.roles['video.upscale']!, 'comfyui', {}, 'video.upscale').model).toBe('seedvr2-upscale');
+    expect(
+      resolveModelRole(models.roles['video.reference_to_video']!, 'comfyui', {}, 'video.reference_to_video').model,
+    ).toBe('pika-h3-ref2va');
   });
 
   it('lets a project point a role at its own workflow without a price', () => {

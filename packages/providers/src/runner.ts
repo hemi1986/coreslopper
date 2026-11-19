@@ -124,6 +124,12 @@ export class GenerationRunner {
       else if (request.operation === 'textToVideo') output = await provider.textToVideo(input);
       else if (request.operation === 'firstLastFrameToVideo') output = await provider.firstLastFrameToVideo(input);
       else if (request.operation === 'lipSync') output = await provider.lipSync(input);
+      else if (request.operation === 'referenceToVideo') {
+        if (!provider.referenceToVideo) {
+          throw new Error(`The ${provider.name} provider has no reference-to-video; run the item on comfyui.`);
+        }
+        output = await provider.referenceToVideo(input);
+      }
       else if (request.operation === 'generateAudio') {
         if (!provider.generateAudio) throw new Error(`The ${provider.name} provider cannot generate audio.`);
         output = await provider.generateAudio(input);

@@ -84,6 +84,11 @@ export class MockProvider implements Provider {
     return writePlaceholder(input, `MOCK FLF ${input.durationSeconds ?? 5}s`, 'clip');
   }
 
+  async referenceToVideo(input: ProviderInput): Promise<ProviderOutput> {
+    if ((input.references ?? []).length < 1) throw new Error('referenceToVideo requires at least one reference image.');
+    return writePlaceholder(input, `MOCK REF2V ${input.durationSeconds ?? 5}s`, 'clip');
+  }
+
   async lipSync(input: ProviderInput): Promise<ProviderOutput> {
     if (!input.references?.[0]) throw new Error('lipSync requires a face reference image.');
     if (!input.audio) throw new Error('lipSync requires an audio file.');
