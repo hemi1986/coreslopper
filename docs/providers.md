@@ -17,6 +17,7 @@ providers:
 |---|---|---|
 | `image` | `generateImage`, `editImage` | `fal`, `higgsfield`, `topview`, `comfyui`, `mock` |
 | `video` | `textToVideo`, `imageToVideo`, `firstLastFrameToVideo` | `fal`, `higgsfield`, `topview`, `comfyui`, `mock` |
+| — | `referenceToVideo` | always `comfyui` (Pika H3 Flex, `video.reference_to_video`), or `mock` |
 | `lipsync` | `lipSync` | `fal` (OmniHuman 1.5), `higgsfield` (Speak v2), `topview` (Avatar 4, separate credentials), `comfyui` (LTX FLF2V lip-sync, see [comfyui/README.md](../comfyui/README.md)), `mock`. Defaults to `video`, or to `fal` when `video` is `comfyui` or `topview`. |
 
 `generate --lipsync-provider <p>` runs the lip-sync items of one batch on another provider, for example to compare OmniHuman with Speak v2 on one shot; `--provider` leaves lip-sync on its own provider. See [Lip-sync](#lip-sync) for the trade-offs.
@@ -80,6 +81,7 @@ editImage(input): Promise<ImageResult>;
 textToVideo(input): Promise<VideoResult>;
 imageToVideo(input): Promise<VideoResult>;           // references[0] = start frame
 firstLastFrameToVideo(input): Promise<VideoResult>;  // references = [start, end]
+referenceToVideo?(input): Promise<VideoResult>;      // references = identity anchors, <Picture 1> first (ComfyUI only)
 lipSync(input): Promise<VideoResult>;
 ```
 

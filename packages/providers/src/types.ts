@@ -4,6 +4,7 @@ export type Operation =
   | 'textToVideo'
   | 'imageToVideo'
   | 'firstLastFrameToVideo'
+  | 'referenceToVideo'
   | 'lipSync'
   | 'generateAudio'
   | 'upscaleVideo';
@@ -54,6 +55,12 @@ export interface Provider {
    * only local backends implement it.
    */
   upscaleVideo?(input: ProviderInput): Promise<ProviderOutput>;
+  /**
+   * Generate a clip, with sound, from 1–n reference images (`references[k]` is
+   * `<Picture k+1>` in the prompt): identity anchors, not a start frame.
+   * Optional: only the local Pika H3 Flex workflow implements it.
+   */
+  referenceToVideo?(input: ProviderInput): Promise<ProviderOutput>;
   /**
    * Extra cache-key material that is not in the request, such as the content of
    * a local workflow file. Return undefined when the model name is enough.

@@ -545,6 +545,25 @@ roles:
       sound, no lip-sync. Character names in the prompt are replaced by their
       characters.yaml description.
     alternatives: {}
+  video.reference_to_video:
+    provider: comfyui
+    model: pika-h3-ref2va
+    params:
+      megapixels: 0.98
+      max_references: 4
+    maxDuration: 10
+    notes: >-
+      Pika H3 Flex (MiniMax H3 reference-to-video + Pika LoRA), operation
+      referenceToVideo. Always local: the item runs on comfyui whatever
+      providers.video says. 1-4 reference images by default (identity anchors,
+      not a start frame), up to 9 with params.max_references; no audio references.
+      references[0] is <Picture 1>. The prompt follows the Flex schema (give
+      "flex" in the batch item, see comfyui/README.md);
+      non_diegetic_music is always "none", music that plays in the scene goes in
+      overall_soundscape. Aspect from the project kind: 16:9 music video, 9:16
+      episode. 24 fps, frames rounded up to 17n+5, the clip keeps its sound.
+      Sampler, sigmas, LoRA, and models are fixed; no Turbo/Lightning LoRAs.
+    alternatives: {}
   video.upscale:
     provider: comfyui
     model: seedvr2-upscale

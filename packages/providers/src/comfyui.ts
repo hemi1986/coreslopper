@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { basename, extname, isAbsolute, join, resolve } from 'node:path';
-import { ConfigError, repoRoot } from '@coreslopper/core';
+import { ConfigError, REF2VA_LIMITS, repoRoot } from '@coreslopper/core';
 import {
   AUDIO_EXTENSIONS,
   IMAGE_EXTENSIONS,
@@ -96,6 +96,7 @@ const ADAPTER_PARAMS = new Set([
   'color_correction',
   'split_latent',
   'turbo',
+  'max_references',
   'node_inputs',
 ]);
 
@@ -135,6 +136,8 @@ export interface ComfyUploads {
   audio?: string;
   /** The clip to restore or upscale (cs_video). */
   video?: string;
+  /** Reference-to-video images for cs_ref_0 … cs_ref_<n-1>, in prompt order (<Picture 1> first). */
+  indexedReferences?: string[];
 }
 
 export interface ComfyUIProviderOptions {
@@ -195,9 +198,137 @@ export function parseWorkflow(text: string, label: string): ComfyWorkflow {
  * spaces or commas, e.g. "cs_width cs_height cs_frames" on an LTX latent node.
  */
 export function nodesWithTitle(workflow: ComfyWorkflow, title: string): string[] {
+  const wanted = normalizeTag(title);
   return Object.entries(workflow)
-    .filter(([, node]) => (node._meta?.title ?? '').split(/[\s,]+/).includes(title))
+    .filter(([, node]) => titleTags(node).includes(wanted))
     .map(([id]) => id);
+}
+
+/** Older names a tag is also found by: the Pika H3 export calls its ResolutionSelector cs:aspect. */
+const TAG_ALIASES: Record<string, string> = { cs_aspect: 'cs_resolution' };
+
+/** `cs:prompt` and `cs_prompt` are the same tag; aliases map to their canonical name. */
+export function normalizeTag(token: string): string {
+  const tag = token.replace(/^cs:/, 'cs_');
+  return TAG_ALIASES[tag] ?? tag;
+}
+
+function titleTags(node: ComfyNode): string[] {
+  return (node._meta?.title ?? '')
+    .split(/[\s,]+/)
+    .filter(Boolean)
+    .map(normalizeTag);
+}
+
+/** Indexed reference images `cs_ref_<n>` (or `cs:ref_<n>`) by index. */
+export function indexedReferenceNodes(workflow: ComfyWorkflow): Map<number, string> {
+  const found = new Map<number, string>();
+  for (const [id, node] of Object.entries(workflow)) {
+    for (const tag of titleTags(node)) {
+      const match = /^cs_ref_(\d+)$/.exec(tag);
+      if (match) found.set(Number(match[1]), id);
+    }
+  }
+  return found;
+}
+
+/** Inputs anywhere in the workflow that link to a node, as [consumer id, input name]. */
+function linksTo(workflow: ComfyWorkflow, source: string): [string, string][] {
+  const links: [string, string][] = [];
+  for (const [id, node] of Object.entries(workflow)) {
+    for (const [name, value] of Object.entries(node.inputs)) {
+      if (isLink(value) && (value as [string, number])[0] === source) links.push([id, name]);
+    }
+  }
+  return links;
+}
+
+/** A workflow built on MiniMax H3 reference-to-video (Pika H3 Flex). */
+function isRef2va(workflow: ComfyWorkflow): boolean {
+  return Object.values(workflow).some((node) => node.class_type === 'MiniMaxH3ReferenceToVideo');
+}
+
+const REF2VA_SAMPLER = 'lcm';
+const REF2VA_SIGMAS = '1.0, 0.972973, 0.923077, 0.8, 0.571429, 0.333333, 0.0';
+const REF2VA_LORA = 'pika_h3_flex_ref2va_v1_bf16.safetensors';
+
+/**
+ * The fixed part of the Pika H3 Flex workflow: sampler lcm, the seven manual
+ * sigmas, and exactly one LoRA (the Pika one at 1.0). Turbo or Lightning LoRAs
+ * break the output, so a workflow that differs is rejected.
+ */
+export function checkRef2vaLocks(workflow: ComfyWorkflow, label: string): void {
+  const problems: string[] = [];
+  const nodes = Object.values(workflow);
+  const samplers = nodes.filter((node) => node.class_type === 'KSamplerSelect');
+  if (samplers.length !== 1 || samplers[0]!.inputs.sampler_name !== REF2VA_SAMPLER) {
+    problems.push(`sampler must be ${REF2VA_SAMPLER}`);
+  }
+  const sigmas = nodes.filter((node) => node.class_type === 'ManualSigmas');
+  const normalized = (value: unknown) => String(value).replace(/\s+/g, '');
+  if (sigmas.length !== 1 || normalized(sigmas[0]!.inputs.sigmas) !== normalized(REF2VA_SIGMAS)) {
+    problems.push(`ManualSigmas must be ${REF2VA_SIGMAS}`);
+  }
+  const loras = nodes.filter((node) => /lora/i.test(node.class_type));
+  if (
+    loras.length !== 1 ||
+    loras[0]!.inputs.lora_name !== REF2VA_LORA ||
+    Number(loras[0]!.inputs.strength_model) !== 1
+  ) {
+    problems.push(`exactly one LoRA, ${REF2VA_LORA} at 1.0 (no Turbo/Lightning LoRAs on top)`);
+  }
+  if (problems.length > 0) {
+    throw new ConfigError(`ComfyUI workflow ${label} breaks the fixed Pika H3 Flex setup: ${problems.join('; ')}.`);
+  }
+}
+
+/**
+ * Wire 1–n uploaded images into the indexed reference slots. Existing
+ * `cs_ref_<k>` LoadImage nodes are filled; missing ones are added as copies and
+ * linked to the next `ref_image_<k>` input of the node `cs_ref_0` feeds; slots
+ * beyond n are removed with their links. Everything is found by title and link,
+ * never by node ID.
+ */
+function setIndexedReferences(workflow: ComfyWorkflow, images: string[], label: string): void {
+  const slots = indexedReferenceNodes(workflow);
+  const first = slots.get(0);
+  if (!first) throw new ConfigError(`ComfyUI workflow ${label} has no node titled cs:ref_0.`);
+  const indices = [...slots.keys()].sort((a, b) => a - b);
+  if (indices.some((index, position) => index !== position)) {
+    throw new ConfigError(`ComfyUI workflow ${label}: reference tags must count cs:ref_0, cs:ref_1, … without gaps.`);
+  }
+  const [consumerLink, ...more] = linksTo(workflow, first);
+  if (!consumerLink || more.length > 0) {
+    throw new ConfigError(`ComfyUI workflow ${label}: cs:ref_0 must feed exactly one reference input.`);
+  }
+  const [consumer, firstInput] = consumerLink;
+  const slotMatch = /^(.*?)(\d+)$/.exec(firstInput);
+  if (!slotMatch) {
+    throw new ConfigError(`ComfyUI workflow ${label}: cs:ref_0 feeds "${firstInput}", which is not a numbered slot.`);
+  }
+  const prefix = slotMatch[1]!;
+  const base = Number(slotMatch[2]);
+  const template = workflow[first]!;
+
+  for (const index of indices) {
+    const id = slots.get(index)!;
+    if (index < images.length) {
+      workflow[id]!.inputs.image = images[index];
+      continue;
+    }
+    for (const [user, input] of linksTo(workflow, id)) delete workflow[user]!.inputs[input];
+    delete workflow[id];
+  }
+  for (let index = indices.length; index < images.length; index += 1) {
+    let id = `cs_ref_${index}`;
+    while (workflow[id]) id = `${id}_`;
+    workflow[id] = {
+      class_type: template.class_type,
+      inputs: { ...template.inputs, image: images[index] },
+      _meta: { title: `cs:ref_${index}` },
+    };
+    workflow[consumer]!.inputs[`${prefix}${base + index}`] = [id, 0];
+  }
 }
 
 export interface WorkflowInspection {
@@ -207,6 +338,8 @@ export interface WorkflowInspection {
   kind: ComfyOutputKind;
   /** Operations the workflow fits, judged by its output and its image/audio inputs. */
   operations: Operation[];
+  /** Indexed reference slots (`cs_ref_<n>`) in the export. */
+  referenceSlots: number;
   warnings: string[];
 }
 
@@ -226,11 +359,14 @@ export function inspectWorkflow(workflow: ComfyWorkflow): WorkflowInspection {
     if (ids.length > 0) titles[key] = ids;
   }
   const kind = outputKind(workflow, titles.output);
+  const referenceSlots = indexedReferenceNodes(workflow).size;
   const operations: Operation[] = [];
   if (kind === 'audio') operations.push('generateAudio');
   // A video workflow that loads a video restores or upscales it.
   else if (kind === 'video' && titles.video) operations.push('upscaleVideo');
   else if (kind === 'image') operations.push(titles.startImage ? 'editImage' : 'generateImage');
+  // Indexed reference images (cs_ref_0 …) are identity anchors, not a start frame.
+  else if (referenceSlots > 0) operations.push('referenceToVideo');
   // A video workflow with driving audio lip-syncs a start (and optional end) frame.
   else if (titles.audio) operations.push('lipSync');
   else if (titles.endImage) operations.push('firstLastFrameToVideo');
@@ -254,7 +390,10 @@ export function inspectWorkflow(workflow: ComfyWorkflow): WorkflowInspection {
   if (kind === 'audio' && titles.audio && !titles.transcript) {
     warnings.push(`${COMFYUI_TITLES.audio} without ${COMFYUI_TITLES.transcript}; a voice clone usually needs the reference transcript`);
   }
-  return { titles, kind, operations, warnings };
+  if (referenceSlots > 0 && titles.audio) {
+    warnings.push('reference-to-video with an audio reference; audio references break identity and are not used');
+  }
+  return { titles, kind, operations, referenceSlots, warnings };
 }
 
 function setTitled(
@@ -493,6 +632,11 @@ export class ComfyUIProvider implements Provider {
     return this.run(input, 'textToVideo');
   }
 
+  async referenceToVideo(input: ProviderInput): Promise<ProviderOutput> {
+    if (!input.references?.[0]) throw new Error('referenceToVideo requires at least one reference image.');
+    return this.run(input, 'referenceToVideo');
+  }
+
   async imageToVideo(input: ProviderInput): Promise<ProviderOutput> {
     if (!input.references?.[0]) throw new Error('imageToVideo requires a start-frame reference image.');
     return this.run(input, 'imageToVideo');
@@ -575,6 +719,28 @@ export class ComfyUIProvider implements Provider {
     if (uploads.end) setTitled(workflow, 'endImage', uploads.end, label);
     addReferenceImages(workflow, uploads.references ?? [], label);
     if (uploads.audio) setTitled(workflow, 'audio', uploads.audio, label);
+    const ref2va = isRef2va(workflow);
+    if (operation === 'referenceToVideo') {
+      if (input.audio) {
+        throw new ConfigError(
+          `ComfyUI workflow ${label} takes no audio reference: MiniMax H3 loses the subject's identity with one. ` +
+            'Describe the sound in overall_soundscape instead.',
+        );
+      }
+      const images = uploads.indexedReferences ?? [];
+      const max = params.max_references === undefined ? REF2VA_LIMITS.defaultImages : Number(params.max_references);
+      if (!Number.isInteger(max) || max < 1 || max > REF2VA_LIMITS.images) {
+        throw new ConfigError(`ComfyUI param max_references must be an integer from 1 to ${REF2VA_LIMITS.images}.`);
+      }
+      if (images.length < 1) throw new ConfigError(`ComfyUI workflow ${label} needs at least one reference image.`);
+      if (images.length > max) {
+        throw new ConfigError(
+          `The item has ${images.length} reference images; ${label} takes ${max} by default. ` +
+            `Merge references, or raise params.max_references (hard limit ${REF2VA_LIMITS.images}).`,
+        );
+      }
+      setIndexedReferences(workflow, images, label);
+    }
     if (inspection.kind === 'video' && inspection.titles.audio) {
       // The driving audio is cut in the workflow: start here, length = frames / fps.
       const start = input.audioStartSeconds ?? 0;
@@ -643,7 +809,22 @@ export class ComfyUIProvider implements Provider {
       if (!nodeInputs || typeof nodeInputs !== 'object' || Array.isArray(nodeInputs)) {
         throw new ConfigError('ComfyUI param node_inputs must map "<node title or id>.<input>" to a value.');
       }
-      for (const [key, value] of Object.entries(nodeInputs)) setNodeInput(workflow, key, value, label);
+      for (const [key, value] of Object.entries(nodeInputs)) {
+        // The fixed part of a Pika H3 Flex graph is only reachable by node ID; keep it out of reach.
+        if (ref2va && !key.startsWith('cs:') && !key.startsWith('cs_')) {
+          throw new ConfigError(
+            `ComfyUI workflow ${label}: node_inputs "${key}" must address a cs: tag. ` +
+              'Sampler, sigmas, LoRA, models, and VAEs of the Pika H3 Flex workflow are fixed.',
+          );
+        }
+        setNodeInput(workflow, key, value, label);
+      }
+    }
+    if (ref2va) checkRef2vaLocks(workflow, label);
+    // Group the server's outputs per workflow and request.
+    const prefix = `coreslopper/${basename(label, '.json')}/${(input.idempotencyKey ?? String(input.seed)).slice(0, 16)}`;
+    for (const id of inspection.titles.output ?? []) {
+      if (typeof workflow[id]!.inputs.filename_prefix === 'string') workflow[id]!.inputs.filename_prefix = prefix;
     }
     return workflow;
   }
@@ -673,7 +854,8 @@ export class ComfyUIProvider implements Provider {
       operation !== 'textToVideo' &&
       operation !== 'generateImage' &&
       operation !== 'generateAudio' &&
-      operation !== 'upscaleVideo';
+      operation !== 'upscaleVideo' &&
+      operation !== 'referenceToVideo';
     const extra = operation === 'editImage' ? references.slice(1) : [];
     // Validate the workflow before uploading anything.
     const check = await this.buildPrompt(input, operation, {
@@ -682,6 +864,7 @@ export class ComfyUIProvider implements Provider {
       references: extra.map(() => 'check.png'),
       audio: 'check.wav',
       video: 'check.mp4',
+      indexedReferences: operation === 'referenceToVideo' ? references.map(() => 'check.png') : [],
     });
     const inspection = inspectWorkflow(check);
     await this.checkModelFiles(check, basename(this.workflowPath(input.model)));
@@ -699,6 +882,9 @@ export class ComfyUIProvider implements Provider {
       end,
       references: await Promise.all(extra.map((path) => this.upload(path))),
       ...(operation === 'upscaleVideo' && startPath ? { video: await this.upload(startPath) } : {}),
+      ...(operation === 'referenceToVideo'
+        ? { indexedReferences: await Promise.all(references.map((path) => this.upload(path))) }
+        : {}),
     };
     if (inspection.titles.audio) {
       // Lip-sync: the driving vocals. Voice clone: the reference voice.

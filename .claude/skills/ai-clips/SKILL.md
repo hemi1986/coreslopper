@@ -31,6 +31,7 @@ license: MIT
    | Movement with a fixed target (turn, sit down, draw a weapon, push into a close-up) | `firstLastFrameToVideo` | start frame, end frame; both show the face cleanly | `video.first_last_frame` | `ltx-flf2v` |
    | One keyframe | `imageToVideo` | start frame | `video.image_to_video.*` | `ltx-i2v` |
    | No keyframe: atmosphere and establishing shots only, never a recurring character | `textToVideo` | none | `video.text_to_video` | `ltx-t2v` |
+   | No keyframe, but characters, props, or a set must stay exact; one continuous camera move with sound | `referenceToVideo` | 1–4 reference images (up to 9), identity anchors | `video.reference_to_video` | `pika-h3-ref2va` (always local) |
 
    Clip rules for every non-lip-sync shot: 3–6 s with one clear action. Keep important faces large in frame. A wide shot with several people gets 2–3 s of minimal motion, or stays a still with a slow zoom in the edit.
 
@@ -45,6 +46,30 @@ license: MIT
    - Speech (`generateAudio`, role `audio.voice`, workflow `voxcpm-clone`): `audio` is the reference WAV, `params.transcript` its exact words, `prompt` the text to speak. Before writing the prompt, spell out every number, year, time, abbreviation, and symbol in German words ("2077" → "zweitausendsiebenundsiebzig", "z. B." → "zum Beispiel"); `generate` rejects digits and symbols. Generate one sentence or paragraph per item and join the takes with ffmpeg. On a slip or wrong stress, retry with up to 3 seeds. Use `audio.voice_design` (`"(description)Text"`) only to find a new voice.
    - Local `lipSync` (`providers.lipsync: comfyui`, workflow `ltx25-lipsync-flf2v`) is driven by the isolated vocal stem `audio/stems/vocals.wav`, never the full mix. Set `"audio": "audio/stems/vocals.wav"`, `audioStartSeconds` to the line's start, and `durationSeconds` to the exact length of the line plus about 0.3 s of the pause after it; keep it at 10 s or less. Cut every segment in a speech pause: the frame count rounds down to 8n+1, so only that silent tail is dropped, never the end of a word. On a weak take, try 2–3 other seeds first, then adjust the prompt.
    - Local clip options per item (ComfyUI only): `"video_model": "wan"` for an image-to-video shot without lip-sync that needs more natural motion than LTX (dance, hair, cloth); Wan has no sound and is rejected for lip-sync. `"quality": "final"` for the final clip pass; it runs the SeedVR2 restore and writes `<clip>_upscaled.mp4` next to the clip; point the storyboard at that file. `"seedvr2": "upscale"` renders LTX at half size and lets SeedVR2 scale it up (faster); `"seedvr2": "off"` when the restored clip looks oversharpened. `"color_correction": "wavelet"` when `lab` shifts the colors. Write Wan prompts with the character names; `generate` swaps them for the descriptions.
+   - `referenceToVideo` (Pika H3 Flex) writes its prompt in the Flex schema; give a `flex` object instead of `prompt` and `generate` renders it. `references[k]` is `<Picture k+1>`; name every picture in a subject. Use the retention labels `fully_preserved`, `attribute_transfer`, `weak_reference` (backgrounds of reference images are usually `weak_reference`), put time marks in the shots ("At about 1.5 seconds …"), and describe SFX, dialogue, and music that plays inside the scene in `soundscape`. There is no music field: `non_diegetic_music` is always "none", because the score comes in post-production (the song, or one bed per episode). No `audio` reference, no negative prompt. The aspect comes from the project kind. Example:
+     ```json
+     {
+       "operation": "referenceToVideo",
+       "role": "video.reference_to_video",
+       "references": ["characters/robot/sheet.png", "assets/references/workshop.png"],
+       "durationSeconds": 4,
+       "flex": {
+         "subjects": [
+           {"is": "the robot", "picture": 1, "role": "identity anchor", "features": "mint-green body, round chest window, number lettering", "avoid": "the white background of <Picture 1>"},
+           {"is": "the workshop", "picture": 2, "role": "set anchor", "features": "pegboard of tools, red tool chest, warm lamps"}
+         ],
+         "summary": "A four-second static medium shot: the robot stands at the workbench and looks up.",
+         "retention": [
+           {"subject": 1, "appears": "[Shot 1]", "label": "fully_preserved", "note": "body, chest window, lettering"},
+           {"subject": 2, "appears": "[Shot 1]", "label": "fully_preserved", "note": "tool wall and lamps"}
+         ],
+         "backgrounds": [{"picture": 1, "label": "weak_reference", "note": "its white background is discarded"}],
+         "style": "Warm practical light, static camera, shallow depth of field.",
+         "shots": ["<Subject 1> stands at the bench of <Subject 2>. At about two seconds it lifts its head toward the lens."],
+         "soundscape": "Workshop hum, a soft servo whir as the head lifts, a radio on the shelf plays faint swing."
+       }
+     }
+     ```
    - Every local workflow has a slower `-quality` variant (`qwen-t2i-quality`, `qwen-edit-quality`, `ltx-i2v-quality`, `ltx-t2v-quality`, `ltx-flf2v-quality`, `ltx25-lipsync-flf2v-quality`). Select it per item with `"params": {"workflow": "<name>"}`. Use it for character references, keyframes with a recurring character, face close-ups, clip and lip-sync start frames, hero clips, and the final clip pass; keep the default workflows for drafts, bass-hit stills, and face-free backgrounds. The parameter is ignored when the item runs on a cloud provider.
    - Resolution follows the project format (16:9 or 9:16) in multiples of 64. The roles render drafts at 0.8 MP; for the final render set `models.<role>.params.megapixels: 1.9` in `project.yaml`. Keyframes must already have the video's aspect ratio.
 3. Write a batch JSON file outside the repo or under `projects/<slug>/assets/batches/`. Shape:
