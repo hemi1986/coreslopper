@@ -1,0 +1,77 @@
+id: robot-glide-9x16
+title: Robot glides to the table, 9:16, 4 s
+sets:
+  - core
+  - portrait
+focus: A non-human character moves through a set in portrait format; the body (castor skirt, CRT head, chest porthole) must keep its shape and the dim tubes must not light up.
+source:
+  project: seite-b-03
+  shot: shot-048
+operation: imageToVideo
+role: video.image_to_video.fast
+seed: 80048
+width: 1080
+height: 1920
+durationSeconds: 4
+prompt: "Preserve the exact scene, characters, framing and lighting from the input image. Static camera. The 1950s
+  household robot glides slowly forward on its small castor wheels towards the table and stops; the red cable drags
+  along the floor behind it. The orange vacuum tubes in the open chest porthole stay a dark, barely glowing ember the
+  whole time and never get brighter. The robot keeps its exact shape: rounded mint-green enamel body with rust, chrome
+  grille, round CRT screen head, accordion hose arms with pincers, no legs. Sound: small castor wheels rolling slowly
+  over a concrete floor, then stopping, slow water drips. No music, nobody speaks."
+fixtures:
+  start:
+    from: seite-b-03/assets/keyframes/rgb/shot-048.png
+  golden:
+    from: seite-b-03/assets/video/image_to_video/fast/c31bd67b3ce7c23c-0.mp4
+inputs:
+  references:
+    - start
+golden: golden
+goldenNote: MiniMax H3 cloud (Topview), 5 s, accepted in the episode.
+frames:
+  - 0.05
+  - 0.35
+  - 0.65
+  - 0.95
+rubric:
+  - id: motion
+    check: The robot rolls forward towards the table and comes to a stop; it glides, it never walks or grows legs.
+  - id: identity
+    check: Body, CRT head, chest porthole, grille, hose arms, and pincers keep their exact shape and colours for the whole clip; no extra limbs or melting.
+    weight: 2
+  - id: tubes
+    check: The vacuum tubes stay a dim ember and never light up brightly.
+  - id: set
+    check: Table, room, and red cable stay consistent; the cable trails behind the robot.
+  - id: camera
+    check: The camera does what the prompt says (static means no push-in, zoom, or jump-zoom).
+flex:
+  subjects:
+  - is: the 1950s household robot
+    picture: 1
+    role: identity anchor
+    features: a narrow rounded refrigerator-shaped body in chipped mint-green enamel with rust patches, chrome trim and
+      a chrome car-grille front, an open chest porthole with dark orange vacuum tubes, a round CRT screen head in a chrome
+      bezel, accordion hose arms with pincer claws, no legs, a flared chrome skirt on four small castor wheels
+  - is: the dim basement room with the table and the red cable in <Picture 1>
+    role: set anchor
+    features: room, table, light, and the red cable on the floor exactly as in the picture
+  summary: 'A four-second static portrait shot: the robot of <Picture 1> glides slowly forward to the table and stops.'
+  retention:
+  - subject: 1
+    appears: '[Shot 1]'
+    label: fully_preserved
+    note: body shape, enamel colour and rust, CRT head, porthole, arms, pincers, castor skirt
+  - subject: 2
+    appears: '[Shot 1]'
+    label: fully_preserved
+    note: room, table, light, red cable
+  style: Photoreal live-action, static locked-off camera, no zoom, one continuous take, slow smooth motion; the robot
+    is a rigid machine and keeps its exact shape.
+  shots:
+  - <Subject 1> stands still in <Subject 2>. At about half a second it starts to glide slowly forward on its castor
+    wheels towards the table, the red cable dragging along the floor behind it. At about three seconds it stops at the
+    table and stays still. The vacuum tubes in its chest stay a dark, barely glowing ember the whole time.
+  soundscape: Small castor wheels rolling slowly over a concrete floor, then stopping; slow water drips in the quiet
+    room. Nobody speaks.

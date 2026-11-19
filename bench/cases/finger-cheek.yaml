@@ -38,3 +38,30 @@ rubric:
     check: "Only eyes and smile move: one slow wink, a conspiratorial smile."
   - id: camera
     check: The camera does what the prompt says (static means no push-in, zoom, or jump-zoom).
+flex:
+  subjects:
+  - is: the young woman
+    picture: 1
+    role: identity and outfit anchor
+    features: a young woman with light freckles, hazel-green eyes, long mint-green hair in a high sleek ponytail
+      with soft straight bangs, her outfit exactly as in the picture
+  - is: the background in <Picture 1>
+    role: set anchor
+    features: exactly as in the picture
+  summary: 'A two-second static close shot: the young woman of <Picture 1> holds her raised index finger still beside
+    her cheek and winks once.'
+  retention:
+  - subject: 1
+    appears: '[Shot 1]'
+    label: fully_preserved
+    note: face, freckles, ponytail, outfit, the finger beside the cheek
+  - subject: 2
+    appears: '[Shot 1]'
+    label: fully_preserved
+    note: background
+  style: Photoreal, static camera, one continuous take, natural anatomy; only her eyes and smile move.
+  shots:
+  - <Subject 1> holds her raised index finger perfectly still beside her cheek, a hand's width away from her face,
+    in front of <Subject 2>. She smiles conspiratorially. At about one second she gives one slow playful wink. At
+    about two seconds the finger is still exactly where it started, the hand has not moved.
+  soundscape: Quiet room tone, one soft amused breath through the nose. Nobody speaks.

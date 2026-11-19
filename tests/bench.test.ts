@@ -18,6 +18,7 @@ import {
 } from '@coreslopper/core';
 import {
   benchItem,
+  benchSkipReason,
   importBenchFixtures,
   loadBenchRun,
   runBench,
@@ -146,6 +147,35 @@ describe('bench files', () => {
       references: [join('fixtures', 'edit-hands', 'start.png')],
       params: { megapixels: 2 },
     });
+  });
+
+  it('runs an i2v case as reference-to-video on a target with as: referenceToVideo', () => {
+    const clip = {
+      ...editCase,
+      id: 'clip',
+      operation: 'imageToVideo',
+      role: 'video.image_to_video.fast',
+      durationSeconds: 2,
+    };
+    const flex = {
+      subjects: [{ is: 'the dancer', picture: 1, role: 'identity anchor' }],
+      summary: 'A two-second static shot of the dancer.',
+      retention: [{ subject: 1, appears: '[Shot 1]', label: 'fully_preserved', note: 'face and outfit' }],
+      style: 'Static camera.',
+      shots: ['<Subject 1> sways. At about one second she raises her hands.'],
+      soundscape: 'Room tone.',
+    };
+    const pika = { provider: 'comfyui', operations: { imageToVideo: { as: 'referenceToVideo', params: {} } } } as const;
+    const plain = parseBenchCase(clip, 'case');
+    expect(benchSkipReason(plain, pika)).toMatch(/no flex prompt/);
+    const withFlex = parseBenchCase({ ...clip, flex }, 'case');
+    expect(benchSkipReason(withFlex, pika)).toBeUndefined();
+    const item = benchItem(withFlex, pika, 0);
+    expect(item).toMatchObject({ operation: 'referenceToVideo', role: 'video.reference_to_video', durationSeconds: 2 });
+    expect(item.prompt).toContain('non_diegetic_music:');
+    // The same case keeps its own operation and prompt on an ordinary target.
+    const ltx = { provider: 'comfyui', operations: { imageToVideo: { params: {} } } } as const;
+    expect(benchItem(withFlex, ltx, 0)).toMatchObject({ operation: 'imageToVideo', prompt: clip.prompt });
   });
 
   it('scores a rubric with weights and reports unscored criteria', () => {

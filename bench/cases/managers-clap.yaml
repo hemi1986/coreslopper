@@ -33,3 +33,29 @@ rubric:
     check: The camera does what the prompt says (static means no push-in, zoom, or jump-zoom).
   - id: identity
     check: The three managers keep their faces.
+flex:
+  subjects:
+  - is: the three managers
+    picture: 1
+    role: identity and costume anchor
+    features: faces, hair, suits and positions of all three exactly as in the picture
+  - is: the room in <Picture 1>
+    role: set anchor
+    features: background and light exactly as in the picture
+  summary: 'A two-second steady medium-wide shot: the three managers of <Picture 1> clap slowly and self-satisfied,
+    nodding.'
+  retention:
+  - subject: 1
+    appears: '[Shot 1]'
+    label: fully_preserved
+    note: three faces, suits, positions
+  - subject: 2
+    appears: '[Shot 1]'
+    label: fully_preserved
+    note: room and lighting
+  style: Photoreal, steady camera at the picture's framing, one continuous take; hands keep five fingers while clapping.
+  shots:
+  - <Subject 1> stand in <Subject 2> and clap their hands slowly and self-satisfied, nodding, mouths closed. At
+    about one second each pair of hands meets cleanly and parts again. At about two seconds they still clap at the
+    same slow pace.
+  soundscape: Slow, dry hand claps from three people, a quiet office hum. Nobody speaks.
