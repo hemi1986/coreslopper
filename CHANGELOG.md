@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.8.0](https://github.com/hemi1986/coreslopper/compare/v0.7.0...v0.8.0) (2026-11-19)
+
+
+### Features
+
+* **comfyui:** Pika H3 Flex reference-to-video (referenceToVideo) ([919d705](https://github.com/hemi1986/coreslopper/commit/919d7051ac7e0539f41e9825bd6a17b59dd2add4))
+* **comfyui:** Pika H3 Flex reference-to-video (referenceToVideo) ([40a30d8](https://github.com/hemi1986/coreslopper/commit/40a30d858d666f56fb9c70af8d3d9677c65e973f))
+* **comfyui:** quality workflows, Wan 2.2 backend, and SeedVR2 restore pass ([83e6d77](https://github.com/hemi1986/coreslopper/commit/83e6d778ca106d0fc440054912326f2066c46c2a))
+* **comfyui:** quality workflows, Wan 2.2 backend, and SeedVR2 restore pass ([447f6c6](https://github.com/hemi1986/coreslopper/commit/447f6c69c35fdbaa0a0f356de168cc469650812d))
+* **core:** plates, prop references, and character states ([b1c9eae](https://github.com/hemi1986/coreslopper/commit/b1c9eae2f20a4a7137c617f815ba15de971bdb76))
+* **episode:** sfx lines may carry text_en for on-screen text subtitles ([566adea](https://github.com/hemi1986/coreslopper/commit/566adeaf6a95a4a5d194de8f0076617f562b27ed))
+* **lipsync:** Higgsfield and Topview lip-sync, lead-only lip-sync audio ([ce5de81](https://github.com/hemi1986/coreslopper/commit/ce5de81e8b00c322eb58cdb2889c208ea7275ae4))
+* plates, prop references, and character states; episode audio and subtitle fixes ([5be8435](https://github.com/hemi1986/coreslopper/commit/5be84355725be834572ed348a29bef9db5cc3f14))
+* **release:** 3:4 TikTok covers and comma-separated YouTube hashtags ([dc5ac77](https://github.com/hemi1986/coreslopper/commit/dc5ac779705765f224822ad3dd131edb97e14368))
+
+
+### Bug Fixes
+
+* **episode-track:** reach the loudness target with a measured gain and limiter ([d15e27c](https://github.com/hemi1986/coreslopper/commit/d15e27c0963572af6b26e3defa047fccc8210f3c))
+* **qa:** failed calls in the manifest warn instead of failing; isolate release tests ([7d8c434](https://github.com/hemi1986/coreslopper/commit/7d8c434d04428667bde8bc5c6b7798ef88efd7aa))
+* **qa:** failed manifest calls warn instead of failing; isolate release tests ([47f4390](https://github.com/hemi1986/coreslopper/commit/47f43901525cd52c0ca6b0b1160829d60b256382))
+* **release:** drop the song-credit footer line from episode texts ([f358463](https://github.com/hemi1986/coreslopper/commit/f358463e870a2b84820f1834eadc2d454e01b2f9))
+* **release:** lay out TikTok texts like TikTok Studio; no DEMO tag on thumbnails ([ae5c024](https://github.com/hemi1986/coreslopper/commit/ae5c024cc359eabe7d05084648241ee9d2436dc1))
+* **release:** TikTok Studio texts and 3:4 covers, comma-separated YouTube hashtags, no DEMO tag ([e90400d](https://github.com/hemi1986/coreslopper/commit/e90400de59fe52cec47b1b4322a2665e67afceef))
+* **remotion:** remove the bottom accent bar from MusicVideo ([9155c17](https://github.com/hemi1986/coreslopper/commit/9155c1703e00f712d7bd71bb375c94201353594c))
+* **remotion:** remove the bottom accent bar from MusicVideo ([c655718](https://github.com/hemi1986/coreslopper/commit/c6557186dab82cb07aa5ef387ecb1dcbc5cc2250))
+* **review-player:** retry the audio stream and fall back to silent playback ([87c822f](https://github.com/hemi1986/coreslopper/commit/87c822fe897c49ad1e1b0dd0d66bed89d662501e))
+
+
+### Documentation
+
+* explain series and episodes in the README ([fec19dc](https://github.com/hemi1986/coreslopper/commit/fec19dc142608fc928bc0a6860d615eed2e8b840))
+* explain series and episodes in the README ([0e7a357](https://github.com/hemi1986/coreslopper/commit/0e7a3573fe1e17dbf250323b4419d94306e0e75f))
+* plates, props, and character states in skills, glossary, and ADR 0025 ([c07f4bd](https://github.com/hemi1986/coreslopper/commit/c07f4bd1b29c8e38e1d72cd02876f9501be8c1d2))
+* **release:** separate review rules for 9:16 Short thumbnails and 3:4 TikTok covers ([796ba81](https://github.com/hemi1986/coreslopper/commit/796ba81d7759a034730a9a14d2bf7e1129861075))
+
 ## [0.7.0](https://github.com/hemi1986/coreslopper/compare/v0.6.0...v0.7.0) (2026-11-16)
 
 
