@@ -35,7 +35,7 @@ license: MIT
 
    Clip rules for every non-lip-sync shot: 3–6 s with one clear action. Keep important faces large in frame. A wide shot with several people gets 2–3 s of minimal motion, or stays a still with a slow zoom in the edit.
 
-   Prompts are short and concrete; long scene descriptions make the result worse. The local LTX models run distilled at CFG 1, so a negative prompt has no effect: write what should happen instead ("her mouth stays closed", "static camera", "calm, natural expression").
+   Prompts are short and concrete; long scene descriptions make the result worse. The local LTX models run distilled at CFG 1, so a negative prompt has no effect: write what should happen instead ("her mouth stays closed", "static camera", "calm, natural expression"). A batch item's `negativePrompt` reaches the cloud models (`negative_prompt`; Higgsfield and Topview need `send_negative_prompt: true`) and local stills (`cs_negative`); `generate` rejects it for local clips.
    - Non-lip-sync prompts start with "Preserve the exact characters, faces, clothing and lighting from the input image." and describe motion precisely and calmly ("smooth, natural movement, steady camera"). These workflows generate their own sound, which the edit discards; where nobody speaks, add "Nobody speaks, mouths stay closed."
    - Lip-sync prompts are 2–3 sentences: shot size and camera, "speaks/sings the audio with accurate lip sync", the exact words in quotes, one note on expression. Template: `Close-up, static camera. She softly speaks the audio with accurate lip sync: "<text>". Calm, natural expression, eyes on camera.` Frame close-up or medium close-up, face large, static camera.
 

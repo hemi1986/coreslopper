@@ -49,3 +49,24 @@ describe('params.workflow', () => {
     await expect(runBatch(target(), bad, { dryRun: true, log: false })).rejects.toThrow(/params.workflow/);
   });
 });
+
+describe('negativePrompt', () => {
+  it('is rejected for local clips, where the distilled LTX models run at CFG 1', async () => {
+    const clip = BatchSchema.parse([
+      {
+        operation: 'imageToVideo',
+        role: 'video.image_to_video.fast',
+        prompt: 'she turns her head',
+        negativePrompt: 'blurry',
+        references: ['frame.png'],
+      },
+    ]);
+    await expect(runBatch(target(), clip, { dryRun: true, log: false })).rejects.toThrow(/no effect/);
+  });
+
+  it('is kept for local stills', async () => {
+    const still = BatchSchema.parse([{ ...batch[0], negativePrompt: 'blurry' }]);
+    const [entry] = await runBatch(target(), still, { dryRun: true, log: false });
+    expect(entry?.resolved.item.negativePrompt).toBe('blurry');
+  });
+});
