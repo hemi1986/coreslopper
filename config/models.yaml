@@ -563,6 +563,11 @@ roles:
       overall_soundscape. Aspect from the project kind: 16:9 music video, 9:16
       episode. 24 fps, frames rounded up to 17n+5, the clip keeps its sound.
       Sampler, sigmas, LoRA, and models are fixed; no Turbo/Lightning LoRAs.
+      Default for every clip without lip-sync, in music videos and episodes: pass
+      the keyframe as references[0] and the clip keeps its framing (model bench
+      2026-11: 18/18 pass over 9 scenes and 2 seeds, LTX 9/18). About 1 MP and
+      1.5-4 min per clip; final pass with quality final + seedvr2 upscale. The
+      image_to_video roles stay for drafts, previews, and cloud hero shots.
     alternatives: {}
   video.upscale:
     provider: comfyui
