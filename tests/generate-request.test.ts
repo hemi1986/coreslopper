@@ -32,6 +32,26 @@ describe('generate request', () => {
     });
   });
 
+  it('keeps a batch negativePrompt and passes it to the provider', () => {
+    const item = BatchItemSchema.parse({
+      operation: 'editImage',
+      role: 'image.edit',
+      prompt: 'make it night',
+      negativePrompt: 'blurry',
+      references: ['frame.png'],
+    });
+    const resolved: ResolvedItem = {
+      item,
+      provider: 'comfyui',
+      model: 'qwen-edit',
+      params: {},
+      pricing: { unit: 'request', usd: 0 },
+      cost: 0,
+      references: ['/p/frame.png'],
+    };
+    expect(toRequest(resolved, { width: 1920, height: 1080 }, '/p/assets/out', '/p').negativePrompt).toBe('blurry');
+  });
+
   it('passes the audio start of a lip-sync cut from the vocal stem', () => {
     const item = BatchItemSchema.parse({
       operation: 'lipSync',

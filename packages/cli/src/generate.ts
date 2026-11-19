@@ -70,6 +70,8 @@ export const BatchItemSchema = z
     prompt: z.string().min(1).optional(),
     /** referenceToVideo: a structured Flex prompt, rendered into `prompt` (see core/flex.ts). */
     flex: FlexPromptSchema.optional(),
+    /** Negative prompt; reaches the provider (ComfyUI `cs_negative`, fal/Higgsfield/Topview `negative_prompt`). */
+    negativePrompt: z.string().min(1).optional(),
     references: z.array(z.string()).default([]),
     /**
      * Vocals for lipSync: the vocal stem (`audio/stems/vocals.wav`) with
@@ -261,6 +263,12 @@ function resolveItem(
     throw new ConfigError(`Only the ComfyUI backend generates audio, but role "${item.role}" resolved to ${provider}.`);
   }
   if (item.operation === 'generateAudio' && item.role.startsWith('audio.voice')) checkSpokenText(item.prompt);
+  if (provider === 'comfyui' && VIDEO_OPERATIONS.has(item.operation) && item.negativePrompt) {
+    throw new ValidationError(
+      'The local LTX workflows run a distilled model at CFG 1, where a negative prompt has no effect. ' +
+        'Drop negativePrompt and say what should happen instead, e.g. "her mouth stays closed", "static camera".',
+    );
+  }
   if (item.audioStartSeconds !== undefined && provider !== 'comfyui' && provider !== 'mock') {
     throw new ValidationError(
       `audioStartSeconds needs the local lip-sync workflow; ${provider} takes a cut segment. ` +
@@ -496,6 +504,7 @@ export function toRequest(
     role: item.item.role,
     model: item.model,
     prompt: item.prompt ?? item.item.prompt,
+    ...(item.item.negativePrompt ? { negativePrompt: item.item.negativePrompt } : {}),
     seed: item.item.seed,
     references: item.references,
     audio: item.audio,
