@@ -108,7 +108,7 @@ license: MIT
    ```bash
    npm run cli -- review-image projects/<slug> --image <png> --shot <shot-id> --attempt <n> [--focus "<issues of the last attempt>"]
    npm run cli -- review-image projects/<slug> --image <png> --ref state:<char>/<state>   # or plate:<set>/<plate>, prop:<id>
-   npm run cli -- review-image projects/<slug> --image <first>,<middle>,<last> --shot <shot-id>   # a clip, frames from `frame`
+   npm run cli -- review-image projects/<slug> --clip <mp4> --shot <shot-id>   # a clip: extracts its first, middle, and last frame and measures the first against the keyframe
    ```
    It runs the art-director headless in its own context (about a minute), appends the verdict to `assets/review/verdicts.jsonl`, and prints one JSON line `{verdict, score, issues, fix_prompt}`; exit code 2 means fail. Work from that line only:
    - **pass** → the image is approved; the next item may use it as a reference. Issues prefixed `note:` never trigger a regeneration.

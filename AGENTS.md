@@ -166,7 +166,7 @@ npm run schema
 | `npm run cli -- normalize-audio <project> --input <file>` | Normalize audio to −14 LUFS / −1 dBTP. |
 | `npm run cli -- footage <project> --input <file> --name <name>` | Normalize a footage proxy. |
 | `npm run cli -- frame <project> --input <clip> --position last` | Extract a review or chaining frame. |
-| `npm run cli -- review-image <project\|series> --image <png[,png]> --shot <id>\|--ref <kind:id>` | Art-director verdict on one image or clip frames, headless in its own context; prints `{verdict, score, issues, fix_prompt}` and appends to `verdicts.jsonl` (exit 2 on fail). |
+| `npm run cli -- review-image <project\|series> --image <png[,png]>\|--clip <mp4> --shot <id>\|--ref <kind:id>` | Art-director verdict on one image or clip, headless in its own context; `--clip` extracts the first, middle, and last frame itself and measures the first against the keyframe. Prints `{verdict, score, issues, fix_prompt}` and appends to `verdicts.jsonl` (exit 2 on fail). |
 | `npm run cli -- audio-segment <project> --start <s> --end <s> --name <shot-id> [--mute <a-b,...>] [--format wav]` | Cut a lead-only vocal segment for a lip-sync shot: backing words (parenthesized lyrics) and `--mute` spans are silenced; cuts from `audio/stems/lead.wav` when it exists. |
 | `npm run cli -- stage-start/-done/-fail/-skip/-reset` | Update `state.json` from the orchestrator. |
 | `npm run cli -- estimate --role <role> --units <n>` | Check a generation cost against the budget. |
