@@ -69,3 +69,4 @@ bench/runs/
 bench/state.json
 bench/manifest.jsonl
 bench/timings.jsonl
+series/*/review/

@@ -42,7 +42,7 @@ A **plate** is an empty frame of a set from one fixed camera angle; a **prop ref
 2. Per set, list the camera angles the treatment needs more than once, as `plates`: `id`, `angle` (position, height, lens, framing), and an optional `prompt`. Typical: a wide establishing angle, a medium angle on the main action spot, a close angle where objects are handled. Three to five per set is usual.
 3. List the recurring objects as `props`: `id`, `name`, a `description` concrete enough to draw it the same way twice (shape, colour, material, size, what is attached and where), and an optional `prompt`.
 4. Generate each plate empty, with no character, in the set's light and the style's look, at the master format's size; generate each prop alone on a neutral ground. Save plates under `sets/<set>/plates/<id>.png` and props under `props/<id>/`, and record the paths in `ref` and `refs`.
-5. Have the `art-director` review each plate and prop on its own, against its description and the style. Regenerate what fails before any shot uses it.
+5. Review each plate and prop as soon as it exists: `npm run cli -- review-image <project> --image <ref> --ref plate:<set>/<plate>` (or `prop:<id>`), the review loop in `.claude/skills/ai-clips/SKILL.md`, step 6. Regenerate what fails with its `fix_prompt` before any shot uses it.
 
 
 ## Completion criteria

@@ -34,6 +34,7 @@ import { createProject } from './new-project.js';
 import { linkProjectMedia } from './media-dir.js';
 import { generateBatch } from './generate.js';
 import { runQa } from './qa.js';
+import { reviewImage } from './review-image.js';
 import { importFootage, importSong, importTakes, normalizeAudio, extractFrame, extractAudioSegment } from './media.js';
 import { parseMuteSpans } from './lipsync-audio.js';
 import { voiceTrack } from './voice-track.js';
@@ -736,6 +737,36 @@ program
         options.out,
       );
     }),
+  );
+
+program
+  .command('review-image [project]')
+  .description('Art-director verdict on one generated image or clip (headless claude) of a project or series canon; appends to verdicts.jsonl and prints the verdict as JSON.')
+  .option('--image <paths>', 'Image to judge; comma-separated for several')
+  .option('--clip <mp4>', 'Clip to judge: its first, middle, and last frame are extracted and reviewed, and the first frame is measured against the start keyframe')
+  .option('--start-frame <png>', 'With --clip: the keyframe the clip starts from (default assets/keyframes/<shot>.png)')
+  .option('--shot <id>', 'Storyboard shot the keyframe or clip belongs to')
+  .option('--ref <kind:id>', 'Continuity reference instead of a shot, e.g. state:hf7/walkman-shared, plate:house-ruin/yard-wide, prop:scarf')
+  .option('--attempt <n>', 'Attempt number of this image', '1')
+  .option('--focus <text>', 'Extra checks, e.g. the issues the previous attempt failed on')
+  .action(
+    (
+      project: string | undefined,
+      options: { image?: string; clip?: string; startFrame?: string; shot?: string; ref?: string; attempt: string; focus?: string },
+    ) =>
+      run(async () => {
+        const verdict = await reviewImage(projectDirFromArg(project), {
+          images: parseCsv(options.image),
+          clip: options.clip,
+          startFrame: options.startFrame,
+          shot: options.shot,
+          ref: options.ref,
+          attempt: Number(options.attempt),
+          focus: options.focus,
+        });
+        console.log(JSON.stringify(verdict));
+        if (verdict.verdict === 'fail') process.exitCode = 2;
+      }),
   );
 
 program
