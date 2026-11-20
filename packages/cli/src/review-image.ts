@@ -21,6 +21,13 @@ export interface ImageVerdict {
   reviewedAt: string;
 }
 
+/**
+ * The only reasons to fail an image. A loop that fails on taste never converges, so every
+ * other finding is a note and the image passes.
+ */
+export const BLOCKING_DEFECTS =
+  'a wrong or drifted character identity; a wrong number of arms, hands, legs, or other anatomy; a character in the wrong continuity state, a prop or cable attached wrong, or something physically impossible; a missing or wrong prop, character, or plate the shot names; misspelled screen text; a break with an approved neighbouring frame in layout, facing, or design; a recognizable real person or trademark';
+
 export const VERDICT_JSON_SCHEMA = {
   type: 'object',
   properties: {
@@ -53,6 +60,7 @@ export function buildReviewPrompt(input: {
   ref?: string;
   neighbours: string[];
   focus?: string;
+  attempt?: number;
 }): string {
   const lines = [
     `Review exactly these image(s) of ${input.projectDir}: ${input.images.join(', ')}.`,
@@ -70,10 +78,18 @@ export function buildReviewPrompt(input: {
   if (input.neighbours.length > 0) {
     lines.push(`Neighbouring frames already approved, for continuity: ${input.neighbours.join(', ')}.`);
   }
-  if (input.focus) lines.push(`Check in particular: ${input.focus}`);
   lines.push(
-    'Judge only these image(s). Pass an image whose small flaws a clip or crop hides; fail any identity, anatomy, attachment, or continuity error.',
-    'Answer with the structured verdict: verdict, score 0-10, issues (each "<issue> -> <fix>"), and fix_prompt (a complete corrected edit prompt for the next attempt, or "none").',
+    `Fail only for a blocking defect: ${BLOCKING_DEFECTS}. Everything else (light, texture, small artefacts, taste, anything a clip, crop, or the edit hides) is a note: the verdict stays pass and the note goes into issues prefixed "note:".`,
+  );
+  if ((input.attempt ?? 1) > 1) {
+    lines.push(
+      `This is attempt ${input.attempt}, regenerated to fix the previous blocking defects${input.focus ? `: ${input.focus}` : ''}. Check that those are fixed and that no new blocking defect appeared; raise no new notes.`,
+    );
+  } else if (input.focus) {
+    lines.push(`Check in particular: ${input.focus}`);
+  }
+  lines.push(
+    'Judge only these image(s). Answer with the structured verdict: verdict, score 0-10, issues (each "<issue> -> <fix>"), and fix_prompt (a complete corrected edit prompt for the next attempt that fixes only the blocking defects, or "none").',
   );
   return lines.join('\n');
 }
@@ -112,6 +128,14 @@ export function parseVerdict(raw: string): Pick<ImageVerdict, 'verdict' | 'score
   const issues = [...text.matchAll(/^\s*-\s+(.+)$/gm)].map((match) => (match[1] ?? '').trim());
   const fix = text.match(/FIX_PROMPT:\s*([\s\S]*)$/i)?.[1]?.trim() ?? 'none';
   return { verdict: verdict as 'pass' | 'fail', score, issues, fix_prompt: fix };
+}
+
+/** A fail whose issues are all notes is a pass: only blocking defects stop an image. */
+export function notesOnlyPass<T extends { verdict: 'pass' | 'fail'; issues: string[]; fix_prompt: string }>(verdict: T): T {
+  if (verdict.verdict === 'fail' && verdict.issues.length > 0 && verdict.issues.every((issue) => /^\W*note\b/i.test(issue))) {
+    return { ...verdict, verdict: 'pass', fix_prompt: 'none' };
+  }
+  return verdict;
 }
 
 function normalise(value: Record<string, unknown>): Pick<ImageVerdict, 'verdict' | 'score' | 'issues' | 'fix_prompt'> {
@@ -202,6 +226,7 @@ export async function reviewImage(projectDir: string, options: ReviewImageOption
     ref: options.ref,
     neighbours: neighbours.filter((path) => !images.includes(path)).map(rel),
     focus: options.focus,
+    attempt: options.attempt,
   });
 
   // Media linked to CORESLOPPER_MEDIA_DIR lives outside the workspace; let the reviewer read it.
@@ -213,7 +238,7 @@ export async function reviewImage(projectDir: string, options: ReviewImageOption
     image: rel(images[0] ?? ''),
     subject: options.shot ?? options.ref ?? '',
     attempt: options.attempt ?? 1,
-    ...parseVerdict(raw),
+    ...notesOnlyPass(parseVerdict(raw)),
     reviewedAt: new Date().toISOString(),
   };
   const log = project ? join(project.paths.assets, 'review', 'verdicts.jsonl') : join(projectDir, 'review', 'verdicts.jsonl');

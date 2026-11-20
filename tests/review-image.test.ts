@@ -105,3 +105,19 @@ describe('reviewImage on a series canon', () => {
     await expect(reviewImage(dir, { images: [image], shot: 'shot-001', runner })).rejects.toThrow(/no shots/);
   });
 });
+
+describe('anti-nitpick rules', () => {
+  it('turns a fail with only notes into a pass', async () => {
+    const { notesOnlyPass } = await import('../packages/cli/src/review-image.ts');
+    expect(notesOnlyPass({ verdict: 'fail', issues: ['note: shadow a bit soft'], fix_prompt: 'x' }).verdict).toBe('pass');
+    expect(notesOnlyPass({ verdict: 'fail', issues: ['note: soft', 'third arm -> remove'], fix_prompt: 'x' }).verdict).toBe('fail');
+  });
+
+  it('limits a retry to the previous blocking defects', () => {
+    const prompt = buildReviewPrompt({ projectDir: 'p', images: ['a.png'], shot: 's', neighbours: [], focus: 'third arm', attempt: 2 });
+    expect(prompt).toContain('attempt 2');
+    expect(prompt).toContain('third arm');
+    expect(prompt).toContain('raise no new notes');
+    expect(prompt).toContain('Fail only for a blocking defect');
+  });
+});
