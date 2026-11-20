@@ -490,8 +490,8 @@ describe('ComfyUI images, lip-sync, and audio', () => {
     const prompt = server.submitted();
     expect(prompt['1']!.inputs.value).toBe('put the character from image 2 into image 1');
     expect(prompt['3']!.inputs.negative_prompt).toBe('extra fingers');
-    expect(prompt['3']!.inputs['images.image_2']).toEqual(['cs_ref_2', 0]);
-    expect(prompt['cs_ref_2']!).toMatchObject({ class_type: 'LoadImage', inputs: { image: `coreslopper/${server.uploads[1]}` } });
+    expect(prompt['3']!.inputs['images.image_2']).toEqual(['ref_2', 0]);
+    expect(prompt['ref_2']!).toMatchObject({ class_type: 'LoadImage', inputs: { image: `coreslopper/${server.uploads[1]}` } });
     expect(result.files[0]!.endsWith('.png')).toBe(true);
   });
 

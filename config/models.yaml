@@ -46,10 +46,31 @@
 #                      workflow, e.g. a slower -quality variant: qwen-t2i-quality,
 #                      qwen-edit-quality, ltx-i2v-quality, ltx-t2v-quality,
 #                      ltx-flf2v-quality, ltx25-lipsync-flf2v-quality. Ignored on
-#                      cloud providers.
+#                      cloud providers. pika-h3-flf2va (Pika H3 Flex FL2VA) is the
+#                      local alternative for firstLastFrameToVideo and imageToVideo
+#                      items: the clip starts exactly on references[0] and ends on
+#                      references[1] when given.
 # See comfyui/README.md for the node titles.
 version: 1
 last_verified: "2026-11-08 (planning estimates; verify before paid use)"
+
+# Model files the fixed Pika H3 Flex workflows may load, per loader input.
+# The adapter rejects a workflow that loads a file not listed here (or a
+# loader input without a list), and it still checks that sampler (lcm), the
+# seven manual sigmas, and exactly one LoRA at 1.0 stay as in the template. To
+# switch a model, e.g. to an NVFP4 UNet, add its file name to the list and
+# point the workflow's loader at it.
+comfyui_locks:
+  pika-h3-ref2va:
+    unet_name: [minimax_h3_ref2va_pruned_int8_convrot.safetensors]
+    clip_name: [qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors]
+    vae_name: [minimax_h3_video_vae_int8_convrot.safetensors, minimax_h3_audio_vae_fp32.safetensors]
+    lora_name: [pika_h3_flex_ref2va_v1_bf16.safetensors]
+  pika-h3-fl2va:
+    unet_name: [minimax_h3_fl2va_pruned_int8_convrot.safetensors]
+    clip_name: [qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors]
+    vae_name: [minimax_h3_video_vae_int8_convrot.safetensors, minimax_h3_audio_vae_fp32.safetensors]
+    lora_name: [pika_h3_flex_fl2va_v1_bf16.safetensors]
 
 roles:
   image.character_sheet:
@@ -508,7 +529,13 @@ roles:
     notes: >-
       Animate between a start and an end keyframe (firstLastFrameToVideo). Local
       LTX workflow by default. A cloud alternative needs end_reference_field set
-      to the model's end-frame field.
+      to the model's end-frame field. Local alternative per item:
+      params.workflow: pika-h3-flf2va (Pika H3 Flex FL2VA, MiniMax H3 + Pika
+      LoRA): starts exactly on references[0], ends on references[1]; also runs
+      imageToVideo items with one keyframe (no end frame). Canvas follows the
+      start frame's aspect at about 0.98 MP, 24 fps, 17n+5 frames, clip sound
+      kept; frame_step, size_multiple, and megapixels do not apply. Prompt in
+      the FL2VA schema: give "fl2va" in the batch item (see comfyui/README.md).
     alternatives:
       topview:
         model: alibaba/wan-3.0/image-to-video

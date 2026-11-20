@@ -730,10 +730,29 @@ export const ModelRoleSchema = z.object({
   alternatives: z.record(z.string(), ModelRoleVariantSchema).default({}),
 });
 
+/** Loader inputs that name a model file in a ComfyUI workflow. */
+export const COMFYUI_MODEL_INPUTS = ['unet_name', 'clip_name', 'vae_name', 'lora_name', 'ckpt_name', 'model_name'] as const;
+
+/**
+ * The model files a fixed ComfyUI workflow family may load, per loader input,
+ * e.g. `unet_name: [minimax_h3_fl2va_pruned_int8_convrot.safetensors]`. A loader
+ * input without a list may not appear in the workflow.
+ */
+export const ComfyUILockSchema = z
+  .object(
+    Object.fromEntries(COMFYUI_MODEL_INPUTS.map((name) => [name, z.array(z.string().min(1)).min(1).optional()])) as Record<
+      (typeof COMFYUI_MODEL_INPUTS)[number],
+      z.ZodOptional<z.ZodArray<z.ZodString>>
+    >,
+  )
+  .strict();
+
 export const ModelsConfigSchema = z.object({
   version: z.literal(1).default(1),
   last_verified: z.string().optional(),
   roles: z.record(z.string(), ModelRoleSchema),
+  /** Allowed model files per fixed workflow family: `pika-h3-ref2va`, `pika-h3-fl2va`. */
+  comfyui_locks: z.record(z.string(), ComfyUILockSchema).default({}),
 });
 
 /** Platforms the `publish` command uploads to. Instagram is not one of them yet (ADR 0023). */

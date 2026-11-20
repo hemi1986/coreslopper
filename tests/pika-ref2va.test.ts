@@ -77,6 +77,9 @@ describe('Flex prompt schema', () => {
       /no \[Shot N\] block/,
     );
     expect(() => checkFlexPrompt(fixedExample.replaceAll(/at about/gi, 'around'), 2)).toThrow(/time marks/);
+    const decimal = fixedExample.replaceAll(/at about [^.\n]*?seconds?/gi, 'at about 1.5 seconds');
+    expect(decimal).toContain('at about 1.5 seconds');
+    expect(() => checkFlexPrompt(decimal, 2)).not.toThrow();
   });
 
   it('renders a structured prompt in schema order with the fixed music line', () => {
@@ -229,6 +232,33 @@ describe('Pika H3 Flex workflow in the ComfyUI adapter', () => {
     expect(fixed.find((node) => node.class_type === 'LoraLoaderModelOnly')!.inputs.strength_model).toBe(1);
   });
 
+  it('names added reference nodes ref_N, so a cs_ref_N key never addresses them by ID', async () => {
+    const { dir, refs } = await setup();
+    const comfy = new ComfyUIProvider({ workflowsDir: dir, fetchImpl: fakeServer().fetchImpl });
+    const workflow = await comfy.buildPrompt(input(refs.slice(0, 3)), 'referenceToVideo', {
+      indexedReferences: ['a.png', 'b.png', 'c.png'],
+    });
+    expect(workflow['ref_2']).toMatchObject({ _meta: { title: 'cs:ref_2' }, inputs: { image: 'c.png' } });
+    expect(Object.keys(workflow).filter((id) => id.startsWith('cs_ref_'))).toEqual([]);
+  });
+
+  it.each([
+    ['cs:aspect', '115'],
+    ['cs:seed', '129'],
+    ['cs:duration', '132'],
+    ['cs:prompt', '138'],
+    ['cs:output', '92'],
+    ['cs:ref_0', '149'],
+  ])('stops with a ConfigError when %s is missing', async (tag, id) => {
+    const changed = original();
+    changed[id]!._meta = { title: 'untitled' };
+    const { dir, refs } = await setup(changed);
+    const comfy = new ComfyUIProvider({ workflowsDir: dir, fetchImpl: fakeServer().fetchImpl });
+    await expect(
+      comfy.buildPrompt(input(refs.slice(0, 1)), 'referenceToVideo', { indexedReferences: ['a.png'] }),
+    ).rejects.toThrow(new RegExp(`Ref2VA\\) has no node titled ${tag}\\b`));
+  });
+
   it('takes 4 references by default and at most 9', async () => {
     const { dir, refs } = await setup();
     const comfy = new ComfyUIProvider({ workflowsDir: dir, fetchImpl: fakeServer().fetchImpl });
@@ -308,7 +338,7 @@ function target(kind: 'music-video' | 'episode', master = { id: '16x9', width: 1
 }
 
 describe('referenceToVideo batch items', () => {
-  const item = { operation: 'referenceToVideo', role: 'video.reference_to_video', references: ['ref0.png'], flex };
+  const item = { operation: 'referenceToVideo', role: 'video.reference_to_video', references: ['ref0.png'], durationSeconds: 5, flex };
 
   it('renders "flex" into the prompt and always runs locally', async () => {
     const batch = BatchSchema.parse([item]);
@@ -329,7 +359,9 @@ describe('referenceToVideo batch items', () => {
   it('rejects audio, too many images, both prompt kinds, and a prompt that misses a picture', async () => {
     expect(() => BatchSchema.parse([{ ...item, audio: 'a.wav' }])).toThrow(/no audio reference/);
     expect(() => BatchSchema.parse([{ ...item, references: Array(10).fill('ref0.png') }])).toThrow(/1 to 9/);
-    expect(() => BatchSchema.parse([{ ...item, prompt: 'x' }])).toThrow(/either .{0,2}prompt.{0,2} or .{0,2}flex/);
+    expect(() => BatchSchema.parse([{ ...item, prompt: 'x' }])).toThrow(/exactly one of/);
+    const untimed = BatchSchema.parse([{ ...item, durationSeconds: undefined }]);
+    await expect(runBatch(target('music-video'), untimed, { dryRun: true, log: false })).rejects.toThrow(/needs durationSeconds/);
     const twoRefs = BatchSchema.parse([{ ...item, references: ['ref0.png', 'ref1.png'] }]);
     await expect(runBatch(target('music-video'), twoRefs, { dryRun: true, log: false })).rejects.toThrow(
       /reference 2 is never named/,
