@@ -26,7 +26,7 @@ license: MIT
 2. Write a precise description for each character: age range, silhouette, face, hair, wardrobe, materials, palette anchors, and what must never change.
 3. Generate a character sheet with `generateImage` or `editImage`. Use at least one reference image when revising a sheet; never rely on text alone for a recurring character.
 4. Save the sheet and 2–4 usable reference images under the project's gitignored `characters/<id>/`. Record them in `characters.yaml` with `sheet`, `refs`, and the prompt.
-5. Run the art-director critic on the sheet. Check identity, costume, palette, and readability at small sizes. Regenerate with a corrected prompt if it fails.
+5. Review the sheet with `npm run cli -- review-image <project> --image <sheet> --ref sheet:<id>` (the review loop in `.claude/skills/ai-clips/SKILL.md`, step 6): identity, costume, palette, and readability at small sizes. On fail, regenerate with its `fix_prompt`.
 6. Add the **character states** the treatment or script needs (see below).
 7. Update the state with `npm run cli -- stage-done <project> style-character --outputs style.yaml,characters.yaml` when the style bible is also ready.
 
@@ -36,7 +36,7 @@ A **character state** is a named look the story puts a character in from some sh
 
 1. Per change in the story, add a state under the character's `states`: `id`, a `description` that says exactly what differs from the sheet and where things lead ("chest hatch open on its left hinge; red cable runs from inside the hatch out of frame to image-right, to the Walkman; no loose clips"), an optional `prompt`, and `from` when it builds on another state.
 2. Generate the reference as an `editImage` of the sheet (or of the `from` state's reference) at the master format's size, with the character's full figure, and save it under `characters/<id>/states/<state>.png`; record it in `ref`.
-3. Have the `art-director` review the state on its own, against its `description`: count limbs, check every attachment end to end (both ends of a cable, what holds what), and compare with the sheet for identity. Regenerate until it passes.
+3. Review the state as soon as it exists: `npm run cli -- review-image <project> --image <ref> --ref state:<id>/<state>` (the review loop in `.claude/skills/ai-clips/SKILL.md`, step 6). The art director counts limbs, follows every attachment end to end, and compares with the sheet. On fail, regenerate from the passing sheet or state with its `fix_prompt`, never from a failed image.
 4. Never derive a state from a shot keyframe; derive it from the sheet or another reviewed state.
 
 

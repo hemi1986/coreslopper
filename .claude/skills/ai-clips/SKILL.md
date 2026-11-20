@@ -23,7 +23,7 @@ license: MIT
 
 ## Process
 
-1. Read the shot's prompts, style refs, character refs, and continuity refs (`refs.plate`, `refs.props`, `refs.states`). If the shot names a character, plate, prop, or state without a reference image, stop and create it first (`character-bible` for states, `style-bible` for plates and props), with its own art-director review, before any keyframe derives from it. Pick any user-provided moodboard or composition references from `assets/references/` and pass their project-relative paths in the batch `references` array.
+1. Read the shot's prompts, style refs, character refs, and continuity refs (`refs.plate`, `refs.props`, `refs.states`). If the shot names a character, plate, prop, or state without a reference image, stop and create it first (`character-bible` for states, `style-bible` for plates and props), and let it pass the review loop of step 6 before any keyframe derives from it. Pick any user-provided moodboard or composition references from `assets/references/` and pass their project-relative paths in the batch `references` array.
 2. Choose roles from `config/models.yaml`, not hard-coded model IDs. Use the cheapest role that meets the shot's quality needs. Route each clip by its keyframes and lip-sync:
    | Shot | Operation | References | Role | Local workflow |
    |---|---|---|---|---|
@@ -40,7 +40,7 @@ license: MIT
    - Lip-sync prompts are 2–3 sentences: shot size and camera, "speaks/sings the audio with accurate lip sync", the exact words in quotes, one note on expression. Template: `Close-up, static camera. She softly speaks the audio with accurate lip sync: "<text>". Calm, natural expression, eyes on camera.` Frame close-up or medium close-up, face large, static camera.
 
    With a `comfyui` provider the generation runs locally from the workflow the role names (`comfyui/workflows/<model>.json`). It costs $0; stills take seconds, clips about a minute per 3 s, so keep clip batches small. Run `npm run cli -- doctor` first; if ComfyUI is unreachable or the workflow is missing, stop with a credential-class hard stop. Local specifics:
-   - `editImage` on `qwen-edit` takes up to 16 references; `references[0]` is the image that is edited and sets the output size.
+   - `editImage` on `qwen-edit` takes up to 16 references; `references[0]` is the image that is edited and sets the output size. On a 16 GB GPU keep `qwen-edit-quality` items at 4 references or fewer: with 5 its reference cache grows past the VRAM and ComfyUI fails sporadically with `Fault failed: 2`. Split a heavier edit into two passes. A single `Fault failed` passes on retry; when the queue stops moving, restart ComfyUI (`comfyui/README.md`).
    - **Keyframe from a plate** (the shot names `refs.plate`): `editImage` with `references` in this order: the plate, then per character its state reference (or its sheet when the shot names no state), then the prop references. The prompt says what goes where, by image number: "Insert the robot from image 2 standing on the floor in front of the shelf in image 1; put the Walkman from image 3 on the shelf beside him; the red cable runs from his open chest hatch to the Walkman. Keep the room, camera, and light of image 1 unchanged." Paths are relative to the project; canon files of an episode are `../../series/<series>/...`. Shots in the same plate then share geometry and light; screen text and other shot-specific edits follow as a second edit of this keyframe.
    - `image.background_removal` (`editImage`, one reference, prompt "Remove the background, and output a PNG image") cuts a subject out as a transparent PNG for Remotion layers. It needs a clear subject; check that the result is not empty.
    - Speech (`generateAudio`, role `audio.voice`, workflow `voxcpm-clone`): `audio` is the reference WAV, `params.transcript` its exact words, `prompt` the text to speak. Before writing the prompt, spell out every number, year, time, abbreviation, and symbol in German words ("2077" → "zweitausendsiebenundsiebzig", "z. B." → "zum Beispiel"); `generate` rejects digits and symbols. Generate one sentence or paragraph per item and join the takes with ffmpeg. On a slip or wrong stress, retry with up to 3 seeds. Use `audio.voice_design` (`"(description)Text"`) only to find a new voice.
@@ -94,7 +94,17 @@ license: MIT
    ```
 4. Run `npm run cli -- estimate --role <role> --units <n> --project projects/<slug>` and check the batch cap. If the batch exceeds it, split the batch or ask before spending.
 5. Run `npm run cli -- generate projects/<slug> --batch <file>` with the project provider. The runner checks the budget, computes a cache key, reuses cached assets, writes `assets/manifest.jsonl`, and records spend.
-6. Inspect every keyframe at full resolution with the art-director critic **before** animating it; thumbnails (400–640 px) miss anatomy errors. Count hands, arms, and legs, check where bodies overlap, and check that the background matches the shot's location. Check the keyframe against its named state and props: what is open, what is attached to what, where each cable or strap leads, and that nobody stands inside furniture. A flawed keyframe yields a flawed clip, so fix it first. If the defect is a hand, limb, or body-overlap error, change the composition (see the composition rules in `.claude/skills/storyboard/SKILL.md`) instead of rerolling the same framing. Then inspect the clip at first/middle/last frame. If a character drifts, regenerate with the same references and a corrected prompt; do not ignore it.
+6. **Review loop, one image at a time.** Review every reference, keyframe, and clip as soon as it exists, before anything derives from it:
+   ```bash
+   npm run cli -- review-image projects/<slug> --image <png> --shot <shot-id> --attempt <n> [--focus "<issues of the last attempt>"]
+   npm run cli -- review-image projects/<slug> --image <png> --ref state:<char>/<state>   # or plate:<set>/<plate>, prop:<id>
+   npm run cli -- review-image projects/<slug> --image <first>,<middle>,<last> --shot <shot-id>   # a clip, frames from `frame`
+   ```
+   It runs the art-director headless in its own context (about a minute), appends the verdict to `assets/review/verdicts.jsonl`, and prints one JSON line `{verdict, score, issues, fix_prompt}`; exit code 2 means fail. Work from that line only:
+   - **pass** → the image is approved; the next item may use it as a reference.
+   - **fail** → regenerate the item with the verdict's `fix_prompt` (a new seed), review again with `--attempt <n+1> --focus "<issues>"`. After 3 failed attempts on the same item, change the composition (see the composition rules in `.claude/skills/storyboard/SKILL.md`) once; if that fails too, keep the best attempt, record the risk in the batch notes, and move on.
+   - Order the work so a reference passes before any keyframe uses it, and a keyframe passes before its clip is generated. On resume, `verdicts.jsonl` tells which items already passed.
+   The art-director counts limbs, follows every cable and strap to both ends, and checks the named plate, state, and props; it reads full resolution, so thumbnails never replace it. After the last batch, the orchestrator reads only the summary of `verdicts.jsonl`: items that never passed, with their last issues.
 7. Use frame chaining only when the storyboard enables it. Extract the last frame of the previous clip with
    `npm run cli -- frame <project> --input <previous-clip> --position last --out <path>`
    and pass it as the first reference of the next clip. To land on a planned frame, use `firstLastFrameToVideo` with that keyframe as the second reference.
@@ -132,7 +142,7 @@ license: MIT
 - The manifest records model, prompt, seed, references, cost, and cache status.
 - The batch stayed under the project budget and batch cap.
 - No generated asset is committed to the repository.
-- The art-director critic passed, or the remaining risk is written into the review report.
+- Every reference, keyframe, and clip has a `pass` line in `assets/review/verdicts.jsonl`, or its remaining risk is written into the batch notes and the review report.
 
 ## Common failures
 

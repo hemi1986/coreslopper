@@ -65,7 +65,7 @@ Generate through the series budget: `npm run cli -- generate --series <slug> --b
 - **Character states** of the canon: an `image.edit` of the sheet per state, saved as `characters/<id>/states/<state>.png` and recorded in `ref` (see `.claude/skills/character-bible/SKILL.md`).
 - **Reference voices** for every character with speech: a recording by the user, or, with `providers.audio: comfyui`, an `audio.voice_design` take ("(voice description)text"). Save it as `characters/<id>/voice.wav` and record `voice.ref` and the exact `voice.transcript` in `characters.yaml`.
 
-Copy the chosen files from `assets/` into `characters/<id>/` and `sets/<id>/`, and record them in `sheet` and `refs`. Have the `art-director` review every sheet, set frame, plate, prop, and state against the bible and the style; regenerate what fails.
+Copy the chosen files from `assets/` into `characters/<id>/` and `sets/<id>/`, and record them in `sheet` and `refs`. Review every sheet, set frame, plate, prop, and state as soon as it exists with `npm run cli -- review-image series/<slug> --image <png> --ref <kind:id>` (the review loop in `.claude/skills/ai-clips/SKILL.md`, step 6); regenerate what fails with its `fix_prompt`.
 
 Done when every on-screen character has a sheet and at least one reference, every set has at least one reference frame and every plate its image, every prop and state its reference, every speaking character has a reference voice with its transcript, and the art director passed them.
 

@@ -34,6 +34,7 @@ import { createProject } from './new-project.js';
 import { linkProjectMedia } from './media-dir.js';
 import { generateBatch } from './generate.js';
 import { runQa } from './qa.js';
+import { reviewImage } from './review-image.js';
 import { importFootage, importSong, importTakes, normalizeAudio, extractFrame, extractAudioSegment } from './media.js';
 import { parseMuteSpans } from './lipsync-audio.js';
 import { voiceTrack } from './voice-track.js';
@@ -736,6 +737,32 @@ program
         options.out,
       );
     }),
+  );
+
+program
+  .command('review-image [project]')
+  .description('Art-director verdict on one generated image (headless claude) of a project or series canon; appends to verdicts.jsonl and prints the verdict as JSON.')
+  .requiredOption('--image <paths>', 'Image to judge; comma-separated for clip frames (first,middle,last)')
+  .option('--shot <id>', 'Storyboard shot the keyframe or clip belongs to')
+  .option('--ref <kind:id>', 'Continuity reference instead of a shot, e.g. state:hf7/walkman-shared, plate:house-ruin/yard-wide, prop:scarf')
+  .option('--attempt <n>', 'Attempt number of this image', '1')
+  .option('--focus <text>', 'Extra checks, e.g. the issues the previous attempt failed on')
+  .action(
+    (
+      project: string | undefined,
+      options: { image: string; shot?: string; ref?: string; attempt: string; focus?: string },
+    ) =>
+      run(async () => {
+        const verdict = await reviewImage(projectDirFromArg(project), {
+          images: parseCsv(options.image),
+          shot: options.shot,
+          ref: options.ref,
+          attempt: Number(options.attempt),
+          focus: options.focus,
+        });
+        console.log(JSON.stringify(verdict));
+        if (verdict.verdict === 'fail') process.exitCode = 2;
+      }),
   );
 
 program

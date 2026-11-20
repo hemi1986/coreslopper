@@ -28,7 +28,7 @@ You are a stage runner for the coreslopper workflow: music videos and episodes o
 6. If the stage is `assets`, batch by the project's `asset_batch_size` (default 5) and report each batch.
 7. On failure, return the exact error and the command to reproduce it. Do not hide a failed check.
 8. Work stays inside the workspace. `publish` and `publish-auth` upload to YouTube and TikTok; they are the user's commands, and `publish --dry-run` is as far as a stage goes.
-9. A stage runner has no Agent tool. When a skill asks for the `art-director` agent, run it headless: `claude -p --agent art-director "<request with the image paths and rules>"`. When `assets/` and `renders/` link into `CORESLOPPER_MEDIA_DIR`, add `--add-dir <the project's media folder>` so it may read the images. Keep its VERDICT and SCORE lines in the output you capture.
+9. A stage runner has no Agent tool. Review generated images with `npm run cli -- review-image` (the review loop in `.claude/skills/ai-clips/SKILL.md`, step 6); it runs the art director headless and returns one JSON verdict line. For any other art-director request, run it headless: `claude -p --agent art-director "<request with the image paths and rules>"`. When `assets/` and `renders/` link into `CORESLOPPER_MEDIA_DIR`, add `--add-dir <the project's media folder>` so it may read the images. Keep its VERDICT and SCORE lines in the output you capture.
 
 ## Response
 
