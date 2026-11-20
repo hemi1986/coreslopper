@@ -741,8 +741,10 @@ program
 
 program
   .command('review-image [project]')
-  .description('Art-director verdict on one generated image (headless claude) of a project or series canon; appends to verdicts.jsonl and prints the verdict as JSON.')
-  .requiredOption('--image <paths>', 'Image to judge; comma-separated for clip frames (first,middle,last)')
+  .description('Art-director verdict on one generated image or clip (headless claude) of a project or series canon; appends to verdicts.jsonl and prints the verdict as JSON.')
+  .option('--image <paths>', 'Image to judge; comma-separated for several')
+  .option('--clip <mp4>', 'Clip to judge: its first, middle, and last frame are extracted and reviewed, and the first frame is measured against the start keyframe')
+  .option('--start-frame <png>', 'With --clip: the keyframe the clip starts from (default assets/keyframes/<shot>.png)')
   .option('--shot <id>', 'Storyboard shot the keyframe or clip belongs to')
   .option('--ref <kind:id>', 'Continuity reference instead of a shot, e.g. state:hf7/walkman-shared, plate:house-ruin/yard-wide, prop:scarf')
   .option('--attempt <n>', 'Attempt number of this image', '1')
@@ -750,11 +752,13 @@ program
   .action(
     (
       project: string | undefined,
-      options: { image: string; shot?: string; ref?: string; attempt: string; focus?: string },
+      options: { image?: string; clip?: string; startFrame?: string; shot?: string; ref?: string; attempt: string; focus?: string },
     ) =>
       run(async () => {
         const verdict = await reviewImage(projectDirFromArg(project), {
           images: parseCsv(options.image),
+          clip: options.clip,
+          startFrame: options.startFrame,
           shot: options.shot,
           ref: options.ref,
           attempt: Number(options.attempt),
