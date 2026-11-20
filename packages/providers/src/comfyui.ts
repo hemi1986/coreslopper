@@ -266,6 +266,15 @@ function isFl2va(workflow: ComfyWorkflow): boolean {
   return Object.values(workflow).some((node) => node.class_type === 'MiniMaxH3ImageToVideo');
 }
 
+/**
+ * A Pika H3 Flex Ref2VA graph that lip-syncs: the vocal (`cs:audio`, cut by
+ * `cs:audio_start`) is anchored as the soundtrack from frame 0 with a
+ * MiniMax H3 AddGuide node, so the picture is generated to the given voice.
+ */
+export function isRef2vaLipSync(workflow: ComfyWorkflow): boolean {
+  return isRef2va(workflow) && nodesWithTitle(workflow, COMFYUI_TITLES.audio).length > 0;
+}
+
 export type PikaVariant = 'ref2va' | 'fl2va';
 
 /** The Pika H3 Flex variant of a workflow, judged by its MiniMax H3 node; undefined for any other graph. */
@@ -308,11 +317,42 @@ export function checkPikaTags(workflow: ComfyWorkflow, label: string): void {
     .filter((tag) => nodesWithTitle(workflow, COMFYUI_TITLES[tag]).length === 0)
     .map(pikaTagName);
   if (variant === 'ref2va' && !indexedReferenceNodes(workflow).has(0)) missing.push('cs:ref_0');
+  if (isRef2vaLipSync(workflow) && nodesWithTitle(workflow, COMFYUI_TITLES.audioStart).length === 0) {
+    missing.push('cs:audio_start');
+  }
   if (missing.length > 0) {
     throw new ConfigError(
       `ComfyUI workflow ${label} (Pika H3 Flex ${variant === 'ref2va' ? 'Ref2VA' : 'FL2VA'}) has no node titled ` +
         `${missing.join(', ')}. Title the nodes in ComfyUI and export again (see comfyui/README.md).`,
     );
+  }
+  if (isRef2vaLipSync(workflow)) checkAudioGuide(workflow, label);
+}
+
+/**
+ * The vocal of a Pika lip-sync graph must reach the sampler as an anchored
+ * soundtrack: a MiniMaxH3AddGuide at frame 0 with the audio VAE, fed from the
+ * reference-to-video conditioning and feeding the guider. As a reference audio
+ * (`ref_audios`) it would only steer the voice and break the identity.
+ */
+function checkAudioGuide(workflow: ComfyWorkflow, label: string): void {
+  const problems: string[] = [];
+  const guides = Object.entries(workflow).filter(([, node]) => node.class_type === 'MiniMaxH3AddGuide');
+  const audioGuides = guides.filter(([, node]) => isLink(node.inputs.audio));
+  if (audioGuides.length !== 1) problems.push('it needs exactly one MiniMaxH3AddGuide with the vocal on its audio input');
+  const [guideId, guide] = audioGuides[0] ?? [];
+  if (guide) {
+    if (Number(guide.inputs.frame_idx) !== 0) problems.push('the audio guide must start at frame_idx 0');
+    if (!isLink(guide.inputs.audio_vae)) problems.push('the audio guide needs the audio VAE');
+    const consumers = linksTo(workflow, guideId!).map(([id]) => workflow[id]!.class_type);
+    if (!consumers.includes('BasicGuider')) problems.push('the audio guide must feed the guider');
+  }
+  const ref2va = Object.values(workflow).find((node) => node.class_type === 'MiniMaxH3ReferenceToVideo');
+  if (ref2va && Object.keys(ref2va.inputs).some((name) => name.startsWith('ref_audios.'))) {
+    problems.push('no reference audio on MiniMaxH3ReferenceToVideo (it breaks identity); the vocal goes through the guide');
+  }
+  if (problems.length > 0) {
+    throw new ConfigError(`ComfyUI workflow ${label} (Pika H3 Flex lip-sync): ${problems.join('; ')}.`);
   }
 }
 
@@ -455,6 +495,8 @@ export function inspectWorkflow(workflow: ComfyWorkflow): WorkflowInspection {
   // A video workflow that loads a video restores or upscales it.
   else if (kind === 'video' && titles.video) operations.push('upscaleVideo');
   else if (kind === 'image') operations.push(titles.startImage ? 'editImage' : 'generateImage');
+  // Pika Ref2VA with an anchored vocal: identity references plus the voice it is generated to.
+  else if (referenceSlots > 0 && titles.audio && isRef2va(workflow)) operations.push('lipSync');
   // Indexed reference images (cs_ref_0 …) are identity anchors, not a start frame.
   else if (referenceSlots > 0) operations.push('referenceToVideo');
   // A video workflow with driving audio lip-syncs a start (and optional end) frame.
@@ -472,7 +514,7 @@ export function inspectWorkflow(workflow: ComfyWorkflow): WorkflowInspection {
   if (titles.endImage && !titles.startImage) {
     warnings.push(`${COMFYUI_TITLES.endImage} without ${COMFYUI_TITLES.startImage}`);
   }
-  if (kind === 'video' && titles.audio && !titles.startImage) {
+  if (kind === 'video' && titles.audio && !titles.startImage && referenceSlots === 0) {
     warnings.push(`${COMFYUI_TITLES.audio} without ${COMFYUI_TITLES.startImage}; lip-sync needs a face frame`);
   }
   if (!titles.seed) warnings.push(`no node titled ${COMFYUI_TITLES.seed}; every run uses the workflow's seed`);
@@ -484,7 +526,7 @@ export function inspectWorkflow(workflow: ComfyWorkflow): WorkflowInspection {
   if (kind === 'audio' && titles.audio && !titles.transcript) {
     warnings.push(`${COMFYUI_TITLES.audio} without ${COMFYUI_TITLES.transcript}; a voice clone usually needs the reference transcript`);
   }
-  if (referenceSlots > 0 && titles.audio) {
+  if (referenceSlots > 0 && titles.audio && !isRef2va(workflow)) {
     warnings.push('reference-to-video with an audio reference; audio references break identity and are not used');
   }
   return { titles, kind, operations, referenceSlots, warnings };
@@ -780,6 +822,8 @@ export class ComfyUIProvider implements Provider {
     const ref2va = isRef2va(workflow);
     const fl2va = isFl2va(workflow);
     const pikaFlex = ref2va || fl2va;
+    // Pika lip-sync takes its face like Ref2VA: as indexed identity references, not a start frame.
+    const indexed = operation === 'referenceToVideo' || (ref2va && operation === 'lipSync');
     checkPikaTags(workflow, label);
     const params = input.params ?? {};
     const unknown = Object.keys(params).filter((key) => !ADAPTER_PARAMS.has(key));
@@ -832,8 +876,8 @@ export class ComfyUIProvider implements Provider {
     }
     addReferenceImages(workflow, uploads.references ?? [], label);
     if (uploads.audio) setTitled(workflow, 'audio', uploads.audio, label);
-    if (operation === 'referenceToVideo') {
-      if (input.audio) {
+    if (indexed) {
+      if (operation === 'referenceToVideo' && input.audio) {
         throw new ConfigError(
           `ComfyUI workflow ${label} takes no audio reference: MiniMax H3 loses the subject's identity with one. ` +
             'Describe the sound in overall_soundscape instead.',
@@ -980,12 +1024,17 @@ export class ComfyUIProvider implements Provider {
 
   private async run(input: ProviderInput, operation: Operation): Promise<ProviderOutput> {
     const references = input.references ?? [];
+    // Ref2VA, and lip-sync on a Pika Ref2VA graph, wire every reference into cs:ref_<n>.
+    const indexed =
+      operation === 'referenceToVideo' ||
+      (operation === 'lipSync' &&
+        isRef2va(parseWorkflow(await readFile(this.workflowPath(input.model), 'utf8'), basename(input.model))));
     const takesStart =
       operation !== 'textToVideo' &&
       operation !== 'generateImage' &&
       operation !== 'generateAudio' &&
       operation !== 'upscaleVideo' &&
-      operation !== 'referenceToVideo';
+      !indexed;
     const extra = operation === 'editImage' ? references.slice(1) : [];
     // Validate the workflow before uploading anything.
     const check = await this.buildPrompt(input, operation, {
@@ -994,7 +1043,7 @@ export class ComfyUIProvider implements Provider {
       references: extra.map(() => 'check.png'),
       audio: 'check.wav',
       video: 'check.mp4',
-      indexedReferences: operation === 'referenceToVideo' ? references.map(() => 'check.png') : [],
+      indexedReferences: indexed ? references.map(() => 'check.png') : [],
     });
     const inspection = inspectWorkflow(check);
     await this.checkModelFiles(check, basename(this.workflowPath(input.model)));
@@ -1012,7 +1061,7 @@ export class ComfyUIProvider implements Provider {
       end,
       references: await Promise.all(extra.map((path) => this.upload(path))),
       ...(operation === 'upscaleVideo' && startPath ? { video: await this.upload(startPath) } : {}),
-      ...(operation === 'referenceToVideo'
+      ...(indexed
         ? { indexedReferences: await Promise.all(references.map((path) => this.upload(path))) }
         : {}),
     };

@@ -1,0 +1,373 @@
+{
+  "92": {
+    "inputs": {
+      "filename_prefix": "video/Pika_H3_Flex_REF2V_Lipsync",
+      "format": "auto",
+      "format.codec": "auto",
+      "codec": "auto",
+      "video-preview": "",
+      "video": [
+        "152",
+        0
+      ]
+    },
+    "class_type": "SaveVideo",
+    "_meta": {
+      "title": "cs:output",
+      "cnr_id": "comfy-core",
+      "ver": "0.33.0"
+    }
+  },
+  "115": {
+    "inputs": {
+      "aspect_ratio": "16:9 (Widescreen)",
+      "megapixels": 0.98,
+      "multiple": 32
+    },
+    "class_type": "ResolutionSelector",
+    "_meta": {
+      "title": "cs:aspect",
+      "cnr_id": "comfy-core",
+      "ver": "0.33.0"
+    }
+  },
+  "119": {
+    "inputs": {
+      "vae_name": "minimax_h3_video_vae_int8_convrot.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE",
+      "cnr_id": "comfy-core",
+      "ver": "0.33.0"
+    }
+  },
+  "120": {
+    "inputs": {
+      "vae_name": "minimax_h3_audio_vae_fp32.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE",
+      "cnr_id": "comfy-core",
+      "ver": "0.33.0"
+    }
+  },
+  "121": {
+    "inputs": {
+      "samples": [
+        "125",
+        0
+      ],
+      "vae": [
+        "120",
+        0
+      ]
+    },
+    "class_type": "VAEDecodeAudio",
+    "_meta": {
+      "title": "VAE Decode Audio",
+      "cnr_id": "comfy-core",
+      "ver": "0.33.0"
+    }
+  },
+  "122": {
+    "inputs": {
+      "samples": [
+        "125",
+        0
+      ],
+      "vae": [
+        "119",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode",
+      "cnr_id": "comfy-core",
+      "ver": "0.33.0"
+    }
+  },
+  "123": {
+    "inputs": {
+      "sampler_name": "lcm"
+    },
+    "class_type": "KSamplerSelect",
+    "_meta": {
+      "title": "KSamplerSelect",
+      "cnr_id": "comfy-core",
+      "ver": "0.33.0"
+    }
+  },
+  "125": {
+    "inputs": {
+      "noise": [
+        "129",
+        0
+      ],
+      "guider": [
+        "126",
+        0
+      ],
+      "sampler": [
+        "123",
+        0
+      ],
+      "sigmas": [
+        "147",
+        0
+      ],
+      "latent_image": [
+        "136",
+        1
+      ]
+    },
+    "class_type": "SamplerCustomAdvanced",
+    "_meta": {
+      "title": "SamplerCustomAdvanced",
+      "cnr_id": "comfy-core",
+      "ver": "0.33.0"
+    }
+  },
+  "126": {
+    "inputs": {
+      "model": [
+        "145",
+        0
+      ],
+      "conditioning": [
+        "202",
+        0
+      ]
+    },
+    "class_type": "BasicGuider",
+    "_meta": {
+      "title": "Basic Guider",
+      "cnr_id": "comfy-core",
+      "ver": "0.33.0"
+    }
+  },
+  "127": {
+    "inputs": {
+      "unet_name": "minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model",
+      "cnr_id": "comfy-core",
+      "ver": "0.33.0"
+    }
+  },
+  "128": {
+    "inputs": {
+      "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+      "type": "minimax",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP",
+      "cnr_id": "comfy-core",
+      "ver": "0.33.0"
+    }
+  },
+  "129": {
+    "inputs": {
+      "noise_seed": 1073336352840368
+    },
+    "class_type": "RandomNoise",
+    "_meta": {
+      "title": "cs:seed",
+      "cnr_id": "comfy-core",
+      "ver": "0.33.0"
+    }
+  },
+  "131": {
+    "inputs": {
+      "expression": "max(5, round(a * 24)) + (5 - (max(5, round(a * 24)) % 17)) % 17",
+      "values.a": [
+        "132",
+        0
+      ]
+    },
+    "class_type": "ComfyMathExpression",
+    "_meta": {
+      "title": "Math Expression",
+      "cnr_id": "comfy-core",
+      "ver": "0.33.0"
+    }
+  },
+  "132": {
+    "inputs": {
+      "value": 5.5
+    },
+    "class_type": "PrimitiveFloat",
+    "_meta": {
+      "title": "cs:duration",
+      "cnr_id": "comfy-core",
+      "ver": "0.33.0"
+    }
+  },
+  "136": {
+    "inputs": {
+      "prompt": [
+        "138",
+        0
+      ],
+      "width": [
+        "115",
+        0
+      ],
+      "height": [
+        "115",
+        1
+      ],
+      "length": [
+        "131",
+        1
+      ],
+      "ref_image_size": "match",
+      "clip": [
+        "128",
+        0
+      ],
+      "vae": [
+        "119",
+        0
+      ],
+      "audio_vae": [
+        "120",
+        0
+      ],
+      "ref_images.ref_image_0": [
+        "149",
+        0
+      ]
+    },
+    "class_type": "MiniMaxH3ReferenceToVideo",
+    "_meta": {
+      "title": "MiniMax H3 Reference to Video",
+      "cnr_id": "comfy-core",
+      "ver": "0.33.0"
+    }
+  },
+  "138": {
+    "inputs": {
+      "value": "subject_definitions:\n<Subject 1> is the singer in <Picture 1>. Reference role: identity, framing and set anchor. Features to follow exactly: long mint-to-emerald green ponytail with pale blonde-green bangs, freckles, hazel-green eyes, a white glossy bomber jacket with a mint collar and a small glowing green heart pin, a white tiled wall under a pale blue upper wall, mint and pink balloons left and right.\n\nsummary:\n[reference generation] A static frontal close-up: the singer of <Picture 1> sings a German pop line straight into the lens, her lips following the anchored vocal word by word; framing and set stay as in <Picture 1>.\n\nretention_analysis:\n<Subject 1> (appears in [Shot 1]): fully_preserved - face, hair, jacket, heart pin, tiled set and balloons.\nThe anchored audio is her own lead vocal; her mouth follows it word by word.\n\ndetailed_description:\nBright, soft, high-key pop studio light, clean pastel colours, sharp focus on the face, static camera, no cut.\n\n[Shot 1] Static frontal close-up exactly as in <Picture 1>, the face filling the upper half of the frame. From the first frame she sings the line \"Lächeln, liken, weiter so, ihr seid der Prompt, ich bin das Echo\" in German, her lips, jaw and tongue forming each syllable in time with the vocal: wide open vowels on the held notes, closed lips on the \"m\" and \"p\" sounds. Her head sways gently with the beat, small nods and slight tilts, eyebrows lifting on the high notes, eyes on the lens, a warm smile between phrases. At about five seconds she finishes the line and holds a closed smile. The camera does not move.\n\noverall_soundscape:\nOnly her lead vocal, close and dry, as anchored; no other sounds.\n\nnon_diegetic_music:\nnone - No music, no score, no melody of any kind."
+    },
+    "class_type": "PrimitiveStringMultiline",
+    "_meta": {
+      "title": "cs:prompt",
+      "cnr_id": "comfy-core",
+      "ver": "0.33.0"
+    }
+  },
+  "145": {
+    "inputs": {
+      "lora_name": "pika_h3_flex_ref2va_v1_bf16.safetensors",
+      "strength_model": 1,
+      "model": [
+        "127",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA",
+      "cnr_id": "comfy-core",
+      "ver": "0.33.0"
+    }
+  },
+  "147": {
+    "inputs": {
+      "sigmas": "1.0, 0.972973, 0.923077, 0.8, 0.571429, 0.333333, 0.0"
+    },
+    "class_type": "ManualSigmas",
+    "_meta": {
+      "title": "ManualSigmas"
+    }
+  },
+  "149": {
+    "inputs": {
+      "image": "example_singer.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "cs:ref_0"
+    }
+  },
+  "152": {
+    "inputs": {
+      "fps": 24,
+      "bit_depth": "auto",
+      "color_space": "sRGB",
+      "chroma_subsampling": "auto",
+      "codec": "none",
+      "images": [
+        "122",
+        0
+      ],
+      "audio": [
+        "121",
+        0
+      ]
+    },
+    "class_type": "CreateVideo",
+    "_meta": {
+      "title": "Create Video"
+    }
+  },
+  "200": {
+    "inputs": {
+      "audio": "example_vocal.wav"
+    },
+    "class_type": "LoadAudio",
+    "_meta": {
+      "title": "cs:audio"
+    }
+  },
+  "201": {
+    "inputs": {
+      "audio": [
+        "200",
+        0
+      ],
+      "start_index": 0,
+      "duration": [
+        "132",
+        0
+      ]
+    },
+    "class_type": "TrimAudioDuration",
+    "_meta": {
+      "title": "cs:audio_start"
+    }
+  },
+  "202": {
+    "inputs": {
+      "positive": [
+        "136",
+        0
+      ],
+      "latent": [
+        "136",
+        1
+      ],
+      "frame_idx": 0,
+      "audio_vae": [
+        "120",
+        0
+      ],
+      "audio": [
+        "201",
+        0
+      ]
+    },
+    "class_type": "MiniMaxH3AddGuide",
+    "_meta": {
+      "title": "Anchor vocal (frame 0)"
+    }
+  }
+}

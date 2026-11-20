@@ -668,7 +668,7 @@ roles:
           depending on the plan, so $0.02/s is a conservative planning estimate.
           maxDuration is a planning limit, not a documented one.
       comfyui:
-        model: ltx25-lipsync-flf2v
+        model: pika-h3-ref2va-lipsync
         params:
           fps: 24
           frame_step: 8
@@ -676,11 +676,22 @@ roles:
           megapixels: 0.8
         maxDuration: 10
         notes: >-
-          LTX 2.5 FLF2V lip-sync, single pass (providers.lipsync: comfyui). Start
-          frame, end frame (the start frame again when there is only one), and the
-          vocal stem cut by audioStartSeconds + durationSeconds. Frames round down
-          to 8n+1, so end each segment in a pause with about 0.3 s of silence.
-          0.8 MP draft, megapixels: 1.9 for the final render.
+          Pika H3 Flex lip-sync (providers.lipsync: comfyui): the Ref2VA graph
+          with the vocal anchored as the soundtrack from frame 0
+          (MiniMaxH3AddGuide), so the face is generated to the given voice. The
+          first local lip-sync choice: in the 2026-11-20 test (shot-022 of
+          trainiert-auf-euch, 5.5 s lead-only segment, one keyframe) identity,
+          set, and framing held and the mouth followed the vocal with head
+          motion; about 4.5 min per clip. 1-4 reference images (the keyframe as
+          <Picture 1>, up to 9 with params.max_references), a Flex prompt
+          ("flex" in the batch item) with the sung words in the shot block, and
+          a cut lead-only segment from `audio-segment` (or the stem with
+          audioStartSeconds + durationSeconds). The clip length comes from the
+          audio and rounds up to 17n+5 frames at 24 fps; the tail after the
+          vocal is silent. Sizes come from the graph (~0.98 MP, aspect from the
+          project kind); the LTX params above only apply to the LTX fallback:
+          params.workflow: ltx25-lipsync-flf2v (start frame, end frame, 8n+1
+          frames rounded down, 0.8 MP draft, megapixels 1.9 final, plain prompt).
 
   audio.music:
     provider: comfyui
