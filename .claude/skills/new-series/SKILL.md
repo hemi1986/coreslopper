@@ -56,7 +56,7 @@ Done when `npm run cli -- series-status <slug>` lists every character, set, and 
 
 ### 4. References
 
-Generate through the series budget: `npm run cli -- generate --series <slug> --batch <file>` estimates, checks the series budget and batch cap, caches, and writes `series/<slug>/assets/manifest.jsonl`. Use `--dry-run` first.
+Generate through the series budget: `npm run cli -- generate --series <slug> --batch <file>` estimates, checks the series budget and batch cap, caches, and writes `series/<slug>/assets/manifest.jsonl`. Use `--dry-run` first. Give every item its `"out"` path inside the canon (`characters/<id>/sheet.png`, `sets/<id>/plates/<plate>.png`, …): `generate` files the result there, so nothing is copied by hand.
 
 - **Characters** shown on screen (`full`, `screen-only`, `silhouette`): a character sheet with `image.character_sheet`, then 2–4 references with `image.edit` from the sheet. Follow `.claude/skills/character-bible/SKILL.md` for descriptions and review. A `silhouette` character gets a silhouette sheet with no readable face.
 - **Sets**: one or more start frames per set with `image.keyframe` from the set's `prompt` plus the style's look keywords, at the master format's size.
@@ -65,7 +65,7 @@ Generate through the series budget: `npm run cli -- generate --series <slug> --b
 - **Character states** of the canon: an `image.edit` of the sheet per state, saved as `characters/<id>/states/<state>.png` and recorded in `ref` (see `.claude/skills/character-bible/SKILL.md`).
 - **Reference voices** for every character with speech: a recording by the user, or, with `providers.audio: comfyui`, an `audio.voice_design` take ("(voice description)text"). Save it as `characters/<id>/voice.wav` and record `voice.ref` and the exact `voice.transcript` in `characters.yaml`.
 
-Copy the chosen files from `assets/` into `characters/<id>/` and `sets/<id>/`, and record them in `sheet` and `refs`. Review every sheet, set frame, plate, prop, and state as soon as it exists with `npm run cli -- review-image series/<slug> --image <png> --ref <kind:id>` (the review loop in `.claude/skills/ai-clips/SKILL.md`, step 6); regenerate what fails with its `fix_prompt`.
+Record the filed paths in `sheet`, `refs`, and `ref`. Review every sheet, set frame, plate, prop, and state as soon as it exists with `npm run cli -- review-image series/<slug> --image <png> --ref <kind:id>`; it fails an image only for a blocking defect. Regenerate what fails with its `fix_prompt` (a new seed, the same `out`), or repair one region with `npm run cli -- patch --series <slug> --image <png> --box <x,y,w,h> --prompt "…" --ref <kind:id> --replace`. The generation queue (`queue`) works on projects only; a canon is small enough for this loop by hand.
 
 Done when every on-screen character has a sheet and at least one reference, every set has at least one reference frame and every plate its image, every prop and state its reference, every speaking character has a reference voice with its transcript, and the art director passed them.
 

@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { readFile, readdir, rm, rmdir } from 'node:fs/promises';
+import { copyFile, readFile, readdir, rm, rmdir } from 'node:fs/promises';
 import { basename, dirname, extname, join, relative, resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
@@ -73,6 +73,14 @@ export const BatchItemSchema = z
       'generateAudio',
     ]),
     role: z.string().min(1),
+    /** Name of the item in logs and in the generation queue, e.g. `keyframe:shot-008`. */
+    id: z.string().min(1).optional(),
+    /**
+     * Where the result is filed, relative to the project (or series canon), e.g.
+     * `assets/keyframes/shot-008.png`. `generate` copies the generated file there
+     * (the SeedVR2 result for a final clip); the original stays under `assets/<role>/`.
+     */
+    out: z.string().min(1).optional(),
     /** The prompt text. A referenceToVideo item can give `flex` instead, a Pika FL2VA item `fl2va`. */
     prompt: z.string().min(1).optional(),
     /** referenceToVideo: a structured Flex prompt, rendered into `prompt` (see core/flex.ts). */
@@ -228,7 +236,7 @@ export interface BatchTarget {
   label: string;
   config: BatchConfig;
   state: { budget: { totalUsd: number; spentUsd: number; reservedUsd: number }; updatedAt: string };
-  paths: { root: string; assets: string; manifest: string };
+  paths: { root: string; assets: string; manifest: string; series?: string };
   /** Characters whose names Wan prompts replace with their descriptions. */
   characters?: { id: string; name: string; description: string }[];
   saveState(): Promise<void>;
@@ -617,6 +625,22 @@ export interface BatchRunResult {
   result?: GenerationResult;
   /** The SeedVR2 result next to the clip (`<clip>_upscaled.mp4`), when one ran. */
   upscaled?: string;
+  /** The item's `out` path (absolute), when it has one and the result was filed there. */
+  out?: string;
+}
+
+/**
+ * Resolve an item's `out`. It stays inside the project (or canon) folder; an
+ * episode may also file into its series canon (`../../series/<series>/…`), where
+ * new plates, props, and character states go (ADR 0025).
+ */
+export function resolveOut(root: string, out: string, canon?: string): string {
+  const target = resolve(root, out);
+  const inside = (base: string) => !relative(base, target).startsWith('..');
+  if (out.startsWith('/') || !(inside(root) || (canon !== undefined && inside(canon)))) {
+    throw new ValidationError(`"out" must be a path inside ${root}${canon ? ` or ${canon}` : ''}, relative to ${root}: ${out}`);
+  }
+  return target;
 }
 
 /**
@@ -644,6 +668,7 @@ export async function runBatch(
     return value.provider === 'mock' || value.provider === 'comfyui' ? { ...value, cost: 0 } : value;
   });
   const totalEstimate = resolved.reduce((sum, item) => sum + item.cost, 0);
+  for (const item of batch) if (item.out) resolveOut(project.paths.root, item.out, project.paths.series);
 
   log(`Batch: ${resolved.length} generation(s), worst-case estimate ${formatUsd(totalEstimate)}`);
   log(
@@ -695,7 +720,15 @@ export async function runBatch(
           `color_correction ${item.restore.colorCorrection}, seed ${result.seed} -> ${relative(project.paths.root, upscaled)}`,
       );
     }
-    results.push({ resolved: item, result, ...(upscaled ? { upscaled } : {}) });
+    let out: string | undefined;
+    const produced = upscaled ?? result.files[0];
+    if (item.item.out && produced) {
+      out = resolveOut(project.paths.root, item.item.out, project.paths.series);
+      await ensureDir(dirname(out));
+      await copyFile(produced, out);
+      log(`[${index + 1}/${resolved.length}] ${item.item.id ?? item.item.role}: -> ${item.item.out}`);
+    }
+    results.push({ resolved: item, result, ...(upscaled ? { upscaled } : {}), ...(out ? { out } : {}) });
     if (result.cached) {
       cacheHits += 1;
       log(`[${index + 1}/${resolved.length}] ${item.item.role}: cache hit ${result.hash.slice(0, 12)}`);

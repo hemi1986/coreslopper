@@ -82,38 +82,37 @@ license: MIT
      Name the keyframes `Picture 1`/`Picture 2` (no angle brackets, no `<Subject N>`); both keyframes need the same aspect ratio. Do not use the Ref2VA Flex sections here; `generate` rejects a mix.
    - Every local workflow has a slower `-quality` variant (`qwen-t2i-quality`, `qwen-edit-quality`, `ltx-i2v-quality`, `ltx-t2v-quality`, `ltx-flf2v-quality`, `ltx25-lipsync-flf2v-quality`). Select it per item with `"params": {"workflow": "<name>"}`. Use it for character references, keyframes with a recurring character, face close-ups, clip and lip-sync start frames, hero clips, and the final clip pass; keep the default workflows for drafts, bass-hit stills, and face-free backgrounds. The parameter is ignored when the item runs on a cloud provider.
    - Resolution follows the project format (16:9 or 9:16) in multiples of 64. The roles render drafts at 0.8 MP; for the final render set `models.<role>.params.megapixels: 1.9` in `project.yaml`. Keyframes must already have the video's aspect ratio.
-3. Write a batch JSON file outside the repo or under `projects/<slug>/assets/batches/`. Shape:
-   ```json
-   [
-     {
-       "operation": "editImage",
-       "role": "image.keyframe",
-       "prompt": "...",
-       "references": ["characters/nova/sheet.png"],
-       "seed": 1234
-     },
-     {
-       "operation": "imageToVideo",
-       "role": "video.image_to_video.quality",
-       "prompt": "...",
-       "references": ["assets/keyframes/shot-004.png"],
-       "durationSeconds": 5,
-       "seed": 1234
-     }
-   ]
-   ```
-4. Run `npm run cli -- estimate --role <role> --units <n> --project projects/<slug>` and check the batch cap. If the batch exceeds it, split the batch or ask before spending.
-5. Run `npm run cli -- generate projects/<slug> --batch <file>` with the project provider. The runner checks the budget, computes a cache key, reuses cached assets, writes `assets/manifest.jsonl`, and records spend.
-6. **Review loop, one image at a time.** Review every reference, keyframe, and clip as soon as it exists, before anything derives from it:
+3. **Queue the items.** Mechanical steps run through `npm run cli -- …` only; never build an `ffmpeg`, Python, or `cp` command for them. The queue (`assets/queue.json`) builds items straight from `storyboard.yaml`:
    ```bash
-   npm run cli -- review-image projects/<slug> --image <png> --shot <shot-id> --attempt <n> [--focus "<issues of the last attempt>"]
-   npm run cli -- review-image projects/<slug> --image <png> --ref state:<char>/<state>   # or plate:<set>/<plate>, prop:<id>
-   npm run cli -- review-image projects/<slug> --clip <mp4> --shot <shot-id>   # a clip: extracts its first, middle, and last frame and measures the first against the keyframe
+   npm run cli -- queue add projects/<slug> --kind keyframe [--shots 001-005,008] [--workflow qwen-edit-quality]
+   npm run cli -- queue add projects/<slug> --kind clip [--shots …] [--workflow pika-h3-flf2va] [--overrides <file>]
    ```
-   It runs the art-director headless in its own context (about a minute), appends the verdict to `assets/review/verdicts.jsonl`, and prints one JSON line `{verdict, score, issues, fix_prompt}`; exit code 2 means fail. Work from that line only:
-   - **pass** → the image is approved; the next item may use it as a reference. Issues prefixed `note:` never trigger a regeneration.
-   - **fail** → regenerate the item with the verdict's `fix_prompt` (a new seed), review again with `--attempt <n+1> --focus "<issues>"`. When the defect is a hand, limb, or body overlap, make the next attempt a different composition (see the composition rules in `.claude/skills/storyboard/SKILL.md`), not the same framing again.
-   - **Cloud fallback.** After 3 failed local attempts, generate the item once on a strong cloud model, with the last `fix_prompt`, inside the budget and batch cap (check with `estimate --role <role> --units <n> --provider <p>` first). Cloud roles take the aspect from their params, so set `"params": {"aspect_ratio": "<project aspect>"}` on the item.
+   - A keyframe item is `prompts.keyframe` with the shot's references in the order the prompt numbers them: plate (image 1), then per character its state reference (its sheet when the shot names no state), then the props. It is filed as `assets/keyframes/<shot>.png`. A chained shot gets no keyframe.
+   - A clip item is `prompts.video` on the keyframe, `motion.props.clipSeconds` long, filed as `assets/clips/<shot>.mp4`; it waits for its keyframe. A chained shot waits for the clip it chains from and starts on that clip's last frame, which the queue extracts itself (`assets/keyframes/chain/<shot>-start.png`). Lip-sync shots are left out (step 8).
+   - What the storyboard cannot say goes into `--overrides`, a JSON object keyed by shot id whose fields replace the built item's: `{"shot-008": {"fl2va": {…}}, "shot-001": {"operation": "firstLastFrameToVideo", "references": ["assets/keyframes/shot-001.png", "assets/keyframes/shot-002.png"]}}`. Write the file with the Write tool under `assets/batches/`. `--dry-run` prints the items.
+   - Anything else (a reference, a lip-sync clip, a derived base image) is a hand-written item: a JSON array under `assets/batches/` with the fields of the tables above plus `"id"`, `"out"` (where the approved file goes, relative to the project; an episode may file new canon references under `../../series/<series>/…`), `"review": {"shot": "<id>"}` or `{"ref": "state:<char>/<state>"}`, and `"after": ["<id>", …]` for what it derives from. Add it with `queue add projects/<slug> --batch <file>`.
+     ```json
+     [{ "id": "state:hf7/chest-open", "out": "../../series/<series>/characters/hf7/states/chest-open.png", "review": {"ref": "state:hf7/chest-open"},
+        "operation": "editImage", "role": "image.edit", "prompt": "…", "references": ["../../series/<series>/characters/hf7/sheet.png"], "seed": 1234 }]
+     ```
+4. Run `npm run cli -- estimate --role <role> --units <n> --project projects/<slug>` for every paid role and check the batch cap. If the batch exceeds it, split it or ask before spending. Local items cost $0.
+5. **Run the queue** in the background (the Bash tool's `run_in_background`, never `&`), then follow it:
+   ```bash
+   npm run cli -- queue run projects/<slug>            # in the background
+   npm run cli -- queue wait projects/<slug>           # blocks until an item needs you, or the run ended (at most 9 min)
+   npm run cli -- queue status projects/<slug>
+   ```
+   One run generates the ready items in order through `generate` (budget, cache, `assets/manifest.jsonl`, spend) and reviews every result in the background the moment it exists, so the GPU never waits on a review. Each attempt is kept as `<out dir>/attempts/<name>-a<n>.<ext>`; only an approved attempt is filed at `out`, and only then do the items that derive from it start. When a generation fails or hangs, the run restarts ComfyUI with `COMFYUI_RESTART_COMMAND` and tries again. It stops by itself on a budget or credential problem. Call `queue wait` again while it reports "Still running"; do not sleep or poll files.
+6. **Review loop.** The queue reviews with `review-image`: the art-director runs headless in its own context (about a minute), appends the verdict to `assets/review/verdicts.jsonl`, and fails an item only for a blocking defect (identity, anatomy, state or attachment, a missing named element, misspelled text, a break with an approved neighbour). Everything else is a note and never triggers a regeneration.
+   - **pass** → filed at `out`; its dependents start.
+   - **Failed image** → the queue regenerates it by itself with the verdict's `fix_prompt`, a new seed, and the old issues as the review focus, up to 3 attempts. Then it waits as `needs-fix`.
+   - **Failed clip** → waits as `needs-fix`: a clip prompt cannot be fixed mechanically. Read its issues in `queue status`, rewrite the prompt (a different action or composition when a hand, limb, or body overlap failed, see `.claude/skills/storyboard/SKILL.md`), and put it back: `npm run cli -- queue retry projects/<slug> clip:<shot> --prompt "<new prompt>"`, or `--item <file>` with the changed fields (a rewritten `fl2va`, an end frame). Three attempts per clip.
+   - **A local defect in an otherwise good image** (a hand, a tread, a patch of background) → repair only that region instead of rerolling the image:
+     ```bash
+     npm run cli -- patch projects/<slug> --image assets/keyframes/<shot>.png --box <x,y,w,h> --prompt "<what changes inside the box>" [--refs <state or prop png>] --shot <shot> [--workflow qwen-edit-quality] [--replace]
+     ```
+     The box is in fractions of the image (`0.3,0.5,0.4,0.3`) or pixels. The command crops it, runs the crop as an `image.edit` generation (the crop is image 1, `--refs` follow), pastes the result back with a soft edge, and files it as the next attempt; pixels outside the box do not change. `--replace` also puts it in place of the image. Review it with `review-image --image <attempt> --shot <shot> --attempt <n>`.
+   - **Cloud fallback.** After 3 failed local attempts, one attempt on a strong cloud model, inside the budget and batch cap (check with `estimate --role <role> --units <n> --provider <p>` first): `queue retry projects/<slug> <id> --provider <p> [--item <file>]`. Cloud roles take the aspect from their params, so the item file sets `{"params": {"aspect_ratio": "<project aspect>"}}`.
      | Item | Role and provider | About |
      |---|---|---|
      | Image, several references | `image.edit` with `--provider topview` (Nano Banana 2.1 edit) | $0.035 |
@@ -121,12 +120,14 @@ license: MIT
      | Image, at most 3 references, cheapest | `image.edit` with `--provider higgsfield` (Qwen edit) | $0.03 |
      | Clip | `video.image_to_video.premium` with `--provider topview` (Seedance 2.5) | $0.21/s |
      | Clip, lower cost | `video.image_to_video.quality` with `--provider higgsfield` (Kling 3.0) or `topview` (Wan 3.0) | $0.06–0.12/s |
-     Pick the strongest one the remaining budget allows. Review it with `--attempt 4`. If it fails too, keep the best attempt, mark it in the batch notes with its last issues, and move on.
-   - **Keep the generation queue full.** Generation and review run side by side, so the GPU never waits on a review: start the next item's `generate` in the background, and review each item asynchronously the moment it is done (`review-image` in the background, several at once). A failed item goes back to the end of the queue with its `fix_prompt` and the next attempt number; a passed item unlocks the items that derive from it. Only dependents wait: a keyframe for its reference, a clip for its keyframe, a chained clip for the last frame of the clip before it. Everything else keeps flowing. On resume, `verdicts.jsonl` tells which items already passed.
-   The review fails an image only for a blocking defect (identity, anatomy, state or attachment, a missing named element, misspelled text, a break with an approved neighbour); everything else is a note, and a retry is checked only against the previous blocking defects. So the loop always ends: at most 3 local attempts and one cloud attempt per item. The art-director reads full resolution, so thumbnails never replace it. After the last batch, the orchestrator reads only the summary of `verdicts.jsonl`: items that never passed, with their last issues.
-7. Use frame chaining only when the storyboard enables it. Extract the last frame of the previous clip with
-   `npm run cli -- frame <project> --input <previous-clip> --position last --out <path>`
-   and pass it as the first reference of the next clip. To land on a planned frame, use `firstLastFrameToVideo` with that keyframe as the second reference.
+     Pick the strongest one the remaining budget allows. If it fails too, keep the best attempt with `queue accept projects/<slug> <id>`, write its last issues into the batch notes, and move on.
+   - **The user's eye wins.** When the user approved an attempt, file it with `queue accept projects/<slug> <id> --attempt <n> --note "user approved"` and do not regenerate it.
+   - An item with status `error` names its cause in `queue status`. `queue retry projects/<slug> <id>` runs it again; an attempt that was generated but never reviewed is only reviewed again.
+
+   To look at results yourself: `npm run cli -- sheet projects/<slug> --images <a.png>,<b.png> [--box <x,y,w,h>]` puts images side by side (with `--box`, zoomed into one region) as `assets/review/sheets/sheet.png`; `npm run cli -- probe <file…>` prints size, length, and frame rate; `npm run cli -- verdicts projects/<slug> [--failed]` lists the last verdict per shot and reference; `npm run cli -- comfy status` shows the server and its queue. A single review outside the queue: `review-image projects/<slug> --image <png> --shot <id>`, `--ref <kind:id>`, or `--clip <mp4> --shot <id>`, which extracts the first, middle, and last frame itself and measures the first frame against the keyframe.
+
+   The loop always ends: at most 3 local attempts and one cloud attempt per item. After the queue is done, the orchestrator reads only `verdicts --failed` and `queue status`.
+7. Frame chaining is used only when the storyboard enables it; the queue handles it (step 3). To land on a planned frame, make the item a `firstLastFrameToVideo` with that keyframe as the second reference. For a single frame outside the queue: `npm run cli -- frame <project> --input <clip> --position last --out <path>`.
 8. **Lip-sync shots** (`lipSync` set on the shot):
    1. Generate a dedicated keyframe with `editImage` from the character sheet: face frontal or slight 3/4, evenly lit, mouth slightly open, face filling at least a third of the frame, modest clothing (high neckline, covered shoulders). Never feed the multi-view sheet itself. Keep the prompt neutral; words such as "sexy", "intimate", or "seductive" trigger the provider's content moderation.
    2. Resolve the shot's start and end anchors to seconds from `timing.effective.json`. Place the start just before the first word and the end in the pause after the last word, about 0.3 s past it. The vocals always come from the vocal stem (`audio/stems/lead.wav` when it exists, else `audio/stems/vocals.wav`); `generate` rejects the full mix (`audio/song.*`).
@@ -151,7 +152,7 @@ license: MIT
       Keep each segment as tight as the sung line and under the role's `maxDuration` for the provider.
       A `422 content_policy_violation` (`partner_validation_failed` or a `sexual` category) means moderation rejected the image or prompt; the call is not billed. Retry once with a more covered close-up and a neutral prompt. If it fails again, stop retrying that shot, because repeated rejections can flag the account. Use a non-lip-synced clip as a stand-in and report it.
    5. The clip must start exactly at the shot start; do not trim its head in Remotion. Its audio is muted; the song stays the only audio source. Check sync at first/middle/last frame against the lyric word timestamps.
-9. Update the storyboard's `asset` path or layer asset. Re-run `npm run cli -- validate projects/<slug>`.
+9. Check that every storyboard `asset` path points at the filed clip (`assets/clips/<shot>.mp4`, or its `_upscaled.mp4`). Re-run `npm run cli -- validate projects/<slug>`.
 10. Update the state when the asset batch is complete.
 
 ## Completion criteria
@@ -161,9 +162,11 @@ license: MIT
 - The manifest records model, prompt, seed, references, cost, and cache status.
 - The batch stayed under the project budget and batch cap.
 - No generated asset is committed to the repository.
-- Every reference, keyframe, and clip has a `pass` line in `assets/review/verdicts.jsonl`, or its remaining risk is written into the batch notes and the review report.
+- Every item in `queue status` is `passed`: by the reviewer, or accepted with its remaining risk written into the batch notes and the review report.
 
 ## Common failures
+
+- Building shell one-liners (`ffmpeg`, `python3 -c`, `cp`, wait loops) for a step that has a CLI command: they stop the run on a permission prompt and are not reproducible.
 
 - Text-only character prompts.
 - Animating a keyframe with an extra limb or merged hands because it was only checked as a thumbnail.
