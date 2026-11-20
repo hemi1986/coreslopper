@@ -5,10 +5,12 @@ import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
 import {
   ConfigError,
+  Fl2vaPromptSchema,
   FlexPromptSchema,
   REF2VA_LIMITS,
   ValidationError,
   assertAffordable,
+  checkFl2vaPrompt,
   checkFlexPrompt,
   checkSpokenText,
   effectiveBatchCap,
@@ -18,13 +20,17 @@ import {
   loadModelsConfig,
   loadProject,
   loadSeries,
+  pikaEndMark,
+  pikaFrames,
   providerForRole,
   recordSpend,
   remainingBudget,
+  renderFl2vaPrompt,
   renderFlexPrompt,
   repoRoot,
   resolveModelRole,
   saveState,
+  withFl2vaAlignment,
   writeJsonAtomic,
   type LoadedProject,
   type LoadedSeries,
@@ -37,6 +43,7 @@ import {
   GenerationRunner,
   clipDurationSeconds,
   createProvider,
+  pikaVariantOf,
   type GenerationRequest,
   type GenerationResult,
   type Operation,
@@ -66,10 +73,15 @@ export const BatchItemSchema = z
       'generateAudio',
     ]),
     role: z.string().min(1),
-    /** The prompt text. A referenceToVideo item can give `flex` instead. */
+    /** The prompt text. A referenceToVideo item can give `flex` instead, a Pika FL2VA item `fl2va`. */
     prompt: z.string().min(1).optional(),
     /** referenceToVideo: a structured Flex prompt, rendered into `prompt` (see core/flex.ts). */
     flex: FlexPromptSchema.optional(),
+    /**
+     * imageToVideo / firstLastFrameToVideo on the pika-h3-flf2va workflow: a
+     * structured FL2VA prompt, rendered with its alignment line (see core/fl2va.ts).
+     */
+    fl2va: Fl2vaPromptSchema.optional(),
     /** Negative prompt; reaches the provider (ComfyUI `cs_negative`, fal/Higgsfield/Topview `negative_prompt`). */
     negativePrompt: z.string().min(1).optional(),
     references: z.array(z.string()).default([]),
@@ -111,8 +123,15 @@ export const BatchItemSchema = z
   .refine((item) => item.operation !== 'lipSync' || item.references.length <= 2, {
     message: 'lipSync takes a start frame and an optional end frame.',
   })
-  .refine((item) => (item.prompt === undefined) !== (item.flex === undefined), {
-    message: 'Give either "prompt" or "flex", not both and not neither.',
+  .refine((item) => [item.prompt, item.flex, item.fl2va].filter((value) => value !== undefined).length === 1, {
+    message: 'Give exactly one of "prompt", "flex", or "fl2va".',
+  })
+  .refine(
+    (item) => item.fl2va === undefined || item.operation === 'imageToVideo' || item.operation === 'firstLastFrameToVideo',
+    { message: '"fl2va" prompts are only for imageToVideo and firstLastFrameToVideo on pika-h3-flf2va.' },
+  )
+  .refine((item) => item.fl2va === undefined || item.durationSeconds !== undefined, {
+    message: '"fl2va" needs durationSeconds: the alignment line names the second mark of the last frame.',
   })
   .refine((item) => item.flex === undefined || item.operation === 'referenceToVideo', {
     message: '"flex" prompts are only for referenceToVideo.',
@@ -126,7 +145,17 @@ export const BatchItemSchema = z
   .refine((item) => item.operation !== 'referenceToVideo' || item.audio === undefined, {
     message: 'referenceToVideo takes no audio reference: it breaks identity. Describe the sound in overall_soundscape.',
   })
-  .transform((item) => ({ ...item, prompt: item.prompt ?? renderFlexPrompt(item.flex!) }));
+  .transform((item) => ({
+    ...item,
+    prompt:
+      item.prompt ??
+      (item.flex
+        ? renderFlexPrompt(item.flex)
+        : renderFl2vaPrompt(item.fl2va!, {
+            seconds: item.durationSeconds!,
+            lastFrame: item.operation === 'firstLastFrameToVideo',
+          })),
+  }));
 
 /** Lip-sync must be driven by isolated vocals, never by the full mix. */
 function checkVocalSource(audio: string, projectRoot: string): void {
@@ -145,6 +174,9 @@ function checkVocalSource(audio: string, projectRoot: string): void {
 const LENGTH_FROM_AUDIO = new Set<ProviderKind>(['comfyui', 'higgsfield', 'topview']);
 
 const VIDEO_OPERATIONS = new Set(['textToVideo', 'imageToVideo', 'firstLastFrameToVideo', 'referenceToVideo', 'lipSync']);
+
+/** First and last frame of a Pika FL2VA clip may differ in aspect by at most this share (rounding to even sizes). */
+const FL2VA_ASPECT_TOLERANCE = 0.01;
 
 /** Reference-to-video aspect by project kind: music videos are 16:9, episodes 9:16. */
 const REF2VA_ASPECT = { 'music-video': { label: '16:9', ratio: 16 / 9 }, episode: { label: '9:16', ratio: 9 / 16 } } as const;
@@ -297,6 +329,20 @@ function resolveItem(
     throw new ValidationError('params.workflow must be the name of a workflow in comfyui/workflows/.');
   }
   if (provider === 'comfyui' && typeof workflow === 'string') resolved.model = workflow;
+  // referenceToVideo exists only as Pika Ref2VA, also when the workflow file is not installed yet.
+  const pika =
+    provider === 'comfyui' && VIDEO_OPERATIONS.has(item.operation)
+      ? (pikaVariantOf(resolved.model) ?? (item.operation === 'referenceToVideo' ? 'ref2va' : undefined))
+      : undefined;
+  if (item.fl2va && pika !== 'fl2va') {
+    throw new ValidationError(
+      `"fl2va" prompts need the Pika H3 FL2VA workflow; this item runs ${provider}/${resolved.model}. ` +
+        'Set params.workflow: "pika-h3-flf2va", or give a plain prompt.',
+    );
+  }
+  if (pika && item.durationSeconds === undefined) {
+    throw new ValidationError(`${resolved.model} needs durationSeconds; it would fall back to the template's length.`);
+  }
   const pricing =
     resolved.pricing ??
     (provider === 'mock' || provider === 'comfyui' ? ({ unit: 'request', usd: 0 } satisfies ModelPricing) : undefined);
@@ -423,7 +469,37 @@ function resolveItem(
       const max = Number(params.max_references ?? REF2VA_LIMITS.defaultImages);
       notes.push(
         `pika-h3 ref2va · ${references.length}/${max} reference(s) · quality ${clip.quality} · about ` +
-          `${render.width}x${render.height} · 24 fps, 17n+5 frames · clip sound (SFX, dialogue), no score`,
+          `${render.width}x${render.height} · 24 fps, ${pikaFrames(item.durationSeconds!)} frames ` +
+          `(${pikaEndMark(item.durationSeconds!)} s) · clip sound (SFX, dialogue), no score`,
+      );
+    } else if (pika === 'fl2va') {
+      // The graph sizes itself from the start frame (~0.98 MP, multiples of 32); LTX sizes do not apply.
+      const lastFrame = item.operation === 'firstLastFrameToVideo';
+      const timing = { seconds: item.durationSeconds!, lastFrame };
+      prompt = withFl2vaAlignment(item.prompt, timing);
+      checkFl2vaPrompt(prompt, timing);
+      const start = imageSize(references[0]!);
+      if (lastFrame) {
+        // The graph stretches the first frame to the canvas and cover-crops the last one; a
+        // different aspect would silently cut the end frame, so stop instead.
+        const end = imageSize(references[1]!);
+        const drift = Math.abs((end.width / end.height) / (start.width / start.height) - 1);
+        if (drift > FL2VA_ASPECT_TOLERANCE) {
+          throw new ValidationError(
+            `pika-h3-flf2va: the end frame ${item.references[1]} is ${end.width}x${end.height}, the start frame ` +
+              `${item.references[0]} ${start.width}x${start.height}. Both frames need the same aspect ratio ` +
+              `(off by ${(drift * 100).toFixed(1)} %); the end frame would be cropped. Regenerate or crop it to the start frame's aspect.`,
+          );
+        }
+      }
+      const factor = Math.sqrt(980_000 / (start.width * start.height));
+      render = {
+        width: Math.round((start.width * factor) / 32) * 32,
+        height: Math.round((start.height * factor) / 32) * 32,
+      };
+      notes.push(
+        `pika-h3 fl2va · ${lastFrame ? 'first and last frame' : 'first frame only'} · about ${render.width}x${render.height} ` +
+          `· 24 fps, ${pikaFrames(timing.seconds)} frames (end mark ${pikaEndMark(timing.seconds)} s) · clip sound, no score`,
       );
     } else {
       if (clip.quality === 'final' && !ownSize) {

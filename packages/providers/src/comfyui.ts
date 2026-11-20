@@ -1,8 +1,19 @@
 import { createHash } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { basename, extname, isAbsolute, join, resolve } from 'node:path';
-import { ConfigError, REF2VA_LIMITS, repoRoot } from '@coreslopper/core';
+import {
+  COMFYUI_MODEL_INPUTS,
+  ConfigError,
+  REF2VA_LIMITS,
+  ValidationError,
+  checkFl2vaPrompt,
+  fl2vaMarkers,
+  loadModelsConfig,
+  pikaFrames,
+  repoRoot,
+  type ModelsConfig,
+} from '@coreslopper/core';
 import {
   AUDIO_EXTENSIONS,
   IMAGE_EXTENSIONS,
@@ -101,7 +112,7 @@ const ADAPTER_PARAMS = new Set([
 ]);
 
 /** Loader inputs that name a model file; checked against GET /object_info before a run. */
-const MODEL_FILE_INPUTS = ['unet_name', 'vae_name', 'clip_name', 'lora_name', 'ckpt_name', 'model_name'];
+const MODEL_FILE_INPUTS: readonly string[] = COMFYUI_MODEL_INPUTS;
 
 /** A ComfyUI failure that means the GPU ran out of memory. */
 export function isOutOfMemory(error: unknown): boolean {
@@ -147,6 +158,8 @@ export interface ComfyUIProviderOptions {
   generationTimeoutMs?: number;
   pollIntervalMs?: number;
   fetchImpl?: FetchLike;
+  /** Allowed model files of fixed workflows; default `comfyui_locks` from config/models.yaml. */
+  locks?: ComfyUILocks;
 }
 
 export function defaultWorkflowsDir(): string {
@@ -248,34 +261,110 @@ function isRef2va(workflow: ComfyWorkflow): boolean {
   return Object.values(workflow).some((node) => node.class_type === 'MiniMaxH3ReferenceToVideo');
 }
 
-const REF2VA_SAMPLER = 'lcm';
-const REF2VA_SIGMAS = '1.0, 0.972973, 0.923077, 0.8, 0.571429, 0.333333, 0.0';
-const REF2VA_LORA = 'pika_h3_flex_ref2va_v1_bf16.safetensors';
+/** A workflow built on MiniMax H3 first/last-frame-to-video (Pika H3 Flex FL2VA); the end frame is optional. */
+function isFl2va(workflow: ComfyWorkflow): boolean {
+  return Object.values(workflow).some((node) => node.class_type === 'MiniMaxH3ImageToVideo');
+}
+
+export type PikaVariant = 'ref2va' | 'fl2va';
+
+/** The Pika H3 Flex variant of a workflow, judged by its MiniMax H3 node; undefined for any other graph. */
+export function pikaVariant(workflow: ComfyWorkflow): PikaVariant | undefined {
+  return isRef2va(workflow) ? 'ref2va' : isFl2va(workflow) ? 'fl2va' : undefined;
+}
 
 /**
- * The fixed part of the Pika H3 Flex workflow: sampler lcm, the seven manual
- * sigmas, and exactly one LoRA (the Pika one at 1.0). Turbo or Lightning LoRAs
- * break the output, so a workflow that differs is rejected.
+ * The Pika H3 Flex variant of a workflow by its model name, read from the
+ * workflows folder; undefined when the file is missing (the adapter reports it)
+ * or is not a Pika graph.
  */
-export function checkRef2vaLocks(workflow: ComfyWorkflow, label: string): void {
+export function pikaVariantOf(model: string, workflowsDir = defaultWorkflowsDir()): PikaVariant | undefined {
+  const name = model.endsWith('.json') ? model : `${model}.json`;
+  const path = isAbsolute(name) ? name : join(workflowsDir, name);
+  if (!existsSync(path)) return undefined;
+  return pikaVariant(parseWorkflow(readFileSync(path, 'utf8'), basename(path)));
+}
+
+/**
+ * Node titles a Pika H3 Flex workflow must carry. Without one of them the
+ * adapter would leave a template value in place (the example image, seed,
+ * aspect, or length), so a missing tag is a configuration error.
+ */
+const PIKA_REQUIRED_TAGS: Record<PikaVariant, ComfyTag[]> = {
+  ref2va: ['prompt', 'seed', 'duration', 'resolution', 'output'],
+  fl2va: ['prompt', 'seed', 'duration', 'startImage', 'endImage', 'output'],
+};
+
+/** The tag as it is written in the Pika exports: `cs:start_image`, `cs:aspect`. */
+function pikaTagName(tag: ComfyTag): string {
+  return tag === 'resolution' ? 'cs:aspect' : COMFYUI_TITLES[tag].replace(/^cs_/, 'cs:');
+}
+
+/** Throw when a Pika H3 Flex workflow misses one of its required node titles. */
+export function checkPikaTags(workflow: ComfyWorkflow, label: string): void {
+  const variant = pikaVariant(workflow);
+  if (!variant) return;
+  const missing = PIKA_REQUIRED_TAGS[variant]
+    .filter((tag) => nodesWithTitle(workflow, COMFYUI_TITLES[tag]).length === 0)
+    .map(pikaTagName);
+  if (variant === 'ref2va' && !indexedReferenceNodes(workflow).has(0)) missing.push('cs:ref_0');
+  if (missing.length > 0) {
+    throw new ConfigError(
+      `ComfyUI workflow ${label} (Pika H3 Flex ${variant === 'ref2va' ? 'Ref2VA' : 'FL2VA'}) has no node titled ` +
+        `${missing.join(', ')}. Title the nodes in ComfyUI and export again (see comfyui/README.md).`,
+    );
+  }
+}
+
+const PIKA_SAMPLER = 'lcm';
+const PIKA_SIGMAS = '1.0, 0.972973, 0.923077, 0.8, 0.571429, 0.333333, 0.0';
+
+/** Allowed model files per workflow family, from `comfyui_locks` in config/models.yaml. */
+export type ComfyUILocks = ModelsConfig['comfyui_locks'];
+
+/** The `comfyui_locks` key of a Pika variant. */
+export const PIKA_LOCK_KEYS: Record<PikaVariant, string> = { ref2va: 'pika-h3-ref2va', fl2va: 'pika-h3-fl2va' };
+
+/**
+ * The fixed part of the Pika H3 Flex workflows. In code: sampler lcm, the seven
+ * manual sigmas, and exactly one LoRA at 1.0 (Turbo or Lightning LoRAs on top
+ * break the output). In config (`comfyui_locks`): which UNet, CLIP, VAE, and
+ * LoRA files the variant may load. A workflow that differs is rejected.
+ */
+export function checkPikaLocks(workflow: ComfyWorkflow, label: string, variant: PikaVariant, locks: ComfyUILocks): void {
+  const key = PIKA_LOCK_KEYS[variant];
+  const allowed = locks[key];
+  if (!allowed) {
+    throw new ConfigError(
+      `config/models.yaml has no comfyui_locks.${key}: list the model files ${label} may load ` +
+        `(${MODEL_FILE_INPUTS.slice(0, 4).join(', ')}).`,
+    );
+  }
   const problems: string[] = [];
   const nodes = Object.values(workflow);
   const samplers = nodes.filter((node) => node.class_type === 'KSamplerSelect');
-  if (samplers.length !== 1 || samplers[0]!.inputs.sampler_name !== REF2VA_SAMPLER) {
-    problems.push(`sampler must be ${REF2VA_SAMPLER}`);
+  if (samplers.length !== 1 || samplers[0]!.inputs.sampler_name !== PIKA_SAMPLER) {
+    problems.push(`sampler must be ${PIKA_SAMPLER}`);
   }
   const sigmas = nodes.filter((node) => node.class_type === 'ManualSigmas');
   const normalized = (value: unknown) => String(value).replace(/\s+/g, '');
-  if (sigmas.length !== 1 || normalized(sigmas[0]!.inputs.sigmas) !== normalized(REF2VA_SIGMAS)) {
-    problems.push(`ManualSigmas must be ${REF2VA_SIGMAS}`);
+  if (sigmas.length !== 1 || normalized(sigmas[0]!.inputs.sigmas) !== normalized(PIKA_SIGMAS)) {
+    problems.push(`ManualSigmas must be ${PIKA_SIGMAS}`);
   }
   const loras = nodes.filter((node) => /lora/i.test(node.class_type));
-  if (
-    loras.length !== 1 ||
-    loras[0]!.inputs.lora_name !== REF2VA_LORA ||
-    Number(loras[0]!.inputs.strength_model) !== 1
-  ) {
-    problems.push(`exactly one LoRA, ${REF2VA_LORA} at 1.0 (no Turbo/Lightning LoRAs on top)`);
+  if (loras.length !== 1 || Number(loras[0]!.inputs.strength_model) !== 1) {
+    problems.push(`exactly one LoRA at 1.0 (no Turbo/Lightning LoRAs on top)`);
+  }
+  for (const node of nodes) {
+    for (const input of MODEL_FILE_INPUTS) {
+      const file = node.inputs[input];
+      if (typeof file !== 'string') continue;
+      const list = allowed[input as keyof typeof allowed];
+      if (!list) problems.push(`${node.class_type} loads ${input} "${file}", but comfyui_locks.${key} allows no ${input}`);
+      else if (!list.includes(file)) {
+        problems.push(`${node.class_type} ${input} "${file}" is not in comfyui_locks.${key}.${input} (${list.join(', ')})`);
+      }
+    }
   }
   if (problems.length > 0) {
     throw new ConfigError(`ComfyUI workflow ${label} breaks the fixed Pika H3 Flex setup: ${problems.join('; ')}.`);
@@ -320,7 +409,8 @@ function setIndexedReferences(workflow: ComfyWorkflow, images: string[], label: 
     delete workflow[id];
   }
   for (let index = indices.length; index < images.length; index += 1) {
-    let id = `cs_ref_${index}`;
+    // The ID is not a tag, so node_inputs keys like "cs_ref_1.image" never address it by ID.
+    let id = `ref_${index}`;
     while (workflow[id]) id = `${id}_`;
     workflow[id] = {
       class_type: template.class_type,
@@ -369,7 +459,11 @@ export function inspectWorkflow(workflow: ComfyWorkflow): WorkflowInspection {
   else if (referenceSlots > 0) operations.push('referenceToVideo');
   // A video workflow with driving audio lip-syncs a start (and optional end) frame.
   else if (titles.audio) operations.push('lipSync');
-  else if (titles.endImage) operations.push('firstLastFrameToVideo');
+  // Pika H3 FL2VA: the end frame is optional, so the same graph also runs image-to-video.
+  else if (titles.endImage) {
+    operations.push('firstLastFrameToVideo');
+    if (isFl2va(workflow)) operations.push('imageToVideo');
+  }
   else if (titles.startImage) operations.push('imageToVideo');
   else operations.push('textToVideo');
 
@@ -456,7 +550,8 @@ function addReferenceImages(workflow: ComfyWorkflow, images: string[], label: st
     );
   }
   const loaders = images.map((image, index) => {
-    const id = `cs_ref_${index + 2}`;
+    let id = `ref_${index + 2}`;
+    while (workflow[id]) id = `${id}_`;
     workflow[id] = { class_type: 'LoadImage', inputs: { image }, _meta: { title: `Reference ${index + 2}` } };
     return id;
   });
@@ -574,6 +669,7 @@ export class ComfyUIProvider implements Provider {
   private readonly pollIntervalMs: number;
   private readonly fetchImpl: FetchLike;
   private readonly clientId: string;
+  private locks?: Promise<ComfyUILocks>;
 
   constructor(options: ComfyUIProviderOptions = {}) {
     this.baseUrl = comfyUIBaseUrl(options.baseUrl);
@@ -584,6 +680,12 @@ export class ComfyUIProvider implements Provider {
     this.pollIntervalMs = options.pollIntervalMs ?? 2_000;
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.clientId = `coreslopper-${process.pid}`;
+    if (options.locks) this.locks = Promise.resolve(options.locks);
+  }
+
+  private comfyuiLocks(): Promise<ComfyUILocks> {
+    this.locks ??= loadModelsConfig().then((config) => config.comfyui_locks);
+    return this.locks;
   }
 
   async generateImage(input: ProviderInput): Promise<ProviderOutput> {
@@ -675,6 +777,10 @@ export class ComfyUIProvider implements Provider {
     const label = basename(path);
     const workflow = parseWorkflow(await readFile(path, 'utf8'), label);
     const inspection = inspectWorkflow(workflow);
+    const ref2va = isRef2va(workflow);
+    const fl2va = isFl2va(workflow);
+    const pikaFlex = ref2va || fl2va;
+    checkPikaTags(workflow, label);
     const params = input.params ?? {};
     const unknown = Object.keys(params).filter((key) => !ADAPTER_PARAMS.has(key));
     if (unknown.length > 0) {
@@ -717,9 +823,15 @@ export class ComfyUIProvider implements Provider {
     if (input.negativePrompt) setTitled(workflow, 'negative', input.negativePrompt, label);
     if (uploads.start) setTitled(workflow, 'startImage', uploads.start, label);
     if (uploads.end) setTitled(workflow, 'endImage', uploads.end, label);
+    if (fl2va && operation === 'imageToVideo') {
+      // No end frame: drop the end LoadImage and its links so the template's example image never leaks in.
+      for (const id of inspection.titles.endImage ?? []) {
+        for (const [user, name] of linksTo(workflow, id)) delete workflow[user]!.inputs[name];
+        delete workflow[id];
+      }
+    }
     addReferenceImages(workflow, uploads.references ?? [], label);
     if (uploads.audio) setTitled(workflow, 'audio', uploads.audio, label);
-    const ref2va = isRef2va(workflow);
     if (operation === 'referenceToVideo') {
       if (input.audio) {
         throw new ConfigError(
@@ -765,18 +877,19 @@ export class ComfyUIProvider implements Provider {
     }
     setTitled(workflow, 'seed', input.seed, label);
 
-    const size = this.targetSize(input, params);
+    // Pika H3 Flex sizes itself (ResolutionSelector or the start frame at ~0.98 MP, multiples of 32).
+    const size = pikaFlex ? {} : this.targetSize(input, params);
     if (size.width !== undefined) setTitled(workflow, 'width', size.width, label);
     if (size.height !== undefined) setTitled(workflow, 'height', size.height, label);
     if (inspection.titles.resolution) {
       const width = Number(params.width ?? input.width);
       const height = Number(params.height ?? input.height);
       if (width > 0 && height > 0) setTitled(workflow, 'resolution', resolutionAspect(width, height), label);
-      if (params.megapixels !== undefined) {
+      if (params.megapixels !== undefined && !pikaFlex) {
         const megapixels = positiveNumber(params.megapixels, 'megapixels', 1);
         for (const id of inspection.titles.resolution) setNodeInput(workflow, `${id}.megapixels`, megapixels, label);
       }
-      if (params.size_multiple !== undefined) {
+      if (params.size_multiple !== undefined && !pikaFlex) {
         const multiple = positiveInt(params.size_multiple, 'size_multiple', 1);
         for (const id of inspection.titles.resolution) setNodeInput(workflow, `${id}.multiple`, multiple, label);
       }
@@ -784,7 +897,24 @@ export class ComfyUIProvider implements Provider {
 
     const fps = positiveInt(params.fps, 'fps', 24);
     if (params.fps !== undefined) setTitled(workflow, 'fps', fps, label);
-    if (input.durationSeconds !== undefined) {
+    if (pikaFlex) {
+      // The graph rounds the duration to 17n+5 frames at 24 fps itself; frame_step,
+      // size_multiple, and megapixels would only shift it, so the shot's own length goes in.
+      if (input.durationSeconds === undefined) {
+        throw new ConfigError(`ComfyUI workflow ${label} needs durationSeconds; it would fall back to the template's length.`);
+      }
+      pikaFrames(input.durationSeconds);
+      setTitled(workflow, 'duration', input.durationSeconds, label);
+      // The two Pika prompt schemas must not mix: the graph reads either one literally.
+      if (fl2va) {
+        checkFl2vaPrompt(input.prompt, { seconds: input.durationSeconds, lastFrame: operation === 'firstLastFrameToVideo' });
+      } else if (fl2vaMarkers(input.prompt).length > 0) {
+        throw new ValidationError(
+          `ComfyUI workflow ${label} is Ref2VA, but the prompt follows the FL2VA schema (${fl2vaMarkers(input.prompt).join(', ')}). ` +
+            'Give a Flex prompt (subject_definitions … non_diegetic_music) or run the item on pika-h3-flf2va.',
+        );
+      }
+    } else if (input.durationSeconds !== undefined) {
       const step = positiveInt(params.frame_step, 'frame_step', 1);
       const frames =
         operation === 'lipSync'
@@ -811,7 +941,7 @@ export class ComfyUIProvider implements Provider {
       }
       for (const [key, value] of Object.entries(nodeInputs)) {
         // The fixed part of a Pika H3 Flex graph is only reachable by node ID; keep it out of reach.
-        if (ref2va && !key.startsWith('cs:') && !key.startsWith('cs_')) {
+        if (pikaFlex && !key.startsWith('cs:') && !key.startsWith('cs_')) {
           throw new ConfigError(
             `ComfyUI workflow ${label}: node_inputs "${key}" must address a cs: tag. ` +
               'Sampler, sigmas, LoRA, models, and VAEs of the Pika H3 Flex workflow are fixed.',
@@ -820,7 +950,7 @@ export class ComfyUIProvider implements Provider {
         setNodeInput(workflow, key, value, label);
       }
     }
-    if (ref2va) checkRef2vaLocks(workflow, label);
+    if (pikaFlex) checkPikaLocks(workflow, label, ref2va ? 'ref2va' : 'fl2va', await this.comfyuiLocks());
     // Group the server's outputs per workflow and request.
     const prefix = `coreslopper/${basename(label, '.json')}/${(input.idempotencyKey ?? String(input.seed)).slice(0, 16)}`;
     for (const id of inspection.titles.output ?? []) {

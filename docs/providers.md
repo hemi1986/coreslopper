@@ -20,6 +20,8 @@ providers:
 | — | `referenceToVideo` | always `comfyui` (Pika H3 Flex, `video.reference_to_video`), or `mock` |
 | `lipsync` | `lipSync` | `fal` (OmniHuman 1.5), `higgsfield` (Speak v2), `topview` (Avatar 4, separate credentials), `comfyui` (LTX FLF2V lip-sync, see [comfyui/README.md](../comfyui/README.md)), `mock`. Defaults to `video`, or to `fal` when `video` is `comfyui` or `topview`. |
 
+Clips without lip-sync default to `referenceToVideo` with the keyframe as the first reference (see the `ai-clips` skill), so they render locally even when `video` names a cloud provider. `video` then covers drafts, first-last-frame shots, and the cloud hero shots chosen within the project budget.
+
 `generate --lipsync-provider <p>` runs the lip-sync items of one batch on another provider, for example to compare OmniHuman with Speak v2 on one shot; `--provider` leaves lip-sync on its own provider. See [Lip-sync](#lip-sync) for the trade-offs.
 
 Without any key, use the mock provider everywhere:

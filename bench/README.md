@@ -27,6 +27,8 @@ npm run cli -- bench report                                  # rebuild the lates
 
 Export the new ComfyUI workflow with **Export (API)** into `comfyui/workflows/`, tag it as described in [`comfyui/README.md`](../comfyui/README.md), and add a target that names it per operation. See the commented examples at the end of `targets.yaml`. A remote server is a target with `comfyui_url`; its results never share the cache with local ones.
 
+A target can run an operation's cases as reference-to-video with `as: referenceToVideo` (see the `pika` target): the case's references become identity anchors (`<Picture 1>` first) and its `flex` prompt replaces `prompt`, so the same scene can be compared with an image-to-video model. Cases without `flex` are skipped on such a target.
+
 ## The comparison page
 
 `runs/<id>/index.html` shows, per case, the known good result and the inputs next to every target's result, with time, cost, size, VRAM peak, the frame strip, and the art director's rubric score. Grade each result 1-5 and add notes; the page keeps them in your browser. **Export ratings.json** and save it into the run folder so `bench report` and the agents can read your grades.

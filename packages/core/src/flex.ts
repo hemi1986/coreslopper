@@ -39,6 +39,36 @@ export const REF2VA_LIMITS = {
   audio: 3,
 } as const;
 
+/** Pika H3 Flex clips (Ref2VA and FL2VA) render at 24 fps. */
+export const PIKA_FPS = 24;
+
+/** Python's round(): halves go to the even neighbour, as the graph's math expression evaluates it. */
+function roundHalfEven(value: number): number {
+  const rounded = Math.round(value);
+  return Math.abs(value % 1) === 0.5 && rounded % 2 !== 0 ? rounded - 1 : rounded;
+}
+
+/**
+ * Frames a Pika H3 Flex graph renders for a duration: `round(seconds × 24)`, at
+ * least 5, rounded up to 17n+5. It mirrors the graph's own expression
+ * `max(5, round(a * 24)) + (5 - (max(5, round(a * 24)) % 17)) % 17`.
+ */
+export function pikaFrames(seconds: number): number {
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    throw new ValidationError(`A Pika H3 Flex clip needs a positive duration, got ${seconds}.`);
+  }
+  const target = Math.max(5, roundHalfEven(seconds * PIKA_FPS));
+  return target + ((((5 - (target % 17)) % 17) + 17) % 17);
+}
+
+/** The second mark of the last rendered frame, as the FL2VA alignment line names it: 5 s → "5.17". */
+export function pikaEndMark(seconds: number): string {
+  return (pikaFrames(seconds) / PIKA_FPS).toFixed(2);
+}
+
+/** A time mark in a shot description: "at about 1.5 seconds", "at about three seconds"; a decimal point does not end it. */
+export const FLEX_TIME_MARK = /\bat about\b(?:[^.\n]|\.\d)*?\bseconds?\b/i;
+
 const Text = z.string().trim().min(1);
 
 export const FlexSubjectSchema = z
@@ -162,12 +192,26 @@ function numbers(text: string, tag: 'Picture' | 'Subject'): number[] {
   return [...text.matchAll(new RegExp(`<${tag} (\\d+)>`, 'g'))].map((match) => Number(match[1]));
 }
 
+/** Parts of the FL2VA prompt schema found in a text: its alignment line and its description header. */
+export function fl2vaMarkers(text: string): string[] {
+  const found = /^How the reference pictures align with the target video/m.test(text) ? ['the alignment line'] : [];
+  if (/^integrated_multimodal_description:/m.test(text)) found.push('integrated_multimodal_description:');
+  return found;
+}
+
 /**
  * Check a Flex prompt against the workflow rules and the reference count.
  * Throws a ValidationError that lists every problem.
  */
 export function checkFlexPrompt(text: string, referenceCount: number): void {
   const problems: string[] = [];
+  // The FL2VA schema is a different one; say so instead of only listing missing sections.
+  const fl2va = fl2vaMarkers(text);
+  if (fl2va.length > 0) {
+    problems.push(
+      `FL2VA schema in a Ref2VA prompt (${fl2va.join(', ')}); Ref2VA takes ${FLEX_SECTIONS.join(' / ')}`,
+    );
+  }
   const sections = flexSections(text);
   const names = sections.map((section) => section.name);
   const missing = FLEX_SECTIONS.filter((name) => !names.includes(name));
@@ -231,7 +275,7 @@ export function checkFlexPrompt(text: string, referenceCount: number): void {
     else if (firstUse.some((n, index) => n !== index + 1)) {
       problems.push(`[Shot N] blocks must count 1, 2, 3 …; found ${firstUse.join(', ')}`);
     }
-    if (!/\bat about\b[^.\n]*?\bseconds?\b/i.test(description)) {
+    if (!FLEX_TIME_MARK.test(description)) {
       problems.push('detailed_description needs time marks, e.g. "At about 1.5 seconds …"');
     }
   }

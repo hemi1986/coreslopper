@@ -17,6 +17,7 @@ import {
   loadBenchConfig,
   loadBenchTargets,
   remainingBudget,
+  renderFlexPrompt,
   repoRoot,
   selectBenchCases,
   writeJsonAtomic,
@@ -231,7 +232,8 @@ export async function listBench(paths = benchPaths()): Promise<void> {
   log(`Targets (${Object.keys(targets).length}):`);
   for (const [name, target] of Object.entries(targets)) {
     const where = target.comfyui_url ? ` @ ${target.comfyui_url}` : '';
-    log(`  ${name.padEnd(22)} ${target.provider}${where}: ${Object.keys(target.operations).join(', ')}`);
+    const ops = Object.entries(target.operations).map(([op, spec]) => (spec?.as ? `${op} as ${spec.as}` : op));
+    log(`  ${name.padEnd(22)} ${target.provider}${where}: ${ops.join(', ')}`);
   }
   const sets = new Set(cases.flatMap((value) => value.sets));
   log(`Sets: ${[...sets].map((set) => `${set}${config.sets[set] ? ` (${config.sets[set].description})` : ''}`).join(', ')}`);
@@ -278,14 +280,33 @@ function providersFor(kind: ProviderKind): BatchConfig['providers'] {
   return { image: kind, video: kind, lipsync: kind, audio: kind } as BatchConfig['providers'];
 }
 
+/** Role and operation a case runs with on a target (a spec with `as` swaps them). */
+function effective(benchCase: BenchCase, target: BenchTarget): { operation: BatchItem['operation']; role: string } {
+  const spec = target.operations[benchCase.operation];
+  if (spec?.as === 'referenceToVideo' || benchCase.operation === 'referenceToVideo') {
+    return { operation: 'referenceToVideo', role: 'video.reference_to_video' };
+  }
+  return { operation: benchCase.operation as BatchItem['operation'], role: benchCase.role };
+}
+
+/** Why a target cannot run a case, or undefined when it can. */
+export function benchSkipReason(benchCase: BenchCase, target: BenchTarget): string | undefined {
+  if (!target.operations[benchCase.operation]) return `target does not run ${benchCase.operation}`;
+  if (effective(benchCase, target).operation === 'referenceToVideo' && !benchCase.flex) {
+    return 'case has no flex prompt for reference-to-video';
+  }
+  return undefined;
+}
+
 function batchConfig(benchCase: BenchCase, target: BenchTarget, config: BenchConfig): BatchConfig {
   const spec = target.operations[benchCase.operation];
+  const { role } = effective(benchCase, target);
   const override: Record<string, unknown> = {};
   if (spec?.model) override.model = spec.model;
   if (spec?.pricing) override.pricing = spec.pricing;
   return {
     providers: providersFor(target.provider),
-    models: Object.keys(override).length > 0 ? { [benchCase.role]: override } : {},
+    models: Object.keys(override).length > 0 ? { [role]: override } : {},
     formats: { master: { aspect: 'bench', ...config.master, fps: 30 }, derivatives: [] },
     batch_cap_usd: config.batch_cap_usd,
   };
@@ -293,10 +314,11 @@ function batchConfig(benchCase: BenchCase, target: BenchTarget, config: BenchCon
 
 export function benchItem(benchCase: BenchCase, target: BenchTarget, seedIndex: number): BatchItem {
   const spec = target.operations[benchCase.operation];
+  const { operation, role } = effective(benchCase, target);
   return {
-    operation: benchCase.operation,
-    role: benchCase.role,
-    prompt: benchCase.prompt,
+    operation,
+    role,
+    prompt: operation === 'referenceToVideo' ? renderFlexPrompt(benchCase.flex!) : benchCase.prompt,
     references: benchCase.inputs.references.map((name) => fixturePath(benchCase, name)),
     ...(benchCase.inputs.audio ? { audio: fixturePath(benchCase, benchCase.inputs.audio) } : {}),
     seed: benchSeed(benchCase, seedIndex),
@@ -537,11 +559,12 @@ export async function runBench(options: BenchRunOptions): Promise<BenchRun> {
     for (const benchCase of cases) {
       for (let seedIndex = 0; seedIndex < seeds; seedIndex += 1) {
         const key = resultKey(benchCase.id, targetName, seedIndex);
-        if (!target.operations[benchCase.operation]) {
+        const skip = benchSkipReason(benchCase, target);
+        if (skip) {
           upsert(run, {
             key, case: benchCase.id, target: targetName, seedIndex,
             seed: benchSeed(benchCase, seedIndex), status: 'skipped',
-            error: `target does not run ${benchCase.operation}`, files: [],
+            error: skip, files: [],
           });
           continue;
         }

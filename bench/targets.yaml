@@ -60,6 +60,35 @@ targets:
         params: { min_duration: 3, sound: "off", cfg_scale: 0.5 }
         pricing: { unit: second, usd: 0.063 }
 
+  ltx-quality:
+    description: Local LTX 2.5 i2v quality workflow (int8 UNet, full VAE) at the final size (1.9 MP)
+    provider: comfyui
+    operations:
+      imageToVideo:
+        params: { workflow: ltx-i2v-quality, megapixels: 1.9 }
+
+  wan:
+    description: Local Wan 2.2 14B I2V (4-step Lightning, draft 832x480, RIFE to 48 fps, no sound)
+    provider: comfyui
+    operations:
+      imageToVideo:
+        params: { video_model: wan }
+
+  pika:
+    description: Local Pika H3 Flex reference-to-video; i2v cases run with the start frame as <Picture 1> and the case's flex prompt
+    provider: comfyui
+    operations:
+      imageToVideo: { as: referenceToVideo }
+
+  minimax-cloud:
+    description: Topview MiniMax H3 image-to-video at 768P (as in seite-b), billed at least 5 s
+    provider: topview
+    operations:
+      imageToVideo:
+        model: minimax/minimax-h3/image-to-video
+        params: { request_format: content, duration: 5, min_duration: 5, resolution: 768P, ratio: adaptive }
+        pricing: { unit: second, usd: 0.0299 }
+
   mock:
     description: Mock provider for tests and dry runs; costs nothing, renders placeholders
     provider: mock

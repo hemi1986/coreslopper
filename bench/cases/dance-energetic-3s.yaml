@@ -43,3 +43,35 @@ rubric:
     check: Ponytail stays tied and does not cover the face.
   - id: photoreal
     check: Stays photoreal live-action; no CGI doll face, plastic skin, or anime drift.
+flex:
+  subjects:
+  - is: the young woman
+    picture: 1
+    role: identity and outfit anchor
+    features: a young woman with light freckles, hazel-green eyes, long mint-green hair in a high sleek ponytail
+      with soft straight bangs, a short white bomber jacket with mint-green cuffs over a silver crop top, a white
+      pleated mini skirt, a green LED heart pin
+  - is: the pastel studio in <Picture 1>
+    role: set anchor
+    features: the background exactly as in the picture
+  summary: 'A three-second static medium shot: the young woman of <Picture 1> dances in place with both arms raised
+    above her head, beaming at the lens.'
+  retention:
+  - subject: 1
+    appears: '[Shot 1]'
+    label: fully_preserved
+    note: face, freckles, eyes, mint-green ponytail, jacket, crop top, skirt, heart pin
+  - subject: 2
+    appears: '[Shot 1]'
+    label: fully_preserved
+    note: the pastel studio background
+  style: Photoreal live-action footage, realistic skin and natural facial proportions, camera locked off and static,
+    no zoom, one continuous take.
+  shots:
+  - <Subject 1> stands centred in <Subject 2>, facing the lens. From the start she sways her hips smoothly from
+    side to side at a moderate pace with both arms raised above her head, beaming at the lens. Her head stays steady,
+    so her face stays sharp and clearly visible the whole time, and her ponytail moves gently. At about one and
+    a half seconds she turns her raised hands outward once in time with the sway; every hand keeps five fingers.
+    At about three seconds she is still dancing in the same place.
+  soundscape: Soft studio room tone, sneakers lightly scuffing the floor, the rustle of the jacket with each sway.
+    Nobody speaks.

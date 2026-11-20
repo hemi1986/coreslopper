@@ -4,6 +4,7 @@ import { extname, join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
 import { ConfigError, ValidationError } from './errors.js';
+import { FlexPromptSchema } from './flex.js';
 import { repoRoot } from './project.js';
 import { ModelPricingSchema, ProviderKindSchema } from './schema.js';
 
@@ -19,6 +20,7 @@ export const BenchOperationSchema = z.enum([
   'textToVideo',
   'imageToVideo',
   'firstLastFrameToVideo',
+  'referenceToVideo',
   'lipSync',
   'generateAudio',
 ]);
@@ -67,6 +69,12 @@ export const BenchCaseSchema = z
     /** The model role whose defaults apply before the target's settings. */
     role: z.string().min(1),
     prompt: z.string().min(1),
+    /**
+     * Flex prompt for reference-to-video (Pika H3): used instead of `prompt`
+     * when the case is a referenceToVideo case or a target runs it `as:
+     * referenceToVideo`; `inputs.references[k]` is <Picture k+1>.
+     */
+    flex: FlexPromptSchema.optional(),
     seed: z.number().int().min(0),
     width: z.number().int().positive().optional(),
     height: z.number().int().positive().optional(),
@@ -101,7 +109,7 @@ export const BenchCaseSchema = z
     }
     const refs = value.inputs.references.length;
     const op = value.operation;
-    if ((op === 'imageToVideo' || op === 'editImage' || op === 'lipSync') && refs < 1) {
+    if ((op === 'imageToVideo' || op === 'editImage' || op === 'lipSync' || op === 'referenceToVideo') && refs < 1) {
       ctx.addIssue({ code: 'custom', message: `${op} needs at least one reference input` });
     }
     if (op === 'firstLastFrameToVideo' && refs !== 2) {
@@ -109,6 +117,9 @@ export const BenchCaseSchema = z
     }
     if ((op === 'generateImage' || op === 'textToVideo' || op === 'generateAudio') && refs > 0) {
       ctx.addIssue({ code: 'custom', message: `${op} takes no reference inputs` });
+    }
+    if (op === 'referenceToVideo' && !value.flex) {
+      ctx.addIssue({ code: 'custom', message: 'referenceToVideo needs a flex prompt' });
     }
     if (op === 'lipSync' && !value.inputs.audio) {
       ctx.addIssue({ code: 'custom', message: 'lipSync needs an audio input' });
@@ -120,6 +131,12 @@ export type BenchCase = z.infer<typeof BenchCaseSchema>;
 
 /** How a target runs one operation: a workflow or model slug, params, and an optional price. */
 export const BenchOperationSpecSchema = z.object({
+  /**
+   * Run this operation's cases as another operation. `referenceToVideo`: the
+   * case's references become identity anchors and its `flex` prompt is used,
+   * with the role `video.reference_to_video`; cases without `flex` are skipped.
+   */
+  as: z.literal('referenceToVideo').optional(),
   model: z.string().min(1).optional(),
   params: z.record(z.string(), z.unknown()).default({}),
   pricing: ModelPricingSchema.optional(),
