@@ -73,9 +73,12 @@ export const BatchItemSchema = z
       'generateAudio',
     ]),
     role: z.string().min(1),
-    /** The prompt text. A referenceToVideo item can give `flex` instead, a Pika FL2VA item `fl2va`. */
+    /**
+     * The prompt text. A referenceToVideo item (or a lipSync item on the Pika
+     * lip-sync workflow) can give `flex` instead, a Pika FL2VA item `fl2va`.
+     */
     prompt: z.string().min(1).optional(),
-    /** referenceToVideo: a structured Flex prompt, rendered into `prompt` (see core/flex.ts). */
+    /** referenceToVideo and Pika lipSync: a structured Flex prompt, rendered into `prompt` (see core/flex.ts). */
     flex: FlexPromptSchema.optional(),
     /**
      * imageToVideo / firstLastFrameToVideo on the pika-h3-flf2va workflow: a
@@ -120,8 +123,8 @@ export const BatchItemSchema = z
   .refine((item) => item.operation !== 'firstLastFrameToVideo' || item.references.length === 2, {
     message: 'firstLastFrameToVideo needs exactly two references: the start frame, then the end frame.',
   })
-  .refine((item) => item.operation !== 'lipSync' || item.references.length <= 2, {
-    message: 'lipSync takes a start frame and an optional end frame.',
+  .refine((item) => item.operation !== 'lipSync' || item.references.length <= REF2VA_LIMITS.images, {
+    message: `lipSync takes a start frame and an optional end frame (Pika lip-sync: up to ${REF2VA_LIMITS.images} references).`,
   })
   .refine((item) => [item.prompt, item.flex, item.fl2va].filter((value) => value !== undefined).length === 1, {
     message: 'Give exactly one of "prompt", "flex", or "fl2va".',
@@ -133,8 +136,8 @@ export const BatchItemSchema = z
   .refine((item) => item.fl2va === undefined || item.durationSeconds !== undefined, {
     message: '"fl2va" needs durationSeconds: the alignment line names the second mark of the last frame.',
   })
-  .refine((item) => item.flex === undefined || item.operation === 'referenceToVideo', {
-    message: '"flex" prompts are only for referenceToVideo.',
+  .refine((item) => item.flex === undefined || item.operation === 'referenceToVideo' || item.operation === 'lipSync', {
+    message: '"flex" prompts are only for referenceToVideo and Pika lipSync.',
   })
   .refine(
     (item) =>
@@ -314,7 +317,7 @@ function resolveItem(
   if (provider === 'comfyui' && clip.videoModel === 'wan') {
     if (item.operation === 'lipSync') {
       throw new ValidationError(
-        'Lip-sync shots always run on LTX: Wan 2.2 makes no sound and cannot follow a vocal. Remove video_model: "wan".',
+        'Lip-sync shots run on Pika H3 or LTX: Wan 2.2 makes no sound and cannot follow a vocal. Remove video_model: "wan".',
       );
     }
     if (VIDEO_OPERATIONS.has(item.operation) && item.operation !== 'imageToVideo') {
@@ -329,18 +332,33 @@ function resolveItem(
     throw new ValidationError('params.workflow must be the name of a workflow in comfyui/workflows/.');
   }
   if (provider === 'comfyui' && typeof workflow === 'string') resolved.model = workflow;
-  // referenceToVideo exists only as Pika Ref2VA, also when the workflow file is not installed yet.
+  // referenceToVideo exists only as Pika Ref2VA, also when the workflow file is not installed yet;
+  // the Pika lip-sync workflow is a Ref2VA graph with an anchored vocal.
   const pika =
     provider === 'comfyui' && VIDEO_OPERATIONS.has(item.operation)
-      ? (pikaVariantOf(resolved.model) ?? (item.operation === 'referenceToVideo' ? 'ref2va' : undefined))
+      ? (pikaVariantOf(resolved.model) ??
+        (item.operation === 'referenceToVideo' || /^pika-h3-ref2va/.test(resolved.model) ? 'ref2va' : undefined))
       : undefined;
+  const pikaLipSync = pika === 'ref2va' && item.operation === 'lipSync';
+  if (item.operation === 'lipSync' && !pikaLipSync) {
+    if (item.flex) {
+      throw new ValidationError(
+        `"flex" lip-sync prompts need the Pika lip-sync workflow; this item runs ${provider}/${resolved.model}. ` +
+          'Use providers.lipsync: comfyui (pika-h3-ref2va-lipsync), or give a plain prompt.',
+      );
+    }
+    if (item.references.length > 2) {
+      throw new ValidationError('lipSync takes a start frame and an optional end frame; only Pika lip-sync takes more references.');
+    }
+  }
   if (item.fl2va && pika !== 'fl2va') {
     throw new ValidationError(
       `"fl2va" prompts need the Pika H3 FL2VA workflow; this item runs ${provider}/${resolved.model}. ` +
         'Set params.workflow: "pika-h3-flf2va", or give a plain prompt.',
     );
   }
-  if (pika && item.durationSeconds === undefined) {
+  // Pika lip-sync takes its length from the vocal segment when the item gives none.
+  if (pika && item.durationSeconds === undefined && !(pikaLipSync && item.audio)) {
     throw new ValidationError(`${resolved.model} needs durationSeconds; it would fall back to the template's length.`);
   }
   const pricing =
@@ -410,14 +428,14 @@ function resolveItem(
     }
   }
 
-  if (item.operation === 'referenceToVideo') {
+  if (item.operation === 'referenceToVideo' || pikaLipSync) {
     checkFlexPrompt(item.prompt, references.length);
     if (config.kind) {
       const want = REF2VA_ASPECT[config.kind];
       const { width, height } = { width: item.width ?? config.formats.master.width, height: item.height ?? config.formats.master.height };
       if (Math.abs(width / height - want.ratio) / want.ratio > 0.02) {
         throw new ValidationError(
-          `referenceToVideo renders ${want.label} for ${config.kind === 'episode' ? 'an episode' : 'a music video'}, but the item asks for ${width}x${height}. ` +
+          `${pikaLipSync ? 'Pika lip-sync' : 'referenceToVideo'} renders ${want.label} for ${config.kind === 'episode' ? 'an episode' : 'a music video'}, but the item asks for ${width}x${height}. ` +
             `Drop width/height or fix formats.master.`,
         );
       }
@@ -459,18 +477,21 @@ function resolveItem(
         `video_model wan · quality ${clip.quality} · turbo ${clip.turbo ? 'on' : 'off'} · ${render.width}x${render.height}` +
           ' · 16 fps, RIFE x3 to 48 fps, no sound',
       );
-    } else if (item.operation === 'referenceToVideo') {
+    } else if (item.operation === 'referenceToVideo' || pikaLipSync) {
       // The graph sizes itself with a ResolutionSelector: the aspect of the request and ~1 MP.
-      const megapixels = Number(params.megapixels ?? 0.98);
+      // The lip-sync role keeps LTX sizes for its LTX fallback; the Pika graph always renders ~0.98 MP.
+      const megapixels = pikaLipSync ? 0.98 : Number(params.megapixels ?? 0.98);
       const width = item.width ?? master.width;
       const height = item.height ?? master.height;
       const factor = Math.sqrt((megapixels * 1_000_000) / (width * height));
       render = { width: Math.round(width * factor), height: Math.round(height * factor) };
       const max = Number(params.max_references ?? REF2VA_LIMITS.defaultImages);
+      const seconds = item.durationSeconds ?? exactAudioSeconds!;
       notes.push(
-        `pika-h3 ref2va · ${references.length}/${max} reference(s) · quality ${clip.quality} · about ` +
-          `${render.width}x${render.height} · 24 fps, ${pikaFrames(item.durationSeconds!)} frames ` +
-          `(${pikaEndMark(item.durationSeconds!)} s) · clip sound (SFX, dialogue), no score`,
+        `pika-h3 ${pikaLipSync ? 'ref2va lip-sync (vocal anchored from frame 0)' : 'ref2va'} · ` +
+          `${references.length}/${max} reference(s) · quality ${clip.quality} · about ` +
+          `${render.width}x${render.height} · 24 fps, ${pikaFrames(seconds)} frames ` +
+          `(${pikaEndMark(seconds)} s) · ${pikaLipSync ? 'the vocal as clip sound' : 'clip sound (SFX, dialogue)'}, no score`,
       );
     } else if (pika === 'fl2va') {
       // The graph sizes itself from the start frame (~0.98 MP, multiples of 32); LTX sizes do not apply.

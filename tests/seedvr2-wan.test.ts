@@ -299,7 +299,7 @@ describe('local clip batches', () => {
         params: { video_model: 'wan' },
       },
     ]);
-    await expect(runBatch(await target(), batch, { dryRun: true, log: false })).rejects.toThrow(/always run on LTX/);
+    await expect(runBatch(await target(), batch, { dryRun: true, log: false })).rejects.toThrow(/run on Pika H3 or LTX/);
   });
 });
 
