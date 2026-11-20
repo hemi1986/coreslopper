@@ -3,6 +3,7 @@ import { existsSync, realpathSync } from 'node:fs';
 import { appendFile } from 'node:fs/promises';
 import { dirname, join, relative, resolve } from 'node:path';
 import { ValidationError, ensureDir, loadProject } from '@coreslopper/core';
+import { clipFrames, imagePsnr } from './image-ops.js';
 
 /**
  * One art-director verdict on one image, as written to `assets/review/verdicts.jsonl`.
@@ -19,7 +20,14 @@ export interface ImageVerdict {
   issues: string[];
   fix_prompt: string;
   reviewedAt: string;
+  /** A clip review: the clip the frames came from. */
+  clip?: string;
+  /** A clip review: PSNR in dB of the first frame against the start keyframe (see START_DRIFT_DB). */
+  startFramePsnr?: number;
 }
+
+/** Below this PSNR the first frame of a clip no longer shows its start keyframe; the reviewer is told to compare them. */
+export const START_DRIFT_DB = 20;
 
 /**
  * The only reasons to fail an image. A loop that fails on taste never converges, so every
@@ -41,8 +49,14 @@ export const VERDICT_JSON_SCHEMA = {
 } as const;
 
 export interface ReviewImageOptions {
-  /** Image(s) to judge; a clip review passes its first, middle, and last frame. */
-  images: string[];
+  /** Image(s) to judge. */
+  images?: string[];
+  /** A clip to judge instead: its first, middle, and last frame are extracted and reviewed. */
+  clip?: string;
+  /** The keyframe a clip starts from; default `assets/keyframes/<shot>.png` (or its chain start frame). */
+  startFrame?: string;
+  /** Replaces the frame extraction of a clip review; used by tests. */
+  frames?: (clip: string, directory: string) => Promise<string[]>;
   shot?: string;
   /** Reference under review instead of a shot, e.g. `state:hf7/walkman-shared`, `plate:house-ruin/yard-wide`, `prop:scarf`. */
   ref?: string;
@@ -61,10 +75,21 @@ export function buildReviewPrompt(input: {
   neighbours: string[];
   focus?: string;
   attempt?: number;
+  /** A clip review: the clip, its start keyframe, and how far the first frame is from it. */
+  clip?: { path: string; startFrame?: string; psnr?: number };
 }): string {
   const lines = [
-    `Review exactly these image(s) of ${input.projectDir}: ${input.images.join(', ')}.`,
+    input.clip
+      ? `Review the clip ${input.clip.path} of ${input.projectDir} by exactly these frames (first, middle, last): ${input.images.join(', ')}.`
+      : `Review exactly these image(s) of ${input.projectDir}: ${input.images.join(', ')}.`,
   ];
+  if (input.clip?.startFrame) {
+    lines.push(
+      input.clip.psnr !== undefined && input.clip.psnr < START_DRIFT_DB
+        ? `The clip starts from the keyframe ${input.clip.startFrame}, but its first frame differs from it (PSNR ${input.clip.psnr.toFixed(1)} dB): compare the two, and fail the clip when the framing, the set, or a character's design changed.`
+        : `The clip starts from the approved keyframe ${input.clip.startFrame}; judge what the motion did to it, not the keyframe itself.`,
+    );
+  }
   if (input.shot) {
     lines.push(
       `They belong to storyboard shot ${input.shot}: read that shot in ${input.projectDir}/storyboard.yaml (keyframe prompt, refs.plate, refs.props, refs.states) and check the image against it and against those reference images.`,
@@ -203,13 +228,19 @@ function neighbourKeyframes(shotIds: string[], shot: string, keyframesDir: strin
 
 export async function reviewImage(projectDir: string, options: ReviewImageOptions): Promise<ImageVerdict> {
   if (!options.shot && !options.ref) throw new ValidationError('Pass --shot <id> or --ref <kind:id>.');
-  if (options.images.length === 0) throw new ValidationError('Pass at least one --image.');
+  if (options.clip && options.images?.length) throw new ValidationError('Pass --image or --clip, not both.');
+  if (!options.clip && !options.images?.length) throw new ValidationError('Pass --image <png> or --clip <mp4>.');
+  if (options.clip && !options.shot) throw new ValidationError('A clip review needs --shot <id>.');
   // A series canon (series/<slug>/series.yaml) has no storyboard; its verdicts go to review/.
   const isSeries = existsSync(join(projectDir, 'series.yaml'));
   if (isSeries && options.shot) throw new ValidationError('A series canon has no shots; pass --ref.');
   const project = isSeries ? undefined : await loadProject(projectDir);
   const root = process.cwd();
-  const images = options.images.map((image) => resolve(image));
+  const clip = options.clip ? resolve(options.clip) : undefined;
+  if (clip && !existsSync(clip)) throw new ValidationError(`Missing clip: ${clip}`);
+  const images = clip
+    ? await (options.frames ?? clipFrames)(clip, join(project?.paths.assets ?? projectDir, 'review', 'frames'))
+    : (options.images ?? []).map((image) => resolve(image));
   for (const image of images) if (!existsSync(image)) throw new ValidationError(`Missing image: ${image}`);
 
   const shotIds = (project?.storyboard?.shots ?? []).map((shot) => shot.id);
@@ -219,6 +250,20 @@ export async function reviewImage(projectDir: string, options: ReviewImageOption
   const keyframesDir = join(project?.paths.assets ?? projectDir, 'keyframes');
   const neighbours = options.shot ? neighbourKeyframes(shotIds, options.shot, keyframesDir) : [];
   const rel = (path: string) => relative(root, path) || path;
+  // A clip is also measured against the keyframe it starts from: a model that lets go of the start frame shows here.
+  let startFrame: string | undefined;
+  let startFramePsnr: number | undefined;
+  if (clip && options.shot) {
+    const candidates = options.startFrame
+      ? [resolve(options.startFrame)]
+      : [join(keyframesDir, 'chain', `${options.shot}-start.png`), join(keyframesDir, `${options.shot}.png`)];
+    startFrame = candidates.find((path) => existsSync(path));
+    if (options.startFrame && !startFrame) throw new ValidationError(`Missing start frame: ${candidates[0]}`);
+    if (startFrame && !options.frames) {
+      const psnr = imagePsnr(images[0]!, startFrame);
+      startFramePsnr = Number.isFinite(psnr) ? Number(psnr.toFixed(1)) : 99;
+    }
+  }
   const prompt = buildReviewPrompt({
     projectDir: rel(resolve(projectDir)),
     images: images.map(rel),
@@ -227,10 +272,11 @@ export async function reviewImage(projectDir: string, options: ReviewImageOption
     neighbours: neighbours.filter((path) => !images.includes(path)).map(rel),
     focus: options.focus,
     attempt: options.attempt,
+    ...(clip ? { clip: { path: rel(clip), ...(startFrame ? { startFrame: rel(startFrame) } : {}), ...(startFramePsnr !== undefined ? { psnr: startFramePsnr } : {}) } } : {}),
   });
 
   // Media linked to CORESLOPPER_MEDIA_DIR lives outside the workspace; let the reviewer read it.
-  const extraDirs = [...new Set(images.map((image) => dirname(realpathSync(image))))].filter(
+  const extraDirs = [...new Set([...images, ...(startFrame ? [startFrame] : [])].map((image) => dirname(realpathSync(image))))].filter(
     (dir) => relative(root, dir).startsWith('..'),
   );
   const run = options.runner ?? claudeRunner(root, extraDirs);
@@ -248,6 +294,8 @@ export async function reviewImage(projectDir: string, options: ReviewImageOption
     attempt: options.attempt ?? 1,
     ...notesOnlyPass(parsed),
     reviewedAt: new Date().toISOString(),
+    ...(clip ? { clip: rel(clip) } : {}),
+    ...(startFramePsnr !== undefined ? { startFramePsnr } : {}),
   };
   const log = project ? join(project.paths.assets, 'review', 'verdicts.jsonl') : join(projectDir, 'review', 'verdicts.jsonl');
   await ensureDir(dirname(log));

@@ -58,7 +58,7 @@ Or open Claude Code and run `/new-video`, which asks for the project data itself
 AGENTS.md          This file: the project description agents read
 CLAUDE.md          @AGENTS.md + Claude Code specifics
 config/            models.yaml and defaults.yaml
-comfyui/           README + workflows/ for local ComfyUI generation (tagged API exports)
+comfyui/           README + workflows/ (tagged API exports) + sources/ for local ComfyUI generation
 docs/              glossary.md, architecture.md, pipeline.md, ADRs, third-party notices
 packages/
   core/            Zod schemas, state, timing resolver, hash, cost, project loader
@@ -119,6 +119,7 @@ Publishing is not a stage. The user runs `publish` after `qa-export`; it uploads
 - The only interface is the project directory plus a short summary.
 - The orchestrator reads `state.json`, `project.yaml`, `review/report.md`, and summaries; it never loads raw assets or full transcripts.
 - Asset production is batched (default 5 shots) so a large batch does not fill a context.
+- Stage runners do mechanical work only through `npm run cli -- …`; a step without a command is a missing command, not a reason for a shell one-liner.
 
 ## State, budget, cache
 
@@ -156,7 +157,7 @@ npm run schema
 | `npm run cli -- series-status <series>` | Series canon, budget, planned and created episodes, stages, spend, length. |
 | `npm run cli -- new-series <slug> --budget <usd> [--format <id>]` | Create a series canon in `series/<slug>/`. |
 | `npm run cli -- generate --series <series> --batch <file>` | Run a canon generation batch against the series budget. |
-| `npm run cli -- generate <project> --batch <file> [--provider <p>] [--lipsync-provider <p>]` | Run a cached, budget-checked generation batch; `--provider` overrides the project provider for one batch (lip-sync keeps its own), `--lipsync-provider` the lip-sync provider. |
+| `npm run cli -- generate <project> --batch <file> [--provider <p>] [--lipsync-provider <p>]` | Run a cached, budget-checked generation batch; an item's `out` files its result at that path; `--provider` overrides the project provider for one batch (lip-sync keeps its own), `--lipsync-provider` the lip-sync provider. |
 | `npm run cli -- qa <project> [--determinism <frame>]` | Write `review/report.md`; optionally check frame hashes. |
 | `npm run cli -- release <project> [--no-render] [--canvas-from <anchor\|s>] [--canvas-seconds <n>]` | Build `renders/release/`: every format, thumbnails, Shorts, WAV, cover, canvas, lyrics, platform texts, README, manifest; renders only missing or stale formats; idempotent. |
 | `npm run cli -- upload-text <project>` | Render `review/upload.md` (a pointer to the release folder) from `review/upload.yaml`. |
@@ -166,7 +167,15 @@ npm run schema
 | `npm run cli -- normalize-audio <project> --input <file>` | Normalize audio to −14 LUFS / −1 dBTP. |
 | `npm run cli -- footage <project> --input <file> --name <name>` | Normalize a footage proxy. |
 | `npm run cli -- frame <project> --input <clip> --position last` | Extract a review or chaining frame. |
-| `npm run cli -- review-image <project\|series> --image <png[,png]> --shot <id>\|--ref <kind:id>` | Art-director verdict on one image or clip frames, headless in its own context; prints `{verdict, score, issues, fix_prompt}` and appends to `verdicts.jsonl` (exit 2 on fail). |
+| `npm run cli -- review-image <project\|series> --image <png[,png]>\|--clip <mp4> --shot <id>\|--ref <kind:id>` | Art-director verdict on one image or clip, headless in its own context; `--clip` extracts the first, middle, and last frame itself and measures the first against the keyframe. Prints `{verdict, score, issues, fix_prompt}` and appends to `verdicts.jsonl` (exit 2 on fail). |
+| `npm run cli -- queue add <project> --kind keyframe\|clip [--shots <ids>] [--workflow <w>] [--overrides <file>]` | Queue keyframes or clips built from `storyboard.yaml` (prompt, references, dependencies); `--batch <file>` queues hand-written items with `id` and `out`. |
+| `npm run cli -- queue run\|wait\|status <project>` | Work `assets/queue.json`: generate in order, review each result in the background, requeue failed images with the fix prompt, file approved results at `out`; `wait` blocks until an item needs a fix or the run ended. |
+| `npm run cli -- queue retry\|accept\|drop <project> <id>` | Put an item back (`--prompt`, `--item <file>`, `--provider <p>` for the cloud attempt), approve an attempt by hand, or remove an item. |
+| `npm run cli -- patch <project> --image <png> --box <x,y,w,h> --prompt "<edit>" [--refs <png,…>] [--shot <id>] [--replace]` | Edit one region: crop, `image.edit` through `generate` (cache, manifest, budget), paste back with a soft edge, file as the next attempt. `--series <s>` for a canon image. |
+| `npm run cli -- sheet <project> --images <png,…> [--box <x,y,w,h>]` | Put images side by side (optionally zoomed into one region) as `assets/review/sheets/<name>.png`. |
+| `npm run cli -- verdicts <project\|series> [--failed]` | Last art-director verdict per shot and reference. |
+| `npm run cli -- probe <file…>` | Size, length, frame rate, and codecs of images, clips, and audio. |
+| `npm run cli -- comfy status\|restart` | ComfyUI server, queue, and VRAM; restart through `COMFYUI_RESTART_COMMAND`. |
 | `npm run cli -- audio-segment <project> --start <s> --end <s> --name <shot-id> [--mute <a-b,...>] [--format wav]` | Cut a lead-only vocal segment for a lip-sync shot: backing words (parenthesized lyrics) and `--mute` spans are silenced; cuts from `audio/stems/lead.wav` when it exists. |
 | `npm run cli -- stage-start/-done/-fail/-skip/-reset` | Update `state.json` from the orchestrator. |
 | `npm run cli -- estimate --role <role> --units <n>` | Check a generation cost against the budget. |
