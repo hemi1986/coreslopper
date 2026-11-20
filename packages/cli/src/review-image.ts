@@ -233,12 +233,20 @@ export async function reviewImage(projectDir: string, options: ReviewImageOption
   const extraDirs = [...new Set(images.map((image) => dirname(realpathSync(image))))].filter(
     (dir) => relative(root, dir).startsWith('..'),
   );
-  const raw = await (options.runner ?? claudeRunner(root, extraDirs))(prompt);
+  const run = options.runner ?? claudeRunner(root, extraDirs);
+  let parsed: ReturnType<typeof parseVerdict>;
+  try {
+    parsed = parseVerdict(await run(prompt));
+  } catch (error) {
+    // The reviewer sometimes answers in prose without a verdict; one rerun fixes that.
+    if (!(error instanceof ValidationError) || !error.message.startsWith('No verdict')) throw error;
+    parsed = parseVerdict(await run(prompt));
+  }
   const verdict: ImageVerdict = {
     image: rel(images[0] ?? ''),
     subject: options.shot ?? options.ref ?? '',
     attempt: options.attempt ?? 1,
-    ...notesOnlyPass(parseVerdict(raw)),
+    ...notesOnlyPass(parsed),
     reviewedAt: new Date().toISOString(),
   };
   const log = project ? join(project.paths.assets, 'review', 'verdicts.jsonl') : join(projectDir, 'review', 'verdicts.jsonl');

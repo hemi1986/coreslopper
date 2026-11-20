@@ -81,6 +81,26 @@ describe('reviewImage', () => {
     expect(JSON.parse(readFileSync(log, 'utf8').trim()).verdict).toBe('pass');
   });
 
+  it('reruns the review once when the answer has no verdict', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'review-retry-'));
+    writeFileSync(join(dir, 'series.yaml'), 'version: 1\n');
+    const image = join(dir, 'plate.png');
+    writeFileSync(image, 'png');
+    const answers = [
+      JSON.stringify({ result: 'The plate looks fine overall.' }),
+      JSON.stringify({ structured_output: { verdict: 'pass', score: 8, issues: [], fix_prompt: 'none' } }),
+    ];
+    let calls = 0;
+    const verdict = await reviewImage(dir, { images: [image], ref: 'plate:yard/wide', runner: async () => answers[calls++] ?? '' });
+    expect(calls).toBe(2);
+    expect(verdict.verdict).toBe('pass');
+    calls = 0;
+    await expect(
+      reviewImage(dir, { images: [image], ref: 'plate:yard/wide', runner: async () => (calls++, 'prose only') }),
+    ).rejects.toThrow(/No verdict/);
+    expect(calls).toBe(2);
+  });
+
   it('rejects an unknown shot', async () => {
     await expect(
       reviewImage(join(process.cwd(), 'projects/demo'), {
