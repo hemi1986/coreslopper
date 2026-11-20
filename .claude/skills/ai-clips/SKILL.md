@@ -103,7 +103,15 @@ license: MIT
    It runs the art-director headless in its own context (about a minute), appends the verdict to `assets/review/verdicts.jsonl`, and prints one JSON line `{verdict, score, issues, fix_prompt}`; exit code 2 means fail. Work from that line only:
    - **pass** → the image is approved; the next item may use it as a reference. Issues prefixed `note:` never trigger a regeneration.
    - **fail** → regenerate the item with the verdict's `fix_prompt` (a new seed), review again with `--attempt <n+1> --focus "<issues>"`. When the defect is a hand, limb, or body overlap, make the next attempt a different composition (see the composition rules in `.claude/skills/storyboard/SKILL.md`), not the same framing again.
-   - **Cloud fallback.** After 3 failed local attempts, generate the item once on a stronger cloud model, with the last `fix_prompt`, inside the budget and batch cap (check with `estimate --provider <p>` first): images on `--provider higgsfield` (Qwen edit, at most 3 references) or `--provider topview` (Nano Banana edit, more references); clips on Higgsfield Kling or Topview Wan. Cloud roles take the aspect from their params, so set `"params": {"aspect_ratio": "<project aspect>"}` on the item. Review it with `--attempt 4`. If it fails too, keep the best attempt, mark it in the batch notes with its last issues, and move on.
+   - **Cloud fallback.** After 3 failed local attempts, generate the item once on a strong cloud model, with the last `fix_prompt`, inside the budget and batch cap (check with `estimate --role <role> --units <n> --provider <p>` first). Cloud roles take the aspect from their params, so set `"params": {"aspect_ratio": "<project aspect>"}` on the item.
+     | Item | Role and provider | About |
+     |---|---|---|
+     | Image, several references | `image.edit` with `--provider topview` (Nano Banana 2.1 edit) | $0.035 |
+     | Image, exact geometry or text | `image.edit` on fal (Flux 2 Pro edit) | $0.05 |
+     | Image, at most 3 references, cheapest | `image.edit` with `--provider higgsfield` (Qwen edit) | $0.03 |
+     | Clip | `video.image_to_video.premium` with `--provider topview` (Seedance 2.5) | $0.21/s |
+     | Clip, lower cost | `video.image_to_video.quality` with `--provider higgsfield` (Kling 3.0) or `topview` (Wan 3.0) | $0.06–0.12/s |
+     Pick the strongest one the remaining budget allows. Review it with `--attempt 4`. If it fails too, keep the best attempt, mark it in the batch notes with its last issues, and move on.
    - Order the work so a reference passes before any keyframe uses it, and a keyframe passes before its clip is generated. On resume, `verdicts.jsonl` tells which items already passed.
    The review fails an image only for a blocking defect (identity, anatomy, state or attachment, a missing named element, misspelled text, a break with an approved neighbour); everything else is a note, and a retry is checked only against the previous blocking defects. So the loop always ends: at most 3 local attempts and one cloud attempt per item. The art-director reads full resolution, so thumbnails never replace it. After the last batch, the orchestrator reads only the summary of `verdicts.jsonl`: items that never passed, with their last issues.
 7. Use frame chaining only when the storyboard enables it. Extract the last frame of the previous clip with
