@@ -1,17 +1,38 @@
 # coreslopper
 
-{One or two sentences: which domain is this, for whom, and what does the software do? Keep it free of technology.}
+A Claude Code-native workflow that produces music videos for an existing song, and episodes of a series from a
+script, from setup to the release package. Creative work is agent work; mechanical work is tested scripts.
 
 ## Language
 
-<!--
-  Glossary – the single source of truth for domain language. Format:
-  .claude/skills/domain-model/CONTEXT-FORMAT.md
+The product's glossary is **[docs/glossary.md](docs/glossary.md)**: the product standard, shipped to every
+workspace, where the media agents use it. This file is Kataster's glossary for engineering on the repository and
+never ships. It imports the product glossary and only extends it.
 
-  Rules: be opinionated (pick one word, list the others under _Avoid_), keep definitions to one or two
-  sentences, only domain-specific terms, group by bounded context once they exist. Every term gets the
-  one word the UI uses for it in en.
--->
+Imports: docs/glossary.md
+
+Rules:
+
+- A product term – one a workspace user or a media agent meets – lives in `docs/glossary.md`, never here.
+- A term only engineering on this repository needs lives below, in the same format.
+- A term is defined in one file only. An unclear meaning is a hotspot in `docs/domain/events.yaml`, not an
+  `[OPEN]` in the shipped glossary.
+- Kataster's deterministic tools (`check-language`, `story-context`) read only this file today; they do not
+  follow the import yet. Agents read both.
+
+## Engineering terms
+
+**Workspace Payload**:
+The part of the upstream repository that every workspace gets: the product code and docs at their own paths, and `workspace/`, which becomes the workspace root. The runtime snapshot is built from it.
+_Avoid_: runtime source
+
+**Engineering Layer**:
+The agent instructions, tooling, and documents for working on the upstream repository itself: the root `AGENTS.md`, `CLAUDE.md`, and `.claude/`. It never reaches a workspace.
+_Avoid_: dev workflow, dev config
+
+**Sandbox Workspace**:
+A workspace created from a local checkout of the upstream repository with `npm run dev:workspace`, outside the repository, to try the workflow the way a user gets it.
+_Avoid_: test workspace, playground
 
 <!--
 **Term**:

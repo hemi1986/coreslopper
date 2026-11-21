@@ -12,18 +12,6 @@ _Avoid_: repo, checkout
 The versioned copy of the workflow files that `npx coreslopper init` writes into a workspace. It is not a git clone and is updated with `npx coreslopper@latest update`, which merges against the **Baseline**.
 _Avoid_: install, template
 
-**Workspace Payload**:
-The part of the upstream repository that every workspace gets: the product code and docs at their own paths, and `workspace/`, which becomes the workspace root. The runtime snapshot is built from it.
-_Avoid_: template, runtime source
-
-**Engineering Layer**:
-The agent instructions, tooling, and documents for working on the upstream repository itself: the root `AGENTS.md`, `CLAUDE.md`, and `.claude/`. It never reaches a workspace.
-_Avoid_: dev workflow, dev config
-
-**Sandbox Workspace**:
-A workspace created from a local checkout of the upstream repository with `npm run dev:workspace`, outside the repository, to try the workflow the way a user gets it.
-_Avoid_: test workspace, playground
-
 **Baseline**:
 The SHA-256 of every runtime file as last installed, stored in `coreslopper.workspace.json`. `coreslopper update` compares it with the workspace to tell local edits from untouched workflow files.
 _Avoid_: lockfile, manifest
@@ -335,11 +323,11 @@ One isolated step of the pipeline with a contract, outputs, and a completion che
 _Avoid_: step, phase
 
 **Review Mode**:
-The project setting that controls whether the pipeline runs autonomously (`auto`) or stops for one final human review (`final`).
+The project setting that controls whether the pipeline runs autonomously (`auto`) or stops for one final human review before `qa-export` (`final`). The orchestrator makes that stop.
 _Avoid_: approval mode
 
 **Hard Stop**:
-A condition that halts the autonomous pipeline: budget exceeded, missing credentials, or unrecoverable validation failure.
+A condition that fails the running stage and halts the autonomous pipeline: the budget or batch cap would be exceeded, a real provider's credentials are missing, validation or QA fails after the stage's bounded retries, or a user-owned file would be overwritten (`timing.overrides.json`, `project.yaml`, an imported take, the series canon).
 _Avoid_: gate
 
 **Stage Runner**:
@@ -347,8 +335,20 @@ The isolated subagent or process that executes exactly one stage and returns a s
 _Avoid_: worker
 
 **Stage Reset**:
-The explicit action that returns a done, failed, or skipped stage to pending so it can run again after an input change.
+The explicit action that returns a done, failed, or skipped stage, and every later stage, to pending so they run again after an input change. A running stage cannot be reset.
 _Avoid_: rerun
+
+**Stage Attempt**:
+One start of a stage. A failed stage resumes with a new stage attempt; a stage reset starts the count again.
+_Avoid_: retry, run
+
+**Stage Skip**:
+The user's manual decision to mark a stage as not needed for a project, so the pipeline continues after it. No skill or command skips a stage.
+_Avoid_: bypass
+
+**Production Phase**:
+The coarse state of a whole project, derived from its stage states and shown on the board: `setup` (an interactive stage is open), `ready`, `running`, `failed`, or `done`.
+_Avoid_: project stage, project status
 
 **Art Director**:
 The automated critic that judges stills and keyframes against the style bible and character references.

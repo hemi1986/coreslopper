@@ -1,0 +1,835 @@
+{
+  "version": 1,
+  "tooling": {
+    "kind": "workspaces",
+    "config": "",
+    "workspaces": [
+      "packages/*"
+    ],
+    "manager": "npm",
+    "monorepo": true
+  },
+  "packages": [
+    {
+      "name": "@coreslopper/cli",
+      "path": "packages/cli",
+      "kind": "library",
+      "language": "TypeScript",
+      "manifest": "packages/cli/package.json",
+      "scripts": {},
+      "entryPoints": [
+        "src/index.ts"
+      ],
+      "internalDeps": [],
+      "externalDeps": 0,
+      "consumers": [],
+      "hasTests": false,
+      "adopted": false,
+      "role": "shared",
+      "roleReasons": [
+        "library/shared package"
+      ]
+    },
+    {
+      "name": "@coreslopper/core",
+      "path": "packages/core",
+      "kind": "library",
+      "language": "TypeScript",
+      "manifest": "packages/core/package.json",
+      "scripts": {},
+      "entryPoints": [
+        "src/index.ts",
+        "src/browser.ts"
+      ],
+      "internalDeps": [],
+      "externalDeps": 0,
+      "consumers": [],
+      "hasTests": false,
+      "adopted": false,
+      "role": "layer",
+      "roleReasons": [
+        "generic package name (@coreslopper/core)",
+        "19 concept stems in this package",
+        "11 shared with other packages"
+      ]
+    },
+    {
+      "name": "@coreslopper/providers",
+      "path": "packages/providers",
+      "kind": "library",
+      "language": "TypeScript",
+      "manifest": "packages/providers/package.json",
+      "scripts": {},
+      "entryPoints": [
+        "src/index.ts"
+      ],
+      "internalDeps": [],
+      "externalDeps": 0,
+      "consumers": [],
+      "hasTests": false,
+      "adopted": false,
+      "role": "layer",
+      "roleReasons": [
+        "generic package name (@coreslopper/providers)",
+        "13 concept stems in this package",
+        "1 shared with other packages"
+      ]
+    },
+    {
+      "name": "@coreslopper/remotion",
+      "path": "packages/remotion",
+      "kind": "library",
+      "language": "TypeScript",
+      "manifest": "packages/remotion/package.json",
+      "scripts": {},
+      "entryPoints": [
+        "src/index.ts"
+      ],
+      "internalDeps": [],
+      "externalDeps": 0,
+      "consumers": [],
+      "hasTests": false,
+      "adopted": false,
+      "role": "shared",
+      "roleReasons": [
+        "library/shared package"
+      ]
+    },
+    {
+      "name": "coreslopper-audio-analysis",
+      "path": "scripts/audio-analysis",
+      "kind": "package",
+      "language": "Python",
+      "manifest": "scripts/audio-analysis/pyproject.toml",
+      "scripts": {},
+      "entryPoints": [],
+      "internalDeps": [],
+      "externalDeps": 5,
+      "consumers": [],
+      "hasTests": true,
+      "adopted": false,
+      "role": "domain",
+      "roleReasons": [
+        "no layer signal"
+      ]
+    },
+    {
+      "name": "coreslopper-review-player",
+      "path": "scripts/review-player",
+      "kind": "package",
+      "language": "Python",
+      "manifest": "scripts/review-player/pyproject.toml",
+      "scripts": {},
+      "entryPoints": [],
+      "internalDeps": [],
+      "externalDeps": 4,
+      "consumers": [],
+      "hasTests": true,
+      "adopted": false,
+      "role": "domain",
+      "roleReasons": [
+        "no layer signal"
+      ]
+    }
+  ],
+  "ranking": [
+    {
+      "path": "packages/cli",
+      "score": 0.61,
+      "reasons": [
+        "320 changed files in recent history",
+        "shared library",
+        "shared infrastructure – not a domain slice"
+      ]
+    },
+    {
+      "path": "scripts/audio-analysis",
+      "score": 0.19,
+      "reasons": [
+        "24 changed files in recent history"
+      ]
+    },
+    {
+      "path": "packages/remotion",
+      "score": 0.16,
+      "reasons": [
+        "61 changed files in recent history",
+        "shared library",
+        "shared infrastructure – not a domain slice"
+      ]
+    },
+    {
+      "path": "scripts/review-player",
+      "score": 0.16,
+      "reasons": [
+        "8 changed files in recent history"
+      ]
+    },
+    {
+      "path": "packages/core",
+      "score": 0.04,
+      "reasons": [
+        "111 changed files in recent history",
+        "shared library",
+        "layer package – hosts many concepts, not a domain slice"
+      ]
+    },
+    {
+      "path": "packages/providers",
+      "score": 0.03,
+      "reasons": [
+        "77 changed files in recent history",
+        "shared library",
+        "layer package – hosts many concepts, not a domain slice"
+      ]
+    }
+  ],
+  "slices": [
+    {
+      "name": "review",
+      "terms": [
+        "image",
+        "note",
+        "player",
+        "review"
+      ],
+      "tables": [],
+      "files": [
+        "packages/cli/src/board/review.js",
+        "packages/cli/src/review-image.ts",
+        "packages/cli/src/review.ts",
+        "packages/core/src/review.ts",
+        "scripts/review-player/review_notes.py",
+        "scripts/review-player/review_player.py",
+        "scripts/review-player/tests/test_review_notes.py",
+        "tests/review-image.test.ts",
+        "tests/review.test.ts"
+      ],
+      "packages": [
+        "?",
+        "packages/cli",
+        "packages/core",
+        "scripts/review-player"
+      ],
+      "layers": [
+        "cli",
+        "core",
+        "scripts",
+        "tests"
+      ],
+      "score": 22,
+      "reasons": [
+        "4 layers: cli, core, scripts, tests",
+        "4 packages",
+        "9 files"
+      ]
+    },
+    {
+      "name": "timing",
+      "terms": [
+        "timing"
+      ],
+      "tables": [],
+      "files": [
+        "packages/core/src/timing.ts",
+        "packages/remotion/src/lib/timing.ts",
+        "scripts/audio-analysis/tests/test_timing_core.py",
+        "scripts/audio-analysis/timing_core.py",
+        "tests/timing.test.ts"
+      ],
+      "packages": [
+        "?",
+        "packages/core",
+        "packages/remotion",
+        "scripts/audio-analysis"
+      ],
+      "layers": [
+        "core",
+        "remotion",
+        "scripts",
+        "tests"
+      ],
+      "score": 21,
+      "reasons": [
+        "4 layers: core, remotion, scripts, tests",
+        "4 packages",
+        "5 files"
+      ]
+    },
+    {
+      "name": "episode",
+      "terms": [
+        "episode",
+        "lipsync",
+        "render",
+        "track"
+      ],
+      "tables": [],
+      "files": [
+        "packages/cli/src/episode-track.ts",
+        "packages/core/src/episode.ts",
+        "tests/episode-lipsync.test.ts",
+        "tests/episode-render.test.ts",
+        "tests/episode-track.test.ts",
+        "tests/episode.test.ts"
+      ],
+      "packages": [
+        "?",
+        "packages/cli",
+        "packages/core"
+      ],
+      "layers": [
+        "cli",
+        "core",
+        "tests"
+      ],
+      "score": 18,
+      "reasons": [
+        "3 layers: cli, core, tests",
+        "3 packages",
+        "6 files"
+      ]
+    },
+    {
+      "name": "release",
+      "terms": [
+        "autopilot",
+        "board",
+        "calendar",
+        "data",
+        "file",
+        "folder",
+        "image",
+        "media",
+        "microsite",
+        "plan",
+        "release",
+        "text",
+        "timer"
+      ],
+      "tables": [],
+      "files": [
+        "packages/cli/src/board/release.js",
+        "packages/cli/src/release-autopilot.ts",
+        "packages/cli/src/release-board-data.ts",
+        "packages/cli/src/release-board.ts",
+        "packages/cli/src/release-calendar.ts",
+        "packages/cli/src/release-files.ts",
+        "packages/cli/src/release-images.ts",
+        "packages/cli/src/release-media.ts",
+        "packages/cli/src/release-microsite.ts",
+        "packages/cli/src/release-qa.ts",
+        "packages/cli/src/release-texts.ts",
+        "packages/cli/src/release-timer.ts",
+        "packages/cli/src/release.ts",
+        "packages/core/src/release.ts",
+        "tests/helpers/release-fixture.ts",
+        "tests/release-autopilot-plan.test.ts",
+        "tests/release-autopilot.test.ts",
+        "tests/release-calendar.test.ts",
+        "tests/release-folder.test.ts",
+        "tests/release.test.ts"
+      ],
+      "packages": [
+        "?",
+        "packages/cli",
+        "packages/core"
+      ],
+      "layers": [
+        "cli",
+        "core",
+        "tests"
+      ],
+      "score": 18,
+      "reasons": [
+        "3 layers: cli, core, tests",
+        "3 packages",
+        "20 files"
+      ]
+    },
+    {
+      "name": "thumbnail",
+      "terms": [
+        "file",
+        "recipe",
+        "render",
+        "thumbnail"
+      ],
+      "tables": [],
+      "files": [
+        "packages/cli/src/thumbnail-files.ts",
+        "packages/cli/src/thumbnail-recipe.ts",
+        "packages/cli/src/thumbnail.ts",
+        "packages/remotion/src/Thumbnail.tsx",
+        "packages/remotion/src/lib/thumbnail.ts",
+        "tests/thumbnail-render.test.ts",
+        "tests/thumbnail.test.ts"
+      ],
+      "packages": [
+        "?",
+        "packages/cli",
+        "packages/remotion"
+      ],
+      "layers": [
+        "cli",
+        "remotion",
+        "tests"
+      ],
+      "score": 18,
+      "reasons": [
+        "3 layers: cli, remotion, tests",
+        "3 packages",
+        "7 files"
+      ]
+    },
+    {
+      "name": "generate",
+      "terms": [
+        "audio",
+        "demo",
+        "generate",
+        "ref",
+        "request",
+        "timing",
+        "voice",
+        "workflow"
+      ],
+      "tables": [],
+      "files": [
+        "packages/cli/src/generate.ts",
+        "scripts/fixtures/generate-audio.mjs",
+        "scripts/fixtures/generate-demo-timing.mjs",
+        "scripts/fixtures/generate-voice-refs.mjs",
+        "scripts/generate-schema.ts",
+        "tests/generate-request.test.ts",
+        "tests/generate-workflow.test.ts"
+      ],
+      "packages": [
+        "?",
+        "packages/cli"
+      ],
+      "layers": [
+        "cli",
+        "scripts",
+        "tests"
+      ],
+      "score": 17,
+      "reasons": [
+        "3 layers: cli, scripts, tests",
+        "2 packages",
+        "7 files"
+      ]
+    },
+    {
+      "name": "bench",
+      "terms": [
+        "bench",
+        "report"
+      ],
+      "tables": [],
+      "files": [
+        "packages/cli/src/bench-report.ts",
+        "packages/cli/src/bench.ts",
+        "packages/core/src/bench.ts",
+        "tests/bench.test.ts"
+      ],
+      "packages": [
+        "?",
+        "packages/cli",
+        "packages/core"
+      ],
+      "layers": [
+        "cli",
+        "core",
+        "tests"
+      ],
+      "score": 16,
+      "reasons": [
+        "3 layers: cli, core, tests",
+        "3 packages",
+        "4 files"
+      ]
+    },
+    {
+      "name": "media",
+      "terms": [
+        "dir",
+        "layer",
+        "media"
+      ],
+      "tables": [],
+      "files": [
+        "packages/cli/src/media-dir.ts",
+        "packages/cli/src/media.ts",
+        "packages/remotion/src/components/MediaLayer.tsx",
+        "tests/media-dir.test.ts"
+      ],
+      "packages": [
+        "?",
+        "packages/cli",
+        "packages/remotion"
+      ],
+      "layers": [
+        "cli",
+        "remotion",
+        "tests"
+      ],
+      "score": 16,
+      "reasons": [
+        "3 layers: cli, remotion, tests",
+        "3 packages",
+        "4 files"
+      ]
+    },
+    {
+      "name": "board",
+      "terms": [
+        "board",
+        "production",
+        "review",
+        "watch",
+        "wizard"
+      ],
+      "tables": [],
+      "files": [
+        "packages/cli/src/board-production.ts",
+        "packages/cli/src/board-review.ts",
+        "packages/cli/src/board-wizard.ts",
+        "tests/board-production.test.ts",
+        "tests/board-review.test.ts",
+        "tests/board-watch.test.ts",
+        "tests/board-wizard.test.ts"
+      ],
+      "packages": [
+        "?",
+        "packages/cli"
+      ],
+      "layers": [
+        "cli",
+        "tests"
+      ],
+      "score": 14,
+      "reasons": [
+        "2 layers: cli, tests",
+        "2 packages",
+        "7 files"
+      ]
+    },
+    {
+      "name": "publish",
+      "terms": [
+        "auth",
+        "autopilot",
+        "instagram",
+        "linkedin",
+        "publish",
+        "setup"
+      ],
+      "tables": [],
+      "files": [
+        "packages/cli/src/publish-auth.ts",
+        "packages/cli/src/publish-setup.ts",
+        "packages/cli/src/publish.ts",
+        "tests/publish-autopilot-adapters.test.ts",
+        "tests/publish-instagram.test.ts",
+        "tests/publish-linkedin.test.ts",
+        "tests/publish-x.test.ts",
+        "tests/publish.test.ts"
+      ],
+      "packages": [
+        "?",
+        "packages/cli"
+      ],
+      "layers": [
+        "cli",
+        "tests"
+      ],
+      "score": 14,
+      "reasons": [
+        "2 layers: cli, tests",
+        "2 packages",
+        "8 files"
+      ]
+    },
+    {
+      "name": "sery",
+      "terms": [
+        "budget",
+        "sery",
+        "statu"
+      ],
+      "tables": [],
+      "files": [
+        "packages/cli/src/new-series.ts",
+        "packages/cli/src/series.ts",
+        "tests/series-budget.test.ts",
+        "tests/series-status.test.ts"
+      ],
+      "packages": [
+        "?",
+        "packages/cli"
+      ],
+      "layers": [
+        "cli",
+        "tests"
+      ],
+      "score": 12,
+      "reasons": [
+        "2 layers: cli, tests",
+        "2 packages",
+        "4 files"
+      ]
+    },
+    {
+      "name": "character",
+      "terms": [
+        "character"
+      ],
+      "tables": [],
+      "files": [
+        "packages/cli/src/board/characters.js",
+        "packages/cli/src/character-library.ts",
+        "tests/character-library.test.ts"
+      ],
+      "packages": [
+        "?",
+        "packages/cli"
+      ],
+      "layers": [
+        "cli",
+        "tests"
+      ],
+      "score": 11,
+      "reasons": [
+        "2 layers: cli, tests",
+        "2 packages",
+        "3 files"
+      ]
+    },
+    {
+      "name": "init",
+      "terms": [
+        "command",
+        "init"
+      ],
+      "tables": [],
+      "files": [
+        "packages/cli/src/init-command.ts",
+        "packages/cli/src/init.ts",
+        "tests/init.test.ts"
+      ],
+      "packages": [
+        "?",
+        "packages/cli"
+      ],
+      "layers": [
+        "cli",
+        "tests"
+      ],
+      "score": 11,
+      "reasons": [
+        "2 layers: cli, tests",
+        "2 packages",
+        "3 files"
+      ]
+    },
+    {
+      "name": "lipsync",
+      "terms": [
+        "audio",
+        "lipsync",
+        "routing"
+      ],
+      "tables": [],
+      "files": [
+        "packages/cli/src/lipsync-audio.ts",
+        "tests/lipsync-audio.test.ts",
+        "tests/lipsync-routing.test.ts"
+      ],
+      "packages": [
+        "?",
+        "packages/cli"
+      ],
+      "layers": [
+        "cli",
+        "tests"
+      ],
+      "score": 11,
+      "reasons": [
+        "2 layers: cli, tests",
+        "2 packages",
+        "3 files"
+      ]
+    },
+    {
+      "name": "production",
+      "terms": [
+        "production",
+        "watch"
+      ],
+      "tables": [],
+      "files": [
+        "packages/cli/src/board/production.js",
+        "packages/cli/src/production-watch.ts",
+        "packages/core/src/production.ts"
+      ],
+      "packages": [
+        "packages/cli",
+        "packages/core"
+      ],
+      "layers": [
+        "cli",
+        "core"
+      ],
+      "score": 11,
+      "reasons": [
+        "2 layers: cli, core",
+        "2 packages",
+        "3 files"
+      ]
+    },
+    {
+      "name": "autopilot",
+      "terms": [
+        "autopilot",
+        "state"
+      ],
+      "tables": [],
+      "files": [
+        "packages/cli/src/autopilot-state.ts",
+        "packages/core/src/autopilot.ts"
+      ],
+      "packages": [
+        "packages/cli",
+        "packages/core"
+      ],
+      "layers": [
+        "cli",
+        "core"
+      ],
+      "score": 10,
+      "reasons": [
+        "2 layers: cli, core",
+        "2 packages",
+        "2 files"
+      ]
+    },
+    {
+      "name": "clip",
+      "terms": [
+        "clip",
+        "duration",
+        "option"
+      ],
+      "tables": [],
+      "files": [
+        "packages/cli/src/clip-options.ts",
+        "tests/clip-duration.test.ts"
+      ],
+      "packages": [
+        "?",
+        "packages/cli"
+      ],
+      "layers": [
+        "cli",
+        "tests"
+      ],
+      "score": 10,
+      "reasons": [
+        "2 layers: cli, tests",
+        "2 packages",
+        "2 files"
+      ]
+    },
+    {
+      "name": "comfyui",
+      "terms": [
+        "comfyui"
+      ],
+      "tables": [],
+      "files": [
+        "packages/providers/src/comfyui.ts",
+        "tests/comfyui.test.ts"
+      ],
+      "packages": [
+        "?",
+        "packages/providers"
+      ],
+      "layers": [
+        "providers",
+        "tests"
+      ],
+      "score": 10,
+      "reasons": [
+        "2 layers: providers, tests",
+        "2 packages",
+        "2 files"
+      ]
+    },
+    {
+      "name": "contact",
+      "terms": [
+        "contact",
+        "sheet"
+      ],
+      "tables": [],
+      "files": [
+        "packages/cli/src/contact-sheet.ts",
+        "tests/contact-sheet.test.ts"
+      ],
+      "packages": [
+        "?",
+        "packages/cli"
+      ],
+      "layers": [
+        "cli",
+        "tests"
+      ],
+      "score": 10,
+      "reasons": [
+        "2 layers: cli, tests",
+        "2 packages",
+        "2 files"
+      ]
+    },
+    {
+      "name": "fal",
+      "terms": [
+        "fal"
+      ],
+      "tables": [],
+      "files": [
+        "packages/providers/src/fal.ts",
+        "tests/fal-provider.test.ts"
+      ],
+      "packages": [
+        "?",
+        "packages/providers"
+      ],
+      "layers": [
+        "providers",
+        "tests"
+      ],
+      "score": 10,
+      "reasons": [
+        "2 layers: providers, tests",
+        "2 packages",
+        "2 files"
+      ]
+    },
+    {
+      "name": "pipeline",
+      "terms": [],
+      "tables": [],
+      "files": [],
+      "packages": [],
+      "layers": [],
+      "score": 0,
+      "reasons": [
+        "marked adopted manually"
+      ],
+      "adopted": true,
+      "adoptedAt": "2026-11-21"
+    }
+  ]
+}

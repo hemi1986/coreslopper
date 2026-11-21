@@ -71,3 +71,38 @@ This repository runs the Kataster workflow. Discovery lives in `.claude/skills/`
 
 Keep this block short: it is loaded into every session. Put rules into the skill that owns them, not here.
 <!-- kataster:end -->
+
+<!-- kataster:repo:begin -->
+<!-- Generated from docs/architecture/repo-map.json by repo-map.ts. Do not edit inside this block. -->
+## Repository map
+
+- **Tooling:** npm workspaces · **Packages:** 6 · **Adopted:** 0 of 6
+- **Layout:** `packages/` (4), `scripts/` (2)
+- **Detail:** `docs/architecture/repo-map.md` – package list, dependency edges, consumers, adoption ranking.
+- **Concept slices:** `review` (cli, core, scripts, tests), `timing` (core, remotion, scripts, tests), `episode` (cli, core, tests), `release` (cli, core, tests), `thumbnail` (cli, remotion, tests) – candidates for `/adopt`, not confirmed domains.
+- **Adopted slices:** concept `pipeline`. Everything else is **not adopted**: run `/adopt` before inferring domain there.
+
+## Commands
+
+| Scope | Command |
+|---|---|
+| Install | `npm install` |
+| Typecheck | `npm run typecheck` |
+| Test | `npm run test` |
+| One package | `npm run test --workspace <package>` |
+| Gate | `node .claude/skills/implement/scripts/verify.ts` |
+
+## Read next
+
+- `docs/architecture/repo-map.md` – where domains and shared libraries live
+- `docs/engineering/conventions.md` – how code is built in this repository
+- `CONTEXT.md` – domain language; this file stays free of domain rules on purpose
+- Package docs: `<package>/AGENTS.md` (loaded when you work there) with `<package>/CLAUDE.md` as the Claude Code entry
+<!-- kataster:repo:end -->
+
+## Hard conventions
+
+- Package import direction: `core` imports no other package; `providers` and `remotion` import only `core`.
+  Enforced by `tests/package-boundaries.test.ts` (package names) and `docs/architecture/boundaries.yaml`
+  (relative imports, `docs/engineering/checks.yaml`).
+- `runtime/` is build output; read and change the sources. Enforced by `boundaries.yaml` (`no-build-output`).

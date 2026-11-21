@@ -9,18 +9,264 @@
 #
 # Aggregates carry an optional status: target (default when missing), as-is (factual boundary, needs evidence),
 # or unresolved (boundary unclear, needs an open hotspot and grilling; no story on it can be ready).
+#
+# Glossary: docs/glossary.md (ships to every workspace). CONTEXT.md points there.
+#
+# Slice adopted 2026-11-21: project and stage pipeline (DRAFT – see docs/domain/adoption-report.md).
 
 version: 1
 domain: coreslopper
 
-events: []
+actors:
+  - id: ACT-User
+    name: User
+  - id: ACT-Orchestrator
+    name: Orchestrator
+  - id: ACT-SetupSkill
+    name: Setup skill
+  - id: ACT-StageRunner
+    name: Stage runner
+  - id: ACT-BoardWizard
+    name: Board wizard
+    description: The board's + New form; it may complete the setup stage and nothing else (ADR 0037, proposed)
 
-# actors: []
-# external_systems: []
-# bounded_contexts: []
-# aggregates: []
-# commands: []
-# policies: []
-# read_models: []
-# hotspots: []
-# flows: []
+external_systems:
+  - id: EXT-Provider
+    name: Generation provider
+
+bounded_contexts:
+  - id: BC-Pipeline
+    name: Pipeline
+    purpose: Drives one project from setup to qa-export through the stages of its project kind and keeps its budget
+
+aggregates:
+  - id: AGG-Project
+    name: Project
+    context: BC-Pipeline
+    status: as-is
+    evidence:
+      - state.json per project, loaded and saved as one document (packages/core/src/project.ts:171-184,233-236)
+      - stage transitions mutate one State (packages/core/src/state.ts:250-324)
+      - budget ledger inside the same State (packages/core/src/state.ts:326-341)
+    invariants:
+      - Spend never exceeds the project budget total (the code enforces it in recordSpend, state.ts:330)
+      - Every stage of the project kind's stage list has a stage state (the code adds missing ones in migrateState, state.ts:207)
+      - The kind in state.json equals the kind in project.yaml (the code enforces it in validate-file, validate-file.ts:175)
+      - The budget total in state.json equals budget_usd in project.yaml (the code enforces it in validate-file, validate-file.ts:164)
+      - A stage is started, done or skipped only when every earlier stage of the kind's list is done or skipped (confirmed 2026-11-21; not enforced in code – gap register)
+      - No writer loses another writer's change to the project state, and no recorded spend is lost (confirmed 2026-11-21; not enforced, state.json has no write lock – gap register)
+      - The project's error history only grows; the current error of a stage is its last error (the code does this, state.ts:293)
+
+events:
+  - id: EVT-ProjectCreated
+    name: Project created
+    aggregate: AGG-Project
+    pivotal: true
+    data: [Slug, Title, Project kind, Budget, Review mode, Series, Episode number]
+  - id: EVT-StageStarted
+    name: Stage started
+    aggregate: AGG-Project
+    data: [Stage, Started at, Stage attempts]
+  - id: EVT-StageCompleted
+    name: Stage completed
+    aggregate: AGG-Project
+    data: [Stage, Outputs, Input hash, Finished at]
+  - id: EVT-StageFailed
+    name: Stage failed
+    aggregate: AGG-Project
+    data: [Stage, Error, Finished at]
+  - id: EVT-StageSkipped
+    name: Stage skipped
+    aggregate: AGG-Project
+    data: [Stage, Reason]
+  - id: EVT-StageReset
+    name: Stage reset
+    aggregate: AGG-Project
+    data: [Stage]
+  - id: EVT-SpendRecorded
+    name: Spend recorded
+    aggregate: AGG-Project
+    data: [Amount, Spent total]
+  - id: EVT-ProjectCompleted
+    name: Project completed
+    aggregate: AGG-Project
+    pivotal: true
+    data: [Finished at]
+
+commands:
+  - id: CMD-CreateProject
+    name: Create project
+    actor: ACT-SetupSkill
+    aggregate: AGG-Project
+    produces: [EVT-ProjectCreated]
+    rules:
+      - The slug is valid and no project folder with it exists
+      - The budget is at least the configured minimum
+      - An episode names its series and episode number, and its budget fits the uncommitted series budget
+  - id: CMD-StartStage
+    name: Start stage
+    actor: ACT-Orchestrator
+    aggregate: AGG-Project
+    produces: [EVT-StageStarted]
+    rules:
+      - Only an autonomous stage, and only from pending or failed (confirmed 2026-11-21; not enforced in code)
+  - id: CMD-CompleteStage
+    name: Complete stage
+    actor: ACT-Orchestrator
+    aggregate: AGG-Project
+    produces: [EVT-StageCompleted, EVT-ProjectCompleted]
+    description: Autonomous stages only; the orchestrator completes them with the outputs the stage runner reported
+    rules:
+      - Only from running (confirmed 2026-11-21; not enforced in code)
+      - Completing style-character takes the project's characters into the character library
+  - id: CMD-CompleteInteractiveStage
+    name: Complete interactive stage
+    actor: ACT-SetupSkill
+    aggregate: AGG-Project
+    produces: [EVT-StageCompleted]
+    description: The setup skill of the kind (new-video, new-episode) completes setup, brief, treatment or script; the board wizard may complete setup
+    rules:
+      - Only an interactive stage, from pending or failed; a setup skill does not start it first (confirmed 2026-11-21; not enforced in code)
+  - id: CMD-FailStage
+    name: Fail stage
+    actor: ACT-Orchestrator
+    aggregate: AGG-Project
+    produces: [EVT-StageFailed]
+    rules:
+      - Only from running (confirmed 2026-11-21; not enforced in code)
+  - id: CMD-SkipStage
+    name: Skip stage
+    actor: ACT-User
+    aggregate: AGG-Project
+    description: A manual decision of the user for a stage the project does not need; no skill or command skips
+    rules:
+      - Only from pending or failed (confirmed 2026-11-21; not enforced in code)
+    produces: [EVT-StageSkipped, EVT-ProjectCompleted]
+  - id: CMD-ResetStage
+    name: Reset stage
+    actor: ACT-User
+    aggregate: AGG-Project
+    produces: [EVT-StageReset]
+    rules:
+      - A running stage cannot be reset (confirmed 2026-11-21; the code accepts it)
+      - Every later stage that is done or skipped returns to pending as well (confirmed 2026-11-21; the code resets one stage only)
+      - The orchestrator resets qa-export after review fixes changed the picture
+  - id: CMD-RecordSpend
+    name: Record spend
+    actor: ACT-StageRunner
+    aggregate: AGG-Project
+    produces: [EVT-SpendRecorded]
+    rules:
+      - Before a paid batch, its worst-case estimate fits the remaining budget and the batch cap (30 % of the remaining budget unless batch_cap_usd is set)
+
+policies:
+  - id: POL-RunNextStage
+    name: Run the next autonomous stage
+    when: [EVT-StageCompleted, EVT-StageSkipped]
+    then: [CMD-StartStage]
+    description: "An orchestrator rule (/video-next). It never starts an interactive stage, and with review mode final it stops before qa-export for the final review; no code reads review_mode"
+  - id: POL-HardStop
+    name: A hard stop fails the stage and halts the pipeline
+    when: [EVT-StageStarted]
+    then: [CMD-FailStage]
+    description: "Hard stop: the budget or batch cap would be exceeded; a real provider's credentials are missing; validation or QA fails after the stage's bounded retries; a user-owned file would be overwritten (timing.overrides.json, project.yaml, an imported take, the series canon)"
+
+read_models:
+  - id: RM-Status
+    name: Status
+    fed_by: [EVT-StageStarted, EVT-StageCompleted, EVT-StageFailed, EVT-StageSkipped, EVT-StageReset, EVT-SpendRecorded]
+    used_by: [ACT-Orchestrator, ACT-User]
+    fields: [Project kind, Stage, Stage status, Stage attempts, Outputs, Spent total, Remaining budget, Batch cap, Next stage]
+  - id: RM-NextAction
+    name: Next action
+    fed_by: [EVT-StageStarted, EVT-StageCompleted, EVT-StageFailed, EVT-StageSkipped, EVT-StageReset]
+    used_by: [ACT-User]
+    fields: [Where, Command, Reason, Stage]
+    description: "Precedence: a running stage (wait), an open interactive stage (setup skill), open review rounds, an open autonomous stage (/video-next, resume when failed); all stages done without a release folder means reset qa-export, then /video-next; then the release view"
+  - id: RM-ProductionView
+    name: Production view
+    fed_by: [EVT-ProjectCreated, EVT-StageStarted, EVT-StageCompleted, EVT-StageFailed, EVT-StageSkipped, EVT-StageReset, EVT-SpendRecorded]
+    used_by: [ACT-User]
+    fields: [Project, Production phase, Stage status, Stage attempts, Spent total, Remaining budget, Next action]
+
+hotspots:
+  - id: HS-1
+    question: "'Production phase' (setup/ready/running/failed/done) is a derived project status, but the glossary lists 'phase' under Avoid for Stage, and 'setup' is both a stage ID and a phase. Which word is the domain term?"
+    refs: [RM-ProductionView, RM-NextAction]
+    status: resolved
+    resolution: "Production Phase is its own term: the coarse state of a whole project, derived from its stage states, shown on the board. 'phase' stays avoided for a stage. The phase value setup (an interactive stage is open) beside the stage ID setup is a gap candidate; nothing is renamed now. (user, 2026-11-21)"
+  - id: HS-2
+    question: "The stage's attempt counter clashes with the glossary's Attempt (a version of a queue item), and the next action reason 'retry' uses a word the glossary avoids. Which words apply to a stage?"
+    refs: [EVT-StageStarted, RM-NextAction]
+    status: resolved
+    resolution: "Stage Attempt: one start of a stage; a failed stage resumes with a new stage attempt. The word for starting a failed stage again is resume; the code's next-action reason 'retry' is a gap candidate. Attempt alone stays the queue item version. (user, 2026-11-21)"
+  - id: HS-3
+    question: "Skipping a stage has a command but no actor and no documented reason. Who skips a stage, and when?"
+    refs: [CMD-SkipStage, EVT-StageSkipped]
+    status: resolved
+    resolution: "Stage Skip is a manual decision of the user for a stage the project does not need; no skill or command skips (ADR 0013). Where the reason is stored is an implementation detail. (user, 2026-11-21)"
+  - id: HS-4
+    question: "Hard stop has three conditions in the glossary, four in docs/pipeline.md and docs/architecture.md, and six in /video-next. What is the one definition?"
+    refs: [POL-HardStop]
+    status: resolved
+    resolution: "Four conditions: budget or batch cap would be exceeded; a real provider's credentials are missing; validation or QA fails after the stage's bounded retries; a user-owned file would be overwritten (timing.overrides.json, project.yaml, an imported take, the series canon). Divergent lists are gap candidates. (user, 2026-11-21)"
+  - id: HS-5
+    question: "The budget lives in project.yaml (budget_usd) and in state.json (budget.totalUsd), kept equal by validate-file. Which one is the source of truth?"
+    refs: [AGG-Project]
+    status: resolved
+    resolution: "budget_usd in project.yaml is the source; state.json budget.totalUsd is a copy that must stay equal. No command changes a budget; that is a gap candidate. (user, 2026-11-21)"
+  - id: HS-6
+    question: "The board wizard completes the setup stage (finishSetup, board-wizard.ts:344), while ADR 0030 calls the production view read-only. Is the board a sanctioned writer of project state?"
+    refs: [CMD-CompleteStage, AGG-Project]
+    status: resolved
+    resolution: "The board wizard is a sanctioned writer, for completing the setup stage only. Recorded in ADR 0037 (proposed), which amends ADR 0030. (user, 2026-11-21)"
+  - id: HS-7
+    question: "Both /video-next and seven stage skills call stage-done for the same stage. Who completes a stage: the orchestrator or the stage runner?"
+    refs: [CMD-CompleteStage]
+    status: resolved
+    resolution: "The orchestrator completes autonomous stages; the setup skill (or the board wizard for setup) completes interactive stages. The stage-done lines in stage skills are drift, a gap candidate. (user, 2026-11-21)"
+  - id: HS-8
+    question: "review_mode: final is in the schema and the glossary, but only /video-next's instructions act on it, and new always writes auto. A supported setting, an instruction-only convention, or legacy?"
+    refs: [EVT-ProjectCreated]
+    status: resolved
+    resolution: "A supported setting, enforced as an orchestrator rule (POL-RunNextStage): the pipeline stops before qa-export. That next action and board ignore it is a gap candidate. (user, 2026-11-21)"
+  - id: HS-9
+    question: "budget.reservedUsd is subtracted and shown as 'reserved', but nothing ever reserves money. Planned or dead?"
+    refs: [AGG-Project, RM-ProductionView]
+    status: resolved
+    resolution: "Dead. Not part of the model; a removal candidate in the gap register. (user, 2026-11-21)"
+  - id: HS-10
+    question: "workspace/AGENTS.md says state.json tracks input hashes for resumability; inputHash can be stored but nothing passes or compares it. Is stale-stage detection part of the model?"
+    refs: [EVT-StageCompleted]
+    status: resolved
+    resolution: "Stale-stage detection is not part of the model today. A stage reset is always an explicit decision. The claim in workspace/AGENTS.md is a contradiction for the gap register; whether detection is wanted is decided later. (user, 2026-11-21)"
+  - id: HS-11
+    question: "No transition is guarded: done → running, pending → done and starting an interactive stage are all accepted. Which transitions are legal?"
+    refs: [AGG-Project, CMD-StartStage, CMD-CompleteStage]
+    status: resolved
+    resolution: "Start: autonomous stages only, from pending or failed, after every earlier stage is done or skipped. Complete (orchestrator) and fail: from running. Complete interactive stage: from pending or failed. Skip: from pending or failed. The code enforces none of it – gap register. (user, 2026-11-21)"
+  - id: HS-12
+    question: "Stage reset accepts any status (also running) and does not touch later stages, while the glossary limits it to done, failed or skipped stages. What does a reset do?"
+    refs: [CMD-ResetStage, EVT-StageReset]
+    status: resolved
+    resolution: "A reset refuses a running stage and returns every later done or skipped stage to pending as well; the generation cache keeps unchanged shots cheap. The code resets one stage of any status – gap register. (user, 2026-11-21)"
+  - id: HS-13
+    question: "When every stage is done but no release exists, the board tells the user to run /video-next for qa-export, while status says done and /video-next stops. What is the next action?"
+    refs: [RM-NextAction]
+    status: resolved
+    resolution: "The release folder is an output of qa-export, so the next action is: reset qa-export, then /video-next. The board's current advice is a gap. (user, 2026-11-21)"
+  - id: HS-14
+    question: "The next action puts an open interactive stage before open review rounds; /video-next answers review rounds before it checks for an interactive stage. Which comes first?"
+    refs: [RM-NextAction]
+    status: resolved
+    resolution: "An open interactive stage comes before open review rounds, as projectNextAction and ADR 0030 say. /video-next answering rounds first is a gap. (user, 2026-11-21)"
+  - id: HS-15
+    question: "state.json has no write lock; a long generation batch saves after each item from the state it loaded at the start and can overwrite a parallel stage-* or spend write. Must project state be safe against concurrent writers?"
+    refs: [AGG-Project, CMD-RecordSpend]
+    status: resolved
+    resolution: "Yes: no writer loses another writer's change and no recorded spend is lost (aggregate invariant). The missing lock and the stale state in long batches are a high-priority gap. (user, 2026-11-21)"
+
+flows:
+  - id: FLOW-AutonomousStage
+    name: One autonomous stage
+    sequence: [ACT-Orchestrator, CMD-StartStage, EVT-StageStarted, ACT-StageRunner, CMD-CompleteStage, EVT-StageCompleted, POL-RunNextStage]

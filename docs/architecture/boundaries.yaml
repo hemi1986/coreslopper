@@ -1,0 +1,36 @@
+# Architecture boundaries – confirmed with the user during /adopt (slice: project and stage pipeline, 2026-11-21).
+# Rules are evaluated in order; the first matching from -> to pair decides. No match means allow.
+# Patterns are repository-relative globs. engine: auto scans JS/TS imports (relative and workspace packages);
+# engine: command runs your own check (dependency-cruiser, Nx, Bazel, ArchUnit, import-linter) and ratchets its output.
+version: 1
+engine: auto
+command: ""
+rules:
+  - id: core-imports-no-package
+    from: packages/core/**
+    to:
+      - packages/cli/**
+      - packages/providers/**
+      - packages/remotion/**
+    effect: deny
+    reason: core is the kernel (schemas, state, project loader); every other package builds on it.
+  - id: providers-import-only-core
+    from: packages/providers/**
+    to:
+      - packages/cli/**
+      - packages/remotion/**
+    effect: deny
+    reason: Provider adapters depend on core only; the CLI wires them.
+  - id: remotion-imports-only-core
+    from: packages/remotion/**
+    to:
+      - packages/cli/**
+      - packages/providers/**
+    effect: deny
+    reason: Compositions depend on core only; the CLI renders them.
+  - id: no-build-output
+    from: packages/**
+    to:
+      - runtime/**
+    effect: deny
+    reason: runtime/ is build output of the packages, never a source.
