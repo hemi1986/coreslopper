@@ -120,7 +120,7 @@ export const defaultVideoProps: VideoProps = {
 /** Props of the Thumbnail composition (one still); colours are resolved by the CLI. */
 export interface ThumbnailProps extends Record<string, unknown> {
   /** `16x9` (1280x720, main video), `9x16` (1080x1920, Short), or `1x1` (3000x3000, streaming cover); default `16x9`. */
-  format?: '16x9' | '9x16' | '3x4' | '1x1';
+  format?: '16x9' | '9x16' | '3x4' | '4x5' | '1x1';
   /** Public path of the source still; empty renders the background colour only. */
   still: string;
   /** Hook lines, already in capitals. */

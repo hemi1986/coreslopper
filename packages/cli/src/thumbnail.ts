@@ -26,6 +26,7 @@ import {
 import type { ThumbnailProps } from '../../remotion/src/types.js';
 import { brandFonts, bundleFor } from './render.js';
 import { thumbnailProblems } from './thumbnail-files.js';
+import { writeRecipe } from './thumbnail-recipe.js';
 
 export interface ThumbnailOptions {
   projectDir: string;
@@ -39,7 +40,7 @@ export interface ThumbnailOptions {
   zoom?: number;
   /** Typography key of style.yaml for the hook (default `display`). */
   font?: string;
-  /** `16x9` (default, 1280x720), `9x16` (1080x1920, a Short), or `1x1` (3000x3000, the streaming cover). */
+  /** `16x9` (default, 1280x720), `9x16` (1080x1920, a Short or story), `3x4` (1080x1440, a TikTok cover), `4x5` (1080x1350, an Instagram feed post), or `1x1` (3000x3000, the streaming cover). */
   format?: string;
 }
 
@@ -102,7 +103,7 @@ export async function buildThumbnailProps(
   }
   if (format !== '16x9' && layout !== 'bottom') {
     throw new ValidationError(
-      format === '9x16' || format === '3x4'
+      format === '9x16' || format === '3x4' || format === '4x5'
         ? `A ${format} thumbnail has a fixed vertical layout (text below, face above); omit --layout.`
         : 'A 1x1 cover has a fixed layout (artist and title below, image above); omit --layout.',
     );
@@ -189,6 +190,7 @@ export async function renderThumbnail(options: ThumbnailOptions): Promise<string
     }
     const problems = await thumbnailProblems(output, props.format);
     if (problems.length) throw new ValidationError(`Thumbnail ${output} failed its checks`, problems);
+    await writeRecipe(output, options);
     console.log(`Thumbnail written to ${output}`);
     return output;
   } finally {

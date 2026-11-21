@@ -329,8 +329,8 @@ const kindOf = (path: string): BoardFile['kind'] =>
 const file = (label: string, path: string | undefined): BoardFile[] => (path ? [{ label, path, kind: kindOf(path) }] : []);
 const field = (label: string, value: string | undefined, extra: Partial<BoardField> = {}): BoardField[] => (value?.trim() ? [{ label, value, ...extra }] : []);
 
-/** Build the board view of one project. */
-export async function boardProject(projectRoot: string, root: string): Promise<BoardProject> {
+/** Everything the release texts of a project are made from: the board and the autopilot read the same. */
+export async function projectReleaseContext(projectRoot: string, root: string) {
   const project = await loadProject(projectRoot);
   const music = project.config.kind !== 'episode';
   const channel = await loadChannel(root);
@@ -339,9 +339,6 @@ export async function boardProject(projectRoot: string, root: string): Promise<B
   const identity = releaseIdentity(project.config, song);
   const data: UploadData | undefined = existsSync(uploadPaths(project.paths.root).data) ? await loadUploadData(project.paths.root).catch(() => undefined) : undefined;
   const language = project.config.release?.language ?? (typeof song.language === 'string' ? song.language : undefined) ?? data?.language ?? channel?.language ?? 'en';
-  const de = language.toLowerCase().startsWith('de');
-  const b = de ? BOARD.de : BOARD.en;
-  const notes = de ? NOTES.de : NOTES.en;
   const l = releaseLabels(language);
   const dir = releaseDir(project.paths.root);
   const manifestPath = join(dir, 'manifest.json');
@@ -367,6 +364,15 @@ export async function boardProject(projectRoot: string, root: string): Promise<B
     premiere: schedule.release.premiere,
     durationSeconds: timing?.audio.duration,
   };
+  return { project, music, channel, limits, identity, data, language, l, dir, manifest, files, calendar, status, schedule, input };
+}
+
+/** Build the board view of one project. */
+export async function boardProject(projectRoot: string, root: string): Promise<BoardProject> {
+  const { project, music, channel, limits, identity, data, language, l, manifest, files, calendar, status, schedule, input } = await projectReleaseContext(projectRoot, root);
+  const de = language.toLowerCase().startsWith('de');
+  const b = de ? BOARD.de : BOARD.en;
+  const notes = de ? NOTES.de : NOTES.en;
   const at = (id: string) => calendar?.events.find((event) => event.id === id)?.at;
   const heading = (id: string, fallback: string) => {
     const event = calendar?.events.find((entry) => entry.id === id);

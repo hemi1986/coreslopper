@@ -598,7 +598,7 @@ describe('publish-auth', () => {
         timeoutMs: 5_000,
         open: (url) => {
           const consent = new URL(url);
-          expect(consent.searchParams.get('scope')).toBe('https://www.googleapis.com/auth/youtube.upload');
+          expect(consent.searchParams.get('scope')).toBe('https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.force-ssl');
           expect(consent.searchParams.get('code_challenge_method')).toBe('S256');
           const redirect = new URL(consent.searchParams.get('redirect_uri')!);
           redirect.searchParams.set('state', 'forged');

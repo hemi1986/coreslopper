@@ -891,7 +891,14 @@ export const UploadDataSchema = z
     /** Spotify for Artists: the Artist Pick message and the editorial pitch. */
     spotify: z.object({ artist_pick: z.string().min(1).optional(), pitch: z.string().min(1).optional() }).optional(),
     /** The announcement a week before the release: an Instagram story with the cover, a YouTube post, and an X post. */
-    announcement: z.object({ text: z.string().min(1), hashtags: z.array(HashtagSchema).default([]) }).optional(),
+    announcement: z
+      .object({
+        text: z.string().min(1),
+        hashtags: z.array(HashtagSchema).default([]),
+        /** The still the announcement and story images are composed from; without it, the still of the cover's recipe. */
+        image: z.object({ still: z.string().min(1), focus: z.string().regex(/^\d*\.?\d+,\d*\.?\d+$/, 'use x,y fractions such as 0.5,0.35').optional() }).optional(),
+      })
+      .optional(),
     x: UploadXSchema.optional(),
     linkedin: UploadLinkedInSchema.optional(),
     microsite: UploadMicrositeSchema.optional(),
@@ -909,6 +916,9 @@ export const UploadDataSchema = z
 const WeekdaySchema = z.enum(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']);
 const ClockSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'use HH:MM');
 const DaySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'use YYYY-MM-DD');
+
+/** Platforms the release autopilot can post to by API (ADR 0029). */
+export const AutopilotPlatformSchema = z.enum(['youtube', 'tiktok', 'instagram', 'x', 'linkedin', 'microsite']);
 
 /**
  * `config/release-schedule.yaml`: the workspace's release rules. Every
@@ -983,6 +993,32 @@ export const ReleaseScheduleSchema = z.object({
   booked: z
     .array(z.object({ date: DaySchema, kind: z.enum(['release', 'short']).default('short'), label: z.string().min(1) }))
     .default([]),
+  /** The release autopilot: which platforms `release-run` posts to by API once the user approved a release (ADR 0029). */
+  autopilot: z
+    .object({
+      /** Platforms the autopilot posts to; the others stay manual on the board. */
+      platforms: z.array(AutopilotPlatformSchema).default(['youtube', 'tiktok', 'instagram', 'x', 'linkedin', 'microsite']),
+      /** YouTube videos are uploaded this many hours before their calendar time (private, or scheduled once the API project is audited). */
+      youtube_ahead_hours: z.number().min(0).max(24 * 14).default(24),
+      /** Google audited the API project: scheduled uploads go public at their time. Without it they stay private until you switch them in YouTube Studio. */
+      youtube_audited: z.boolean().default(false),
+      /** TikTok audited the app for direct posting (scope video.publish): posts go out with caption instead of landing as inbox drafts. */
+      tiktok_direct: z.boolean().default(false),
+      /** A post whose time passed by more than this many hours (the computer was off) waits for you instead of going out late. */
+      late_hours: z.number().min(0).max(24 * 7).default(12),
+      /** Failed attempts before a post waits for you. */
+      retries: z.number().int().min(1).max(10).default(3),
+      /** The artist microsite: copy microsite/<slug>.json and its images into `dir` at the page's time, then run `command` there. */
+      microsite: z
+        .object({
+          /** Directory the song pages live in, relative to the workspace or absolute. */
+          dir: z.string().min(1),
+          /** A command run in `dir` after the copy, e.g. a commit and push that deploys the site. */
+          command: z.string().min(1).optional(),
+        })
+        .optional(),
+    })
+    .prefault({}),
 });
 
 export const CalendarPlatformSchema = z.enum(['distributor', 'spotify', 'youtube', 'shorts', 'tiktok', 'instagram', 'x', 'linkedin', 'microsite']);
@@ -1012,9 +1048,18 @@ export const ReleaseCalendarSchema = z.object({
   events: z.array(CalendarEventSchema).default([]),
 });
 
-/** `review/release-status.json`: what the user has posted, keyed by calendar event, with the live URL. */
+/** `review/release-status.json`: what is posted, keyed by calendar event, with the live URL, and the user's release approval. */
 export const ReleaseStatusSchema = z.object({
   version: z.literal(1),
+  /** The user's one click on the release board: from then on the autopilot posts this release at its calendar times. */
+  approval: z
+    .object({
+      /** When the user approved. */
+      at: z.string().min(1),
+      /** The release day the user approved. */
+      release_date: DaySchema,
+    })
+    .optional(),
   items: z
     .record(
       z.string(),
@@ -1024,9 +1069,56 @@ export const ReleaseStatusSchema = z.object({
         at: z.string().optional(),
         /** The live post, video, or track. */
         url: z.string().url().optional(),
+        /** Who marked it done: the user on the board, or the autopilot. */
+        by: z.enum(['user', 'autopilot']).optional(),
+        /** The user takes this post over by hand: the autopilot leaves it alone. */
+        manual: z.boolean().optional(),
       }),
     )
     .default({}),
+});
+
+export const AutopilotEntryStatusSchema = z.enum([
+  /** An attempt started; a crash leaves it standing, and the post then waits for the user. */
+  'running',
+  /** Live on the platform. */
+  'posted',
+  /** YouTube: uploaded as a private video; waiting for it to go public. */
+  'uploaded',
+  /** YouTube: uploaded with a publication time. */
+  'scheduled',
+  /** TikTok: a draft in the inbox, waiting for the user to post it. */
+  'draft',
+  'failed',
+  /** The user asked for another attempt: earlier failures and a stuck attempt no longer count. */
+  'retry',
+  /** The user asked to post now although the time has passed. */
+  'force',
+]);
+
+/** One step of the autopilot on one calendar event. */
+export const AutopilotEntrySchema = z.object({
+  event: z.string().min(1),
+  status: AutopilotEntryStatusSchema,
+  at: z.string().min(1),
+  /** Platform ID of the post or video. */
+  remote_id: z.string().min(1).optional(),
+  url: z.string().url().optional(),
+  /** YouTube: the scheduled publication time. */
+  publish_at: z.string().optional(),
+  error: z.string().optional(),
+  warnings: z.array(z.string()).default([]),
+  /** What the user still does by hand on the platform. */
+  manual_steps: z.array(z.string()).default([]),
+  /** What the calls cost, where the platform bills per call (X). */
+  cost_usd: z.number().nonnegative().optional(),
+  mock: z.boolean().default(false),
+});
+
+/** `review/autopilot.json`: the autopilot's log, one entry per step, oldest first. `release-run` writes it; the board appends retry and force. */
+export const AutopilotLogSchema = z.object({
+  version: z.literal(1),
+  entries: z.array(AutopilotEntrySchema).default([]),
 });
 
 export const PublishStatusSchema = z.enum(['uploaded', 'scheduled', 'draft', 'processing', 'failed']);
@@ -1151,6 +1243,12 @@ export const ReleaseFileKindSchema = z.enum([
   'readme',
   'calendar',
   'microsite',
+  /** The announcement images and teaser a week before the release, with the release date on them. */
+  'announcement',
+  /** The release-day story image. */
+  'story',
+  /** The 4:5 Instagram feed image, when the project has no feed-format render. */
+  'feed-image',
 ]);
 
 /** One file of the release folder. */
@@ -1226,6 +1324,10 @@ export type CalendarPlatform = z.infer<typeof CalendarPlatformSchema>;
 export type CalendarEvent = z.infer<typeof CalendarEventSchema>;
 export type ReleaseCalendar = z.infer<typeof ReleaseCalendarSchema>;
 export type ReleaseStatus = z.infer<typeof ReleaseStatusSchema>;
+export type AutopilotPlatform = z.infer<typeof AutopilotPlatformSchema>;
+export type AutopilotSettings = ReleaseSchedule['autopilot'];
+export type AutopilotEntry = z.infer<typeof AutopilotEntrySchema>;
+export type AutopilotLog = z.infer<typeof AutopilotLogSchema>;
 export type PublishStatus = z.infer<typeof PublishStatusSchema>;
 export type PublishEntry = z.infer<typeof PublishEntrySchema>;
 export type PublishLog = z.infer<typeof PublishLogSchema>;
