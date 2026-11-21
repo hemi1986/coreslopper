@@ -140,6 +140,10 @@ _Avoid_: cast list
 A reference image showing a character's design from multiple angles or expressions; required for every character shot.
 _Avoid_: portrait
 
+**Character Library**:
+The workspace's collection of characters to reuse across music videos and series, in `library/characters/<id>/`. Characters of finished character bibles and canons come in by themselves; a project or canon takes a copy with `character use`, and its entry then names the library character in `library`.
+_Avoid_: character database, cast
+
 **Brand Kit**:
 A reusable package of logo, colors, fonts, tokens, and style guide, stored under `brand/<kit>/`.
 _Avoid_: theme

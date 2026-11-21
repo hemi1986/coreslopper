@@ -180,3 +180,18 @@ ol.sections { margin: 4px 0 0 20px; padding: 0; font-size: 13px; }
 .ref img, .ref .ref-icon { width: 72px; height: 54px; object-fit: cover; border-radius: 5px; background: var(--chip); flex: none; display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--muted); font-weight: 700; }
 .ref-body { flex: 1; min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
 .ref-body a { color: var(--accent); }
+
+/* Character library */
+.char-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.char-card h3 { margin: 10px 0 4px; font-size: 15px; }
+.char-card .chip { margin: 2px 2px 0 0; }
+.char-cover { width: 100%; height: 240px; object-fit: cover; object-position: top; border-radius: 8px; background: var(--chip); display: block; }
+.char-cover.placeholder, .pick-cover.placeholder { display: flex; align-items: center; justify-content: center; font-size: 42px; font-weight: 700; color: var(--muted); }
+.clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.ref .pick-cover { width: 72px; height: 96px; object-fit: cover; object-position: top; border-radius: 5px; background: var(--chip); flex: none; }
+.ref .pick-cover.placeholder { font-size: 24px; }
+.ref.picked { border-color: var(--ok); }
+.ref .chip { margin-left: 6px; }
+.state-checks { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 6px 0; font-size: 12px; }
+.state-check { display: inline-flex; align-items: center; gap: 3px; cursor: pointer; }
+.back-link, .ref-body a, .char-pick a { color: var(--accent); }

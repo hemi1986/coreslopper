@@ -69,6 +69,8 @@ Higgsfield has no lip-sync yet. For lip-sync shots, add a `FAL_KEY` to `.env` an
 
 It analyzes the song, builds the style and character bibles, writes and validates the storyboard, generates the assets, and renders `projects/<slug>/renders/` without further questions. If you stop halfway through setup, `/new-video <slug>` resumes where you left off.
 
+Every character the pipeline builds lands in the workspace's character library. In your next video or series, pick it on the board (**Characters**, or the wizard's library step) or let the agent run `npm run cli -- character use <slug> <id>`: its sheet and references are copied into the project and the character bible builds on them instead of starting over ([docs/board.md](docs/board.md#characters)).
+
 ## 3. Review and fix
 
 Watch the result in the board's **Review** tab (`npm run cli -- board`): step frame by frame along a timeline of sections and shots, write notes on a frame or a range, and send them to the agent with one click. `/video-next <slug>` then works through them, re-renders the preview, and answers every note on the board ([docs/board.md](docs/board.md#review)).

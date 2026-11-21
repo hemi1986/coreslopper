@@ -55,7 +55,7 @@ assets/manifest.jsonl
 assets/references/  user-provided moodboards and reference images, gitignored
 assets/footage/     normalized real footage, gitignored
 audio/              the user's song.wav and stems/vocals.wav, gitignored
-characters/<id>/    character sheets and refs, gitignored
+characters/<id>/    character sheets and refs, gitignored (copies of library characters too)
 renders/            gitignored
 review/             report, contact sheet, small stills
 ```
@@ -208,6 +208,10 @@ The release autopilot ([ADR 0029](adr/0029-release-autopilot.md)) is a pure plan
 - `.claude/settings.json` — registers the hook.
 
 The core skills and scripts are tool-agnostic. The commands, agents, and hooks are the Claude Code layer.
+
+## Character library
+
+`packages/cli/src/character-library.ts` keeps the workspace's characters in `library/characters/<id>/` ([ADR 0034](adr/0034-character-library.md)): a `character.yaml` (`LibraryCharacterSchema`) and the files beside it, stored once by content hash. `importCharacters` reads a project's or canon's `characters.yaml` and finds each character's entry (its `library` link, a same-id entry sharing a file, `--into`, or a new id), copies new files, appends new references and states, and records the import in `history`; `stage-done … style-character` calls it. `useCharacter` copies an entry's identity and the chosen states into a target's `characters/<id>/` and edits its `characters.yaml` through the YAML document API, so comments and the other characters stay as they were. Where a library character is used is derived from the `library` fields of every `characters.yaml`, not stored. The board serves entry files at `/library-files/<id>/<file>` and writes through `/api/library/*`.
 
 ## Distribution and onboarding
 

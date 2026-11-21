@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "number",
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z0-9][a-z0-9_-]*$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "prompt": {
+      "type": "string"
+    },
+    "face": {
+      "default": "full",
+      "type": "string",
+      "enum": [
+        "full",
+        "silhouette",
+        "screen-only",
+        "voice-only"
+      ]
+    },
+    "sheet": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]*$"
+    },
+    "refs": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9._-]*$"
+      }
+    },
+    "voice": {
+      "type": "object",
+      "properties": {
+        "ref": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+        },
+        "transcript": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "ref",
+        "transcript"
+      ]
+    },
+    "states": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9_-]*$"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "ref": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]*$"
+          },
+          "from": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "description"
+        ],
+        "additionalProperties": {}
+      }
+    },
+    "tags": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "origin": {
+      "type": "string",
+      "minLength": 1
+    },
+    "added": {
+      "type": "string",
+      "minLength": 1
+    },
+    "history": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string",
+            "minLength": 1
+          },
+          "from": {
+            "type": "string",
+            "minLength": 1
+          },
+          "added": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "at",
+          "from"
+        ]
+      }
+    }
+  },
+  "required": [
+    "version",
+    "id",
+    "name",
+    "description",
+    "origin",
+    "added"
+  ]
+}

@@ -3,16 +3,17 @@
 // command to type in Claude Code, where the grilling happens.
 //   #/new                 choose            #/new/video[/<slug>]
 //   #/new/series[/<slug>]                   #/new/episode[/<slug>]
-import { addStrings, api, copyButton, el, go, post, projectFile, setLang, showError, t } from './lib.js';
+import { addStrings, api, copyButton, el, go, post, projectFile, setLang, showError, t, upload } from './lib.js';
+import { libraryPicker } from './characters.js';
 
 addStrings({
   de: {
-    newTitle: 'Neu anlegen', newVideo: 'Musikvideo', newVideoSub: 'Zu einem fertigen Song: Projektdaten, Lyrics, Song, Referenzen.',
+    newTitle: 'Neu anlegen', newVideo: 'Musikvideo', newVideoSub: 'Zu einem fertigen Song: Projektdaten, Lyrics, Song, Referenzen, Figuren.',
     newSeries: 'Serie', newSeriesSub: 'Der Canon einer Serie: Daten und Referenzen für Figuren, Sets, Look.', newEpisode: 'Episode', newEpisodeSub: 'Eine Episode einer Serie, deren Canon fertig ist.',
     title: 'Titel', artist: 'Artist', slug: 'Slug', budget: 'Budget (USD)', imageProvider: 'Bilder', videoProvider: 'Clips', audioProvider: 'Stimmen und Sounds',
     language: 'Gesungene Sprache (ISO, z. B. de)', rights: 'Rechte (wem gehört der Song?)', license: 'Lizenz', format: 'Hauptformat',
     create: 'Anlegen', noKey: '(kein Zugang in .env)', minimum: function (v) { return 'mindestens $' + v; }, taken: 'Diesen Slug gibt es schon.',
-    stepData: 'Projekt', stepLyrics: 'Lyrics', stepSong: 'Song und Vocal-Stem', stepRefs: 'Referenzen', stepDone: 'Fertig',
+    stepData: 'Projekt', stepLyrics: 'Lyrics', stepSong: 'Song und Vocal-Stem', stepRefs: 'Referenzen', stepChars: 'Figuren aus der Bibliothek', stepDone: 'Fertig',
     lyricsHelp: 'Die kompletten Lyrics einfügen. Jede Zeile gehört unter einen Section-Tag wie [Verse 1] oder [Chorus]; Suno-Klammern bleiben, wie sie sind.',
     propose: 'Tags vorschlagen', saveLyrics: 'Lyrics speichern', sections: 'Sections', saved: 'gespeichert',
     songHelp: 'Den fertigen Mix und, wenn möglich, den Vocal-Stem aus derselben Session. WAV wird direkt genutzt; MP3, FLAC, AIFF, M4A, OGG werden umgewandelt.',
@@ -26,12 +27,12 @@ addStrings({
     remaining: function (v) { return 'frei im Serienbudget: $' + v; }, warnings: 'Hinweise', uploading: 'lädt hoch …', open: 'öffnen', remove: 'Entfernen', back: 'Zurück'
   },
   en: {
-    newTitle: 'Create', newVideo: 'Music video', newVideoSub: 'For a finished song: project data, lyrics, song, references.',
+    newTitle: 'Create', newVideo: 'Music video', newVideoSub: 'For a finished song: project data, lyrics, song, references, characters.',
     newSeries: 'Series', newSeriesSub: 'A series canon: data and references for characters, sets, and look.', newEpisode: 'Episode', newEpisodeSub: 'An episode of a series whose canon is complete.',
     title: 'Title', artist: 'Artist', slug: 'Slug', budget: 'Budget (USD)', imageProvider: 'Images', videoProvider: 'Clips', audioProvider: 'Voices and sounds',
     language: 'Sung language (ISO, e.g. en)', rights: 'Rights (who owns the song?)', license: 'License', format: 'Master format',
     create: 'Create', noKey: '(no access in .env)', minimum: function (v) { return 'at least $' + v; }, taken: 'This slug exists already.',
-    stepData: 'Project', stepLyrics: 'Lyrics', stepSong: 'Song and vocal stem', stepRefs: 'References', stepDone: 'Done',
+    stepData: 'Project', stepLyrics: 'Lyrics', stepSong: 'Song and vocal stem', stepRefs: 'References', stepChars: 'Characters from the library', stepDone: 'Done',
     lyricsHelp: 'Paste the complete lyrics. Every line belongs under a section tag like [Verse 1] or [Chorus]; Suno parentheses stay as they are.',
     propose: 'Propose tags', saveLyrics: 'Save lyrics', sections: 'Sections', saved: 'saved',
     songHelp: 'The finished mix and, if you have it, the vocal stem from the same session. WAV is used as is; MP3, FLAC, AIFF, M4A, and OGG are converted.',
@@ -66,23 +67,6 @@ function step(n, title, done, children) {
   return el('section', { class: 'card step' + (done ? ' done-step' : '') }, [el('h3', { class: 'step-title' }, [el('span', { class: 'step-n', text: done ? '✓' : String(n) }), title])].concat(children));
 }
 function loadOptions() { return api('/api/new/options').then(function (o) { options = o; return o; }); }
-
-/** Send one file as the raw request body, with progress. */
-function upload(url, file, onProgress) {
-  return new Promise(function (resolve, reject) {
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', url);
-    xhr.setRequestHeader('content-type', 'application/octet-stream');
-    xhr.upload.onprogress = function (e) { if (e.lengthComputable) onProgress(e.loaded / e.total); };
-    xhr.onload = function () {
-      let body = {};
-      try { body = JSON.parse(xhr.responseText); } catch (e) { /* not JSON */ }
-      if (xhr.status >= 200 && xhr.status < 300) resolve(body); else reject(new Error(body.error || xhr.statusText));
-    };
-    xhr.onerror = function () { reject(new Error('upload failed')); };
-    xhr.send(file);
-  });
-}
 
 function choose() {
   const node = main();
@@ -224,9 +208,10 @@ function videoSteps(slug) {
     node.appendChild(step(3, t('stepSong'), typeof s.duration === 'number', [el('p', { class: 'meta', text: t('songHelp') }), audioUpload('song', t('songFile')), audioUpload('vocals', t('vocalsFile')), songStatus]));
 
     node.appendChild(referencesStep(4, 'project', slug, state.references, refresh));
+    node.appendChild(step(5, t('stepChars'), false, [libraryPicker('project', slug)]));
 
     const finishError = el('p', { class: 'error', text: state.missing.length ? t('missing')(state.missing.map(function (m) { return m === 'lyrics' ? t('stepLyrics') : t('stepSong'); }).join(', ')) : '' });
-    node.appendChild(step(5, t('stepDone'), state.setupDone, state.setupDone ? [commandBox(t('setupDone'), '/new-video ' + slug)] : [
+    node.appendChild(step(6, t('stepDone'), state.setupDone, state.setupDone ? [commandBox(t('setupDone'), '/new-video ' + slug)] : [
       finishError,
       el('button', { class: 'primary', text: t('finish'), disabled: state.missing.length ? true : undefined, onclick: function () { post('/api/new/video/' + encodeURIComponent(slug) + '/finish', {}).then(refresh).catch(function (e) { finishError.textContent = e.message; }); } })
     ]));
@@ -269,7 +254,8 @@ function seriesSteps(slug) {
     node.appendChild(el('header', { class: 'project' }, [el('h2', { text: slug }), el('span', { class: 'chip', text: t('newSeries') })]));
     node.appendChild(el('div', { style: 'height:12px' }));
     node.appendChild(referencesStep(1, 'series', slug, refs.references, function () { seriesSteps(slug); }));
-    node.appendChild(step(2, t('stepDone'), false, [commandBox(t('seriesNext'), '/new-series ' + slug)]));
+    node.appendChild(step(2, t('stepChars'), false, [libraryPicker('series', slug)]));
+    node.appendChild(step(3, t('stepDone'), false, [commandBox(t('seriesNext'), '/new-series ' + slug)]));
   }).catch(showError);
 }
 

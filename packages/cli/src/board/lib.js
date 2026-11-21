@@ -79,6 +79,23 @@ export function copyButton(value, labels) {
   return button;
 }
 
+/** Send one file as the raw request body, with progress. */
+export function upload(url, file, onProgress) {
+  return new Promise(function (resolve, reject) {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url);
+    xhr.setRequestHeader('content-type', 'application/octet-stream');
+    xhr.upload.onprogress = function (e) { if (e.lengthComputable) onProgress(e.loaded / e.total); };
+    xhr.onload = function () {
+      let body = {};
+      try { body = JSON.parse(xhr.responseText); } catch (e) { /* not JSON */ }
+      if (xhr.status >= 200 && xhr.status < 300) resolve(body); else reject(new Error(body.error || xhr.statusText));
+    };
+    xhr.onerror = function () { reject(new Error('upload failed')); };
+    xhr.send(file);
+  });
+}
+
 export function go(hash) { if (location.hash !== hash) location.hash = hash; }
 
 export function showError(error) {

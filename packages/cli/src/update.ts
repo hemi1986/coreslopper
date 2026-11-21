@@ -39,9 +39,9 @@ const ALWAYS_UPSTREAM_FILES = new Set(['package-lock.json']);
 
 /**
  * Upstream files below these prefixes are added when missing but never
- * overwritten or removed: projects and series canons belong to the user.
+ * overwritten or removed: projects, series canons, and the character library belong to the user.
  */
-const USER_OWNED_PREFIXES = ['projects/', 'series/'];
+const USER_OWNED_PREFIXES = ['projects/', 'series/', 'library/'];
 
 export function isRuntimePath(path: string): boolean {
   if (!path) return true;
