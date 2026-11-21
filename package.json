@@ -43,6 +43,7 @@
   "scripts": {
     "cli": "tsx packages/cli/src/index.ts",
     "build:runtime": "node scripts/build-runtime.mjs",
+    "dev:workspace": "node scripts/dev-workspace.mjs",
     "build:cli": "tsup",
     "build": "npm run build:runtime && npm run build:cli",
     "pack:check": "npm run build && npm pack --dry-run",

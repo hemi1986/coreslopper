@@ -8,7 +8,7 @@ This file records third-party skills, libraries, assets, and terms used by this 
 - **License:** MIT
 - **Pinned commit:** `4ae2317ddb22b046e26455e4f9c9b3aaaf62212d` (2026-10-31)
 - **Installed:** 2026-11-08 via `npx skills add`; the adopted skills and their supporting files were copied into `.claude/skills/`.
-- **Vendored location:** `.claude/skills/`
+- **Vendored location:** `grill-me` and `grilling` ship to workspaces from `workspace/.claude/skills/`; `writing-for-agents` and `domain-modeling` are engineering skills in the upstream repository's `.claude/skills/` and do not ship ([ADR 0036](adr/0036-workspace-payload.md)).
 
 ### Adopted skills
 

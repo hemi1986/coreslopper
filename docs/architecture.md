@@ -201,6 +201,8 @@ The release autopilot ([ADR 0029](adr/0029-release-autopilot.md)) is a pure plan
 
 ## Claude Code layer
 
+Paths as a workspace sees them; in the upstream repository they live under `workspace/` ([ADR 0036](adr/0036-workspace-payload.md)).
+
 - `.claude/skills/<name>/SKILL.md` — the stage skills.
 - `.claude/commands/` — `/video-next`, `/video-status`, `/series-status`. `/new-video` and `/new-episode` are skills. `/video-next` reads the project kind from `status` and walks that kind's stages.
 - `.claude/agents/` — `stage-runner`, `art-director`, `qa-checker`.

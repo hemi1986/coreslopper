@@ -37,9 +37,22 @@ Optional system dependency: `ffmpeg` and `ffprobe` for footage import and loudne
 - Documentation, examples, and tests.
 - Accessibility, readability, and safe-area checks.
 
+## The workspace payload
+
+This repository has two layers ([ADR 0036](docs/adr/0036-workspace-payload.md)). The root `AGENTS.md`, `CLAUDE.md`, and `.claude/` are for working on coreslopper and never ship. What a workspace gets is the product code and docs plus `workspace/`, which becomes the workspace root: the media skills, agents, commands, and hook in `workspace/.claude/`, and the workspace's `AGENTS.md` and `CLAUDE.md`.
+
+`scripts/runtime-files.mjs` lists which tracked files ship. A new top-level file or docs page fails the build until it is in one of its lists.
+
+To try the media workflow (`/new-video`, `/video-next`, the board) the way a user gets it, build a sandbox workspace outside the repository:
+
+```bash
+npm run dev:workspace                 # creates or updates ../coreslopper-sandbox
+npm run dev:workspace -- ../other-dir
+```
+
 ## Skills
 
-Use the vendored `writing-for-agents` skill when creating or editing a skill. Own skills use only:
+Product skills live in `workspace/.claude/skills/`. Use the vendored `writing-for-agents` skill when creating or editing a skill. Own skills use only:
 
 ```yaml
 ---
