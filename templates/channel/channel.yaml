@@ -6,6 +6,7 @@
 version: 1
 name: My Channel           # your channel or artist name
 # tagline: ""
+# motto: ""             # a line the release board shows in its top right corner
 language: en             # BCP-47 language of the footer and bios
 
 # Handles and links per platform. A URL may hold <ID> until you know it;

@@ -658,6 +658,7 @@ describe('release board', () => {
     await buildRelease({ projectDir: dir, deps: fakeDeps() });
     const root = join(dir, '..', '..');
     const handler = boardHandler({ root, now: () => new Date('2026-12-11T17:05:00Z') });
+    expect(JSON.parse((await request(handler, 'GET', '/api/channel')).body)).toEqual({});
     const list = JSON.parse((await request(handler, 'GET', '/api/projects')).body);
     expect(list).toEqual([expect.objectContaining({ slug: 'neon', releaseDate: '2026-12-11', done: 0, hasRelease: true })]);
     const posted = await request(handler, 'POST', '/api/projects/neon/status', { id: 'youtube', done: true, url: 'https://youtu.be/abc' });

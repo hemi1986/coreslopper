@@ -1096,6 +1096,8 @@ export const ChannelConfigSchema = z.object({
   version: z.literal(1),
   name: z.string().min(1),
   tagline: z.string().min(1).optional(),
+  /** A line the release board shows in its top right corner. */
+  motto: z.string().min(1).max(200).optional(),
   /** BCP-47 language of the channel's own texts (footer, bios). */
   language: z.string().min(2),
   /** Keyed by platform: youtube, instagram, tiktok, spotify, or any other. */

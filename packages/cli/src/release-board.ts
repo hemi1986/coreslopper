@@ -3,7 +3,7 @@ import { readFile, readdir, stat } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ValidationError, calendarIcs, repoRoot, type ReleaseCalendar } from '@coreslopper/core';
+import { ValidationError, calendarIcs, loadChannel, repoRoot, type ReleaseCalendar } from '@coreslopper/core';
 import { boardProject, type BoardProject } from './release-board-data.js';
 import { loadCalendar, updateStatus } from './release-calendar.js';
 import { releaseDir } from './release.js';
@@ -122,6 +122,10 @@ export function boardHandler(options: BoardOptions = {}) {
       if (req.method === 'GET' && path === '/') {
         const page = await readFile(fileURLToPath(new URL('./release-board.html', import.meta.url)), 'utf8');
         return send(res, 200, page, 'text/html; charset=utf-8');
+      }
+      if (req.method === 'GET' && path === '/api/channel') {
+        const channel = await loadChannel(root).catch(() => undefined);
+        return json(res, { name: channel?.name, motto: channel?.motto });
       }
       if (req.method === 'GET' && path === '/api/projects') {
         const projects = await allProjects();

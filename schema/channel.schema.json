@@ -14,6 +14,11 @@
       "type": "string",
       "minLength": 1
     },
+    "motto": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
     "language": {
       "type": "string",
       "minLength": 2

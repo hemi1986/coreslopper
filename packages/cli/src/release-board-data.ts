@@ -71,6 +71,8 @@ export interface BoardPost {
   pointer?: string;
   /** Ask for the live URL once posted. */
   url?: boolean;
+  /** A task to do (distributor, pitch, canvas, links), not a post to publish. */
+  task?: boolean;
 }
 
 export interface BoardPlatform {
@@ -407,6 +409,7 @@ export async function boardProject(projectRoot: string, root: string): Promise<B
       files: [],
       fields: field('Spotify', status.items.song?.url),
       checklist: [b.linksStep],
+      task: true,
     });
   }
 
@@ -526,6 +529,7 @@ export async function boardProject(projectRoot: string, root: string): Promise<B
       files: [...file(b.audio, files.audio), ...file(b.cover, files.cover), ...file(b.lyrics, files.lyricsTxt), ...file(b.lrc, files.lyricsLrc)],
       fields: distributorRows(input, l).map(([label, value]) => ({ label, value: value.replace(/`/g, '') })),
       checklist: [b.distributorCheck],
+      task: true,
     });
     spotify.push({
       id: 'pitch',
@@ -534,8 +538,9 @@ export async function boardProject(projectRoot: string, root: string): Promise<B
       files: [],
       fields: field(b.pitch, data?.spotify?.pitch, { limit: limits.spotify.pitch, unit: 'chars' }),
       checklist: [b.pitchCheck],
+      task: true,
     });
-    spotify.push({ id: 'canvas', heading: heading('canvas', b.canvas), at: at('canvas'), files: file(b.canvas, files.canvas), fields: [], checklist: [b.canvasCheck] });
+    spotify.push({ id: 'canvas', heading: heading('canvas', b.canvas), at: at('canvas'), files: file(b.canvas, files.canvas), fields: [], checklist: [b.canvasCheck], task: true });
     spotify.push({ id: 'song', heading: heading('song', l.cal.steps.song), at: at('song'), files: [], fields: [], checklist: [b.spotifyUrl], url: true });
     spotify.push({
       id: 'artist-pick',
@@ -544,6 +549,7 @@ export async function boardProject(projectRoot: string, root: string): Promise<B
       files: [...file(b.master, files.master), ...file(b.cover, files.cover)],
       fields: field(b.artistPick, data?.spotify?.artist_pick),
       checklist: [b.videoBeta],
+      task: true,
     });
   }
 
