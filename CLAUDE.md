@@ -12,6 +12,8 @@
 - `/model-bench` — skill that compares models, workflows, or ComfyUI servers on the bench cases in `bench/` and scores them with `art-director` agents.
 - `npm run cli -- review <slug>` — the user opens a render in the review player; notes land in `review/notes/`. On a fix pass, follow the review-notes section of `assembly-render`.
 - `/series-status <series>` — read-only series overview: canon, episodes, stages, spend, length.
+- `/release-backfill <slug>` — skill that brings an existing or already published project into the release calendar: asks what is out, writes the missing release texts, plans the open slots, marks the past done.
+- `npm run cli -- release-board` — the user's local release page: per project and platform the files, texts, and settings, the release calendar of all projects, and checkboxes for what is posted.
 - `npm run cli -- publish <slug>` — uploads a finished release package (YouTube private, TikTok drafts); a user command, not a stage. See `docs/publishing.md`.
 
 `/video-next` dispatches one `stage-runner` subagent per stage. Do not inline a whole stage into the main context.
@@ -28,7 +30,7 @@ Create a workspace with `npx coreslopper init <dir>` (or `npx coreslopper@latest
 
 ## Hooks
 
-`.claude/settings.json` registers a `PostToolUse` hook for `Write|Edit`. It validates changes to `storyboard.yaml`, `timing.json`, `timing.overrides.json`, `project.yaml`, `state.json`, `style.yaml`, `characters.yaml`, `script.yaml`, `series.yaml`, `sets.yaml`, and `review/upload.yaml` in projects and series canons, and the workspace's `config/channel.yaml`. Exit code 2 blocks the edit and returns the validation message.
+`.claude/settings.json` registers a `PostToolUse` hook for `Write|Edit`. It validates changes to `storyboard.yaml`, `timing.json`, `timing.overrides.json`, `project.yaml`, `state.json`, `style.yaml`, `characters.yaml`, `script.yaml`, `series.yaml`, `sets.yaml`, `review/upload.yaml`, and `review/calendar.yaml` in projects and series canons, and the workspace's `config/channel.yaml` and `config/release-schedule.yaml`. Exit code 2 blocks the edit and returns the validation message.
 
 The hook calls `npm run cli -- validate-file <file>`, which is also runnable by hand.
 

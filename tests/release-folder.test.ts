@@ -23,7 +23,7 @@ import {
   chapterProblems,
   chaptersFromSections,
   channelTodos,
-  planDate,
+  addDays,
   plainLyrics,
   platformLimits,
   platformTextProblems,
@@ -34,6 +34,9 @@ import {
 } from '../packages/core/src/index.ts';
 import { buildRelease, type ReleaseDeps } from '../packages/cli/src/release.ts';
 import { releaseChecks } from '../packages/cli/src/release-qa.ts';
+import { boardProject } from '../packages/cli/src/release-board-data.ts';
+import { boardHandler } from '../packages/cli/src/release-board.ts';
+import { loadCalendar, loadStatus, runCalendar } from '../packages/cli/src/release-calendar.ts';
 import {
   canvasArgs,
   canvasProblems,
@@ -133,6 +136,16 @@ function uploadYaml() {
     },
     shorts: [short('Z1-intro', 1), short('Z2-chorus', 2), short('Z3-outro', 3)],
     spotify: { artist_pick: 'Neu: Neon Rain', pitch: 'Treibender Synthwave mit Regen und Neon.' },
+    instagram_post: { caption: 'Neon Rain, das ganze Video im Feed.', hashtags: ['#synthwave'] },
+    announcement: { text: 'Freitag: Neon Rain.', hashtags: ['#synthwave'] },
+    x: { post: 'Neon Rain ist da. Zwölf Sekunden Regen.', hashtags: ['#synthwave'], reply: 'Ganzes Video:', media: 'Z1-intro' },
+    linkedin: {
+      decision: 'post',
+      reason: 'The video is about how an AI pipeline makes a music video.',
+      post: 'Ein Musikvideo, komplett von einer KI-Pipeline gebaut.\n\nWas ich dabei gelernt habe.',
+      hashtags: ['#KI'],
+    },
+    microsite: { teaser: 'Zwölf Sekunden Neonregen.', text: 'Ein Spaziergang im Regen.', quote: 'Neon im Regen' },
   };
 }
 
@@ -276,8 +289,8 @@ describe('lyrics, chapters, canvas window', () => {
   });
 
   it('dates the release plan from the release day', () => {
-    expect(planDate('2026-12-11', -21)).toBe('2026-11-20');
-    expect(planDate('2026-12-11', 4)).toBe('2026-12-15');
+    expect(addDays('2026-12-11', -21)).toBe('2026-11-20');
+    expect(addDays('2026-12-11', 4)).toBe('2026-12-15');
   });
 });
 
@@ -344,7 +357,7 @@ describe('TODO detection and text limits', () => {
       files: { master: 'video/neon-16x9.mp4', thumbnails: ['thumbnails/thumb-1.jpg'], shorts: [{ name: 'Z1-intro', video: 'shorts/Z1-intro-9x16.mp4' }] },
     };
     const texts = releaseTexts(input);
-    expect(Object.keys(texts)).toEqual(['youtube.md', 'shorts.md', 'instagram.md', 'tiktok.md', 'spotify.md', 'release-plan.md']);
+    expect(Object.keys(texts)).toEqual(['youtube.md', 'shorts.md', 'instagram.md', 'tiktok.md', 'spotify.md', 'x.md', 'linkedin.md', 'release-plan.md']);
     expect(texts['youtube.md']).toContain('## Beschreibung');
     expect(texts['youtube.md']).toContain('0:00 Intro\n0:40 Refrain\n1:10 Bridge');
     expect(texts['youtube.md']).toContain('Neon Static – Neon Rain (Suno)');
@@ -356,7 +369,9 @@ describe('TODO detection and text limits', () => {
     expect(texts['tiktok.md']).not.toContain('Text-Overlay');
     expect(texts['spotify.md']).toMatch(/1\. \*\*Künstler:\*\* Neon Static/);
     expect(texts['spotify.md']).toContain('Musik: vollständig KI');
-    expect(texts['release-plan.md']).toContain('| -21 | 2026-11-20 |');
+    expect(texts['release-plan.md']).toContain('TODO: no release calendar');
+    expect(texts['x.md']).toContain('Ganzes Video: [Link zum Hauptvideo]');
+    expect(texts['linkedin.md']).toContain('erster Absatz');
     for (const text of Object.values(texts)) expect(unmarkedPlaceholders(text)).toEqual([]);
     expect(texts['instagram.md']).not.toBe(texts['tiktok.md']);
     expect(footerLines({ ...input, kind: 'episode' }, releaseLabels('de'))).not.toContain('Neon Static – Neon Rain (Suno)');
@@ -428,6 +443,7 @@ describe('release folder', () => {
     expect(await tree(result.dir)).toEqual([
       'README.md',
       'audio/Neon Static - Neon Rain.wav',
+      'calendar.ics',
       'shorts/Z1-intro-9x16.mp4',
       'shorts/Z1-intro-thumb.jpg',
       'shorts/Z1-intro-tiktok.jpg',
@@ -442,10 +458,12 @@ describe('release folder', () => {
       'streaming/lyrics.lrc',
       'streaming/lyrics.txt',
       'texts/instagram.md',
+      'texts/linkedin.md',
       'texts/release-plan.md',
       'texts/shorts.md',
       'texts/spotify.md',
       'texts/tiktok.md',
+      'texts/x.md',
       'texts/youtube.md',
       'thumbnails/thumb-1.jpg',
       'thumbnails/thumb-2.jpg',
@@ -454,7 +472,8 @@ describe('release folder', () => {
       'video/neon-1x1.mp4',
       'video/neon-9x16.mp4',
       'video/neon.de.srt',
-    ]);
+      'microsite/neon.json',
+    ].sort());
     // The upload thumbnail comes first; large files are the renders' bytes.
     expect((await readFile(join(result.dir, 'thumbnails', 'thumb-1.jpg'))).toString('latin1').endsWith('b')).toBe(true);
     expect(await readFile(join(result.dir, 'video', 'neon-16x9.mp4'), 'utf8')).toBe('render 16x9');
@@ -577,5 +596,103 @@ describe('release QA', () => {
   it('is a single TODO before release ran', async () => {
     const dir = await fixture();
     expect(await releaseChecks(dir, fixtureProbe())).toEqual([{ name: 'Release package', result: 'TODO', evidence: 'renders/release/ is missing; run npm run cli -- release' }]);
+  });
+});
+
+/** Call the board's request handler without a socket. */
+async function request(handler: ReturnType<typeof boardHandler>, method: string, url: string, body?: unknown, headers: Record<string, string> = {}) {
+  const { Readable } = await import('node:stream');
+  const req = Object.assign(Readable.from(body === undefined ? [] : [Buffer.from(JSON.stringify(body))]), { method, url, headers });
+  return new Promise<{ status: number; headers: Record<string, unknown>; body: string }>((done) => {
+    const chunks: Buffer[] = [];
+    const res = {
+      statusCode: 200,
+      headers: {} as Record<string, unknown>,
+      setHeader(name: string, value: unknown) { this.headers[name.toLowerCase()] = value; },
+      writeHead(status: number, head: Record<string, unknown> = {}) { this.statusCode = status; Object.assign(this.headers, head); return this; },
+      write(chunk: Buffer | string) { chunks.push(Buffer.from(chunk)); return true; },
+      end(chunk?: Buffer | string) { if (chunk) chunks.push(Buffer.from(chunk)); done({ status: this.statusCode, headers: this.headers, body: Buffer.concat(chunks).toString('utf8') }); },
+      on() { return this; }, once() { return this; }, emit() { return true; }, removeListener() { return this; },
+    };
+    void handler(req as never, res as never);
+  });
+}
+
+describe('release board', () => {
+  it('plans the calendar during release and lays out every platform with files, texts, and limits', async () => {
+    const dir = await fixture();
+    await buildRelease({ projectDir: dir, deps: fakeDeps() });
+    const calendar = await loadCalendar(dir);
+    expect(calendar).toMatchObject({ project: 'neon', release_date: '2026-12-11', proposed: false, timezone: 'Europe/Berlin' });
+    expect(calendar!.events.find((event) => event.id === 'youtube')?.at).toBe('2026-12-11T18:00:00+01:00');
+    expect(calendar!.events.find((event) => event.id === 'linkedin')?.at).toBe('2026-12-15T09:00:00+01:00');
+    const release = join(dir, 'renders', 'release');
+    expect(await readFile(join(release, 'texts', 'release-plan.md'), 'utf8')).toContain('| 0 | Fr 11.12.2026 | 18:00 | Hauptvideo als YouTube-Premiere (youtube.md) |');
+    expect(await readFile(join(release, 'calendar.ics'), 'utf8')).toContain('DTSTART:20261211T170000Z');
+    const site = JSON.parse(await readFile(join(release, 'microsite', 'neon.json'), 'utf8'));
+    expect(site).toMatchObject({ slug: 'neon', title: 'Neon Rain', teaser: 'Zwölf Sekunden Neonregen.', disclosure: 'Song und Video wurden mit KI erstellt.', links: {} });
+
+    const board = await boardProject(dir, join(dir, '..', '..'));
+    expect(board.platforms.map((platform) => platform.id)).toEqual(['youtube', 'shorts', 'tiktok', 'instagram', 'spotify', 'x', 'linkedin', 'microsite']);
+    const youtube = board.platforms.find((platform) => platform.id === 'youtube')!;
+    const main = youtube.posts.find((post) => post.id === 'youtube')!;
+    expect(main.files.map((file) => file.path)).toEqual(['video/neon-16x9.mp4', 'thumbnails/thumb-1.jpg', 'thumbnails/thumb-2.jpg', 'thumbnails/thumb-3.jpg', 'video/neon.de.srt']);
+    expect(main.fields.find((field) => field.label === 'Titel')).toMatchObject({ limit: 100, unit: 'chars' });
+    const tiktok = board.platforms.find((platform) => platform.id === 'tiktok')!;
+    expect(tiktok.posts.map((post) => post.id)).toEqual(['short:Z1-intro:tiktok', 'short:Z2-chorus:tiktok', 'short:Z3-outro:tiktok']);
+    expect(tiktok.posts[0]!.files.map((file) => file.path)).toEqual(['shorts/Z1-intro-9x16.mp4', 'shorts/Z1-intro-tiktok.jpg']);
+    const x = board.platforms.find((platform) => platform.id === 'x')!.posts.find((post) => post.id === 'x')!;
+    expect(x.fields.find((field) => field.label === 'Antwort mit Link')?.value).toBe('Ganzes Video: [Link zum Hauptvideo]');
+    expect(board.platforms.find((platform) => platform.id === 'linkedin')!.skipped).toBeUndefined();
+    // The square render is the feed version: the Instagram feed post and LinkedIn carry it.
+    const feed = board.platforms.find((platform) => platform.id === 'instagram')!.posts.find((post) => post.id === 'instagram-post')!;
+    expect(feed.files.map((entry) => entry.path)).toEqual(['video/neon-1x1.mp4', 'streaming/cover-3000x3000.jpg']);
+    expect(board.platforms.find((platform) => platform.id === 'linkedin')!.posts[0]!.files.map((entry) => entry.path)).toEqual(['video/neon-1x1.mp4']);
+    // Every post with a date is a calendar event, so its done state is the calendar's.
+    const ids = new Set(board.calendar.map((event) => event.id));
+    for (const post of board.platforms.flatMap((platform) => platform.posts)) if (post.at) expect(ids.has(post.id)).toBe(true);
+  });
+
+  it('records posted items and live URLs, and serves only release-folder files', async () => {
+    const dir = await fixture();
+    await buildRelease({ projectDir: dir, deps: fakeDeps() });
+    const root = join(dir, '..', '..');
+    const handler = boardHandler({ root, now: () => new Date('2026-12-11T17:05:00Z') });
+    expect(JSON.parse((await request(handler, 'GET', '/api/channel')).body)).toEqual({});
+    const list = JSON.parse((await request(handler, 'GET', '/api/projects')).body);
+    expect(list).toEqual([expect.objectContaining({ slug: 'neon', releaseDate: '2026-12-11', done: 0, hasRelease: true })]);
+    const posted = await request(handler, 'POST', '/api/projects/neon/status', { id: 'youtube', done: true, url: 'https://youtu.be/abc' });
+    expect(posted.status).toBe(200);
+    const status = JSON.parse(await readFile(join(dir, 'review', 'release-status.json'), 'utf8'));
+    expect(status.items.youtube).toEqual({ done: true, at: '2026-12-11T17:05:00.000Z', url: 'https://youtu.be/abc' });
+    // The live URL lands in the texts that point to the video.
+    const board = JSON.parse((await request(handler, 'GET', '/api/projects/neon')).body);
+    const x = board.platforms.find((platform: { id: string }) => platform.id === 'x').posts.find((post: { id: string }) => post.id === 'x');
+    expect(x.fields.find((field: { label: string }) => field.label === 'Antwort mit Link').value).toBe('Ganzes Video: https://youtu.be/abc');
+    expect((await request(handler, 'POST', '/api/projects/neon/status', { id: 'x', url: 'javascript:alert(1)' })).status).toBe(400);
+    expect((await request(handler, 'GET', '/api/projects/..%2F..%2Fetc')).status).toBe(404);
+    expect((await request(handler, 'GET', '/api/projects/Etc')).status).toBe(400);
+    expect((await request(handler, 'GET', '/media/neon/..%2F..%2Fproject.yaml')).status).toBe(403);
+    const video = await request(handler, 'GET', '/media/neon/video/neon-16x9.mp4', undefined, { range: 'bytes=0-5' });
+    expect(video.status).toBe(206);
+    expect(video.headers['content-range']).toMatch(/^bytes 0-5\//);
+    const events = JSON.parse((await request(handler, 'GET', '/api/calendar')).body);
+    expect(events.find((event: { id: string }) => event.id === 'youtube')).toMatchObject({ project: 'neon', done: true, label: 'Hauptvideo als YouTube-Premiere (youtube.md)' });
+    const ics = await request(handler, 'GET', '/calendar.ics');
+    expect(ics.body).toContain('SUMMARY:Neon Rain: Hauptvideo als YouTube-Premiere (youtube.md)');
+  });
+
+  it('marks a published song done up to a day and keeps the rest open', async () => {
+    const dir = await fixture();
+    await buildRelease({ projectDir: dir, deps: fakeDeps() });
+    const lines: string[] = [];
+    const calendar = await runCalendar({ projectDir: dir, root: join(dir, '..', '..'), doneUntil: '2026-12-11', now: new Date('2026-12-14T08:00:00Z'), log: (line) => lines.push(line) });
+    const status = await loadStatus(dir);
+    const done = calendar.events.filter((event) => status.items[event.id]?.done).map((event) => event.id);
+    expect(done).toEqual(expect.arrayContaining(['distributor', 'pitch', 'youtube', 'short:Z1-intro:tiktok']));
+    expect(done).not.toContain('links');
+    expect(done).not.toContain('short:Z2-chorus:youtube');
+    expect(lines.join('\n')).toContain(`Marked ${done.length} event(s) up to 2026-12-11 as done.`);
+    await expect(runCalendar({ projectDir: dir, root: join(dir, '..', '..'), doneUntil: 'yesterday', log: () => undefined })).rejects.toThrow('--done-until');
   });
 });

@@ -72,7 +72,7 @@ scripts/           Audio analysis and review player (Python/uv), fixture generat
 templates/project/ Project template used by the new-video skill
 templates/episode/ Episode template used by the new-episode skill
 templates/series/  Series canon template used by the new-series skill
-templates/channel/ Optional config/channel.yaml template and example (links, footer, hashtag sets)
+templates/channel/ Optional config/channel.yaml (links, footer, hashtag sets) and config/release-schedule.yaml templates
 brand/example/     Neutral synthwave/cyberpunk brand kit with OFL fonts
 bench/             Model bench: cases, targets, budget (fixtures and runs gitignored)
 projects/          Video projects and episodes (media gitignored)
@@ -93,7 +93,7 @@ dist/              Generated npx bundle (gitignored)
 | 6 | `storyboard` | `storyboard` | `storyboard.yaml`, `storyboard.md`, contact sheet | Schema, anchors, coverage, refs, source rules |
 | 7 | `assets` | `remotion-motion`, `ai-clips`, `footage` | Components, keyframes, clips, footage | Per-batch cost + QA; cache |
 | 8 | `assembly` | `assembly-render` | `renders/preview-16x9.mp4` | Preview; sync/legibility |
-| 9 | `qa-export` | `video-qa` | `review/report.md`, `review/upload.yaml`, release folder `renders/release/` (all formats, 3 thumbnails, 3 Shorts, WAV, cover, canvas, lyrics, platform texts, release plan) | Sync, readability, determinism; art director on thumbnails and cover; release checks (PASS/FAIL/TODO) |
+| 9 | `qa-export` | `video-qa` | `review/report.md`, `review/upload.yaml`, release folder `renders/release/` (all formats, 3 thumbnails, 3 Shorts, WAV, cover, canvas, lyrics, platform texts, release calendar, microsite data) | Sync, readability, determinism; art director on thumbnails and cover; release checks (PASS/FAIL/TODO) |
 
 The song always exists already; the workflow never writes lyrics or generates music. ✋ marks the **interactive stages**: the `new-video` skill runs them in the main session with the user (project data, lyrics, song import, grilling). `/video-next` refuses to start while one is open.
 
@@ -159,6 +159,8 @@ npm run schema
 | `npm run cli -- generate <project> --batch <file> [--provider <p>] [--lipsync-provider <p>]` | Run a cached, budget-checked generation batch; `--provider` overrides the project provider for one batch (lip-sync keeps its own), `--lipsync-provider` the lip-sync provider. |
 | `npm run cli -- qa <project> [--determinism <frame>]` | Write `review/report.md`; optionally check frame hashes. |
 | `npm run cli -- release <project> [--no-render] [--canvas-from <anchor\|s>] [--canvas-seconds <n>]` | Build `renders/release/`: every format, thumbnails, Shorts, WAV, cover, canvas, lyrics, platform texts, README, manifest; renders only missing or stale formats; idempotent. |
+| `npm run cli -- calendar <project> [--replan] [--done-until <date>]` | Plan `review/calendar.yaml` (when what goes online where) in the next free slots of `config/release-schedule.yaml`, without colliding with other projects; `release` does it too. `--done-until` marks a published song's past events done. |
+| `npm run cli -- release-board [--port <n>]` | User command: a local page over all release folders, per platform files, texts, limits, settings, and links, the calendar of all projects (`.ics`), and what is posted (`review/release-status.json`). |
 | `npm run cli -- upload-text <project>` | Render `review/upload.md` (a pointer to the release folder) from `review/upload.yaml`. |
 | `npm run cli -- publish <project> [--platform youtube\|tiktok\|all] [--only main\|shorts\|<name>] [--schedule <iso>] [--dry-run] [--force]` | User command, never a stage: upload the release package to YouTube (private or scheduled) and TikTok (inbox drafts); idempotent through `review/publish.json`. |
 | `npm run cli -- publish-auth youtube\|tiktok` | One-time OAuth consent; stores the refresh token in `.env`. |
@@ -188,7 +190,7 @@ The root package is published as `coreslopper`. `npm run build` copies the track
 
 ## Skills
 
-Own skills: `new-video`, `video-brief`, `video-treatment`, `audio-analysis`, `style-bible`, `character-bible`, `storyboard`, `remotion-motion`, `ai-clips`, `footage`, `assembly-render`, `video-qa`, and for series and episodes `new-series`, `new-episode`, `voice-track`, `episode-track`. Outside the pipeline: `model-bench` compares models and servers before a model switch.
+Own skills: `new-video`, `video-brief`, `video-treatment`, `audio-analysis`, `style-bible`, `character-bible`, `storyboard`, `remotion-motion`, `ai-clips`, `footage`, `assembly-render`, `video-qa`, and for series and episodes `new-series`, `new-episode`, `voice-track`, `episode-track`. Outside the pipeline: `model-bench` compares models and servers before a model switch; `release-backfill` brings an existing or already published project into the release board and calendar.
 
 Vendored from Matt Pocock (MIT, see `docs/THIRD_PARTY.md`): `grill-me`, `grilling`, `writing-for-agents`, `domain-modeling`.
 
@@ -223,6 +225,7 @@ CI runs without API keys and uses the mock provider. GPU tests are opt-in.
 - `docs/THIRD_PARTY.md` — vendored skills, licenses, fonts, providers.
 - `docs/mcp.md` — optional exploration MCP servers; provider adapters.
 - `docs/publishing.md` — `publish`: YouTube and TikTok setup, limits, quota.
+- `docs/release-platforms.md` — what each platform takes (fields, limits, links), posting times, legal notes for Germany.
 - `docs/adr/0024-release-folder-manual-distribution.md` — the release folder and the manual distributor upload.
 
 ## License

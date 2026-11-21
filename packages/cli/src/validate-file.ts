@@ -10,6 +10,8 @@ import {
   StyleBibleSchema,
   CharacterBibleSchema,
   ChannelConfigSchema,
+  ReleaseCalendarSchema,
+  ReleaseScheduleSchema,
   ValidationError,
   loadProject,
   loadDefaults,
@@ -94,6 +96,10 @@ export async function validateChangedFile(file: string): Promise<string | undefi
     await readYamlFile(resolve(file), ChannelConfigSchema);
     return 'channel';
   }
+  if (basename(file) === 'release-schedule.yaml' && basename(dirname(resolve(file))) === 'config') {
+    await readYamlFile(resolve(file), ReleaseScheduleSchema);
+    return 'release schedule';
+  }
   const root = findArtifactRoot(file);
   const name = basename(file);
   if (root.type === 'series') return validateSeriesFile(root.dir, name);
@@ -164,6 +170,10 @@ export async function validateChangedFile(file: string): Promise<string | undefi
   if (name === 'upload.yaml' && basename(dirname(resolve(file))) === 'review') {
     await loadUploadData(projectDir);
     return 'upload data';
+  }
+  if (name === 'calendar.yaml' && basename(dirname(resolve(file))) === 'review') {
+    await readYamlFile(join(projectDir, 'review', 'calendar.yaml'), ReleaseCalendarSchema);
+    return 'release calendar';
   }
   if (name === 'publish.json' && basename(dirname(resolve(file))) === 'review') {
     await readJsonFile(join(projectDir, 'review', 'publish.json'), PublishLogSchema);

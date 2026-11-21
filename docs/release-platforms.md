@@ -1,0 +1,148 @@
+# Release platforms: fields, limits, and links
+
+What each platform takes for a release, as researched on 2026-11-21 from official help pages where they exist. **(unverified)** marks a figure only third parties state. Platforms change these often: `PLATFORM_LIMITS` in `packages/core/src/schema.ts` holds the enforced numbers, and `config/channel.yaml` can override them.
+
+## Which file goes where
+
+The release board assigns each file of the release folder to its posts:
+
+| File | Goes to |
+|---|---|
+| `video/<slug>-16x9.mp4` (master) | YouTube main video; Spotify music video (beta, 16:9 only) |
+| `video/<slug>-4x5.mp4` or `-1x1.mp4` (feed format) | Instagram feed post of the release; LinkedIn post |
+| `shorts/<name>-9x16.mp4` | YouTube Shorts, TikTok, Instagram Reels, X posts, Instagram story |
+| `thumbnails/thumb-1.jpg` (2, 3) | YouTube thumbnail (Test & compare); YouTube post |
+| `shorts/<name>-thumb.jpg` / `-tiktok.jpg` | Shorts and Reel cover / TikTok cover (3:4) |
+| `streaming/cover-3000x3000.jpg` | Distributor; announcement; Instagram feed post cover |
+| `streaming/canvas-9x16.mp4` | Spotify Canvas |
+
+## YouTube (long-form)
+
+| Field | Rule | Source |
+|---|---|---|
+| Title | 100 characters | [57404](https://support.google.com/youtube/answer/57404) |
+| Description | 5,000 characters; the first ~100–150 show before "more" (unverified) | 57404 |
+| Tags | "Minimal role" in discovery; 500 characters in total (unverified) | [146402](https://support.google.com/youtube/answer/146402) |
+| Hashtags | Up to 3 shown above the title; more than 60 and all are ignored | [6390658](https://support.google.com/youtube/answer/6390658) |
+| Chapters | First `00:00`, at least 3, ascending, each ≥ 10 s | [9884579](https://support.google.com/youtube/answer/9884579) |
+| Thumbnail | Verified account; 16:9, 3840×2160 recommended, min. width 640; JPG/PNG; 50 MB desktop, 2 MB mobile | [72431](https://support.google.com/youtube/answer/72431) |
+| End screen | Video ≥ 25 s; last 5–20 s; up to 4 elements; external link only in the Partner Program | [6388789](https://support.google.com/youtube/answer/6388789) |
+| Cards | Up to 5; link cards only in the Partner Program | [6140493](https://support.google.com/youtube/answer/6140493) |
+| Subtitles | `.srt`, `.vtt`, `.lrc` and others, UTF-8 | [2734698](https://support.google.com/youtube/answer/2734698) |
+| AI disclosure | "Altered or synthetic content" required for realistic AI content and AI music in focus | [14328491](https://support.google.com/youtube/answer/14328491) |
+| Premiere | Scheduled or instant; not for Shorts or above 1080p | [9080341](https://support.google.com/youtube/answer/9080341) |
+| Pinned comment | Needs advanced features (phone verification and history) | [9891124](https://support.google.com/youtube/answer/9891124) |
+| Links | Clickable in descriptions and comments; external links need advanced features; up to 14 channel links | [13748639](https://support.google.com/youtube/answer/13748639) |
+| Posts (community) | Open to all channels except made-for-kids (unverified) | [7124474](https://support.google.com/youtube/answer/7124474) |
+| Official Artist Channel | 3 official releases via a distributor; request through the distributor | [7336634](https://support.google.com/youtube/answer/7336634) |
+
+## YouTube Shorts
+
+| Field | Rule | Source |
+|---|---|---|
+| Duration | Square or vertical, up to 3 minutes | [15424877](https://support.google.com/youtube/answer/15424877) |
+| Texts | Same fields and limits as long-form | 57404 |
+| Thumbnail | Custom thumbnail from Studio on desktop; 9:16, 2160×3840 recommended | 72431 |
+| Links | Not clickable in description or comments since 2023-08-31 | 13748639 |
+| Related video | One clickable link to an own video; Studio → Content → Short → Related video | [14075157](https://support.google.com/youtube/answer/14075157) |
+| Scheduling | Yes; no Premiere | 9080341 |
+
+The related video is the only clickable pointer from a Short to the main video.
+
+## TikTok
+
+| Field | Rule | Source |
+|---|---|---|
+| Length | 10 min recorded; uploads up to 60 min (unverified as general) | [TechCrunch](https://techcrunch.com/2024/05/16/tiktok-upload-60-minute-videos) |
+| Caption | 4,000 characters in the app (unverified); 2,200 through the Content Posting API | [onlinemarketing.de](https://onlinemarketing.de/social-media-marketing/tiktok-captions-limit-4000-zeichen) |
+| Hashtags | No official cap; 3–5 relevant ones (unverified) | — |
+| AI label | Required for realistic AI image, audio, or video: "AI-generated" toggle | [TikTok support](https://support.tiktok.com/en/using-tiktok/creating-videos/ai-generated-content) |
+| Own song as sound | Delivered by the distributor; claim the artist profile in TikTok for Artists | [MBW](https://musicbusinessworldwide.com/tiktok-just-launched-its-own-music-distribution-platform-soundon) |
+| Bio link | 1,000 followers or a business account (unverified) | [Buffer](https://buffer.com/library/how-to-put-a-link-in-tiktok-bio/) |
+| Caption links | Not clickable | — |
+| Scheduling | TikTok Studio on the web, 15 min to 10 days ahead; carousels not | [TikTok](https://ads.tiktok.com/business/en/blog/introducing-video-scheduler-now-you-can-plan-tiktoks-in-advance) |
+| Photo carousel | Up to 35 images (unverified) | — |
+
+Pointers to YouTube: bio link, pinned comment, a text line in the caption or on the cover.
+
+## Instagram
+
+| Field | Rule | Source |
+|---|---|---|
+| Reels | Up to 3 min; 9:16, 1080×1920 | [Social Media Today](https://www.socialmediatoday.com/news/instagram-officially-expands-reels-length-to-3-minutes/737766/) |
+| Reel cover | 420×654 (1:1.55) recommended; not editable after upload; keep text in the centre 3:4 | [Instagram help](https://help.instagram.com/1038071743007909) |
+| Profile grid | 3:4 tiles since January 2025 | [Business Today](https://www.businesstoday.in/technology/news/story/instagram-head-announces-big-changes-3-minute-reels-and-new-look-for-profile-grid-461527-2025-01-21) |
+| Feed / carousel | Up to 20 slides; all take the first slide's ratio; 1080×1350 (4:5) standard | [Storrito](https://storrito.com/resources/how-instagrams-20-slide-carousels-work-and-what-the-new-limits-are/) |
+| Caption | 2,200 characters; ~125 show before "more" (unverified) | [Meta API](https://developers.secure.facebook.com/docs/instagram-api/reference/ig-user/media) |
+| Hashtags | 5 per post or Reel since December 2025 | [Business Today](https://www.businesstoday.in/technology/news/story/no-more-hashtag-stuffing-instagram-limits-hashtag-usage-to-just-5-per-reel-and-post-507444-2025-12-19) |
+| Collab posts | Up to 5 collaborators; cannot be scheduled | [Buffer](https://buffer.com/resources/instagram-collab-post/) |
+| AI info | May be required for realistic video or AI vocals | [Meta](https://www.meta.com/help/artificial-intelligence/1783222608822690/) |
+| Bio links | Up to 5 | [Meta](https://www.meta.com/help/subscriptions/29142271265407659/) |
+| Stories | 9:16, up to 60 s per segment; link sticker for all accounts | [Instagram](https://about.instagram.com/blog/announcements/expanding-sharing-links-in-stories-to-everyone) |
+| Scheduling | Native for professional accounts, up to 75 days ahead | [Instagram help](https://help.instagram.com/iphone-app/439971288310029) |
+
+Pointers to YouTube: a story link sticker on release day, a bio link, a pinned comment; caption links are not clickable.
+
+## Spotify for Artists
+
+The release itself (audio, cover, ISRC, AI credits) goes through the distributor.
+
+| Feature | Rule | Source |
+|---|---|---|
+| Canvas | 3–8 s loop, 9:16, 720–1080 px tall, MP4/JPG; no URLs, logos, calls to action, or repeated title; avoid lip-sync and fast cuts | [Canvas guidelines](https://support.spotify.com/artists/article/canvas-guidelines/) |
+| Clips | New uploads ended 2026-06-17 | [Clips](https://support.spotify.com/us/artists/article/clips/) |
+| Music video (beta) | 16:9, ≥ 1920×1080, 30 s–20 min, music-first, linked to one song; waitlist; Premium listeners only | [Uploading videos](https://support.spotify.com/us/artists/article/uploading-videos/) |
+| Editorial pitch | At least 7 days before release; also places the song on followers' Release Radar; genre, mood, culture tags; ~500 characters (unverified) | [Pitching](https://support.spotify.com/us/artists/article/pitching-music-and-videos-to-playlist-editors/) |
+| Countdown Page | Albums and EPs only, ≥ 3,000 monthly listeners | [Countdown Pages](https://support.spotify.com/us/artists/article/countdown-pages/) |
+| Artist Pick | Song, album, music video, playlist, …; image ≥ 690×500; 180 days; Spotify content only | [Artist Pick](https://support.spotify.com/us/artists/article/artist-pick/) |
+| Cover | 1:1, 640–10,000 px, JPG/PNG/TIFF, sRGB | [Cover art](https://support.spotify.com/us/artists/article/cover-art-requirements/) |
+| Profile | Bio 1,500 characters; social links Instagram, Facebook, X, TikTok, Wikipedia; no YouTube or website field | [Artist bio](https://support.spotify.com/uk/artists/article/artist-bio) |
+| Lyrics | Musixmatch Pro | [Lyrics](https://support.spotify.com/artists/article/lyrics/) |
+
+Spotify has no link out to YouTube; the equivalent is the music video on Spotify itself.
+
+## X
+
+| Field | Rule | Source |
+|---|---|---|
+| Post | 280 characters free; 25,000 with Premium | [X help](https://help.x.com/en/using-x/x-premium) |
+| Video | 140 s free; up to 4 h with Premium | [X help](https://help.x.com/en/using-x/premium-longer-videos) |
+| Images | Up to 4 per post, 5 MB each | [X help](https://help.x.com/en/using-x/x-videos) |
+| Alt text | 1,000 characters | [X help](https://help.x.com/en/using-x/picture-descriptions) |
+| Links | X says it dropped the link penalty in July 2026; data still shows weak reach for link posts | [ppc.land](https://ppc.land/x-drops-year-old-link-penalty-musk-tells-zuckerberg-on-platform/) |
+| Hashtags | 1–2 (unverified) | — |
+
+Post the Short natively and put the YouTube link in a reply.
+
+## LinkedIn
+
+| Field | Rule | Source |
+|---|---|---|
+| Post | 3,000 characters; ~210 (desktop) / ~140 (mobile) before "see more" (unverified) | [AuthoredUp](https://authoredup.com/blog/linkedin-character-limit) |
+| Video | 3 s–15 min desktop, 10 min mobile, 5 GB, MP4/MOV (unverified) | [LinkedIn help](https://www.linkedin.com/help/linkedin/answer/a548372) |
+| Document post | PDF/PPTX/DOCX, 100 MB, 300 pages | [LinkedIn help](https://www.linkedin.com/help/linkedin/answer/97459) |
+| Links | Reach penalty contested (−19 % to −27 % in studies); link in the first comment shows no advantage | [Ordinal](https://www.tryordinal.com/blog/linkedin-link-penalty-study) |
+| Hashtags | 0–3 (unverified) | — |
+
+LinkedIn fits songs with a political, work, tech, or AI angle, told as a personal story with a native video; it is weak for plain fan promotion.
+
+## Posting times
+
+Vendor studies, mostly global, in CET; the channel's own analytics win. `config/release-schedule.yaml` holds the times a workspace uses.
+
+- Instagram: Mon and Thu 20:00, then 15:00; weekdays around 12:00 ([Metricool](https://metricool.com/de/beste-zeiten-zum-posten-auf-social-media/), [Sprout](https://sproutsocial.com/de/insights/best-times-to-post-on-social-media/)).
+- TikTok: 20:00 daily, Saturday 18:00 ([Metricool](https://metricool.com/de/beste-zeiten-zum-posten-auf-social-media/)).
+- LinkedIn: weekdays 9–12, not on weekends ([Metricool](https://metricool.com/de/beste-zeiten-zum-posten-auf-linkedin)).
+- X, YouTube: no study with CET times found.
+
+## Release conventions
+
+- Global Release Day: Friday, 00:00 local time ([IFPI via MBW](https://musicbusinessworldwide.com/global-release-day-begins-on-friday-july-10)).
+- Distributor delivery 2–4 weeks ahead; the Spotify pitch at least 7 days ahead.
+- Rollout practice: announcement with cover around T−14, teasers T−10 to T−1, release on Friday, then 2–4 Shorts a week for up to four weeks with the official sound.
+
+## Legal notes for Germany
+
+- **Impressum** (§ 5 DDG): commercial profiles need one within two clicks, usually through the bio link, with the legal name ([e-recht24](https://www.e-recht24.de/impressum/13396-impressum-social-media.html)).
+- **Werbung/Anzeige** (§ 5a UWG): for posts with something in return; promoting one's own music on one's own profile is generally not covered ([Verbraucherzentrale](https://www.verbraucherzentrale.de/wissen/digitale-welt/soziale-netzwerke/influencerin-oder-nicht-wann-ein-beitrag-in-social-media-werbung-ist-39954)).
+- **EU AI Act Art. 50**: transparency duties apply since 2026-08-02; deepfakes must be disclosed, with a lighter duty for evidently artistic works ([Goodwin](https://www.goodwinlaw.com/en/insights/publications/2026/08/alerts-technology-dpc-eu-ai-act-transparency-obligations-now-in-force)). Set the platform AI labels and add a line like "Video mit KI erstellt".

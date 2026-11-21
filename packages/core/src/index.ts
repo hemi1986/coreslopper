@@ -12,3 +12,4 @@ export * from './bench.js';
 export * from './release.js';
 export * from './flex.js';
 export * from './fl2va.js';
+export * from './calendar.js';

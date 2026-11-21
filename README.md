@@ -81,6 +81,26 @@ Space plays and pauses, ←/→ steps one frame, ↑/↓ one second. While pause
 
 Then ask Claude Code for a fix pass, for example *"work through the review notes for <slug>"*. It maps every note to its shot, fixes timing, motion, or generated media, re-renders, and reports which notes are done. Keys and file format: [scripts/review-player/README.md](scripts/review-player/README.md).
 
+## 4. Release
+
+The last stage, `qa-export`, builds the release package in `projects/<slug>/renders/release/`: every format, three thumbnails, three Shorts with covers, the song as WAV, the streaming cover, the Spotify Canvas, lyrics, and the texts for each platform (YouTube, Shorts, TikTok, Instagram, Spotify and the distributor, X, LinkedIn when the song suits it, and your microsite). It also plans a **release calendar** for the project: when what goes online where.
+
+**Open the release board** to publish from it:
+
+```bash
+npm run cli -- release-board                  # http://127.0.0.1:4848
+```
+
+- One tab per platform: which file goes where (with previews), every text with a copy button and a counter against the platform's limit, the settings to check (AI label, related video, cover), and where each post links to.
+- Tick off what you posted and paste its live URL. The YouTube URL then fills the link in the X and LinkedIn texts and the microsite data. Your progress is saved in `projects/<slug>/review/release-status.json`.
+- The calendar view shows the dates of all your projects; **Calendar as .ics** imports them into your calendar app.
+
+**Set your release rules once** in `config/release-schedule.yaml` (copy [templates/channel/release-schedule.yaml](templates/channel/release-schedule.yaml)): release weekday and times, your time zone, lead times for the distributor and the Spotify pitch, the Short slots, posting times, and holidays. Every new project takes the next free slots, so two songs never share a Friday or a Short slot. Set `release.release_date` in `project.yaml` to fix a project's date; until then the calendar's date is a proposal.
+
+**Projects from before the calendar**, or songs that are already out: run `/release-backfill <slug>` in Claude Code. It asks what is published, writes the missing texts, plans the open slots, and marks the past as done.
+
+Uploading stays yours: the board tells you what to post, and `publish` can upload to YouTube and TikTok as private videos or drafts ([docs/publishing.md](docs/publishing.md)). What each platform accepts and why: [docs/release-platforms.md](docs/release-platforms.md).
+
 ## Series and episodes
 
 Besides music videos, coreslopper makes episodes of a series from a script instead of a song. A **series** has a canon in `series/<slug>/`: bible, style, characters, sets, reference images and voices, and an episode plan. Each **episode** is its own project that reads this canon and builds its audio from `script.yaml`: generated or recorded takes per line, ambience per scene, and English subtitles.
@@ -120,6 +140,8 @@ Run these inside the workspace.
 | `npm run cli -- validate <project>` | Check timing, storyboard, style, and characters. |
 | `npm run cli -- render <project> --format 16x9` | Render a format (`16x9`, `9x16`, `1x1`). |
 | `npm run cli -- review <project>` | Watch a render frame by frame and leave review notes. |
+| `npm run cli -- release-board` | Publish from the release board: files, texts, settings, and the calendar of all projects. |
+| `npm run cli -- calendar <project>` | Plan or show a project's release calendar (`--replan`, `--done-until <date>`). |
 | `npm run cli -- estimate --role image.keyframe --units 8 --project projects/<project>` | Check a cost against the budget. |
 | `npm run cli -- doctor` | Check tools, fonts, Remotion, and keys. |
 | `/video-next <project>` | Run all open stages in Claude Code. |
@@ -149,6 +171,8 @@ Your projects, `.env`, and your own edits to workflow files are kept. If a file 
 | Series and episodes: stages, takes, re-timing | [docs/pipeline.md#episodes](docs/pipeline.md#episodes), [ADR 0016](docs/adr/0016-episode-projects.md) |
 | fal.ai, Higgsfield, budgets, and model roles | [docs/providers.md](docs/providers.md) |
 | Review player: keys, notes, fix pass | [scripts/review-player/README.md](scripts/review-player/README.md) |
+| Release board, calendar, and what each platform accepts | [docs/release-platforms.md](docs/release-platforms.md), [ADR 0028](docs/adr/0028-release-board-and-calendar.md) |
+| Uploading to YouTube and TikTok | [docs/publishing.md](docs/publishing.md) |
 | Local video clips with ComfyUI | [comfyui/README.md](comfyui/README.md) |
 | Optional MCP servers | [docs/mcp.md](docs/mcp.md) |
 | How it works inside | [docs/architecture.md](docs/architecture.md), [docs/adr/](docs/adr/) |

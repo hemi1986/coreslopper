@@ -277,6 +277,26 @@
               "caption"
             ]
           },
+          "x": {
+            "type": "object",
+            "properties": {
+              "post": {
+                "type": "string",
+                "minLength": 1
+              },
+              "hashtags": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^#[\\p{L}\\p{N}_]+$"
+                }
+              }
+            },
+            "required": [
+              "post"
+            ]
+          },
           "summary_en": {
             "type": "object",
             "properties": {
@@ -336,6 +356,112 @@
           "minLength": 1
         }
       }
+    },
+    "announcement": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hashtags": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^#[\\p{L}\\p{N}_]+$"
+          }
+        }
+      },
+      "required": [
+        "text"
+      ]
+    },
+    "x": {
+      "type": "object",
+      "properties": {
+        "post": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hashtags": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^#[\\p{L}\\p{N}_]+$"
+          }
+        },
+        "reply": {
+          "type": "string",
+          "minLength": 1
+        },
+        "media": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "post"
+      ]
+    },
+    "linkedin": {
+      "type": "object",
+      "properties": {
+        "decision": {
+          "type": "string",
+          "enum": [
+            "post",
+            "skip"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "post": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hashtags": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^#[\\p{L}\\p{N}_]+$"
+          }
+        },
+        "media": {
+          "default": "main",
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "decision",
+        "reason"
+      ]
+    },
+    "microsite": {
+      "type": "object",
+      "properties": {
+        "teaser": {
+          "type": "string",
+          "minLength": 1
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "quote": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "teaser",
+        "text"
+      ]
     }
   },
   "required": [

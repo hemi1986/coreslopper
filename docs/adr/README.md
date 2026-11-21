@@ -32,4 +32,6 @@ Short records of decisions that are hard to reverse, surprising without context,
 | [0026](0026-cloud-lipsync-and-lead-only-audio.md) | Higgsfield (Speak v2, legacy job-set routes) and Topview (Avatar 4 on the OpenAPI) lip-sync; `generate --lipsync-provider`; lip-sync segments are lead-only: backing words and `--mute` spans are silenced, `lead.wav` is preferred, unwritten vocals are reported. |
 | [0027](0027-pika-lipsync-audio-guide.md) | Local lip-sync on Pika H3 Ref2VA with the vocal anchored from frame 0 (`MiniMaxH3AddGuide`), `pika-h3-ref2va-lipsync`; LTX lip-sync stays as a `params.workflow` fallback. |
 
+| [0028](0028-release-board-and-calendar.md) | `release-board`: a local page per project and platform (files, texts, limits, settings, live URLs, done state); `review/calendar.yaml` planned under the workspace's `config/release-schedule.yaml` without collisions across projects; X, LinkedIn (agent decides), announcement, and microsite in the upload data. |
+
 Status values: `Accepted`, `Deprecated`, `Superseded by ADR-NNNN`.
