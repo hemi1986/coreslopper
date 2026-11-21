@@ -17,3 +17,4 @@ export * from './autopilot.js';
 export * from './production.js';
 export * from './watch.js';
 export * from './review.js';
+export * from './lyrics.js';

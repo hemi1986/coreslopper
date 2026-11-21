@@ -16,6 +16,7 @@ license: MIT
 ## Inputs
 
 - `brief.md`, `treatment.md`, `style.yaml`
+- The user references in `references.yaml` of kind `character` (`subject` names the character)
 - `config/models.yaml` (character-sheet and image-edit roles)
 - `packages/providers` (generation adapter)
 - `docs/glossary.md`

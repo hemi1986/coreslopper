@@ -354,6 +354,10 @@ _Avoid_: boilerplate
 The final step that produces all format renders, the review report, and the release package; also the optional extraction of a project into its own repository.
 _Avoid_: render
 
+**User Reference**:
+Material the user hands over for the grilling and the bibles: mood boards, photos of people, places, their own storyboards, video concepts, footage, voice recordings, and links. Listed in `references.yaml` of a project or series canon (kind, subject, note), with the files in `assets/references/`; added in the board's wizard or with `reference add|link`. Not to be confused with the generated references of characters, sets, and props.
+_Avoid_: moodboard (one kind of it), input files
+
 **Review Note**:
 A user's free-text remark on one frame or a range of frames of a render, saved by the board's review view or the desktop review player in `review/notes/<video-stem>.json` with its frame and time. A note without a round is a draft.
 _Avoid_: annotation, comment, feedback

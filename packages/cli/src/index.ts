@@ -562,6 +562,62 @@ async function loadAndSave(project: string | undefined) {
 }
 
 program
+  .command('lyrics <project>')
+  .description('Write lyrics.txt from a file, once every sung line sits under a section tag; --propose prints tags for untagged lyrics instead (blocks that repeat become [Chorus]).')
+  .requiredOption('--file <path>', 'The lyrics as plain text')
+  .option('--propose', 'Print the lyrics with proposed section tags and the section list; write nothing')
+  .action((project: string, options: { file: string; propose?: boolean }) =>
+    run(async () => {
+      const { readFile } = await import('node:fs/promises');
+      const text = await readFile(options.file, 'utf8');
+      if (options.propose) {
+        const { lyricsSections, proposeTags } = await import('@coreslopper/core');
+        const tagged = proposeTags(text);
+        console.log(tagged);
+        for (const section of lyricsSections(tagged).sections) console.log(`[${section.tag}] ${section.lines[0] ?? ''}`);
+        return;
+      }
+      const { writeLyrics } = await import('./board-wizard.js');
+      await writeLyrics(projectDirFromArg(project), text);
+      console.log('✔ lyrics.txt written');
+    }),
+  );
+
+program
+  .command('reference <action> [target]')
+  .description('The user\'s references of a project or series canon (references.yaml, files in assets/references/): list | add --file | link --url | remove --id. Kinds: look, character, location, storyboard, concept, footage, voice, other.')
+  .option('--series', 'The target is a series canon, not a project')
+  .option('--file <path>', 'add: the file to copy in')
+  .option('--url <url>', 'link: the address')
+  .option('--title <title>', 'link: a title')
+  .option('--kind <kind>', 'What it is', 'other')
+  .option('--subject <text>', 'Who or what it shows')
+  .option('--note <text>', 'What the user wants from it')
+  .option('--id <id>', 'remove: the reference id')
+  .action((action: string, target: string | undefined, options: { series?: boolean; file?: string; url?: string; title?: string; kind: string; subject?: string; note?: string; id?: string }) =>
+    run(async () => {
+      const wizard = await import('./board-wizard.js');
+      const dir = options.series ? seriesDirFromArg(target ?? '.') : projectDirFromArg(target);
+      const which = validateChoice(action, ['list', 'add', 'link', 'remove'] as const, 'action');
+      if (which === 'add') {
+        if (!options.file) throw new ValidationError('add needs --file <path>');
+        const reference = await wizard.addReferenceFromPath(dir, options.file, { kind: options.kind, subject: options.subject, note: options.note });
+        console.log(`✔ ${reference.id} ${reference.file}`);
+      } else if (which === 'link') {
+        const reference = await wizard.addReferenceLink(dir, { url: options.url, title: options.title, kind: options.kind, subject: options.subject, note: options.note });
+        console.log(`✔ ${reference.id} ${reference.url}`);
+      } else if (which === 'remove') {
+        await wizard.removeReference(dir, options.id);
+        console.log(`✔ ${options.id} removed`);
+      } else {
+        for (const reference of (await wizard.loadReferences(dir)).references) {
+          console.log(`${reference.id}  ${reference.kind.padEnd(10)} ${reference.file ?? reference.url}${reference.subject ? `  · ${reference.subject}` : ''}${reference.note ? `  · ${reference.note}` : ''}`);
+        }
+      }
+    }),
+  );
+
+program
   .command('stage-start <project> <stage>')
   .description('Mark a stage as running and save state.json.')
   .action((project: string, stage: string) =>

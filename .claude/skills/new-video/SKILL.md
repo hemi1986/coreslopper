@@ -12,7 +12,7 @@ Talk to the user in their language. Write every project file in English, except 
 
 ## Start or resume
 
-1. If the user named a slug and `projects/<slug>/project.yaml` exists, run `npm run cli -- status projects/<slug>` and jump to the first stage that is not `done`: `setup` → step 1 below (skip project creation), `brief` → step 6, `treatment` → step 7. If all three are done, go to step 8. When `setup` is done and `project.yaml` has no `release:` block, offer step 4 first; the user may skip it.
+1. If the user named a slug and `projects/<slug>/project.yaml` exists (the board's wizard may have created it, with lyrics, song, and user references), run `npm run cli -- status projects/<slug>` and jump to the first stage that is not `done`: `setup` → step 1 below (skip project creation), `brief` → step 6, `treatment` → step 7. If all three are done, go to step 8. When `setup` is done and `project.yaml` has no `release:` block, offer step 4 first; the user may skip it.
 2. Otherwise start at step 1.
 
 ## Steps
@@ -93,7 +93,7 @@ Tell the user the song is in and that you now interview them about the video. Me
 
 ### 6. Brief
 
-Use the `grilling` skill to interview the user about the video, then follow `.claude/skills/video-brief/SKILL.md` to write `brief.md`. You already know title, artist, budget, language, rights, and the lyrics, so do not ask for them again; read `lyrics.txt` and ground your questions in it. Typical open branches: what the video is about versus what the song is about, audience and platform, look and references, performers or characters on screen, real footage the user has, formats, and what must be avoided.
+Use the `grilling` skill to interview the user about the video, then follow `.claude/skills/video-brief/SKILL.md` to write `brief.md`. You already know title, artist, budget, language, rights, and the lyrics, so do not ask for them again; read `lyrics.txt` and ground your questions in it. Read the user references (`npm run cli -- reference list projects/<slug>`) and open every file before the first question (images and PDFs directly, a video through `npm run cli -- frame projects/<slug> --input <file> --position middle`); ask what each one stands for unless its note says so. A storyboard or concept of the user's is their starting point: grill on it rather than around it. Record material the user hands over in chat with `npm run cli -- reference add projects/<slug> --file <path> --kind <kind> --note "<what for>"`. Typical open branches: what the video is about versus what the song is about, audience and platform, look and references, performers or characters on screen, real footage the user has, formats, and what must be avoided.
 
 Done when the grilling frontier is empty, the user has confirmed shared understanding, `brief.md` is written, and `npm run cli -- stage-done projects/<slug> brief --outputs brief.md` succeeded.
 

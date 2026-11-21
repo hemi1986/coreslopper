@@ -16,6 +16,7 @@ license: MIT
 ## Inputs
 
 - `brief.md`, `treatment.md`
+- The user references in `references.yaml` of kind `look` and `location`
 - `brand/<kit>/` or project brand overrides
 - `docs/glossary.md`
 

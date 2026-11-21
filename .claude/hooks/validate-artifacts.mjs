@@ -26,6 +26,7 @@ const TRACKED = new Set([
   'channel.yaml',
   'release-schedule.yaml',
   'calendar.yaml',
+  'references.yaml',
 ]);
 
 function readStdin() {

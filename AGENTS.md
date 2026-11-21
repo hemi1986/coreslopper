@@ -169,6 +169,8 @@ npm run schema
 | `npm run cli -- release-run [--project <slug>] [--dry-run] [--plan]` | The release autopilot's round: post what is due of every approved release by API; run by the timer, never by a stage. |
 | `npm run cli -- watch [--every <min>] [--no-autopilot]` | The watchdog round: `release-run`, then the production scan (stage, render, queue, budget events and stalled stages in `.cache/watch/`); run by the timer or the board container (`board --watch`, `docker compose up -d`), never by a stage. |
 | `npm run cli -- release-timer [show\|install\|remove\|status] [--every <min>]` | User command: the timer that runs `watch` (Windows Task Scheduler under WSL, systemd, launchd); not with the board container. |
+| `npm run cli -- lyrics <project> --file <txt> [--propose]` | Write `lyrics.txt` once every line sits under a section tag; `--propose` prints proposed tags (repeated blocks become `[Chorus]`). |
+| `npm run cli -- reference list\|add\|link\|remove [<project> \| --series <s>]` | The user references (`references.yaml`, files in `assets/references/`): mood boards, photos, storyboards, concepts, footage, voices, links, with kind, subject, and note. |
 | `npm run cli -- import-song <project>` | Register `audio/song.wav` and `audio/stems/vocals.wav` in `song.json`; converts other formats. |
 | `npm run cli -- normalize-audio <project> --input <file>` | Normalize audio to −14 LUFS / −1 dBTP. |
 | `npm run cli -- footage <project> --input <file> --name <name>` | Normalize a footage proxy. |

@@ -38,7 +38,7 @@ Done when `new` succeeded and `setup` is `done`.
 
 ### 2. Grill into the script
 
-Read `bible.md`, the episode's entry in the episode plan, the canon's characters (with their `face` display rules) and sets, and the `script.yaml` of the previous episode of the series, if one exists, for continuity. Then use the `grilling` skill until the episode is fully decided: what happens and how it ends, the scenes and the set each plays in, who speaks which line in which kind (`dialogue`, `voiceover`, `announcement`, `chat`, `sfx`, `pause`), the pauses that carry tension, the ambience of each scene, and the target length inside `limits.episode_seconds`.
+Read `bible.md`, the episode's entry in the episode plan, the canon's characters (with their `face` display rules) and sets, the episode's user references (`npm run cli -- reference list projects/<slug>`: a storyboard or script draft is the starting point), and the `script.yaml` of the previous episode of the series, if one exists, for continuity. Then use the `grilling` skill until the episode is fully decided: what happens and how it ends, the scenes and the set each plays in, who speaks which line in which kind (`dialogue`, `voiceover`, `announcement`, `chat`, `sfx`, `pause`), the pauses that carry tension, the ambience of each scene, and the target length inside `limits.episode_seconds`.
 
 Ground every question in the canon. When the story needs a character or set the canon lacks, stop the grilling on that branch and tell the user to add it to the series canon first; an episode cannot add one.
 

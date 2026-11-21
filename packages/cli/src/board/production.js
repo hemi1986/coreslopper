@@ -21,7 +21,7 @@ addStrings({
       release: 'Fertig. Weiter im Release-Tab.', released: 'Release freigegeben: der Autopilot postet.',
       canon: 'Canon fertigstellen:', episode: 'Nächste geplante Episode anlegen:', 'series-done': 'Alle geplanten Episoden sind angelegt.'
     },
-    drafts: function (n) { return n + ' Notiz(en) noch nicht an den Agenten gesendet'; },
+    drafts: function (n) { return n + ' Notiz(en) noch nicht an den Agenten gesendet'; }, wizard: 'oder im Assistenten',
     canon: 'Canon', characters: 'Figuren', sets: 'Sets', episodes: 'Episoden', notCreated: 'nicht angelegt', gaps: 'Lücken im Canon', format: 'Format',
     uncommitted: 'frei', canonSpent: 'Canon', episodeBudgets: 'Episoden-Budgets', updated: 'aktualisiert vor',
     activity: 'Aktivität', watchdog: function (at) { return 'Watchdog: letzte Runde vor ' + at; },
@@ -55,7 +55,7 @@ addStrings({
       release: 'Done. Continue in the release tab.', released: 'Release approved: the autopilot posts.',
       canon: 'Finish the canon:', episode: 'Create the next planned episode:', 'series-done': 'Every planned episode exists.'
     },
-    drafts: function (n) { return n + ' note(s) not sent to the agent yet'; },
+    drafts: function (n) { return n + ' note(s) not sent to the agent yet'; }, wizard: 'or in the wizard',
     canon: 'Canon', characters: 'Characters', sets: 'Sets', episodes: 'Episodes', notCreated: 'not created', gaps: 'Gaps in the canon', format: 'Format',
     uncommitted: 'uncommitted', canonSpent: 'canon', episodeBudgets: 'episode budgets', updated: 'updated',
     activity: 'Activity', watchdog: function (at) { return 'Watchdog: last round ' + at + ' ago'; },
@@ -82,12 +82,14 @@ function stageLabel(project, id) {
   return stage ? stage.label : id;
 }
 
-function nextBox(next, label, slug) {
+function nextBox(next, label, slug, kind) {
   const words = t('next')[next.reason];
   const text = typeof words === 'function' ? words(label || next.stage || '') : words;
   const box = el('div', { class: 'next' }, [el('span', { text: text })]);
   if (next.command) box.appendChild(el('code', { text: next.command }));
   if (next.command) box.appendChild(copyButton(next.command, { copy: t('copy'), copied: t('copied') }));
+  // A setup the wizard can finish: project data, lyrics, song, references.
+  if (next.reason === 'interactive' && next.stage === 'setup' && slug && kind !== 'episode') box.appendChild(el('a', { href: '#/new/video/' + slug, text: t('wizard') + ' →', onclick: function (e) { e.stopPropagation(); } }));
   if (next.where === 'board' && slug) box.appendChild(el('a', { href: '#/p/' + slug + '/release', text: t('tabRelease') + ' →', onclick: function (e) { e.stopPropagation(); } }));
   return box;
 }
@@ -161,7 +163,7 @@ function projectCard(project) {
     project.failedReviews ? el('div', { class: 'meta error', text: t('failedReviews')(project.failedReviews) }) : null,
     project.review && project.review.drafts ? el('div', { class: 'meta', text: t('drafts')(project.review.drafts) }) : null
   ].concat(progressRows(project)).concat([
-    nextBox(project.next, project.next.stage && stageLabel(project, project.next.stage), project.slug)
+    nextBox(project.next, project.next.stage && stageLabel(project, project.next.stage), project.slug, project.kind)
   ]));
 }
 
@@ -217,7 +219,7 @@ function renderProject(p) {
     p.updatedAt ? el('span', { class: 'sub', text: t('updated') + ' ' + ago(p.updatedAt) }) : null
   ]));
   main.appendChild(viewTabs(p.slug, 'production', p.hasRelease));
-  main.appendChild(nextBox(p.next, p.next.stage && stageLabel(p, p.next.stage), p.slug));
+  main.appendChild(nextBox(p.next, p.next.stage && stageLabel(p, p.next.stage), p.slug, p.kind));
   const stalled = stalledNote(p);
   if (stalled) main.appendChild(stalled);
   main.appendChild(el('div', { style: 'height:14px' }));

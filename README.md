@@ -46,6 +46,8 @@ claude
 /new-video
 ```
 
+Or start on the board: `npm run cli -- board`, **+ New** → Music video takes the project data, the lyrics with proposed section tags, the song and stem as uploads, and your references (mood boards, storyboards, concepts, footage, links); `/new-video <slug>` then starts with the brief ([docs/board.md](docs/board.md#new-projects)).
+
 The `new-video` skill walks you through setup:
 
 1. It asks for the title, artist, slug, budget (USD, mandatory), visual provider (`mock`, `fal`, or `higgsfield`), the sung language, and the song's rights, then creates the project.

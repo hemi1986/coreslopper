@@ -1412,6 +1412,40 @@ export const ReviewRepliesSchema = z.object({
   ),
 });
 
+export const ReferenceKindSchema = z.enum(['look', 'character', 'location', 'storyboard', 'concept', 'footage', 'voice', 'other']);
+
+/**
+ * `references.yaml` of a project or series canon: what the user handed over
+ * before the grilling (images, storyboards, concepts, footage, voice
+ * recordings, links). Files live in `assets/references/`.
+ */
+export const ReferencesSchema = z.object({
+  version: z.literal(1),
+  references: z
+    .array(
+      z
+        .object({
+          id: z.string().regex(/^r[0-9a-f]{6,}$/),
+          kind: ReferenceKindSchema,
+          /** Relative to the project or canon, under assets/references/. */
+          file: z.string().regex(/^assets\/references\/[^/]+$/).optional(),
+          url: z.string().regex(/^https?:\/\//).optional(),
+          /** The original file name or the link's title. */
+          title: z.string().optional(),
+          /** Who or what it shows: a character, a set, a section of the song. */
+          subject: z.string().optional(),
+          /** What the user wants from it, in their words. */
+          note: z.string().optional(),
+          added: z.string().min(1),
+        })
+        .refine((value) => Boolean(value.file) !== Boolean(value.url), { message: 'a reference is either a file or a url' }),
+    )
+    .default([]),
+});
+
+export type ReferenceKind = z.infer<typeof ReferenceKindSchema>;
+export type References = z.infer<typeof ReferencesSchema>;
+export type Reference = References['references'][number];
 export type ReviewNote = z.infer<typeof ReviewNoteSchema>;
 export type ReviewNotes = z.infer<typeof ReviewNotesSchema>;
 export type ReviewRound = z.infer<typeof ReviewRoundSchema>;

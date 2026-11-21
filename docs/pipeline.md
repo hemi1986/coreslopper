@@ -24,8 +24,8 @@ The song always exists already. There is no lyric-writing or song-generation sta
 
 ## 1. Setup
 
-- Skill: `new-video`
-- Input: project data, pasted lyrics, the song at `audio/song.wav` and the vocal stem at `audio/stems/vocals.wav`
+- Skill: `new-video`, or the board's wizard for the same steps ([board.md](board.md#new-projects))
+- Input: project data, pasted lyrics, the song at `audio/song.wav` and the vocal stem at `audio/stems/vocals.wav`, and optional user references (`references.yaml`, files in `assets/references/`)
 - Output: `project.yaml`, `lyrics.txt`, `song.json`, `audio/song.wav`, `audio/stems/vocals.wav` (optional)
 
 ```bash

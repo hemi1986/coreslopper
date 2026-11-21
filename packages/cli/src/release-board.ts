@@ -1,5 +1,5 @@
 import { createReadStream, existsSync } from 'node:fs';
-import { readFile, readdir, stat } from 'node:fs/promises';
+import { readFile, readdir, rm, stat } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -107,13 +107,19 @@ const LOOPBACK_HOST = /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/i;
  * Origin of that same host when the browser sends one, and a JSON body
  * (which a cross-site page cannot send without a preflight the board never answers).
  */
-export function trustedWrite(req: Pick<IncomingMessage, 'headers'>): string | undefined {
+export function trustedWrite(req: Pick<IncomingMessage, 'headers'>, upload = false): string | undefined {
   const host = req.headers.host ?? '';
   if (!LOOPBACK_HOST.test(host)) return 'writes are accepted from the board on 127.0.0.1 only';
   const origin = req.headers.origin;
   if (origin !== undefined && origin !== `http://${host}`) return 'writes are accepted from the board page only';
   const site = req.headers['sec-fetch-site'];
   if (site !== undefined && site !== 'same-origin' && site !== 'none') return 'writes are accepted from the board page only';
+  // An upload is a raw file body, which a cross-site page cannot send without a preflight either; it must name its origin.
+  if (upload) {
+    if (origin === undefined) return 'uploads are accepted from the board page only';
+    if (!/^application\/octet-stream\b/i.test(req.headers['content-type'] ?? '')) return 'uploads need content-type application/octet-stream';
+    return undefined;
+  }
   if (!/^application\/json\b/i.test(req.headers['content-type'] ?? '')) return 'writes need content-type application/json';
   return undefined;
 }
@@ -163,6 +169,84 @@ export function boardHandler(options: BoardOptions = {}) {
     if (!dir) throw new ValidationError(`unknown ${what} ${slug}`);
     return dir;
   };
+  const scopeDir = (scope: string, slug: string) =>
+    scope === 'series' ? workspaceDir(seriesDirs, slug, 'series') : workspaceDir(projectDirs, slug, 'project');
+  /** The wizard for new projects, series, and episodes; true when it answered the request. */
+  const wizardRoute = async (req: IncomingMessage, res: ServerResponse, path: string, query: URLSearchParams): Promise<boolean> => {
+    const wizard = await import('./board-wizard.js');
+    const answer = (value: unknown) => {
+      json(res, value);
+      return true;
+    };
+    if (req.method === 'GET' && path === '/api/new/options') return answer(await wizard.wizardOptions(root));
+    if (req.method === 'POST' && path === '/api/new/video') {
+      const dir = await wizard.createVideoProject(root, (await body(req)) as never);
+      return answer({ slug: dir.split(sep).at(-1) });
+    }
+    if (req.method === 'POST' && path === '/api/new/series') {
+      const dir = await wizard.createSeriesCanon(root, (await body(req)) as never);
+      return answer({ slug: dir.split(sep).at(-1) });
+    }
+    if (req.method === 'POST' && path === '/api/new/episode') {
+      const dir = await wizard.createEpisode(root, (await body(req)) as never);
+      return answer({ slug: dir.split(sep).at(-1) });
+    }
+    const videoMatch = /^\/api\/new\/video\/([^/]+)(?:\/(lyrics|finish))?$/.exec(path);
+    if (videoMatch) {
+      const dir = await scopeDir('project', videoMatch[1]!);
+      if (req.method === 'GET' && !videoMatch[2]) return answer(await wizard.videoWizardState(dir));
+      if (req.method === 'POST' && videoMatch[2] === 'lyrics') {
+        const change = (await body(req)) as { text?: unknown; preview?: unknown };
+        if (change.preview) {
+          const { lyricsSections, proposeTags } = await import('@coreslopper/core');
+          const text = proposeTags(typeof change.text === 'string' ? change.text : '');
+          return answer({ text, ...lyricsSections(text) });
+        }
+        await wizard.writeLyrics(dir, change.text);
+        return answer(await wizard.videoWizardState(dir));
+      }
+      if (req.method === 'POST' && videoMatch[2] === 'finish') {
+        await wizard.finishSetup(dir);
+        return answer(await wizard.videoWizardState(dir));
+      }
+    }
+    const referencesMatch = /^\/api\/new\/(project|series)\/([^/]+)\/references$/.exec(path);
+    if (referencesMatch) {
+      const dir = await scopeDir(referencesMatch[1]!, referencesMatch[2]!);
+      if (req.method === 'GET') return answer(await wizard.loadReferences(dir));
+      if (req.method === 'POST') {
+        const change = (await body(req)) as Record<string, unknown>;
+        if (change.action === 'link') await wizard.addReferenceLink(dir, change as never, now());
+        else if (change.action === 'update') await wizard.updateReference(dir, change.id, change as never);
+        else if (change.action === 'delete') await wizard.removeReference(dir, change.id);
+        else throw new ValidationError('action must be link, update, or delete');
+        return answer(await wizard.loadReferences(dir));
+      }
+    }
+    const uploadMatch = /^\/api\/upload\/(project|series)\/([^/]+)\/(song|vocals|reference)$/.exec(path);
+    if (req.method === 'POST' && uploadMatch) {
+      const [, scope, slug, target] = uploadMatch as unknown as [string, 'project' | 'series', string, 'song' | 'vocals' | 'reference'];
+      const dir = await scopeDir(scope, slug);
+      const name = query.get('name') ?? '';
+      if (target === 'reference') {
+        const file = await wizard.referenceTarget(dir, name);
+        await wizard.receiveUpload(req, file, wizard.UPLOAD_LIMITS.reference.bytes);
+        try {
+          const reference = await wizard.recordReferenceFile(dir, file, name.slice(0, 300), { kind: query.get('kind'), subject: query.get('subject'), note: query.get('note') }, now());
+          return answer(reference);
+        } catch (error) {
+          await rm(file, { force: true });
+          throw error;
+        }
+      }
+      if (scope !== 'project') throw new ValidationError('a series has no song');
+      const file = await wizard.audioTarget(dir, target, name);
+      await wizard.receiveUpload(req, file, wizard.UPLOAD_LIMITS.audio.bytes);
+      const { warnings } = await wizard.importUploadedSong(dir);
+      return answer({ ...(await wizard.videoWizardState(dir)), warnings });
+    }
+    return false;
+  };
   const projectDir = async (slug: string) => {
     if (!SLUG.test(slug)) throw new ValidationError(`unknown project ${slug}`);
     const dir = join(root, 'projects', slug);
@@ -186,7 +270,7 @@ export function boardHandler(options: BoardOptions = {}) {
       const url = new URL(req.url ?? '/', 'http://localhost');
       const path = decodeURIComponent(url.pathname);
       if (req.method !== 'GET') {
-        const refused = trustedWrite(req);
+        const refused = trustedWrite(req, path.startsWith('/api/upload/'));
         if (refused) return json(res, { error: refused }, 403);
       }
       if (req.method === 'GET' && path === '/') {
@@ -235,6 +319,10 @@ export function boardHandler(options: BoardOptions = {}) {
           const change = (await body(req)) as { video?: unknown };
           return json(res, await submitRound(dir, change.video, now()));
         }
+      }
+      if (path.startsWith('/api/new') || path.startsWith('/api/upload/')) {
+        const handled = await wizardRoute(req, res, path, url.searchParams);
+        if (handled) return;
       }
       const fileMatch = /^\/(files|series-files)\/([^/]+)\/(.+)$/.exec(path);
       if (req.method === 'GET' && fileMatch) {

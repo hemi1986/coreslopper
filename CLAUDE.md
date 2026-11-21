@@ -4,6 +4,7 @@
 
 ## Commands
 
+- The board's wizard (`npm run cli -- board`, **+ New**) can do the form part first: project data, lyrics, song, and user references (`references.yaml`); the skills below then resume at the grilling.
 - `/new-video [slug]` — skill that creates a project for an existing song (or resumes one): asks for project data and lyrics, imports the song and vocal stem, then grills the user into the brief and treatment. Runs in the main session, not in a stage runner.
 - `/new-series [slug]` — skill that creates a series canon (bible, characters, sets, episode plan, references) through the series budget. Runs in the main session.
 - `/new-episode [slug]` — skill that creates an episode of a series (or resumes one) and grills the user into `script.yaml`. Runs in the main session.

@@ -164,3 +164,19 @@ ul.activity a { color: var(--accent); }
 .note-reply { border-left: 3px solid var(--accent); padding: 2px 8px; font-size: 13px; margin: 4px 0; }
 .note-actions { display: flex; gap: 6px; }
 .pill.partly, .pill.question { color: var(--warn); font-weight: 600; } .pill.not-fixed { color: var(--bad); font-weight: 600; } .pill.fixed { color: var(--ok); }
+
+/* Wizard */
+.form .form-row, .step .form-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-start; margin-bottom: 12px; }
+.form-field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); flex: 1; min-width: 180px; }
+.form-field > span:first-child { font-weight: 600; color: var(--ink); }
+input.text, select.text { padding: 7px 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--ink); font: inherit; }
+.step-title { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; font-size: 16px; }
+.step-n { display: inline-flex; width: 26px; height: 26px; border-radius: 50%; align-items: center; justify-content: center; background: var(--chip); color: var(--muted); font-size: 13px; font-weight: 700; }
+.done-step .step-n { background: var(--ok); color: #fff; }
+textarea.lyrics { font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; margin-bottom: 8px; }
+ol.sections { margin: 4px 0 0 20px; padding: 0; font-size: 13px; }
+.refs { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; margin-top: 8px; }
+.ref { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+.ref img, .ref .ref-icon { width: 72px; height: 54px; object-fit: cover; border-radius: 5px; background: var(--chip); flex: none; display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--muted); font-weight: 700; }
+.ref-body { flex: 1; min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
+.ref-body a { color: var(--accent); }
