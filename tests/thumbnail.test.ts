@@ -13,6 +13,7 @@ import {
   parseFocus,
   parseThumbnailText,
   readableOn,
+  scrimGradient,
   type LineMetrics,
 } from '../packages/remotion/src/lib/thumbnail.ts';
 import { buildThumbnailProps, thumbnailColors } from '../packages/cli/src/thumbnail.ts';
@@ -128,6 +129,19 @@ describe('slab layout', () => {
   });
 });
 
+describe('scrim', () => {
+  it('keeps the original fades at strength 1', () => {
+    expect(scrimGradient('#fff6ee', 'left', '9x16')).toBe('linear-gradient(to top, #fff6eef0 0%, #fff6eec0 22%, #fff6ee00 58%)');
+    expect(scrimGradient('#fff6ee', 'bottom')).toBe('linear-gradient(to top, #fff6eee6 0%, #fff6eeb3 18%, #fff6ee00 46%)');
+    expect(scrimGradient('#fff6ee', 'left')).toBe('linear-gradient(to right, #fff6eee0 11%, #fff6ee00 50%)');
+    expect(scrimGradient('#fff6ee', 'right')).toBe('linear-gradient(to left, #fff6eee0 11%, #fff6ee00 50%)');
+  });
+
+  it('shortens and fades the scrim at a lower strength', () => {
+    expect(scrimGradient('#fff6ee', 'left', '9x16', 0.5)).toBe('linear-gradient(to top, #fff6ee78 0%, #fff6ee60 11%, #fff6ee00 29%)');
+  });
+});
+
 describe('thumbnail colours', () => {
   it('computes WCAG contrast', () => {
     expect(contrastRatio('#ffffff', '#000000')).toBeCloseTo(21);
@@ -182,6 +196,8 @@ describe('thumbnail props', () => {
     await expect(buildThumbnailProps({ projectDir: demoDir, still, text: 'A', layout: 'top', out: 'x.jpg' })).rejects.toThrow(/layout/);
     await expect(buildThumbnailProps({ projectDir: demoDir, still, text: 'A', font: 'hook', out: 'x.jpg' })).rejects.toThrow(/typography/);
     await expect(buildThumbnailProps({ projectDir: demoDir, still: 'missing.png', text: 'A', out: 'x.jpg' })).rejects.toThrow(/not found/);
+    await expect(buildThumbnailProps({ projectDir: demoDir, still, text: 'A', scrim: 1.5, out: 'x.jpg' })).rejects.toThrow(/scrim/);
+    await expect(buildThumbnailProps({ projectDir: demoDir, still, text: 'A', textOffset: 900, out: 'x.jpg' })).rejects.toThrow(/offset/);
   });
 });
 

@@ -21,6 +21,10 @@ export const ThumbnailRecipeSchema = z.object({
   font: z.string().optional(),
   tag: z.string().optional(),
   layout: z.string().optional(),
+  /** Scrim strength 0–1, when not the default 1. */
+  scrim: z.number().optional(),
+  /** Hook shift in pixels, when not 0; it belongs to this image's layout only. */
+  textOffset: z.number().optional(),
 });
 export type ThumbnailRecipe = z.infer<typeof ThumbnailRecipeSchema>;
 
@@ -30,7 +34,7 @@ export const recipePath = (image: string) => image.replace(/\.jpe?g$/i, '') + '.
 /** Write the recipe of a rendered thumbnail; the still is stored relative to the project when it lies inside. */
 export async function writeRecipe(
   output: string,
-  options: { projectDir: string; still: string; text: string; format?: string; focus?: string; zoom?: number; accent?: string; font?: string; tag?: string; layout?: string },
+  options: { projectDir: string; still: string; text: string; format?: string; focus?: string; zoom?: number; accent?: string; font?: string; tag?: string; layout?: string; scrim?: number; textOffset?: number },
 ): Promise<void> {
   const project = await loadProject(options.projectDir);
   const candidates = [resolve(process.cwd(), options.still), resolve(project.paths.root, options.still)];
@@ -47,6 +51,8 @@ export async function writeRecipe(
     ...(options.font ? { font: options.font } : {}),
     ...(options.tag ? { tag: options.tag } : {}),
     ...(options.layout ? { layout: options.layout } : {}),
+    ...(options.scrim !== undefined && options.scrim !== 1 ? { scrim: options.scrim } : {}),
+    ...(options.textOffset ? { textOffset: options.textOffset } : {}),
   };
   await writeTextAtomic(recipePath(output), `${JSON.stringify(recipe, null, 2)}\n`);
 }

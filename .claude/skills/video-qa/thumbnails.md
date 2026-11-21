@@ -27,6 +27,7 @@ If a still fails one of these, take the next candidate. A still whose sign or sc
 - The hook: the song's hook or its title, in at most three lines of at most four words. Separate lines with `|`. Short, loud, and the same language as the song.
 - Optional tag: one small word for the genre or frame, e.g. `SATIRE`, `LIVE`, `PARODY`.
 - The first line sits on the `primary` role, the other lines and the tag on `--accent` (default `accent`). Use a palette key that `style.yaml` reserves for alarm or error (e.g. `error_red`) only when the thumbnail shows that moment.
+- The scrim darkens the still towards the text in the background colour. On a dark still it can look like a grey veil: lower it with `--scrim` (0–1, default 1; 0 turns it off). `--text-offset <px>` moves the hook up (negative) or down (positive) when it covers a chin or a hand; keep it inside the zones above.
 
 ## 3. Compose
 

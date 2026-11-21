@@ -150,7 +150,7 @@ export async function fixture(options: { release?: boolean; upload?: boolean } =
 export interface FakeDeps extends Partial<ReleaseDeps> {
   ffmpegCalls: string[][];
   renders: string[];
-  thumbnails: { text: string; format?: string; out: string }[];
+  thumbnails: { text: string; format?: string; out: string; scrim?: number; textOffset?: number }[];
 }
 
 export function fakeDeps(overrides: Partial<ReleaseDeps> = {}, probes: Record<string, MediaProbe> = {}): FakeDeps {
@@ -159,7 +159,13 @@ export function fakeDeps(overrides: Partial<ReleaseDeps> = {}, probes: Record<st
     renders: [],
     thumbnails: [],
     thumbnail: async (options) => {
-      deps.thumbnails.push({ text: options.text, format: options.format, out: options.out });
+      deps.thumbnails.push({
+        text: options.text,
+        format: options.format,
+        out: options.out,
+        ...(options.scrim !== undefined ? { scrim: options.scrim } : {}),
+        ...(options.textOffset !== undefined ? { textOffset: options.textOffset } : {}),
+      });
       const size = { '9x16': [1080, 1920], '16x9': [1280, 720], '4x5': [1080, 1350] }[options.format ?? '16x9'] ?? [1280, 720];
       await writeFile(options.out, Buffer.concat([jpeg(size[0]!, size[1]!), Buffer.from(options.text)]));
       return options.out;

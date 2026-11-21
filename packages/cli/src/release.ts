@@ -490,7 +490,9 @@ async function deriveReleaseMedia(context: {
     } else {
       const stillHash = await hashFileStream(stillPath);
       for (const image of images) {
-        const spec = { format: image.format, text: image.text, tag: image.tag, still: recipe.still, stillSha256: stillHash, focus: recipe.focus ?? null };
+        // The scrim belongs to the still and carries over; a text offset belongs to the cover's layout and does not.
+        const scrim = 'scrim' in recipe && recipe.scrim !== undefined ? recipe.scrim : undefined;
+        const spec = { format: image.format, text: image.text, tag: image.tag, still: recipe.still, stillSha256: stillHash, focus: recipe.focus ?? null, ...(scrim !== undefined ? { scrim } : {}) };
         const key = sha256(JSON.stringify(spec));
         const same = await writer.unchanged(image.path, (entry) => entry.spec.key === key);
         if (!same && !context.stills) {
@@ -511,6 +513,7 @@ async function deriveReleaseMedia(context: {
             ...(recipe.focus ? { focus: recipe.focus } : {}),
             ...('accent' in recipe && recipe.accent ? { accent: recipe.accent } : {}),
             ...('font' in recipe && recipe.font ? { font: recipe.font } : {}),
+            ...(scrim !== undefined ? { scrim } : {}),
             out: join(dir, image.path),
           });
           await rm(recipePath(join(dir, image.path)), { force: true });
