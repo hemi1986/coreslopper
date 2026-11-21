@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { existsSync } from 'node:fs';
+import { basename, join, relative, resolve } from 'node:path';
 import { Command } from 'commander';
 import {
   ValidationError,
@@ -36,6 +38,24 @@ import { linkProjectMedia } from './media-dir.js';
 import { generateBatch } from './generate.js';
 import { runQa } from './qa.js';
 import { reviewImage } from './review-image.js';
+import { patchImage } from './patch.js';
+import { formatVerdicts, summarizeVerdicts } from './verdicts.js';
+import { formatMediaInfo, makeSheet, mediaInfo } from './image-ops.js';
+import { comfyRestart, comfyStatus, formatComfyStatus } from './comfy.js';
+import {
+  acceptItem,
+  addToQueue,
+  buildShotItems,
+  dropItem,
+  formatQueue,
+  loadQueue,
+  readJsonOrYaml,
+  retryItem,
+  runQueue,
+  runningPid,
+  waitForQueue,
+  type QueueItemInput,
+} from './queue.js';
 import { importFootage, importSong, importTakes, normalizeAudio, extractFrame, extractAudioSegment } from './media.js';
 import { parseMuteSpans } from './lipsync-audio.js';
 import { voiceTrack } from './voice-track.js';
@@ -232,6 +252,8 @@ program
   .option('--focus <x,y>', 'Point of the still (fractions 0-1) placed on the face side', '0.5,0.4')
   .option('--zoom <factor>', 'Extra zoom on the still, 1-4', (value) => Number(value), 1)
   .option('--font <key>', 'Typography key of style.yaml for the hook', 'display')
+  .option('--scrim <strength>', 'Fade towards the text, 0-1: lower is shorter and fainter (default 1)', (value) => Number(value))
+  .option('--text-offset <px>', 'Move the hook up (negative) or down (positive) in pixels (default 0)', (value) => Number(value))
   .action(
     (
       project: string | undefined,
@@ -246,6 +268,8 @@ program
         focus: string;
         zoom: number;
         font: string;
+        scrim?: number;
+        textOffset?: number;
       },
     ) =>
       run(async () => {
@@ -800,6 +824,283 @@ program
         console.log(JSON.stringify(verdict));
         if (verdict.verdict === 'fail') process.exitCode = 2;
       }),
+  );
+
+program
+  .command('verdicts [project]')
+  .description('Last art-director verdict per shot and reference of a project or series canon (from verdicts.jsonl).')
+  .option('--failed', 'Only the subjects whose last verdict is a fail')
+  .option('--json', 'Print machine-readable JSON')
+  .action((project: string | undefined, options: { failed?: boolean; json?: boolean }) =>
+    run(async () => {
+      const rows = await summarizeVerdicts(projectDirFromArg(project), { failed: options.failed });
+      console.log(options.json ? JSON.stringify(rows) : formatVerdicts(rows));
+    }),
+  );
+
+program
+  .command('patch [project]')
+  .description('Edit one region of an image and paste it back: crop the box, run it as an image.edit generation (cache, manifest, budget), blend the result in with a soft edge, and file it as the next attempt.')
+  .requiredOption('--image <png>', 'Image to repair')
+  .requiredOption('--box <x,y,w,h>', 'Region to edit: fractions of the image (0-1) or pixels')
+  .requiredOption('--prompt <text>', 'Edit prompt; the crop is image 1, --refs follow as image 2, 3, …')
+  .option('--refs <paths>', 'Extra reference images for the edit, comma-separated')
+  .option('--shot <id>', 'Shot the image belongs to (names the attempt)')
+  .option('--ref <kind:id>', 'Continuity reference the image is, instead of a shot')
+  .option('--attempt <n>', 'Attempt number of the patched image; default one after the last reviewed attempt')
+  .option('--out <png>', 'Where the patched image goes; default <image dir>/attempts/<name>-a<attempt>.png')
+  .option('--replace', 'Also put the patched image in place of --image; the old one is kept as the previous attempt')
+  .option('--feather <px>', 'Soft edge in pixels', '24')
+  .option('--size <px>', 'Long side the crop is scaled to for the edit', '1024')
+  .option('--seed <n>', 'Seed of the edit')
+  .option('--workflow <name>', 'Local workflow for the edit, e.g. qwen-edit-quality')
+  .option('--provider <name>', 'Override the provider for this edit: mock, fal, higgsfield, topview, or comfyui')
+  .option('--series <series>', 'Patch an image of this series canon against the series budget')
+  .action(
+    (
+      project: string | undefined,
+      options: {
+        image: string; box: string; prompt: string; refs?: string; shot?: string; ref?: string; attempt?: string; out?: string;
+        replace?: boolean; feather: string; size: string; seed?: string; workflow?: string; provider?: string; series?: string;
+      },
+    ) =>
+      run(async () => {
+        const provider = options.provider
+          ? validateChoice(options.provider, ['mock', 'fal', 'higgsfield', 'topview', 'comfyui'] as const, 'provider')
+          : undefined;
+        const result = await patchImage(projectDirFromArg(project), {
+          image: options.image,
+          box: options.box,
+          prompt: options.prompt,
+          references: parseCsv(options.refs),
+          subject: options.shot ?? options.ref,
+          ...(options.attempt ? { attempt: Number(options.attempt) } : {}),
+          out: options.out,
+          replace: options.replace,
+          feather: Number(options.feather),
+          size: Number(options.size),
+          ...(options.seed ? { seed: Number(options.seed) } : {}),
+          workflow: options.workflow,
+          provider,
+          ...(options.series ? { seriesDir: seriesDirFromArg(options.series) } : {}),
+        });
+        console.log(JSON.stringify(result));
+      }),
+  );
+
+program
+  .command('sheet [project]')
+  .description('Put images side by side on one sheet to look at them together; --box zooms every image into the same region.')
+  .requiredOption('--images <paths>', 'Images, comma-separated (at most 12), left to right')
+  .option('--name <stem>', 'File name of the sheet under assets/review/sheets/', 'sheet')
+  .option('--out <png>', 'Write the sheet here instead')
+  .option('--box <x,y,w,h>', 'Crop every image to this region first: fractions (0-1) or pixels')
+  .option('--height <px>', 'Height of one tile', '640')
+  .option('--columns <n>', 'Tiles per row; default one row, at most 4')
+  .action(
+    (
+      project: string | undefined,
+      options: { images: string; name: string; out?: string; box?: string; height: string; columns?: string },
+    ) =>
+      run(async () => {
+        const dir = projectDirFromArg(project);
+        const output = options.out
+          ? resolve(options.out)
+          : join(existsSync(join(dir, 'series.yaml')) ? dir : (await loadProject(dir)).paths.assets, 'review', 'sheets', `${options.name}.png`);
+        const images = parseCsv(options.images);
+        await makeSheet(images.map((image) => resolve(image)), output, {
+          height: Number(options.height),
+          ...(options.columns ? { columns: Number(options.columns) } : {}),
+          box: options.box,
+        });
+        console.log(`Sheet written to ${relative(process.cwd(), output)} (${images.map((image, index) => `${index + 1}: ${basename(image)}`).join(', ')})`);
+      }),
+  );
+
+program
+  .command('probe <files...>')
+  .description('Size, length, frame rate, and codecs of images, clips, and audio files.')
+  .option('--json', 'Print machine-readable JSON')
+  .action((files: string[], options: { json?: boolean }) =>
+    run(async () => {
+      const infos = files.map((file) => mediaInfo(file));
+      console.log(options.json ? JSON.stringify(infos) : infos.map(formatMediaInfo).join('\n'));
+    }),
+  );
+
+const comfy = program.command('comfy').description('The local ComfyUI server: status and restart.');
+
+comfy
+  .command('status')
+  .description('Server, queue length, VRAM, and the outcome of the last prompts.')
+  .option('--json', 'Print machine-readable JSON')
+  .action((options: { json?: boolean }) =>
+    run(async () => {
+      const status = await comfyStatus();
+      console.log(options.json ? JSON.stringify(status) : formatComfyStatus(status));
+      if (!status.ok) process.exitCode = 1;
+    }),
+  );
+
+comfy
+  .command('restart')
+  .description('Restart ComfyUI with the command in COMFYUI_RESTART_COMMAND (.env).')
+  .action(() =>
+    run(async () => {
+      await comfyRestart();
+      console.log(formatComfyStatus(await comfyStatus()));
+    }),
+  );
+
+const queue = program
+  .command('queue')
+  .description('The generation queue of a project (assets/queue.json): generate in order, review every result in the background, requeue failed images.');
+
+queue
+  .command('add [project]')
+  .description('Add items: keyframes or clips built from storyboard.yaml (--kind), or items from a batch file with id and out (--batch).')
+  .option('--kind <kind>', 'Build items from the storyboard: keyframe or clip')
+  .option('--shots <ids>', 'With --kind: shot ids or ranges, comma-separated (001,004-007); default every shot with the prompt')
+  .option('--role <role>', 'With --kind: model role instead of the default')
+  .option('--workflow <name>', 'With --kind: local workflow for every item, e.g. qwen-edit-quality or pika-h3-flf2va')
+  .option('--overrides <file>', 'With --kind: JSON/YAML object of item changes keyed by shot id, e.g. {"shot-008": {"fl2va": {…}}}')
+  .option('--batch <file>', 'JSON/YAML array of batch items, each with "id" and "out" (optional "review", "after", "chainFrom")')
+  .option('--replace', 'Reset items that are already queued instead of skipping them')
+  .option('--dry-run', 'Print the items without adding them')
+  .action(
+    (
+      project: string | undefined,
+      options: { kind?: string; shots?: string; role?: string; workflow?: string; overrides?: string; batch?: string; replace?: boolean; dryRun?: boolean },
+    ) =>
+      run(async () => {
+        if (Boolean(options.kind) === Boolean(options.batch)) throw new ValidationError('Pass either --kind keyframe|clip or --batch <file>.');
+        const loaded = await loadProject(projectDirFromArg(project));
+        let items: QueueItemInput[];
+        if (options.batch) {
+          const data = await readJsonOrYaml(options.batch);
+          if (!Array.isArray(data)) throw new ValidationError(`${options.batch} must be an array of items.`);
+          items = data as QueueItemInput[];
+        } else {
+          const kind = validateChoice(options.kind!, ['keyframe', 'clip'] as const, 'kind');
+          const overrides = options.overrides ? ((await readJsonOrYaml(options.overrides)) as Record<string, Record<string, unknown>>) : undefined;
+          const built = buildShotItems(loaded, { kind, shots: parseCsv(options.shots), role: options.role, workflow: options.workflow, overrides });
+          for (const skipped of built.skipped) console.log(`  skipped ${skipped.shot}: ${skipped.reason}`);
+          items = built.items;
+        }
+        if (options.dryRun) {
+          console.log(JSON.stringify(items, null, 2));
+          return;
+        }
+        if (items.length === 0) throw new ValidationError('Nothing to add.');
+        const result = addToQueue(loaded, items, { replace: options.replace });
+        console.log(
+          `Added ${result.added.length}${result.replaced.length ? `, replaced ${result.replaced.length}` : ''}` +
+            `${result.skipped.length ? `, already queued ${result.skipped.length} (${result.skipped.join(', ')})` : ''}.`,
+        );
+      }),
+  );
+
+queue
+  .command('run [project]')
+  .description('Work the queue until nothing can move. Exit code 2 when items need a fix. Start it in the background and follow it with `queue wait`.')
+  .option('--max-attempts <n>', 'Attempts per item before it waits as needs-fix', '3')
+  .option('--reviews <n>', 'Reviews that run at once', '2')
+  .option('--tries <n>', 'Tries per generation when the backend fails', '2')
+  .option('--timeout <s>', 'Seconds after which a generation counts as hung', '1500')
+  .action((project: string | undefined, options: { maxAttempts: string; reviews: string; tries: string; timeout: string }) =>
+    run(async () => {
+      const result = await runQueue(projectDirFromArg(project), {
+        maxAttempts: Number(options.maxAttempts),
+        reviews: Number(options.reviews),
+        tries: Number(options.tries),
+        timeoutSeconds: Number(options.timeout),
+      });
+      console.log(
+        `Queue done: ${result.passed.length} passed, ${result.needsFix.length} need a fix, ${result.errors.length} error(s), ${result.blocked.length} waiting.`,
+      );
+      for (const id of [...result.needsFix, ...result.errors]) console.log(`  ${id}`);
+      // A generation that hung past its timeout may still hold a timer; do not wait for it.
+      process.exit(result.needsFix.length + result.errors.length > 0 ? 2 : 0);
+    }),
+  );
+
+queue
+  .command('status [project]')
+  .description('Every item with its status, attempt, last score, and what it waits for.')
+  .option('--json', 'Print machine-readable JSON')
+  .action((project: string | undefined, options: { json?: boolean }) =>
+    run(async () => {
+      const loaded = await loadProject(projectDirFromArg(project));
+      const state = loadQueue(loaded.paths.assets);
+      if (options.json) return void console.log(JSON.stringify(state));
+      console.log(formatQueue(state));
+      console.log(runningPid(loaded.paths.assets) ? 'A queue run is active.' : 'No queue run is active.');
+    }),
+  );
+
+queue
+  .command('wait [project]')
+  .description('Block until an item needs a fix or failed, the run ended, or the timeout passed; prints what changed.')
+  .option('--timeout <s>', 'Seconds to wait at most', '540')
+  .action((project: string | undefined, options: { timeout: string }) =>
+    run(async () => {
+      const loaded = await loadProject(projectDirFromArg(project));
+      const result = await waitForQueue(loaded.paths.assets, { timeoutSeconds: Number(options.timeout) });
+      for (const change of result.changes) console.log(change);
+      console.log(
+        result.reason === 'needs-fix'
+          ? 'An item needs you: see `queue status`.'
+          : result.reason === 'finished'
+            ? 'No queue run is active.'
+            : 'Still running.',
+      );
+    }),
+  );
+
+queue
+  .command('retry <project> <id>')
+  .description('Put an item back: the next attempt with a new seed (and --prompt/--item/--provider), or only a new review when the last attempt has none.')
+  .option('--prompt <text>', 'New prompt for the next attempt')
+  .option('--item <file>', 'JSON/YAML object of item fields to merge in, e.g. a rewritten fl2va or other references')
+  .option('--provider <name>', 'Provider for this one attempt (the cloud fallback): fal, higgsfield, topview, comfyui, or mock')
+  .option('--seed <n>', 'Seed of the next attempt')
+  .action((project: string, id: string, options: { prompt?: string; item?: string; provider?: string; seed?: string }) =>
+    run(async () => {
+      const loaded = await loadProject(projectDirFromArg(project));
+      const provider = options.provider
+        ? validateChoice(options.provider, ['mock', 'fal', 'higgsfield', 'topview', 'comfyui'] as const, 'provider')
+        : undefined;
+      const entry = retryItem(loaded.paths.assets, id, {
+        prompt: options.prompt,
+        ...(options.item ? { item: (await readJsonOrYaml(options.item)) as Record<string, unknown> } : {}),
+        provider,
+        ...(options.seed ? { seed: Number(options.seed) } : {}),
+      });
+      console.log(`${entry.id}: ${entry.status}, attempt ${entry.attempt}.${runningPid(loaded.paths.assets) ? '' : ' Start `queue run`.'}`);
+    }),
+  );
+
+queue
+  .command('accept <project> <id>')
+  .description('Approve an item by hand: file the given attempt (default: the best one) at its out path and unlock what derives from it.')
+  .option('--attempt <n>', 'Attempt to keep')
+  .option('--note <text>', 'Why, e.g. "user approved by eye"')
+  .action((project: string, id: string, options: { attempt?: string; note?: string }) =>
+    run(async () => {
+      const loaded = await loadProject(projectDirFromArg(project));
+      const entry = await acceptItem(loaded, id, options.attempt ? Number(options.attempt) : undefined, options.note);
+      console.log(`${entry.id}: ${entry.note} -> ${entry.out}`);
+    }),
+  );
+
+queue
+  .command('drop <project> <id>')
+  .description('Remove an item from the queue; its files stay.')
+  .action((project: string, id: string) =>
+    run(async () => {
+      const loaded = await loadProject(projectDirFromArg(project));
+      console.log(`Dropped ${dropItem(loaded.paths.assets, id).id}.`);
+    }),
   );
 
 program

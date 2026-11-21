@@ -25,8 +25,8 @@ license: MIT
 1. Read the treatment and style bible. Decide which characters need a sheet. A one-off background figure may not.
 2. Write a precise description for each character: age range, silhouette, face, hair, wardrobe, materials, palette anchors, and what must never change.
 3. Generate a character sheet with `generateImage` or `editImage`. Use at least one reference image when revising a sheet; never rely on text alone for a recurring character.
-4. Save the sheet and 2–4 usable reference images under the project's gitignored `characters/<id>/`. Record them in `characters.yaml` with `sheet`, `refs`, and the prompt.
-5. Review the sheet with `npm run cli -- review-image <project> --image <sheet> --ref sheet:<id>` (the review loop in `.claude/skills/ai-clips/SKILL.md`, step 6): identity, costume, palette, and readability at small sizes. On fail, regenerate with its `fix_prompt`.
+4. File the sheet and 2–4 usable reference images under the project's gitignored `characters/<id>/` by giving each batch item its `out` path there; never copy generated files by hand. Record them in `characters.yaml` with `sheet`, `refs`, and the prompt.
+5. Every sheet is reviewed before anything derives from it: queue it as a hand-written item with `out` and `review` (`.claude/skills/ai-clips/SKILL.md`, steps 3–6), with `"review": {"ref": "sheet:<id>"}`. The queue reviews it (identity, costume, palette, readability at small sizes), regenerates a failed image with the verdict's `fix_prompt`, and files only an approved one.
 6. Add the **character states** the treatment or script needs (see below).
 7. Update the state with `npm run cli -- stage-done <project> style-character --outputs style.yaml,characters.yaml` when the style bible is also ready.
 
@@ -35,8 +35,8 @@ license: MIT
 A **character state** is a named look the story puts a character in from some shot on: a hatch open, a cable plugged in, headphones on (`docs/glossary.md`, ADR 0025). Every later keyframe derives from the state's reference, so one wrong state reference spreads into every shot after it. Make each one right before anything uses it.
 
 1. Per change in the story, add a state under the character's `states`: `id`, a `description` that says exactly what differs from the sheet and where things lead ("chest hatch open on its left hinge; red cable runs from inside the hatch out of frame to image-right, to the Walkman; no loose clips"), an optional `prompt`, and `from` when it builds on another state.
-2. Generate the reference as an `editImage` of the sheet (or of the `from` state's reference) at the master format's size, with the character's full figure, and save it under `characters/<id>/states/<state>.png`; record it in `ref`.
-3. Review the state as soon as it exists: `npm run cli -- review-image <project> --image <ref> --ref state:<id>/<state>` (the review loop in `.claude/skills/ai-clips/SKILL.md`, step 6). The art director counts limbs, follows every attachment end to end, and compares with the sheet. On fail, regenerate from the passing sheet or state with its `fix_prompt`, never from a failed image.
+2. Generate the reference as an `editImage` of the sheet (or of the `from` state's reference) at the master format's size, with the character's full figure: a queue item with `"out": "characters/<id>/states/<state>.png"` (in an episode `../../series/<series>/characters/<id>/states/<state>.png`), `"review": {"ref": "state:<id>/<state>"}`, and `"after"` naming the `from` state's item when that is queued too. Record the path in `ref`.
+3. The queue reviews the state as soon as it exists (`.claude/skills/ai-clips/SKILL.md`, steps 5–6): the art director counts limbs, follows every attachment end to end, and compares with the sheet. A failed state is regenerated from the passing sheet or state with its `fix_prompt`, never from a failed image. For a small local defect (one claw, one cable end), use `patch` on the attempt instead of a new roll.
 4. Never derive a state from a shot keyframe; derive it from the sheet or another reviewed state.
 
 
