@@ -1,0 +1,81 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+.agents/
+
+# Build output
+dist/
+build/
+coverage/
+.remotion/
+runtime/
+*.tgz
+
+# Secrets and local config
+.env
+.env.*
+!.env.example
+
+# Caches and local tools
+.cache/
+.tools/
+.vitest/
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Project media (text artifacts stay tracked)
+projects/*/audio/*
+!projects/*/audio/.gitkeep
+projects/*/assets/*
+!projects/*/assets/.gitkeep
+projects/*/characters/*
+!projects/*/characters/.gitkeep
+projects/*/sets/*
+!projects/*/sets/.gitkeep
+projects/*/props/*
+!projects/*/props/.gitkeep
+projects/*/renders/*
+!projects/*/renders/.gitkeep
+projects/*/timing.effective.json
+
+# A series canon is a project too (projects/<slug>/ with series.yaml): its media fall under the rules above.
+# Its art-director verdicts and review frames live in review/ (a music video keeps them in assets/review/).
+projects/*/review/verdicts.jsonl
+projects/*/review/frames/
+
+# Legacy layout before migrate-layout (series/<slug>/ beside projects/); keeps old canons' media out until they move
+series/*/characters/*
+!series/*/characters/.gitkeep
+series/*/sets/*
+!series/*/sets/.gitkeep
+series/*/props/*
+!series/*/props/.gitkeep
+series/*/assets/*
+!series/*/assets/.gitkeep
+
+# Character library media; each character.yaml stays tracked
+library/characters/*/*
+!library/characters/*/character.yaml
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Temporary
+tmp/
+
+# Model bench: case and target files stay tracked; media, runs, and spend are local
+bench/fixtures/
+bench/runs/
+bench/state.json
+bench/manifest.jsonl
+bench/timings.jsonl
+series/*/review/

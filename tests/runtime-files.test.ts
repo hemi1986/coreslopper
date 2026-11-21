@@ -73,6 +73,19 @@ describe('the runtime of this repository', () => {
     }
   });
 
+  it('ships the workspace ignore rules and keeps each of them in the repository', () => {
+    expect(plan.get('.gitignore')).toBe('workspace/.gitignore');
+    const rules = (file: string) =>
+      readFileSync(file, 'utf8')
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line && !line.startsWith('#'));
+    const repository = new Set(rules('.gitignore'));
+    for (const rule of rules('workspace/.gitignore')) {
+      expect(repository.has(rule), `.gitignore lacks ${rule}`).toBe(true);
+    }
+  });
+
   it('ships every file a shipped hook runs', () => {
     const settings = JSON.parse(readFileSync('workspace/.claude/settings.json', 'utf8')) as {
       hooks?: Record<string, { hooks?: { command?: string }[] }[]>;

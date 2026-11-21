@@ -1,3 +1,6 @@
+# The workspace's rules are in workspace/.gitignore, which ships as a workspace's .gitignore.
+# Keep every rule of it here too (tests/runtime-files.test.ts); rules only this repository needs go below them.
+
 # Dependencies
 node_modules/
 .pnpm-store/
