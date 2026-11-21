@@ -1,0 +1,201 @@
+# Workflow – coreslopper
+
+The map of this repository's agent workflow. `AGENTS.md` is the short version loaded into every session; this file
+is what to read when you are unsure where something belongs.
+
+## Two phases
+
+- **Discovery** produces the domain artifacts in `docs/` – including the backlog of stories as Markdown files. It
+  continues for every new feature (`/feature`).
+- **Engineering** implements the `ready` stories one by one with `/implement`. Code and discovery artifacts live in
+  the same repository and change together.
+
+## Sources of truth
+
+| Artifact | File | Owner |
+|---|---|---|
+| Vision, user groups, scope | `docs/product/vision.md` | user + main session |
+| Initiative briefs (proposals, no stories) | `docs/product/initiatives/<slug>.md` | `/shape`; user accepts |
+| UI/UX decisions (yardstick) | `docs/product/ux-guidelines.md` | `ux-designer` (user approves) |
+| Research evidence (expiry) | `docs/research/<topic>.md` | `researcher` (read-only); main session writes; user confirms findings |
+| Prototypes (throwaway, on branch `prototype/<slug>`) | `docs/prototypes/<slug>/` | `ux-designer`; verdict in the story and `ux-guidelines.md` |
+| Glossary (ubiquitous language) | `CONTEXT.md` | `domain-model` skill |
+| Event storming model | `docs/domain/events.yaml` | event storming / `domain-architect` |
+| Gap register (as-is ↔ target) | `docs/domain/gap-register.md` | `gap-register.ts` (generated rows) + user decisions outside the block |
+| Visualization (generated!) | `docs/domain/event-storming.md` | hook – never edit manually |
+| Target context map | `docs/domain/context-map.md` | `domain-architect`, `/bootstrap`, `/shape`, `/feature`, `/improve-codebase-architecture`; `/adopt` never writes it |
+| As-is context map | `docs/domain/context-map.as-is.md` | `/adopt` only |
+| Logical data model | `docs/architecture/data-model.md` | `domain-architect` |
+| Repository map (generated!) | `docs/architecture/repo-map.json`, `docs/architecture/repo-map.md` | `repo-map.ts` – packages, roles, concept slices; never edit manually |
+| Package docs (loaded on demand) | `<package>/AGENTS.md` + `<package>/CLAUDE.md` | `/adopt`, user confirms the prose |
+| Path-scoped rules | `.claude/rules/*.md` (both harnesses) | `/adopt`, user approves |
+| Architecture boundaries | `docs/architecture/boundaries.yaml` | user confirms; checked by `boundary-check.ts` |
+| Existing boundary debt (generated) | `docs/architecture/boundaries.baseline.json` | `boundary-check.ts --update-baseline` |
+| Project checks (what runs when) | `docs/engineering/checks.yaml` | `/adopt`, user approves |
+| Architecture decisions (ADRs) | `docs/adr/` | `architect` skill / `domain-architect` (user accepts) |
+| Stories | `docs/stories/ST-NNN-*.md` | main session as spec engineer; linter gate; status by `/implement`; with a tracker this is the mirror |
+| Backlog backend | `.claude/project.json` → `backlog.provider` – `local`, `github` or `jira` | user |
+| Backlog mirror (with a tracker) | `docs/stories/` | `/backlog-sync` |
+| Backlog (generated!) | `docs/stories/BACKLOG.md` | hook – never edit manually |
+| Open questions | `docs/stories/OPEN_QUESTIONS.md` | everyone |
+| Reviews | `docs/reviews/` | spec linter and `acceptance-tester`/`code-reviewer` (domain lane only; findings, no stories) |
+| Engineering conventions, seam catalog | `docs/engineering/conventions.md` | written after the foundation, user approves |
+| Application code and tests | `repo.codeRoots` in `.claude/project.json` | `/implement` |
+
+## Commands
+
+| Command | Covers |
+|---|---|
+| `/bootstrap` | greenfield: vision → event storming → model → architecture → UX → stories |
+| `/adopt [scope] [--stories]` | brownfield: repo map → one concept or package slice (+ shared library) → evidence → domain draft → context docs → grilling → gap register; scope may be a package path, `--paths`, `--route`, `--table`, `--event`, `--cluster` or a term; stories only with `--stories` |
+| `/shape <idea \| ticket>` | before a large feature: frame, place (existing/new context, shared library), impact, slices, rough cost range, recommendation; creates no stories; `--dry-run` writes nothing |
+| `boundary-check.ts` | architecture boundaries: `--init`, `--update-baseline`, `--changed`, `--json` |
+| `affected.ts` | monorepo fast loop: changed files or `--base` → affected packages + native test command |
+| `slice.ts` | concept scope (`--paths`/`--route`/`--table`/`--event`/`--cluster`/`--term`) → candidate files across layers |
+| `slice-doc.ts` | cross-cutting concept slice → `.claude/rules/<context>.md` with `paths:` frontmatter |
+| `characterize.ts` | affected story/paths → existing tests and files with no test; the input for characterization tests |
+| `grilling` (`/grill-me`) | relentless interview in rounds with recommended answers – how we ask questions |
+| `/research <question>` | one cross-cutting question as evidence: check existing research and expiry, read-only researcher, findings in `docs/research/<topic>.md`, cited in grilling and stories |
+| `/grill-with-docs` | grilling + `domain-model` + `architect`: writes glossary and ADRs as it goes |
+| `/event-storming [process]`, `/feature <idea \| ST-NNN \| ticket>` | discovery entry points; both start by grilling. `/feature` resolves a story or ticket read-only and routes bugs to a regression story; `--prototype` adds a throwaway prototype before the stories; `--research` forces the research step |
+| `user-stories`, `/review-stories` | story format, 1-command rule, spec linter, human approval |
+| `backlog`, `/backlog-sync` | local / GitHub Issues / Jira mirror, sync and conflict rules |
+| `ux-design` | how we decide the interface: the UX frontier, what a story says about a screen, review order |
+| `prototype` | throwaway HTML prototype for a UI or logic question; the verdict goes into the story and the guidelines |
+| `/groom-backlog` | periodic challenge of the open backlog |
+| `/implement [ST-NNN] [--fast]` | one story on its branch: domain = test-first, diff-scaled review, acceptance; chore/task or `--fast` = fast lane without Gherkin matching or formal reviews; `--prototype` settles an open UI question first |
+| `tdd` | red → green loop, good tests, seams |
+| `codebase-design` | vocabulary for deep modules |
+| `/improve-codebase-architecture` | periodic scan for deepening opportunities, then grilling |
+| `/retro` | retrospective on a session; the user picks the changes |
+| `writing-for-agents` | how to write skills, agent files and `AGENTS.md` |
+
+## Rules
+
+- **Language.** Artifacts and code are in the artifact language (`languages.artifacts`), UI texts in the UI language
+  (`languages.ui`) – both in `.claude/project.json`. IDs are CamelCase with a prefix (`EVT-OrderPlaced`).
+- **Domain terms exactly as in `CONTEXT.md`**, never an `_Avoid_` synonym – in docs and in code. A new term goes into
+  `CONTEXT.md` first.
+- **Don't guess.** Capture anything unclear as a hotspot (`HS-n` in `events.yaml`) or `[OPEN]` plus a row in
+  `OPEN_QUESTIONS.md`. During implementation, a wrong or unclear story goes back to `review` – never decided in code.
+- **`events.yaml` and stories are validated by a hook after every write**, including status changes. Fix errors
+  immediately; never work around them.
+- **Tech stack only after event storming and domain model**, via ADR. New ADRs are `proposed`; only the user sets
+  `accepted`. Accepted ADRs are never edited, only superseded (a hook enforces it).
+- **The backlog is local by default.** `docs/stories/` is the backlog and no issue tracker is required. With
+  `backlog.provider` = `jira` or `github` in `.claude/project.json`, the tracker is the source of truth and
+  `docs/stories/` is its local mirror; sync through `/backlog-sync` and never edit `BACKLOG.md` by hand. Reviews and
+  open questions stay local. `ST-NNN` stays the stable id; the tracker key lives in `external`.
+- **1-command rule.** One story = one command + its events on one aggregate, at most 4 Gherkin scenarios. A second
+  command is a second story, never a second scenario set. `type: domain` requires `aggregate` and `command` and the
+  linter cross-checks them against `events.yaml`.
+- **Aggregate status is honest.** `target` is the desired boundary (the default when the field is missing);
+  `as-is` is the factual boundary recovered from code and needs `evidence`; `unresolved` means the boundary is
+  unclear and needs an open hotspot. A story on an `unresolved` aggregate cannot leave `review` – settle the
+  boundary first. `/adopt` never writes `target` for something inferred from code.
+- **As-is and target are separate.** `/adopt` writes `docs/domain/context-map.as-is.md` and `as-is` aggregates;
+  it never edits the target map `docs/domain/context-map.md`. `/bootstrap`, `/shape`, `/feature`,
+  `/event-storming`, `domain-architect` and `/improve-codebase-architecture` write the target. The gap register
+  (`docs/domain/gap-register.md`) links both sides; its generated block comes from `events.yaml`.
+- **Fast lane.** `type: chore` and `type: task` cover UI tweaks, refactorings, dependencies and setup. `/implement`
+  takes the fast lane automatically (or with `--fast`): branch → implement → lint/typecheck/tests → pull request, no
+  Gherkin matching and no formal review pass. `type: tech-task` keeps its checklist and acceptance; `type: spike` is
+  a timeboxed question.
+- **Characterization before test-first.** In a domain story, an affected path with no test for the behaviour that
+  is about to change gets a characterization test first: pin the current behaviour, run it green, commit it
+  separately (`ST-NNN: characterize <area>`), then start the story tests. If the current behaviour contradicts the
+  story, the story goes back to `review` – the test is not adapted to the story. The fast lane skips this except
+  for an explicit refactoring.
+- **The spec linter is the gate.** `node .claude/skills/user-stories/scripts/lint-story.ts <file>` (or
+  `kataster lint-story`) checks frontmatter, required fields, aggregate/command/event references, Gherkin and the
+  scenario limit – deterministically, without an LLM. Green → `ready-for-human-review`; the user approves `ready`.
+- **Traceability in the code**: every Gherkin scenario of a `domain` story has a test titled exactly
+  `ST-NNN: <scenario title>`; commands, events, read models and policies carry their ID from `events.yaml`.
+  `verify.ts` checks both. Chore/task stories are covered by their checklist and unit tests.
+- **Reviews report, they do not plan.** `code-reviewer` and `acceptance-tester` find problems; they never create,
+  split or revise stories. A finding is fixed in the story or becomes an open question to the developer. Review
+  effort follows the diff (light lane for texts/layout, normal lane otherwise).
+- **Status changes** go through `node .claude/skills/implement/scripts/story-status.ts`. A `done` story is never
+  reopened – changes become a new story.
+- **Never weaken or delete a test to get green.** One branch and one pull request per story; the user merges.
+- **Subagents don't know the conversation**: when delegating, pass file paths and a clear task.
+- **Adopt in slices, by concept.** One concept or domain plus at most one shared library per session; never the
+  whole monorepo. In a layered repository a domain runs through `api/`, `services/` and `repositories/` – a
+  generic `services`/`utils` package is a layer, not a domain. The ranking and the concept clusters in
+  `docs/architecture/repo-map.md` suggest where to start; `slice.ts` resolves the candidate files.
+- **The root `AGENTS.md` has no domain.** Structure, commands, hard conventions and links. Domain language lives
+  in `CONTEXT.md`, package reality in `<package>/AGENTS.md` – loaded only when someone works there.
+- **Directory docs before glob rules.** Rules that apply to a directory belong in its `AGENTS.md`; `.claude/rules/`
+  with `paths:` is for patterns a directory cannot express. A cross-cutting concept slice documents its domain in
+  `.claude/rules/<context>.md` with the slice's globs; a real domain package keeps `<package>/AGENTS.md`. Never
+  duplicate the same content in both. Claude Code scopes rules natively, OpenCode's plugin attaches them when a
+  matching file is read or written – one file, both harnesses.
+- **Checks are green on day one.** Brownfield checks start report-only with a baseline and only new violations
+  fail; a red hook gets switched off. `docs/engineering/checks.yaml` decides what runs at edit time and at
+  Stop/CI; the `project-check.ts` dispatcher is wired once and never per package.
+- **Boundaries are data, not prose.** `docs/architecture/boundaries.yaml` lists the allowed/forbidden edges
+  (first match wins); `boundary-check.ts` enforces them. Existing debt lives in
+  `boundaries.baseline.json` and only shrinks.
+- **A ticket is evidence, not a specification.** When `/feature` starts from an `ST-NNN`, `#issue` or Jira key, the
+  source is recorded in the story (`Source: …`), its acceptance criteria are grilled like any other claim, and
+  `external` is still written only by the backlog sync. A bug is a story with the label `bug`, not a separate type; a
+  change to a documented rule is a feature, because the rule changes.
+- **Research is evidence, not a specification.** Auth/identity, security, payment, privacy, accessibility,
+  performance and new technologies are researched before the round that depends on them; `/feature --research`
+  forces it. The `researcher` is read-only and the only path to web content. Findings live in
+  `docs/research/<topic>.md` with an expiry; only a finding the user confirms becomes a testable criterion. A story
+  with `risk: high` or a configured gate label needs a resolvable `sources:` entry before `ready-for-human-review`.
+- **Prototypes are throwaway.** One question, one self-contained HTML file under `docs/prototypes/<slug>/`,
+  captured on a throwaway branch `prototype/<slug>` and never merged. The decision lands in the story
+  (`Prototype: …`) and, when it is a recurring rule, in `ux-guidelines.md` as a G-number. No tests, no
+  persistence, no production code.
+- **Initiatives are not a backlog.** `docs/product/initiatives/` holds proposals from `/shape`; they have no
+  `ready`/`done` and create no stories. Only `docs/stories/` is work. Cost is a range with a basis and a
+  confidence – never a single number, never a commitment.
+- **At most 3 questions to the user at once** – except in grilling rounds, which ask the whole frontier.
+
+## Workflow
+
+Discovery, first time: `/bootstrap` (greenfield) or `/adopt` (existing code), then `/review-stories` until stories
+are `ready`. A monorepo is adopted slice by slice: finish one domain plus its shared library, then run
+`/adopt <next path>` – the map keeps track of what is adopted. Later features: `/feature <idea | ticket>`; an idea
+larger than one feature goes through `/shape` first and then `/feature` per slice. When a UI, flow or state
+question cannot be settled on paper, `/feature --prototype` adds a throwaway prototype between grilling and the
+stories; the verdict goes into the story and the UX guidelines.
+
+Cross-cutting questions – auth, security, payment, privacy, accessibility, performance, a new library or technology –
+are researched before the round that depends on them: `/research` or the research step of `/feature`, with findings
+in `docs/research/<topic>.md`, an expiry and a citation in the story's `sources:`. `/feature --research` forces the
+step. Research is evidence for the grilling, never a decision; an expired file is refreshed before approval.
+
+Engineering, story by story: `/implement [ST-NNN]` (empty = next ready story whose dependencies are done). Domain
+lane: prepare → test plan → **characterization net for untested existing behaviour** → red/green per scenario →
+`verify.ts` → review lane scaled to the diff → refactor → acceptance tester's verdict → `done` + pull request.
+Fast lane (`chore`/`task`, or `--fast`): prepare → implement → lint/typecheck/tests → `verify.ts` → pull request.
+**The user only merges.** `--prototype` settles an open UI question first; if it changes the story, the story goes
+back to `review`, through the linter and the user again. Start the next story in a fresh session.
+
+In a brownfield domain story, `characterize.ts` names the affected paths with no test. Characterization tests pin
+the current behaviour and are committed separately (`ST-NNN: characterize <area>`) **before** the story's red →
+green loop. If the current behaviour contradicts the story, that is a finding: the story goes back to `review` and
+the code is not silently adjusted. The fast lane skips this except for an explicit refactoring.
+
+With a tracker: pull before `/review-stories`, `/groom-backlog` and `/implement`; push after changing or approving
+stories and after `done`. The tracker leads on conflict; `docs/stories/` is the mirror and `BACKLOG.md` stays
+generated from it.
+
+Periodic: `/improve-codebase-architecture` and `/groom-backlog` after a bounded context or about every 8–10 done
+domain stories – not in between. Progress is measured in done domain stories and scenarios, not in story count.
+
+## Tool access
+
+- **`gh`** (optional): with it, `/implement` opens the pull request itself and a GitHub backlog syncs; without it, push
+  and hand the user the compare URL. The session-start hook reports what is missing.
+- **`mcp-atlassian`** (optional, for a Jira backlog): configured in the harness. Jira reads and writes go through the
+  MCP tools; the local mirror keeps validation and traceability deterministic.
+- **Preview provider** (optional, `review.preview` in `.claude/project.json`): with it, acceptance testing uses the
+  branch preview; without it, the reviewers work from the code.
+- **Web access** goes through the read-only `researcher` (web search/fetch only; no write, no shell). The main
+  session receives structured findings and never fetches pages itself.
+- Never work around missing access silently (no token in a file, no login in the background) – report it and let the
+  user decide.

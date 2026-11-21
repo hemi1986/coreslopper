@@ -1,0 +1,102 @@
+{
+  "name": "coreslopper",
+  "kind": "brownfield",
+  "domain": "coreslopper",
+  "languages": {
+    "artifacts": "en",
+    "ui": "en",
+    "uiAdditional": []
+  },
+  "stack": {
+    "summary": "TypeScript, JavaScript, Python, React",
+    "languages": [
+      "TypeScript",
+      "JavaScript",
+      "Python"
+    ],
+    "frameworks": [
+      "React"
+    ],
+    "databases": [],
+    "testers": [
+      "Vitest"
+    ],
+    "packageManager": "npm"
+  },
+  "repo": {
+    "defaultBranch": "main",
+    "codeRoots": [
+      "packages"
+    ],
+    "tooling": {
+      "kind": "workspaces",
+      "config": "",
+      "workspaces": [
+        "packages/*"
+      ],
+      "manager": "npm",
+      "monorepo": true
+    }
+  },
+  "commands": {
+    "install": "npm install",
+    "lint": "",
+    "typecheck": "npm run typecheck",
+    "test": "npm run test",
+    "e2e": "",
+    "verify": "node .claude/skills/implement/scripts/verify.ts"
+  },
+  "review": {
+    "preview": "none",
+    "pullRequest": "gh"
+  },
+  "backlog": {
+    "provider": "local",
+    "github": {
+      "repo": "",
+      "labelPrefix": "kataster"
+    },
+    "jira": {
+      "mcpServer": "mcp-atlassian",
+      "project": "",
+      "issueType": "Story",
+      "labelPrefix": "kataster",
+      "statusMap": {
+        "draft": "To Do",
+        "review": "In Review",
+        "ready": "Ready",
+        "in-progress": "In Progress",
+        "done": "Done",
+        "superseded": "Won't Do"
+      },
+      "priorityMap": {
+        "must": "Highest",
+        "should": "High",
+        "could": "Medium",
+        "wont": "Lowest"
+      }
+    }
+  },
+  "research": {
+    "expiryMonths": 12,
+    "gate": {
+      "risk": [
+        "high"
+      ],
+      "labels": [
+        "security",
+        "auth",
+        "payment",
+        "privacy"
+      ]
+    }
+  },
+  "setup": {
+    "envFile": "",
+    "envHint": ""
+  },
+  "workflow": {
+    "version": "0.6.0",
+    "installedAt": "2026-11-21T15:32:30.245Z"
+  }
+}

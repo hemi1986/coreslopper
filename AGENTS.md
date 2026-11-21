@@ -35,3 +35,39 @@ The root package is published as `coreslopper`. `npm run build` writes the works
 - Decisions that are hard to reverse get an ADR in `docs/adr/` (`domain-modeling`).
 - Load `writing-for-agents` before writing a skill, an agent, a command, or an `AGENTS.md`/`CLAUDE.md`. Own skills use only `name`, `description`, and `license` in frontmatter; vendored skills keep theirs (`grill-me` keeps `disable-model-invocation: true` as a Claude Code hint).
 - Generated media, secrets, and copyrighted material are never committed.
+
+<!-- kataster:begin – managed by kataster; edits inside are overwritten on upgrade -->
+## coreslopper – agent workflow (Kataster)
+
+This repository runs the Kataster workflow. Discovery lives in `.claude/skills/`, the OpenCode wiring in
+`.opencode/`; Claude Code uses the same skills and hooks.
+
+- **Profile:** `.claude/project.json` – name, stack, languages, commands, backlog backend. Read it before assuming anything.
+- **Backlog:** `backlog.provider` is `local` (default), `github` or `jira`. With a tracker, `docs/stories/` is the
+  local mirror and the tracker is the source of truth – sync with `/backlog-sync`; `BACKLOG.md` stays generated.
+- **Map:** `docs/workflow.md` – sources of truth, commands, phases, rules. Read it when unsure where something
+  belongs.
+- **Research:** cross-cutting questions go through the read-only `researcher` (`/research`,
+  `/feature --research`); findings live in `docs/research/<topic>.md` with an expiry and are cited from a story's
+  `sources:`. Evidence, not a specification.
+- **Repo map (brownfield):** `docs/architecture/repo-map.md` – packages, dependency edges, consumers, adopted
+  slices. A package's `AGENTS.md` is loaded only when you work there; the root file stays free of domain.
+- **Start:** greenfield → `/bootstrap`; existing code → `/adopt` (in slices, not the whole monorepo).
+- **Never guess:** unclear → a hotspot (`HS-n`) or `[OPEN]` plus a row in `OPEN_QUESTIONS.md`.
+- **Project checks:** `docs/engineering/checks.yaml` – what runs at edit time and Stop/CI; architecture boundaries
+  in `docs/architecture/boundaries.yaml` with existing debt in the baseline (only new violations fail).
+- **Language:** domain terms exactly as in `CONTEXT.md`; UI words from its `_UI (<lang>)_` lines.
+- **1-command rule:** one story = one command + its events on one aggregate, at most 4 Gherkin scenarios. Full
+  domain stories are `type: domain`; UI tweaks, refactors, dependencies and setup use the fast lane
+  (`type: chore` or `type: task`).
+- **Spec gate:** `node .claude/skills/user-stories/scripts/lint-story.ts <file>` must be green. A story the linter
+  accepts becomes `ready-for-human-review`; only the user approves `ready`.
+- **Traceability:** every domain scenario has a test titled `ST-NNN: <scenario title>`; domain IDs come from
+  `docs/domain/events.yaml`.
+- **ADRs:** new ones are `proposed`; only the user sets `accepted`. A `done` story is never reopened.
+- **Reviews:** `/implement` scales review to the diff. `code-reviewer` and `acceptance-tester` report findings and
+  never create stories; fast-lane stories skip the formal review pass.
+- **Gate:** `node .claude/skills/implement/scripts/verify.ts`.
+
+Keep this block short: it is loaded into every session. Put rules into the skill that owns them, not here.
+<!-- kataster:end -->

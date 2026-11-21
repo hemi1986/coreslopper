@@ -25,6 +25,8 @@ export const NOT_SHIPPED = [
   'AGENTS.md',
   'CLAUDE.md',
   'CONTEXT.md',
+  // The repository's ignore rules: the workspace's (workspace/.gitignore) plus the engineering layer's.
+  '.gitignore',
   'skills-lock.json',
   // The engineering workflow's documents (Kataster).
   'docs/workflow.md',
@@ -58,7 +60,6 @@ export const SHIPPED = [
   '.env.example',
   '.gitattributes',
   '.github/',
-  '.gitignore',
   '.nvmrc',
   'CHANGELOG.md',
   'CODE_OF_CONDUCT.md',
