@@ -204,8 +204,12 @@ _Avoid_: posting plan, cadence
 `review/calendar.yaml`: when what goes online where for one project, planned in the next free slots of the release schedule without colliding with other projects. Each entry is an event with an id, a time, a platform, and a step.
 _Avoid_: release plan (the plan is the calendar's table in the release folder), timeline
 
+**Board**:
+The workspace's local page (`board`). Its **production view** shows every project and series as the pipeline leaves them, with the next command for Claude Code; its release view is the release board.
+_Avoid_: dashboard, studio
+
 **Release Board**:
-The local page `release-board` serves over all release folders: per platform the posts with files, texts, limits, and settings, the calendar of all projects, and the user's done state and live URLs in `review/release-status.json`.
+The board's release view over all release folders: per platform the posts with files, texts, limits, and settings, the calendar of all projects, and the user's done state and live URLs in `review/release-status.json`.
 _Avoid_: dashboard, CMS
 
 **Release Approval**:

@@ -13,7 +13,7 @@
 - `npm run cli -- review <slug>` — the user opens a render in the review player; notes land in `review/notes/`. On a fix pass, follow the review-notes section of `assembly-render`.
 - `/series-status <series>` — read-only series overview: canon, episodes, stages, spend, length.
 - `/release-backfill <slug>` — skill that brings an existing or already published project into the release calendar: asks what is out, writes the missing release texts, plans the open slots, marks the past done.
-- `npm run cli -- release-board` — the user's local release page: per project and platform the files, texts, and settings, the release calendar of all projects, checkboxes for what is posted, and **Approve release**, which hands the release to the autopilot (`release-run` on a timer, `release-timer install`).
+- `npm run cli -- board` — the user's local page over the workspace. Production shows every project and series and the next command to run here; release shows per project and platform the files, texts, and settings, the release calendar of all projects, checkboxes for what is posted, and **Approve release**, which hands the release to the autopilot (`release-run` on a timer, `release-timer install`).
 - `npm run cli -- publish <slug>` — uploads a finished release package (YouTube private, TikTok drafts); a user command, not a stage. See `docs/publishing.md`.
 
 `/video-next` dispatches one `stage-runner` subagent per stage. Do not inline a whole stage into the main context.

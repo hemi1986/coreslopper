@@ -5,16 +5,20 @@ import { extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ValidationError, calendarIcs, loadChannel, repoRoot, type ReleaseCalendar } from '@coreslopper/core';
 import { boardProject, type BoardProject } from './release-board-data.js';
+import { SLUG, productionDetail, productionOverview, productionSeries, projectDirs, seriesDirs } from './board-production.js';
 import { loadCalendar, updateStatus } from './release-calendar.js';
 import { releaseDir } from './release.js';
 
-// The release board: a local web page over every project's release folder.
-// Per platform it shows which file goes where, the texts to paste with their
-// limits, the settings to check, and the calendar; the user ticks off what is
-// posted and enters the live URL, which lands in review/release-status.json.
-// Bound to 127.0.0.1 only; it reads the release folders and writes the
-// status files, the approval, and the autopilot's retry and takeover marks
-// (and, on approval of a proposed date, release.release_date in project.yaml).
+// The board: a local web page over the workspace. Its production view shows
+// every project and series as the pipeline leaves them (stages, budget,
+// queue, reviews, renders, the next command for Claude Code). Its release
+// view shows, per platform, which file goes where, the texts to paste with
+// their limits, the settings to check, and the calendar; the user ticks off
+// what is posted and enters the live URL, which lands in
+// review/release-status.json. Writes come only from its own page (see
+// trustedWrite): the status files, the approval, and the autopilot's retry and
+// takeover marks (and, on approval of a proposed date,
+// release.release_date in project.yaml).
 
 export interface BoardOptions {
   /** The workspace (or repository) root; projects live in its projects/. */
@@ -47,9 +51,21 @@ const MIME: Record<string, string> = {
   '.srt': 'text/plain; charset=utf-8',
   '.md': 'text/plain; charset=utf-8',
   '.ics': 'text/calendar; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.yaml': 'text/plain; charset=utf-8',
+  '.yml': 'text/plain; charset=utf-8',
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
 };
 
-const SLUG = /^[a-z0-9][a-z0-9-]*$/;
+/** What the board serves from a project, relative to the project: its media folders and its documents. */
+const PROJECT_FILES = /^(renders|review|assets|characters|sets|props)\/|^(brief\.md|treatment\.md|storyboard\.md|timing\.report\.md|lyrics\.txt|script\.yaml)$/;
+/** What the board serves from a series canon. */
+const SERIES_FILES = /^(characters|sets|props|assets|review)\/|^(bible\.md)$/;
+/** The page's own files in ./board/. */
+const PAGE_FILE = /^[a-z][a-z0-9-]*\.(js|css)$/;
+const pageDir = fileURLToPath(new URL('./board/', import.meta.url));
 
 /** Project directories of the workspace that have a release folder or a calendar. */
 export async function boardProjectDirs(root: string): Promise<string[]> {
@@ -102,6 +118,9 @@ export function trustedWrite(req: Pick<IncomingMessage, 'headers'>): string | un
 
 /** Serve a file of a release folder, with byte ranges so videos seek. */
 async function serveMedia(req: IncomingMessage, res: ServerResponse, base: string, rel: string): Promise<void> {
+  // Served files are data, never a page that runs: an SVG or HTML file opened from here gets no scripts.
+  res.setHeader('x-content-type-options', 'nosniff');
+  res.setHeader('content-security-policy', "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'; sandbox");
   const target = resolve(base, rel);
   if (!target.startsWith(resolve(base) + sep)) return send(res, 403, 'forbidden', 'text/plain');
   const info = await stat(target).catch(() => undefined);
@@ -137,6 +156,11 @@ export function boardHandler(options: BoardOptions = {}) {
     refreshing.set(dir, next);
     return next;
   };
+  const workspaceDir = async (list: (root: string) => Promise<string[]>, slug: string, what: string) => {
+    const dir = SLUG.test(slug) ? (await list(root)).find((entry) => entry.split(sep).at(-1) === slug) : undefined;
+    if (!dir) throw new ValidationError(`unknown ${what} ${slug}`);
+    return dir;
+  };
   const projectDir = async (slug: string) => {
     if (!SLUG.test(slug)) throw new ValidationError(`unknown project ${slug}`);
     const dir = join(root, 'projects', slug);
@@ -164,8 +188,32 @@ export function boardHandler(options: BoardOptions = {}) {
         if (refused) return json(res, { error: refused }, 403);
       }
       if (req.method === 'GET' && path === '/') {
-        const page = await readFile(fileURLToPath(new URL('./release-board.html', import.meta.url)), 'utf8');
-        return send(res, 200, page, 'text/html; charset=utf-8');
+        return send(res, 200, await readFile(join(pageDir, 'index.html'), 'utf8'), MIME['.html']);
+      }
+      const pageMatch = /^\/board\/([^/]+)$/.exec(path);
+      if (req.method === 'GET' && pageMatch) {
+        if (!PAGE_FILE.test(pageMatch[1]!)) return send(res, 404, 'not found', 'text/plain');
+        const file = await readFile(join(pageDir, pageMatch[1]!), 'utf8').catch(() => undefined);
+        return file === undefined ? send(res, 404, 'not found', 'text/plain') : send(res, 200, file, MIME[extname(pageMatch[1]!)]);
+      }
+      if (req.method === 'GET' && path === '/api/production') return json(res, await productionOverview(root));
+      const productionMatch = /^\/api\/production\/(projects|series)\/([^/]+)$/.exec(path);
+      if (req.method === 'GET' && productionMatch) {
+        if (productionMatch[1] === 'series') {
+          const detail = await productionSeries(await workspaceDir(seriesDirs, productionMatch[2]!, 'series'));
+          return 'error' in detail ? json(res, detail, 500) : json(res, detail);
+        }
+        return json(res, await productionDetail(await workspaceDir(projectDirs, productionMatch[2]!, 'project')));
+      }
+      const fileMatch = /^\/(files|series-files)\/([^/]+)\/(.+)$/.exec(path);
+      if (req.method === 'GET' && fileMatch) {
+        const series = fileMatch[1] === 'series-files';
+        const rel = fileMatch[3]!;
+        if (!(series ? SERIES_FILES : PROJECT_FILES).test(rel) || rel.split('/').some((part) => part === '..' || part.startsWith('.'))) {
+          return send(res, 403, 'forbidden', 'text/plain');
+        }
+        const base = await workspaceDir(series ? seriesDirs : projectDirs, fileMatch[2]!, series ? 'series' : 'project');
+        return serveMedia(req, res, base, rel);
       }
       if (req.method === 'GET' && path === '/api/channel') {
         const channel = await loadChannel(root).catch(() => undefined);

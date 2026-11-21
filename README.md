@@ -85,11 +85,14 @@ Then ask Claude Code for a fix pass, for example *"work through the review notes
 
 The last stage, `qa-export`, builds the release package in `projects/<slug>/renders/release/`: every format, three thumbnails, three Shorts with covers, the song as WAV, the streaming cover, the Spotify Canvas, lyrics, and the texts for each platform (YouTube, Shorts, TikTok, Instagram, Spotify and the distributor, X, LinkedIn when the song suits it, and your microsite). It also plans a **release calendar** for the project: when what goes online where.
 
-**Open the release board** to publish from it:
+**Open the board** to publish from its release view:
 
 ```bash
-npm run cli -- release-board                  # http://127.0.0.1:4848
+npm run cli -- board                          # http://127.0.0.1:4848
 ```
+
+Its production view shows every project and series in the workspace while they are made: stages, budget, the generation queue, the art director's reviews, renders, and the command to type next in Claude Code.
+
 
 - One tab per platform: which file goes where (with previews), every text with a copy button and a counter against the platform's limit, the settings to check (AI label, related video, cover), and where each post links to.
 - Tick off what you posted and paste its live URL. The YouTube URL then fills the link in the X and LinkedIn texts and the microsite data. Your progress is saved in `projects/<slug>/review/release-status.json`.
@@ -149,7 +152,7 @@ Run these inside the workspace.
 | `npm run cli -- validate <project>` | Check timing, storyboard, style, and characters. |
 | `npm run cli -- render <project> --format 16x9` | Render a format (`16x9`, `9x16`, `1x1`). |
 | `npm run cli -- review <project>` | Watch a render frame by frame and leave review notes. |
-| `npm run cli -- release-board` | Publish from the release board: files, texts, settings, and the calendar of all projects. |
+| `npm run cli -- board` | The workspace's page: production status of every project and series, and the release view with files, texts, settings, and the calendar of all projects. |
 | `npm run cli -- calendar <project>` | Plan or show a project's release calendar (`--replan`, `--done-until <date>`). |
 | `npm run cli -- release-run --plan` | What the release autopilot posts when, and what needs you. |
 | `npm run cli -- release-timer install` | Run the release autopilot every 5 minutes. |

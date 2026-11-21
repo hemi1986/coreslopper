@@ -325,17 +325,20 @@ program
   );
 
 program
-  .command('release-board')
+  .command('board')
+  .alias('release-board')
   .description(
-    'Open the release board: a local page with every project\'s release package per platform (files, texts to copy, limits, ' +
-      'settings, links), the release calendar of all projects, and checkboxes for what is posted (review/release-status.json).',
+    'Open the board: a local page over the workspace. Production shows every project and series (stages, budget, queue, ' +
+      'reviews, renders, and the next command for Claude Code); release shows each release package per platform (files, ' +
+      'texts to copy, limits, settings, links), the release calendar of all projects, and what is posted (review/release-status.json).',
   )
-  .option('--port <n>', 'Port on 127.0.0.1', (value) => Number(value), 4848)
-  .action((options: { port: number }) =>
+  .option('--port <n>', 'Port', (value) => Number(value), 4848)
+  .option('--host <address>', 'Address to listen on; 0.0.0.0 only inside a container whose port is published to 127.0.0.1', '127.0.0.1')
+  .action((options: { port: number; host: string }) =>
     run(async () => {
       const { startBoard } = await import('./release-board.js');
-      const { url } = await startBoard({ root: repoRoot(), port: options.port });
-      console.log(`Release board: ${url}  (Ctrl+C to stop)`);
+      const { url } = await startBoard({ root: repoRoot(), port: options.port, host: options.host });
+      console.log(`Board: ${url.replace('://0.0.0.0:', '://127.0.0.1:')}  (Ctrl+C to stop)`);
       await new Promise(() => undefined);
     }),
   );
