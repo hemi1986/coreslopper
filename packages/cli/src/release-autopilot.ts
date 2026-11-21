@@ -342,7 +342,7 @@ async function act(dir: string, item: AutopilotEventPlan, context: Context, deps
       platform,
       only: action.item,
       ...(schedule ? { schedule } : {}),
-      ...(platform === 'tiktok' ? { tiktokMode: settings.tiktok_direct ? 'direct' : 'inbox' } : {}),
+      ...(platform === 'tiktok' ? { tiktokMode: settings.tiktok_direct || deps.env.TIKTOK_DIRECT_POST === '1' ? 'direct' : 'inbox' } : {}),
       now: deps.now,
       log: () => undefined,
     });
@@ -350,7 +350,7 @@ async function act(dir: string, item: AutopilotEventPlan, context: Context, deps
     if (!entry) throw new ValidationError(`publish planned no ${platform} upload for ${action.item}`);
     if (entry.status === 'failed') throw new Error(entry.error ?? `the ${platform} upload failed`);
     if (platform === 'tiktok') {
-      const direct = settings.tiktok_direct && entry.status === 'uploaded';
+      const direct = (settings.tiktok_direct || deps.env.TIKTOK_DIRECT_POST === '1') && entry.status === 'uploaded';
       return {
         status: direct ? 'posted' : 'draft',
         remote_id: entry.remote_id,

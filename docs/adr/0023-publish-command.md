@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — 2026-11-16. Amends [ADR 0019](0019-release-package.md): the upload text is now rendered from structured upload data.
+Accepted — 2026-11-16. Amends [ADR 0019](0019-release-package.md): the upload text is now rendered from structured upload data. Amended by [ADR 0029](0029-release-autopilot.md): `publish` still uploads privately, but an approved release goes out through the release autopilot.
 
 ## Context
 

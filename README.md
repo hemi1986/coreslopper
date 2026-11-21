@@ -95,6 +95,15 @@ npm run cli -- release-board                  # http://127.0.0.1:4848
 - Tick off what you posted and paste its live URL. The YouTube URL then fills the link in the X and LinkedIn texts and the microsite data. Your progress is saved in `projects/<slug>/review/release-status.json`.
 - The calendar view shows the dates of all your projects; **Calendar as .ics** imports them into your calendar app.
 
+**Release with one click.** **Approve release** on the board hands the release to the autopilot: every post a platform API allows goes out at its calendar time without you logging in. That covers the Instagram Reels, the feed post and the announcement story, X with media and the link, LinkedIn, the YouTube uploads a day ahead, TikTok drafts, the Spotify link in the description, and your microsite. The board shows what is still yours: switching the YouTube video public until Google audited your API project, a Premiere, the release-day story, the distributor and Spotify for Artists. Set it up once:
+
+```bash
+npm run cli -- publish-auth youtube        # and tiktok, x, linkedin, instagram: each optional
+npm run cli -- release-timer install       # runs release-run every 5 minutes
+```
+
+Your computer has to be on at the posting times; a post it missed waits for you on the board. Setup per platform, costs (X bills per post), and limits: [docs/publishing.md](docs/publishing.md#release-autopilot).
+
 **Set your release rules once** in `config/release-schedule.yaml` (copy [templates/channel/release-schedule.yaml](templates/channel/release-schedule.yaml)): release weekday and times, your time zone, lead times for the distributor and the Spotify pitch, the Short slots, posting times, and holidays. Every new project takes the next free slots, so two songs never share a Friday or a Short slot. Set `release.release_date` in `project.yaml` to fix a project's date; until then the calendar's date is a proposal.
 
 **Projects from before the calendar**, or songs that are already out: run `/release-backfill <slug>` in Claude Code. It asks what is published, writes the missing texts, plans the open slots, and marks the past as done.
@@ -142,6 +151,8 @@ Run these inside the workspace.
 | `npm run cli -- review <project>` | Watch a render frame by frame and leave review notes. |
 | `npm run cli -- release-board` | Publish from the release board: files, texts, settings, and the calendar of all projects. |
 | `npm run cli -- calendar <project>` | Plan or show a project's release calendar (`--replan`, `--done-until <date>`). |
+| `npm run cli -- release-run --plan` | What the release autopilot posts when, and what needs you. |
+| `npm run cli -- release-timer install` | Run the release autopilot every 5 minutes. |
 | `npm run cli -- estimate --role image.keyframe --units 8 --project projects/<project>` | Check a cost against the budget. |
 | `npm run cli -- doctor` | Check tools, fonts, Remotion, and keys. |
 | `/video-next <project>` | Run all open stages in Claude Code. |
@@ -172,6 +183,7 @@ Your projects, `.env`, and your own edits to workflow files are kept. If a file 
 | fal.ai, Higgsfield, budgets, and model roles | [docs/providers.md](docs/providers.md) |
 | Review player: keys, notes, fix pass | [scripts/review-player/README.md](scripts/review-player/README.md) |
 | Release board, calendar, and what each platform accepts | [docs/release-platforms.md](docs/release-platforms.md), [ADR 0028](docs/adr/0028-release-board-and-calendar.md) |
+| The release autopilot: one approval, then the calendar posts by API | [docs/publishing.md](docs/publishing.md#release-autopilot), [ADR 0029](docs/adr/0029-release-autopilot.md) |
 | Uploading to YouTube and TikTok | [docs/publishing.md](docs/publishing.md) |
 | Local video clips with ComfyUI | [comfyui/README.md](comfyui/README.md) |
 | Optional MCP servers | [docs/mcp.md](docs/mcp.md) |

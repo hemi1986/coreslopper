@@ -13,7 +13,7 @@
 - `npm run cli -- review <slug>` — the user opens a render in the review player; notes land in `review/notes/`. On a fix pass, follow the review-notes section of `assembly-render`.
 - `/series-status <series>` — read-only series overview: canon, episodes, stages, spend, length.
 - `/release-backfill <slug>` — skill that brings an existing or already published project into the release calendar: asks what is out, writes the missing release texts, plans the open slots, marks the past done.
-- `npm run cli -- release-board` — the user's local release page: per project and platform the files, texts, and settings, the release calendar of all projects, and checkboxes for what is posted.
+- `npm run cli -- release-board` — the user's local release page: per project and platform the files, texts, and settings, the release calendar of all projects, checkboxes for what is posted, and **Approve release**, which hands the release to the autopilot (`release-run` on a timer, `release-timer install`).
 - `npm run cli -- publish <slug>` — uploads a finished release package (YouTube private, TikTok drafts); a user command, not a stage. See `docs/publishing.md`.
 
 `/video-next` dispatches one `stage-runner` subagent per stage. Do not inline a whole stage into the main context.
@@ -36,7 +36,7 @@ The hook calls `npm run cli -- validate-file <file>`, which is also runnable by 
 
 ## MCP
 
-The pipeline and `publish` need no MCP server. The song is always supplied by the user. fal.ai, Higgsfield, and Topview are used through the pipeline adapters (`FAL_KEY`, `HIGGSFIELD_API_KEY`, `TOPVIEW_API_PLATFORM_KEY`), YouTube and TikTok through the publish adapters, not through MCP. If you want to explore fal.ai models interactively, see `docs/mcp.md` and add a project-scoped MCP server for fal.ai; keep it out of the pipeline.
+The pipeline and `publish` need no MCP server. The song is always supplied by the user. fal.ai, Higgsfield, and Topview are used through the pipeline adapters (`FAL_KEY`, `HIGGSFIELD_API_KEY`, `TOPVIEW_API_PLATFORM_KEY`), YouTube and TikTok through the publish adapters, X, LinkedIn, and Instagram through the post adapters, not through MCP. If you want to explore fal.ai models interactively, see `docs/mcp.md` and add a project-scoped MCP server for fal.ai; keep it out of the pipeline.
 
 ## Permissions and safety
 
@@ -45,7 +45,7 @@ The pipeline and `publish` need no MCP server. The song is always supplied by th
 - Generated media belongs to the project, not the workflow repo.
 - Do not overwrite `timing.overrides.json` or `project.yaml` from a stage runner.
 - A paid batch must pass the cost estimate and the project budget before the first call.
-- `publish` and `publish-auth` run only when the user asks for them; `/video-next` and stage runners never run them. Uploads stay private or drafts.
+- `publish`, `publish-auth`, `release-approve`, `release-run`, and `release-timer` run only when the user asks for them; `/video-next` and stage runners never run them. `publish` uploads private videos and drafts; only the user's approval on the release board lets the autopilot post publicly.
 
 ## Skill frontmatter
 

@@ -72,7 +72,7 @@ Done when `import-song` succeeded and `setup` is `done`.
 
 ### 4. Release data (optional)
 
-The release package at the end of the pipeline fills a distributor form (DistroKid or any other) from the `release:` block of `project.yaml`. Ask in one round; the user may answer "later" to any field or to the whole block:
+The release package at the end of the pipeline fills a distributor form (DistroKid or any other) from the `release:` block of `project.yaml`, over the channel's `release_defaults` in `config/channel.yaml`. Read those defaults first and ask only for the fields they leave open, in one round; the user may answer "later" to any field or to the whole block:
 
 - **Distributor**: `distrokid` or `manual`.
 - **Artist** and **title** as they appear in stores (default: song.json), **featured artists**.
@@ -83,7 +83,7 @@ The release package at the end of the pipeline fills a distributor form (DistroK
 
 Write only what the user said into `project.yaml` under `release:` (schema: `schema/project.schema.json`; the hook validates the file). Names, credits, ISRCs, and rights come from the user alone; a field they leave open stays out, and `release` lists it as a TODO in `renders/release/README.md`.
 
-If `config/channel.yaml` does not exist, mention once that the user can copy `templates/channel/channel.yaml` there for channel links, footer lines, and hashtag sets in the release texts; it is optional.
+If `config/channel.yaml` does not exist, mention once that the user can copy `templates/channel/channel.yaml` there for channel links, footer lines, hashtag sets, and the release facts every song shares (`release_defaults`); it is optional. When the user gives a fact that holds for every song (songwriters, AI credits, distributor), offer to put it into `release_defaults` instead of this project.
 
 Done when the user has answered or deferred each field and `npm run cli -- validate-file projects/<slug>/project.yaml` passes.
 

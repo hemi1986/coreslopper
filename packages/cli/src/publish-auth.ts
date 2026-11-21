@@ -89,7 +89,10 @@ export async function publishAuth(platform: PublishPlatform, options: PublishAut
   const loopback = await startLoopback(options.redirectUri ?? tiktokRedirectUri());
   try {
     const pkce = pkcePair('hex');
-    const scopes = tiktokScopes();
+    // Direct posting (an audited app) needs video.publish: asked for when .env or the release schedule turns it on.
+    const { loadReleaseSchedule } = await import('@coreslopper/core');
+    const schedule = await loadReleaseSchedule(findWorkspaceRoot() ?? repoRoot()).catch(() => undefined);
+    const scopes = schedule?.autopilot.tiktok_direct ? tiktokScopes({ ...process.env, TIKTOK_DIRECT_POST: '1' }) : tiktokScopes();
     const url = tiktokAuthUrl({ clientKey, redirectUri: loopback.redirectUri, state, challenge: pkce.challenge, scopes });
     print(
       scopes.includes('video.publish')

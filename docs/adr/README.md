@@ -33,5 +33,6 @@ Short records of decisions that are hard to reverse, surprising without context,
 | [0027](0027-pika-lipsync-audio-guide.md) | Local lip-sync on Pika H3 Ref2VA with the vocal anchored from frame 0 (`MiniMaxH3AddGuide`), `pika-h3-ref2va-lipsync`; LTX lip-sync stays as a `params.workflow` fallback. |
 
 | [0028](0028-release-board-and-calendar.md) | `release-board`: a local page per project and platform (files, texts, limits, settings, live URLs, done state); `review/calendar.yaml` planned under the workspace's `config/release-schedule.yaml` without collisions across projects; X, LinkedIn (agent decides), announcement, and microsite in the upload data. |
+| [0029](0029-release-autopilot.md) | One approval on the release board hands a release to the autopilot: `release-run` (on a timer) posts each calendar event a platform API can post, at its time — YouTube ahead and private until the audit, Instagram, X, LinkedIn, TikTok drafts, the links step, the microsite; never twice, a stuck post waits for the user. Nothing goes public without the user's approval. |
 
 Status values: `Accepted`, `Deprecated`, `Superseded by ADR-NNNN`.

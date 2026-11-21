@@ -126,6 +126,19 @@ Post the Short natively and put the YouTube link in a reply.
 
 LinkedIn fits songs with a political, work, tech, or AI angle, told as a personal story with a native video; it is weak for plain fan promotion.
 
+## API access (release autopilot)
+
+What each platform lets the release autopilot do ([ADR 0029](adr/0029-release-autopilot.md); checked 2026-11). Setup steps are in [publishing.md](publishing.md#release-autopilot).
+
+| Platform | By API | Not by API | Source |
+|---|---|---|---|
+| YouTube | Upload, thumbnail, `publishAt`, status, description, comments | Public or scheduled from an unaudited API project (stays private); Premiere; community posts; related video; pinning | [Videos](https://developers.google.com/youtube/v3/docs/videos), [audit](https://support.google.com/youtube/contact/yt_api_form), [quota](https://developers.google.com/youtube/v3/determine_quota_cost) |
+| TikTok | Inbox draft; direct post with caption and `is_aigc` after the audit | Public direct post before the audit (private only); cover; pinned comment; scheduling | [Direct Post](https://developers.tiktok.com/docs/en/content-posting-api-reference-direct-post), [guidelines](https://developers.tiktok.com/docs/en/content-sharing-guidelines) |
+| Instagram | Reels, feed images and videos, stories (own professional account, no App Review), `is_ai_generated` | Uploads (media from a public URL only); story stickers; changing the cover later; scheduling | [Content publishing](https://developers.facebook.com/documentation/instagram-platform/content-publishing.md), [changelog](https://developers.facebook.com/documentation/instagram-platform/changelog.md) |
+| X | Posts with video or images, replies; pay-per-use (~$0.015 a post, $0.20 with a URL) | Scheduling | [Pricing](https://docs.x.com/x-api/getting-started/pricing), [media upload](https://docs.x.com/x-api/media/quickstart/media-upload-chunked) |
+| LinkedIn | Member posts with video or image (self-serve "Share on LinkedIn"); token 60 days, no refresh | Scheduling; refresh tokens (partners only) | [Posts API](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/posts-api), [Videos API](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/videos-api) |
+| Spotify for Artists, distributors | — | Pitch, canvas, artist pick, delivery | — |
+
 ## Posting times
 
 Vendor studies, mostly global, in CET; the channel's own analytics win. `config/release-schedule.yaml` holds the times a workspace uses.
