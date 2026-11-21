@@ -16,7 +16,7 @@ npm run cli -- publish projects/<slug>                # upload what is not uploa
 | `--force` | Upload again although `review/publish.json` has the same file. |
 | `--mock` | Use the mock adapters: no network, entries marked `mock`. |
 
-Everything else of the release, including the files and texts for Instagram, Spotify, and the distributor, lies in `renders/release/` (`npm run cli -- release`, [ADR 0024](adr/0024-release-folder-manual-distribution.md)); those uploads stay manual.
+Everything else of the release, including the files and texts for Instagram, Spotify, the distributor, X, LinkedIn, and the microsite, lies in `renders/release/` (`npm run cli -- release`, [ADR 0024](adr/0024-release-folder-manual-distribution.md)); those uploads stay manual. `npm run cli -- release-board` lays them out per platform with the release calendar, and records what you posted ([ADR 0028](adr/0028-release-board-and-calendar.md)). To schedule a YouTube upload at its calendar time, pass that time to `--schedule`; `review/calendar.yaml` holds it with its offset.
 
 ## What it reads and writes
 
