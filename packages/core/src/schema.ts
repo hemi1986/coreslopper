@@ -469,6 +469,12 @@ export const CharacterSchema = z.object({
    * `refs.states`; its `ref` is the reference every such keyframe derives from.
    */
   states: z.array(CharacterStateSchema).default([]),
+  /**
+   * The character library entry this character was taken from
+   * (`library/characters/<id>/`). Its sheet and references are copies of the
+   * library's; the character bible keeps them and adds states and outfits.
+   */
+  library: ScriptIdSchema.optional(),
 });
 
 export const CharacterBibleSchema = z
@@ -1337,6 +1343,7 @@ export type StyleBible = z.infer<typeof StyleBibleSchema>;
 export type Character = z.infer<typeof CharacterSchema>;
 export type CharacterState = z.infer<typeof CharacterStateSchema>;
 export type CharacterBible = z.infer<typeof CharacterBibleSchema>;
+export type LibraryCharacter = z.infer<typeof LibraryCharacterSchema>;
 export type BrandKit = z.infer<typeof BrandKitSchema>;
 /** One note on a render: a frame, or a range from `frame` to `end_frame`. Written by the review player and the board. */
 export const ReviewNoteSchema = z
@@ -1411,6 +1418,44 @@ export const ReviewRepliesSchema = z.object({
     }),
   ),
 });
+
+/** A file name inside a library entry's folder: no folders, no dot files. */
+const LibraryFileSchema = z.string().regex(/^[a-z0-9][a-z0-9._-]*$/i, 'a library file is a plain file name inside the entry folder');
+
+/**
+ * `library/characters/<id>/character.yaml`: a character of the workspace's
+ * character library. Its files lie next to it. A project or series takes a
+ * copy (`character use`); the identity (sheet, references, voice) always
+ * comes along, each state only when chosen.
+ */
+export const LibraryCharacterSchema = z
+  .object({
+    version: z.literal(1),
+    id: ScriptIdSchema,
+    name: z.string().min(1),
+    description: z.string().min(1),
+    prompt: z.string().optional(),
+    face: DisplayRuleSchema.default('full'),
+    /** The character sheet, a file of this folder. */
+    sheet: LibraryFileSchema.optional(),
+    /** Identity and outfit references: seed, face, outfits, turnarounds. */
+    refs: z.array(LibraryFileSchema).default([]),
+    voice: z.object({ ref: LibraryFileSchema, transcript: z.string().min(1) }).optional(),
+    /** Continuity states from earlier productions; chosen one by one when the character is used. */
+    states: z
+      .array(CharacterStateSchema.extend({ ref: LibraryFileSchema.optional(), from: z.string().optional() }).passthrough())
+      .default([]),
+    /** Free words for finding the character on the board: "pop star", "narrator". */
+    tags: z.array(z.string().min(1)).default([]),
+    /** Where the character came from first: `projects/<slug>`, `series/<slug>`, or `manual`. */
+    origin: z.string().min(1),
+    added: z.string().min(1),
+    /** Every later import into this entry: when, from where, which files and states it brought. */
+    history: z
+      .array(z.object({ at: z.string().min(1), from: z.string().min(1), added: z.array(z.string()).default([]) }))
+      .default([]),
+  })
+  .superRefine((entry, ctx) => duplicateIds(entry.states, ctx, ['states'], 'state'));
 
 export const ReferenceKindSchema = z.enum(['look', 'character', 'location', 'storyboard', 'concept', 'footage', 'voice', 'other']);
 

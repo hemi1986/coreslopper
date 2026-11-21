@@ -3,15 +3,17 @@
 //   #/p/<slug>       a project's production   #/p/<slug>/release[/<platform>[/<event>]]
 //   #/p/<slug>/review[/<render>]             the review player
 //   #/s/<slug>       a series                #/new[/video|series|episode[/<slug>]]  the wizard
+//   #/characters[/<id>]                     the character library
 import { addStrings, api, el, go, showError, t } from './lib.js';
 import { currentProductionKey, forgetProduction, showProduction } from './production.js';
 import { onReleaseChange, showCalendar, showRelease } from './release.js';
 import { showReview } from './review.js';
 import { showWizard } from './wizard.js';
+import { showCharacters } from './characters.js';
 
 addStrings({
-  de: { board: 'Board', navProduction: 'Produktion', navCalendar: 'Release-Kalender', navNew: '+ Neu' },
-  en: { board: 'Board', navProduction: 'Production', navCalendar: 'Release calendar', navNew: '+ New' },
+  de: { board: 'Board', navProduction: 'Produktion', navCalendar: 'Release-Kalender', navCharacters: 'Figuren', navNew: '+ Neu' },
+  en: { board: 'Board', navProduction: 'Production', navCalendar: 'Release calendar', navCharacters: 'Characters', navNew: '+ New' },
 });
 
 const REFRESH_MS = 10000;
@@ -31,6 +33,7 @@ function renderNav() {
   nav.innerHTML = '';
   nav.appendChild(navButton(t('navProduction'), null, active === 'overview', '#/'));
   nav.appendChild(navButton(t('navCalendar'), null, active === 'calendar', '#/calendar'));
+  nav.appendChild(navButton(t('navCharacters'), null, active === 'characters', '#/characters'));
   nav.appendChild(navButton(t('navNew'), null, active === 'new', '#/new'));
   if (overview.projects.length) nav.appendChild(el('h2', { text: t('projects') }));
   overview.projects.forEach(function (project) {
@@ -59,6 +62,7 @@ function route() {
   let match;
   if ((match = /^#\/new(?:\/(video|series|episode)(?:\/([a-z0-9-]+))?)?\/?$/.exec(hash))) { active = 'new'; forgetProduction(); showWizard(match[1], match[2]); }
   else if (hash === '#/calendar') { active = 'calendar'; forgetProduction(); showCalendar(); }
+  else if ((match = /^#\/characters(?:\/([a-z0-9][a-z0-9_-]*))?\/?$/.exec(hash))) { active = 'characters'; forgetProduction(); showCharacters(match[1]); }
   else if ((match = /^#\/p\/([a-z0-9-]+)\/release(?:\/([a-z]+))?(?:\/(.+))?$/.exec(hash))) { active = 'release:' + match[1]; forgetProduction(); showRelease(match[1], match[2], match[3]); }
   else if ((match = /^#\/p\/([a-z0-9-]+)\/review(?:\/(.+))?$/.exec(hash))) { active = 'review:' + match[1]; forgetProduction(); showReview(match[1], match[2]); }
   else if ((match = /^#\/p\/([a-z0-9-]+)\/([a-z]+)$/.exec(hash))) { go('#/p/' + match[1] + '/release/' + match[2]); return; } // the release board's old links

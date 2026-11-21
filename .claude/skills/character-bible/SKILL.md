@@ -23,13 +23,17 @@ license: MIT
 
 ## Process
 
-1. Read the treatment and style bible. Decide which characters need a sheet. A one-off background figure may not.
+1. Read the treatment and style bible. Decide which characters need a sheet. A one-off background figure may not. For each recurring character, look in the workspace character library first (`npm run cli -- character list`): a character the treatment names that is already there comes in with `npm run cli -- character use <project> <id> [--states <ids>]` instead of a new sheet (see **Library characters**).
 2. Write a precise description for each character: age range, silhouette, face, hair, wardrobe, materials, palette anchors, and what must never change.
 3. Generate a character sheet with `generateImage` or `editImage`. Use at least one reference image when revising a sheet; never rely on text alone for a recurring character.
 4. File the sheet and 2–4 usable reference images under the project's gitignored `characters/<id>/` by giving each batch item its `out` path there; never copy generated files by hand. Record them in `characters.yaml` with `sheet`, `refs`, and the prompt.
 5. Every sheet is reviewed before anything derives from it: queue it as a hand-written item with `out` and `review` (`.claude/skills/ai-clips/SKILL.md`, steps 3–6), with `"review": {"ref": "sheet:<id>"}`. The queue reviews it (identity, costume, palette, readability at small sizes), regenerates a failed image with the verdict's `fix_prompt`, and files only an approved one.
 6. Add the **character states** the treatment or script needs (see below).
-7. Update the state with `npm run cli -- stage-done <project> style-character --outputs style.yaml,characters.yaml` when the style bible is also ready.
+7. Update the state with `npm run cli -- stage-done <project> style-character --outputs style.yaml,characters.yaml` when the style bible is also ready. It takes the project's characters into the library by itself and prints what it added.
+
+## Library characters
+
+A character with `library: <id>` in `characters.yaml` is a copy from `library/characters/<id>/` (ADR 0034). Its sheet, references, and voice passed review in an earlier production: build on them as they are. Keep its `description` and `prompt`, and add what this video needs as new states or outfit references derived from its sheet, reviewed like any other. A state the library has but the project lacks comes in with `character use <project> <id> --states <state>`.
 
 ## Character states
 

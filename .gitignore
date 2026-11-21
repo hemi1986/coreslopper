@@ -53,6 +53,10 @@ series/*/props/*
 series/*/assets/*
 !series/*/assets/.gitkeep
 
+# Character library media; each character.yaml stays tracked
+library/characters/*/*
+!library/characters/*/character.yaml
+
 # Python
 .venv/
 __pycache__/

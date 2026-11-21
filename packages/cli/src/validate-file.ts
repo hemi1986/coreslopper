@@ -9,6 +9,7 @@ import {
   StateSchema,
   StyleBibleSchema,
   CharacterBibleSchema,
+  LibraryCharacterSchema,
   ChannelConfigSchema,
   ReleaseCalendarSchema,
   ReleaseScheduleSchema,
@@ -106,6 +107,10 @@ export async function validateChangedFile(file: string): Promise<string | undefi
   if (basename(file) === 'release-schedule.yaml' && basename(dirname(resolve(file))) === 'config') {
     await readYamlFile(resolve(file), ReleaseScheduleSchema);
     return 'release schedule';
+  }
+  if (isLibraryCharacterFile(file)) {
+    await validateLibraryCharacter(resolve(file));
+    return 'library character';
   }
   const root = findArtifactRoot(file);
   const name = basename(file);
@@ -235,4 +240,20 @@ async function validateReferences(dir: string): Promise<void> {
     seen.add(reference.id);
     if (reference.file && !existsSync(join(dir, reference.file))) throw new ValidationError(`reference ${reference.id}: ${reference.file} is missing`);
   }
+}
+
+/** `library/characters/<id>/character.yaml` of the workspace's character library. */
+export function isLibraryCharacterFile(file: string): boolean {
+  const dir = dirname(resolve(file));
+  return basename(file) === 'character.yaml' && basename(dirname(dir)) === 'characters' && basename(dirname(dirname(dir))) === 'library';
+}
+
+/** A library character: the schema, its id matching its folder, and every named file present. */
+async function validateLibraryCharacter(path: string): Promise<void> {
+  const entry = await readYamlFile(path, LibraryCharacterSchema);
+  const dir = dirname(path);
+  if (entry.id !== basename(dir)) throw new ValidationError(`character.yaml says id "${entry.id}", but its folder is "${basename(dir)}".`);
+  const files = [entry.sheet, ...entry.refs, entry.voice?.ref, ...entry.states.map((state) => state.ref)].filter(Boolean) as string[];
+  const missing = files.filter((file) => !existsSync(join(dir, file)));
+  if (missing.length) throw new ValidationError(`library character ${entry.id} names files that are missing: ${missing.join(', ')}`);
 }

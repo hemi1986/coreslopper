@@ -68,6 +68,7 @@ packages/
   cli/             validate, status, new, render, contact-sheet, stage-*, estimate, doctor, board (page in src/board/), watch
                    npx entry, onboarding, tool checks, workspace init
   remotion/        MusicVideo composition, motion components, effects, 3D
+library/           The workspace character library: characters/<id>/character.yaml (media gitignored)
 schema/            Generated JSON Schema for cross-language validation
 scripts/           Audio analysis and review player (Python/uv), fixture generators, runtime build
 templates/project/ Project template used by the new-video skill
@@ -90,7 +91,7 @@ dist/              Generated npx bundle (gitignored)
 | 2 | `brief` ✋ | `grilling`, `video-brief` | `brief.md` | Budget/formats present; grilling frontier empty |
 | 3 | `treatment` ✋ | `grilling`, `video-treatment` | `treatment.md` | Critic vs. brief; user accepts |
 | 4 | `audio-analysis` | `audio-analysis` | `timing.json`, `timing.report.md` | Schema; confidence flags |
-| 5 | `style-character` | `style-bible`, `character-bible` | `style.yaml`, `characters.yaml`, `sets.yaml` (plates, props), refs, character states | Schema; image QA per reference |
+| 5 | `style-character` | `style-bible`, `character-bible` | `style.yaml`, `characters.yaml`, `sets.yaml` (plates, props), refs, character states; characters into the library | Schema; image QA per reference |
 | 6 | `storyboard` | `storyboard` | `storyboard.yaml`, `storyboard.md`, contact sheet | Schema, anchors, coverage, refs, source rules |
 | 7 | `assets` | `remotion-motion`, `ai-clips`, `footage` | Components, keyframes, clips, footage | Per-batch cost + QA; cache |
 | 8 | `assembly` | `assembly-render` | `renders/preview-16x9.mp4` | Preview; sync/legibility |
@@ -172,6 +173,7 @@ npm run schema
 | `npm run cli -- release-timer [show\|install\|remove\|status] [--every <min>]` | User command: the timer that runs `watch` (Windows Task Scheduler under WSL, systemd, launchd); not with the board container. |
 | `npm run cli -- lyrics <project> --file <txt> [--propose]` | Write `lyrics.txt` once every line sits under a section tag; `--propose` prints proposed tags (repeated blocks become `[Chorus]`). |
 | `npm run cli -- reference list\|add\|link\|remove [<project> \| --series <s>]` | The user references (`references.yaml`, files in `assets/references/`): mood boards, photos, storyboards, concepts, footage, voices, links, with kind, subject, and note. |
+| `npm run cli -- character list\|import\|new\|add-file\|use\|remove` | The workspace character library (`library/characters/<id>/`): `import <project> [--series] [--id] [--into]` takes characters in (runs by itself at `stage-done … style-character`); `use <project> <id> [--series] [--states <ids>\|all]` copies one into a music video or canon with `library: <id>`. |
 | `npm run cli -- import-song <project>` | Register `audio/song.wav` and `audio/stems/vocals.wav` in `song.json`; converts other formats. |
 | `npm run cli -- normalize-audio <project> --input <file>` | Normalize audio to −14 LUFS / −1 dBTP. |
 | `npm run cli -- footage <project> --input <file> --name <name>` | Normalize a footage proxy. |

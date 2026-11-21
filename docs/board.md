@@ -36,13 +36,19 @@ The port is published on 127.0.0.1 only, since the board writes release approval
 
 **+ New** opens the wizard for a music video, a series, or an episode. It holds what a form can hold; the grilling (brief and treatment, series bible, episode script) stays in Claude Code ([ADR 0033](adr/0033-board-wizard.md)).
 
-- **Music video**: title, artist, slug, budget, providers (those with credentials in `.env` are marked), sung language, rights, license. Then the lyrics: paste them, let **Propose tags** add section tags (a block that repeats becomes `[Chorus]`, every other block a numbered `[Verse n]`), correct them, and save; the section list shows what the analyzer will see. Then the song and the vocal stem: the upload runs `import-song`, converting MP3, FLAC, AIFF, M4A, or OGG to WAV. Then your **references**. **Finish setup** marks `setup` done; type `/new-video <slug>` in Claude Code, which starts with the brief.
-- **Series**: title, slug, budget, master format, providers; then references (characters with photos and voice recordings, sets, look, concepts). Then `/new-series <slug>` grills the bible and builds the canon.
+- **Music video**: title, artist, slug, budget, providers (those with credentials in `.env` are marked), sung language, rights, license. Then the lyrics: paste them, let **Propose tags** add section tags (a block that repeats becomes `[Chorus]`, every other block a numbered `[Verse n]`), correct them, and save; the section list shows what the analyzer will see. Then the song and the vocal stem: the upload runs `import-song`, converting MP3, FLAC, AIFF, M4A, or OGG to WAV. Then your **references** and the **characters from the library** to take along. **Finish setup** marks `setup` done; type `/new-video <slug>` in Claude Code, which starts with the brief.
+- **Series**: title, slug, budget, master format, providers; then references (characters with photos and voice recordings, sets, look, concepts) and characters from the library. Then `/new-series <slug>` grills the bible and builds the canon.
 - **Episode**: the series, the episode number (the next planned one is proposed), slug, and budget; then references (a storyboard, a script draft). Then `/new-episode <slug>` grills the script.
 
 References are files or links with a kind (look, character, location, storyboard, concept, footage, voice, other), what they show, and what you want from them. They are listed in `references.yaml` of the project or canon, with the files in `assets/references/`; the agent opens them before the grilling. In a terminal: `npm run cli -- reference add projects/<slug> --file <path> --kind storyboard --note "<what for>"`, `reference link`, `reference list`, `reference remove`, and `--series` for a canon. Uploads take up to 1 GB of audio and 4 GB per reference.
 
 A project the wizard started shows on the production page with a link back to it until its setup is done.
+
+## Characters
+
+**Characters** is the workspace's character library ([ADR 0034](adr/0034-character-library.md)): every character of your videos and series, with its sheet, references, voice, the states earlier productions gave it, and where it is used. A project's characters come in by themselves once its `style-character` stage is done; **Take from a project or series** imports an existing one, and **New character** adds your own (name, description, prompt, sheet, more images, a voice WAV with its transcript).
+
+On a character's page, **Use in** copies it into a music video or series canon: its files land in `characters/<id>/`, its entry in `characters.yaml` with `library: <id>`, and only the states you tick come along. The wizard has the same choice as a step for a new music video or series, so the agent finds the character in place when it grills and builds the character bible on it. An episode gets its characters from its series. In a terminal: `npm run cli -- character list`, `character import <project>` (`--series`, `--id`, `--into`), `character new`, `character add-file`, `character use <project> <id> [--states <ids>|all]`, `character remove`.
 
 ## Production
 

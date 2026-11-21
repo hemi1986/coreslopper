@@ -20,7 +20,8 @@ import { releaseDir } from './release.js';
 // review/release-status.json. Writes come only from its own page (see
 // trustedWrite): the status files, the approval, and the autopilot's retry and
 // takeover marks (and, on approval of a proposed date,
-// release.release_date in project.yaml).
+// release.release_date in project.yaml), the wizard's new projects and
+// references, and the character library (library/characters/, ADR 0034).
 
 export interface BoardOptions {
   /** The workspace (or repository) root; projects live in its projects/. */
@@ -247,6 +248,76 @@ export function boardHandler(options: BoardOptions = {}) {
     }
     return false;
   };
+  /** The character library: list, import, new entries, uploads, use in a project or canon; true when it answered. */
+  const libraryRoute = async (req: IncomingMessage, res: ServerResponse, path: string, query: URLSearchParams): Promise<boolean> => {
+    const library = await import('./character-library.js');
+    const answer = (value: unknown) => {
+      json(res, value);
+      return true;
+    };
+    const listing = async () => ({ ...(await library.listLibrary(root)), targets: await library.libraryTargets(root) });
+    const fileMatch = /^\/library-files\/([^/]+)\/([^/]+)$/.exec(path);
+    if (req.method === 'GET' && fileMatch) {
+      const [, id, name] = fileMatch as unknown as [string, string, string];
+      if (name.startsWith('.') || name === 'character.yaml') {
+        send(res, 403, 'forbidden', 'text/plain');
+        return true;
+      }
+      await serveMedia(req, res, library.entryDir(root, id), name);
+      return true;
+    }
+    if (req.method === 'GET' && path === '/api/library') return answer(await listing());
+    if (req.method === 'POST' && path === '/api/library/new') {
+      const entry = await library.addLibraryCharacter(root, (await body(req)) as never, now());
+      return answer({ id: entry.id });
+    }
+    if (req.method === 'POST' && path === '/api/library/import') {
+      const change = (await body(req)) as { scope?: unknown; slug?: unknown; character?: unknown; into?: unknown };
+      const dir = await library.libraryTarget(root, change.scope, change.slug);
+      const results = await library.importCharacters(root, dir, {
+        character: typeof change.character === 'string' && change.character ? change.character : undefined,
+        into: typeof change.into === 'string' && change.into ? change.into : undefined,
+        now: now(),
+      });
+      return answer({ results, ...(await listing()) });
+    }
+    if (req.method === 'POST' && path === '/api/library/use') {
+      const change = (await body(req)) as { scope?: unknown; slug?: unknown; id?: unknown; states?: unknown };
+      const dir = await library.libraryTarget(root, change.scope, change.slug);
+      if (change.states !== undefined && change.states !== 'all' && !(Array.isArray(change.states) && change.states.every((state) => typeof state === 'string'))) {
+        throw new ValidationError('states must be a list of state ids or "all"');
+      }
+      const result = await library.useCharacter(root, dir, String(change.id ?? ''), { states: change.states as string[] | 'all' | undefined });
+      return answer({ result, ...(await listing()) });
+    }
+    const entryMatch = /^\/api\/library\/([^/]+)$/.exec(path);
+    if (req.method === 'POST' && entryMatch) {
+      const id = entryMatch[1]!;
+      const change = (await body(req)) as Record<string, unknown>;
+      if (change.action === 'update') await library.updateLibraryCharacter(root, id, change);
+      else if (change.action === 'remove-file') await library.removeLibraryFile(root, id, change.name);
+      else if (change.action === 'delete') await library.removeLibraryCharacter(root, id);
+      else throw new ValidationError('action must be update, remove-file, or delete');
+      return answer(await listing());
+    }
+    const uploadMatch = /^\/api\/upload\/library\/([^/]+)$/.exec(path);
+    if (req.method === 'POST' && uploadMatch) {
+      const id = uploadMatch[1]!;
+      const role = query.get('role') ?? 'ref';
+      if (role !== 'ref' && role !== 'sheet' && role !== 'voice') throw new ValidationError('role must be ref, sheet, or voice');
+      const file = await library.libraryFileTarget(root, id, query.get('name') ?? '', role);
+      const { receiveUpload } = await import('./board-wizard.js');
+      await receiveUpload(req, file, library.LIBRARY_FILE_LIMITS.bytes);
+      try {
+        await library.recordLibraryFile(root, id, file, role, query.get('transcript') ?? undefined, now());
+      } catch (error) {
+        await rm(file, { force: true });
+        throw error;
+      }
+      return answer(await listing());
+    }
+    return false;
+  };
   const projectDir = async (slug: string) => {
     if (!SLUG.test(slug)) throw new ValidationError(`unknown project ${slug}`);
     const dir = join(root, 'projects', slug);
@@ -319,6 +390,10 @@ export function boardHandler(options: BoardOptions = {}) {
           const change = (await body(req)) as { video?: unknown };
           return json(res, await submitRound(dir, change.video, now()));
         }
+      }
+      if (path.startsWith('/api/library') || path.startsWith('/library-files/') || path.startsWith('/api/upload/library/')) {
+        const handled = await libraryRoute(req, res, path, url.searchParams);
+        if (handled) return;
       }
       if (path.startsWith('/api/new') || path.startsWith('/api/upload/')) {
         const handled = await wizardRoute(req, res, path, url.searchParams);

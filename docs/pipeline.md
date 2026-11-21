@@ -83,6 +83,8 @@ Completion: style validates; every storyboard style key exists; every recurring 
 
 Plates, prop references, and character states are the continuity references ([ADR 0025](adr/0025-plates-props-character-states.md)): a plate is an empty frame of a set from one fixed camera angle, a prop reference the one look of a recurring object, a character state a named look the story puts a character in (hatch open, cable plugged in). Shots name them in `refs.plate`, `refs.props`, and `refs.states`, and keyframes in a plate are edits of it.
 
+Characters from the workspace's character library ([ADR 0034](adr/0034-character-library.md)) arrive in `characters.yaml` with `library: <id>`, taken during setup or the brief (`character use`, or the board); the character bible keeps their sheet and references and adds what this video needs. `stage-done … style-character` takes the finished characters back into the library.
+
 ## 6. Storyboard
 
 - Skill: `storyboard`

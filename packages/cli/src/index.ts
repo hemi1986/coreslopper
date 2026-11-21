@@ -641,6 +641,114 @@ program
     }),
   );
 
+const character = program
+  .command('character')
+  .description('The workspace character library (library/characters/<id>/): list | import | new | add-file | use | remove.');
+
+character
+  .command('list')
+  .description('Every library character with its files, states, and where it is used.')
+  .action(() =>
+    run(async () => {
+      const { listLibrary } = await import('./character-library.js');
+      const { characters, errors } = await listLibrary(repoRoot());
+      if (!characters.length && !errors.length) console.log('The library is empty. `character import <project>` or `character new` adds characters.');
+      for (const entry of characters) {
+        const used = entry.usedIn.map((use) => `${use.scope === 'series' ? 'series/' : ''}${use.slug}`).join(', ');
+        console.log(`${entry.id.padEnd(20)} ${entry.name}`);
+        console.log(`  ${[entry.sheet ? 'sheet' : 'no sheet', `${entry.refs.length} refs`, entry.voice ? 'voice' : '', entry.states.length ? `states: ${entry.states.map((state) => state.id).join(', ')}` : ''].filter(Boolean).join(' · ')}`);
+        console.log(`  from ${entry.origin}${used ? ` · used in ${used}` : ''}`);
+      }
+      for (const error of errors) console.log(`✖ ${error.id}: ${error.error}`);
+    }),
+  );
+
+character
+  .command('import <target>')
+  .description('Take the characters of a project or series canon into the library: new entries, or new files and states for entries they came from. Runs by itself when style-character is done.')
+  .option('--series', 'The target is a series canon')
+  .option('--id <character>', 'Only this character')
+  .option('--into <library-id>', 'Merge into this library entry (an earlier copy of the same character)')
+  .action((target: string, options: { series?: boolean; id?: string; into?: string }) =>
+    run(async () => {
+      const { importCharacters } = await import('./character-library.js');
+      const dir = options.series ? seriesDirFromArg(target) : projectDirFromArg(target);
+      const results = await importCharacters(repoRoot(), dir, { character: options.id, into: options.into });
+      if (!results.length) console.log('No character with files to take into the library.');
+      for (const result of results) printImport(result);
+    }),
+  );
+
+character
+  .command('new')
+  .description('Add a character to the library by hand; add its images and voice with add-file.')
+  .requiredOption('--name <name>', 'Display name')
+  .requiredOption('--description <text>', 'Who the character is and how they look')
+  .option('--id <id>', 'Library id (default: from the name)')
+  .option('--prompt <text>', 'Prompt sentence for keyframes')
+  .option('--face <rule>', 'full | silhouette | screen-only | voice-only', 'full')
+  .option('--tags <list>', 'Comma-separated words for finding the character')
+  .option('--files <paths>', 'Reference images to copy in, comma-separated; the first is the sheet unless --sheet is given')
+  .option('--sheet <path>', 'The character sheet')
+  .action((options: { name: string; description: string; id?: string; prompt?: string; face: string; tags?: string; files?: string; sheet?: string }) =>
+    run(async () => {
+      const library = await import('./character-library.js');
+      const root = repoRoot();
+      const entry = await library.addLibraryCharacter(root, options);
+      const files = parseCsv(options.files);
+      const sheet = options.sheet ?? files.shift();
+      if (sheet) await library.addLibraryFile(root, entry.id, sheet, 'sheet');
+      for (const file of files) await library.addLibraryFile(root, entry.id, file, 'ref');
+      console.log(`✔ ${entry.id} in ${relative(process.cwd(), library.entryDir(root, entry.id)) || '.'}`);
+    }),
+  );
+
+character
+  .command('add-file <id>')
+  .description('Copy an image or a voice WAV into a library character.')
+  .requiredOption('--file <path>', 'The file')
+  .option('--role <role>', 'ref | sheet | voice', 'ref')
+  .option('--transcript <text>', 'voice: the exact words of the recording')
+  .action((id: string, options: { file: string; role: string; transcript?: string }) =>
+    run(async () => {
+      const { addLibraryFile } = await import('./character-library.js');
+      const role = validateChoice(options.role, ['ref', 'sheet', 'voice'] as const, 'role');
+      await addLibraryFile(repoRoot(), id, options.file, role, options.transcript);
+      console.log(`✔ ${basename(options.file)} → ${id} (${role})`);
+    }),
+  );
+
+character
+  .command('use <target> <id>')
+  .description('Copy a library character into a music video or a series canon: files to characters/<id>/, the entry to characters.yaml with library: <id>.')
+  .option('--series', 'The target is a series canon')
+  .option('--states <ids>', 'Continuity states to take along, comma-separated, or "all" (default: none)')
+  .action((target: string, id: string, options: { series?: boolean; states?: string }) =>
+    run(async () => {
+      const { useCharacter } = await import('./character-library.js');
+      const dir = options.series ? seriesDirFromArg(target) : projectDirFromArg(target);
+      const result = await useCharacter(repoRoot(), dir, id, { states: options.states === 'all' ? 'all' : parseCsv(options.states) });
+      console.log(`✔ ${result.character} ${result.updated ? 'updated in' : 'added to'} ${basename(dir)}: ${result.files.length} files${result.states.length ? `, states ${result.states.join(', ')}` : ''}`);
+    }),
+  );
+
+character
+  .command('remove <id>')
+  .description('Delete a library character and its files; projects keep their copies.')
+  .action((id: string) =>
+    run(async () => {
+      const { removeLibraryCharacter } = await import('./character-library.js');
+      await removeLibraryCharacter(repoRoot(), id);
+      console.log(`✔ ${id} removed from the library`);
+    }),
+  );
+
+function printImport(result: { character: string; id: string; created: boolean; added: string[]; missing: string[] }): void {
+  const what = result.created ? `new entry ${result.id}` : result.added.length ? `${result.id}: ${result.added.join(', ')}` : `${result.id}: nothing new`;
+  console.log(`✔ ${result.character} → ${what}`);
+  if (result.missing.length) console.log(`  missing in the source: ${result.missing.join(', ')}`);
+}
+
 program
   .command('stage-start <project> <stage>')
   .description('Mark a stage as running and save state.json.')
@@ -664,6 +772,15 @@ program
       setStageDone(loaded.state, stage, parseCsv(options.outputs), options.hash);
       await saveState(loaded.paths.state, loaded.state);
       console.log(`✔ ${stage} done`);
+      // The characters of a finished character bible go into the workspace library.
+      if (stage === 'style-character' && existsSync(join(loaded.paths.root, 'characters.yaml'))) {
+        const { importCharacters } = await import('./character-library.js');
+        try {
+          for (const result of await importCharacters(repoRoot(), loaded.paths.root)) printImport(result);
+        } catch (error) {
+          console.warn(`⚠ character library: ${(error as Error).message}`);
+        }
+      }
     }),
   );
 

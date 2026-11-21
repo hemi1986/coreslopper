@@ -30,7 +30,7 @@ A coreslopper music-video project.
 | `characters/<id>/` | Character sheets and reference images; gitignored. |
 | `audio/`, `assets/`, `renders/` | Local media; gitignored. `renders/thumbnails/` and `renders/shorts/` hold the release package's thumbnails and Shorts. |
 
-User-provided references belong in `assets/references/` (moodboards, composition, color) or `characters/<id>/` (recurring characters). Actual footage or stills used in the timeline belong in `assets/footage/`. All of these stay local.
+User-provided references belong in `assets/references/` (moodboards, composition, color) or `characters/<id>/` (recurring characters). A character from the workspace's character library comes in with `npm run cli -- character use <project> <id>` (or the board's **Characters**), which fills `characters/<id>/` and marks the entry in `characters.yaml` with `library: <id>`. Actual footage or stills used in the timeline belong in `assets/footage/`. All of these stay local.
 
 ## Media policy
 
