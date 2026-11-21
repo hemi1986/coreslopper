@@ -82,3 +82,8 @@ bench/state.json
 bench/manifest.jsonl
 bench/timings.jsonl
 series/*/review/
+
+# Kataster
+.claude/node_modules/
+.claude/state/
+.kataster/
