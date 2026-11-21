@@ -205,7 +205,6 @@
       "type": "object",
       "properties": {
         "distributor": {
-          "default": "manual",
           "type": "string",
           "enum": [
             "distrokid",

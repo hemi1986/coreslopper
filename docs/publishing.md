@@ -109,7 +109,7 @@ Length and aspect ratio need `ffprobe`; without it the dry run warns that they a
 
 ## Release autopilot
 
-The release autopilot posts an approved release by API at its calendar times, so you do not log in to each platform ([ADR 0029](adr/0029-release-autopilot.md)). Releasing stays one click: **Approve release** on the release board (or `npm run cli -- release-approve <project>`). A proposed release day becomes `release.release_date` in `project.yaml` with that click. **Withdraw approval** stops everything that has not gone out.
+The release autopilot posts an approved release by API at its calendar times, so you do not log in to each platform ([ADR 0029](adr/0029-release-autopilot.md)). Releasing stays one click: **Approve release** on the release board (or `npm run cli -- release-approve <project>`). A proposed release day becomes `release.release_date` in `project.yaml` with that click. The approval holds for that day: when the release moves, nothing goes out until you approve the new day. **Withdraw approval** stops everything that has not gone out. The board takes writes only from its own page on 127.0.0.1, so another website open in your browser cannot approve a release.
 
 ```bash
 npm run cli -- release-timer show       # what the timer runs, for this computer
@@ -118,7 +118,7 @@ npm run cli -- release-run --plan       # every approved event with its state
 npm run cli -- release-run --dry-run    # what is due now; posts nothing
 ```
 
-`release-timer install` sets up the Windows Task Scheduler under WSL (WSL itself stops when no terminal is open), a systemd user timer on Linux, or a launchd agent on macOS. Each round runs `release-run` in the workspace and appends to `.cache/release-run.log`. The computer has to be on at the posting times; a post missed by more than `late_hours` waits for you on the board.
+`release-timer install` sets up the Windows Task Scheduler under WSL (WSL itself stops when no terminal is open), a systemd user timer on Linux, or a launchd agent on macOS. Each round runs the script `~/.coreslopper/release-run.sh`, which puts the Node.js that installed the timer on PATH (a timer's shell loads no nvm or profile), runs `release-run` in the workspace, and appends to `.cache/release-run.log`. Install the timer again after a Node.js upgrade or when you move the workspace. The computer has to be on at the posting times; a post missed by more than `late_hours` waits for you on the board.
 
 ### What goes out by itself
 

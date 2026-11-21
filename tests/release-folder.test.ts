@@ -31,6 +31,7 @@ import {
   releaseTodos,
   unmarkedPlaceholders,
   withReleaseDefaults,
+  releaseIdentity,
   type Timing,
 } from '../packages/core/src/index.ts';
 import { buildRelease, type ReleaseDeps } from '../packages/cli/src/release.ts';
@@ -75,7 +76,8 @@ describe('release schemas', () => {
     expect(ReleaseMetadataSchema.safeParse({ isrc: 'ABC' }).success).toBe(false);
     expect(ReleaseMetadataSchema.safeParse({ release_date: '11.12.2026' }).success).toBe(false);
     expect(ReleaseMetadataSchema.safeParse({ ai_credits: { music: 'some' } }).success).toBe(false);
-    expect(ReleaseMetadataSchema.parse({ isrc: 'DE-ABC-26-00001' }).distributor).toBe('manual');
+    // Unset means manual; only an unset distributor takes the channel's default.
+    expect(ReleaseMetadataSchema.parse({ isrc: 'DE-ABC-26-00001' }).distributor).toBeUndefined();
     expect(UploadDataSchema.safeParse(uploadYaml()).success).toBe(true);
   });
 
@@ -165,6 +167,10 @@ describe('TODO detection and text limits', () => {
     expect(releaseTodos(merged, channel, { artist: 'Neon Static', title: 'Neon Rain' })).toEqual(['release.language is not set']);
     // Without defaults nothing changes.
     expect(withReleaseDefaults(undefined, undefined)).toBeUndefined();
+    // The default artist reaches the identity; an explicit manual distributor stays manual.
+    const artistChannel = ChannelConfigSchema.parse({ version: 1, name: 'x', language: 'de', release_defaults: { artist: 'Neon Static', distributor: 'distrokid' } });
+    expect(releaseIdentity({ title: 'Neon Rain', release: withReleaseDefaults(undefined, artistChannel) }).artist).toBe('Neon Static');
+    expect(withReleaseDefaults(ReleaseMetadataSchema.parse({ distributor: 'manual' }), artistChannel)!.distributor).toBe('manual');
   });
 
   it('finds <ID> placeholders and unmarked ones', () => {
@@ -371,9 +377,14 @@ describe('release folder', () => {
     const config = parse(await readFile(join(dir, 'project.yaml'), 'utf8'));
     config.release.release_date = '2026-12-18';
     await writeFile(join(dir, 'project.yaml'), stringify(config));
+    // The board's quick refresh composes nothing: the outdated dated images go, the story image stays.
     const moved = await buildRelease({ projectDir: dir, deps, stills: false });
     expect(deps.thumbnails).toEqual([]);
-    expect(moved.todos.filter((todo) => todo.includes('not composed'))).toEqual([]);
+    expect(moved.todos.filter((todo) => todo.includes('not composed'))).toHaveLength(2);
+    expect(await tree(moved.dir)).not.toContain('announce/story-9x16.jpg');
+    expect(await tree(moved.dir)).toContain('instagram/story-9x16.jpg');
+    const fallback = (await boardProject(dir, join(dir, '..', '..'))).platforms.find((platform) => platform.id === 'instagram')!.posts.find((post) => post.id === 'announce:instagram')!;
+    expect(fallback.files.map((file) => file.path)).toEqual(['streaming/cover-3000x3000.jpg']);
     await buildRelease({ projectDir: dir, deps });
     expect(deps.thumbnails.map((call) => call.text)).toEqual([
       'NEON RAIN|FR 18.12. 18 UHR',
@@ -515,8 +526,10 @@ describe('release QA', () => {
 });
 
 /** Call the board's request handler without a socket. */
-async function request(handler: ReturnType<typeof boardHandler>, method: string, url: string, body?: unknown, headers: Record<string, string> = {}) {
+async function request(handler: ReturnType<typeof boardHandler>, method: string, url: string, body?: unknown, extra: Record<string, string> = {}) {
   const { Readable } = await import('node:stream');
+  // What the board page itself sends; a test overrides them to play a foreign page.
+  const headers = { host: '127.0.0.1:4848', ...(method === 'GET' ? {} : { 'content-type': 'application/json', origin: 'http://127.0.0.1:4848' }), ...extra };
   const req = Object.assign(Readable.from(body === undefined ? [] : [Buffer.from(JSON.stringify(body))]), { method, url, headers });
   return new Promise<{ status: number; headers: Record<string, unknown>; body: string }>((done) => {
     const chunks: Buffer[] = [];

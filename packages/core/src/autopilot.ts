@@ -33,7 +33,7 @@ export type AutopilotState =
   /** No API for it, its platform is off, or the user took it over. */
   | 'manual'
   | 'done'
-  /** The release is not approved yet. */
+  /** The release is not approved yet, or its day moved since the approval. */
   | 'unapproved'
   /** Before its time. */
   | 'waiting'
@@ -138,6 +138,11 @@ function currentEntries(log: AutopilotLog, id: string): AutopilotEntry[] {
   return lastRetry >= 0 ? entries.slice(lastRetry + 1) : entries;
 }
 
+/** The approval covers the calendar's release day. */
+export function approvalHolds(status: Pick<ReleaseStatus, 'approval'>, calendar: Pick<ReleaseCalendar, 'release_date'>): boolean {
+  return Boolean(status.approval && status.approval.release_date === calendar.release_date);
+}
+
 /** Plan every event of a calendar. */
 export function planAutopilot(context: AutopilotContext): AutopilotEventPlan[] {
   return context.calendar.events.map((event) => planEvent(event, context));
@@ -161,7 +166,8 @@ function planEvent(event: CalendarEvent, context: AutopilotContext): AutopilotEv
   const due = action.kind === 'youtube' ? at - settings.youtube_ahead_hours * HOUR : at;
   const dueAt = new Date(due).toISOString();
   const withDue = { ...plan, dueAt };
-  if (!status.approval) return { ...withDue, state: 'unapproved' };
+  // An approval holds for the day the user approved: a moved release asks again.
+  if (!approvalHolds(status, context.calendar)) return { ...withDue, state: 'unapproved' };
   // Missing credentials show from the approval on; they need the user once the post is due.
   if (context.ready && context.ready[platform] === false) return { ...withDue, state: 'blocked', block: 'credentials', needsUser: now.getTime() >= due };
 
@@ -182,7 +188,8 @@ function planEvent(event: CalendarEvent, context: AutopilotContext): AutopilotEv
   if (attempts >= settings.retries) return { ...withDue, state: 'failed', needsUser: true };
 
   if (now.getTime() < due) return { ...withDue, state: 'waiting' };
-  const forced = latest?.status === 'force';
+  // "Post now", or "Try again" before the next attempt: the user asked for it, however late.
+  const forced = latest?.status === 'force' || (latest === undefined && log.entries.some((entry) => entry.event === event.id && entry.status === 'retry'));
   // A task (the links step) has no deadline; a post that comes too late waits for the user.
   // Lateness counts from the calendar time, also for a YouTube upload that was due a day earlier.
   const late = action.kind !== 'links' && !forced && attempts === 0 && now.getTime() - at > settings.late_hours * HOUR;

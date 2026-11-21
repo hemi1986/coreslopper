@@ -120,8 +120,8 @@
       pilot: 'Autopilot', approve: 'Release freigeben', approveDate: function (d, p) { return 'Release am ' + d + ' freigeben' + (p ? ' (Datum wird festgelegt)' : ''); },
       approved: function (at) { return 'Freigegeben am ' + at + ': die API-Posts gehen zu ihren Kalenderzeiten raus.'; }, revoke: 'Freigabe zurückziehen',
       summary: function (a, m) { return a + ' Posts gehen per API raus, ' + m + ' bleiben bei dir.'; }, missingAccess: 'Ohne Zugang (bleiben von Hand, bis du publish-auth ausführst):',
-      lastRun: function (at) { return 'Letzter Lauf von release-run: ' + at; }, noRun: 'release-run ist noch nie gelaufen: npm run cli -- release-timer install', staleRun: 'release-run lief seit über 30 Minuten nicht: läuft der Timer?',
-      attention: 'Braucht dich:', confirmApprove: 'Release freigeben? Ab jetzt postet der Autopilot zu den Kalenderzeiten auf den Plattformen mit Zugang.',
+      lastRun: function (at) { return 'Letzter Lauf von release-run: ' + at; }, noRun: 'release-run ist noch nie gelaufen: npm run cli -- release-timer install', staleRun: 'release-run lief seit mehreren Runden nicht: läuft der Timer?',
+      attention: 'Braucht dich:', staleApproval: function (was, now) { return 'Freigegeben war der ' + was + ', das Release liegt jetzt am ' + now + ': bis zur neuen Freigabe geht nichts raus.'; }, confirmApprove: 'Release freigeben? Ab jetzt postet der Autopilot zu den Kalenderzeiten auf den Plattformen mit Zugang.',
       states: { manual: 'von Hand', done: 'erledigt', unapproved: 'nach Freigabe automatisch', waiting: 'automatisch', due: 'ist dran', blocked: 'wartet', running: 'läuft …', pending: 'hochgeladen', failed: 'fehlgeschlagen', stuck: 'unklar, ob online', missed: 'verpasst' },
       blocks: { credentials: 'Zugang fehlt: npm run cli -- publish-auth ', youtube: 'wartet, bis das Hauptvideo öffentlich ist', spotify: 'wartet auf den Spotify-Link (Spotify-Tab, „Song“)' },
       byPilot: 'vom Autopiloten', takeOver: 'Selbst machen', giveBack: 'Dem Autopiloten geben', retry: 'Erneut versuchen', force: 'Jetzt posten', isLive: 'Ist online', at: 'um', upload: 'Upload', retryAt: 'nächster Versuch'
@@ -134,8 +134,8 @@
       pilot: 'Autopilot', approve: 'Approve release', approveDate: function (d, p) { return 'Approve the release on ' + d + (p ? ' (fixes the date)' : ''); },
       approved: function (at) { return 'Approved on ' + at + ': the API posts go out at their calendar times.'; }, revoke: 'Withdraw approval',
       summary: function (a, m) { return a + ' posts go out by API, ' + m + ' stay with you.'; }, missingAccess: 'No access (they stay manual until you run publish-auth):',
-      lastRun: function (at) { return 'Last release-run: ' + at; }, noRun: 'release-run has never run: npm run cli -- release-timer install', staleRun: 'release-run has not run for over 30 minutes: is the timer on?',
-      attention: 'Needs you:', confirmApprove: 'Approve the release? From now on the autopilot posts at the calendar times on every platform it has access to.',
+      lastRun: function (at) { return 'Last release-run: ' + at; }, noRun: 'release-run has never run: npm run cli -- release-timer install', staleRun: 'release-run has missed several rounds: is the timer on?',
+      attention: 'Needs you:', staleApproval: function (was, now) { return 'You approved ' + was + '; the release is now on ' + now + ': nothing goes out until you approve the new day.'; }, confirmApprove: 'Approve the release? From now on the autopilot posts at the calendar times on every platform it has access to.',
       states: { manual: 'manual', done: 'done', unapproved: 'automatic after approval', waiting: 'automatic', due: 'due', blocked: 'waiting', running: 'running …', pending: 'uploaded', failed: 'failed', stuck: 'not sure it is live', missed: 'missed' },
       blocks: { credentials: 'no access: npm run cli -- publish-auth ', youtube: 'waits until the main video is public', spotify: 'waits for the Spotify link (Spotify tab, "Song")' },
       byPilot: 'by the autopilot', takeOver: 'Do it myself', giveBack: 'Give it to the autopilot', retry: 'Try again', force: 'Post now', isLive: 'It is live', at: 'at', upload: 'Upload', retryAt: 'next attempt'
@@ -229,7 +229,12 @@
     if (!pilot) return null;
     var box = el('section', { class: 'pilot' + (pilot.approval ? ' on' : '') }, [el('h3', { text: t('pilot') })]);
     var missing = Object.keys(pilot.ready).filter(function (p) { return !pilot.ready[p] && p !== 'microsite'; });
-    if (pilot.approval) {
+    if (pilot.approval && pilot.approvalStale) {
+      box.appendChild(el('p', { class: 'error', text: t('staleApproval')(pilot.approval.release_date, state.data.releaseDate) }));
+      var again = el('button', { class: 'primary', text: t('approveDate')(state.data.releaseDate, state.data.proposed) });
+      again.onclick = function () { if (confirm(t('confirmApprove'))) pilotCall('/approve', { release_date: state.data.releaseDate }); };
+      box.appendChild(el('p', {}, [again, ' ', el('button', { class: 'small', text: t('revoke'), onclick: function () { pilotCall('/revoke'); } })]));
+    } else if (pilot.approval) {
       box.appendChild(el('p', { text: t('approved')(local(pilot.approval.at)) }));
       var attention = state.data.calendar.filter(function (e) { var a = pilot.events[e.id]; return a && a.needsUser; });
       if (attention.length) box.appendChild(el('div', {}, [el('strong', { text: t('attention') }), el('ul', {}, attention.map(function (e) {
@@ -245,7 +250,9 @@
     }
     if (missing.length) box.appendChild(el('p', { text: t('missingAccess') + ' ' + missing.join(', ') }));
     if (pilot.notes.length) box.appendChild(el('ul', {}, pilot.notes.map(function (n) { return el('li', { text: n }); })));
-    var stale = pilot.lastRun && Date.now() - Date.parse(pilot.lastRun) > 30 * 60000;
+    // Stale after three missed rounds of the timer (30 minutes when the interval is unknown).
+    var staleAfter = Math.max(15, 3 * (pilot.lastRunEvery || 10)) * 60000;
+    var stale = pilot.lastRun && Date.now() - Date.parse(pilot.lastRun) > staleAfter;
     box.appendChild(el('p', { class: 'sub' + (stale || !pilot.lastRun ? ' error' : ''), text: pilot.lastRun ? (stale ? t('staleRun') + ' ' : '') + t('lastRun')(local(pilot.lastRun)) : t('noRun') }));
     return box;
   }

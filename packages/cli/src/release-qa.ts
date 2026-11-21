@@ -223,7 +223,8 @@ export async function releaseChecks(projectDir: string, probe: Prober = probeMed
   if (music) {
     const meta = await song(project);
     const channel = await loadChannel(repoRoot());
-    const todos = releaseTodos(withReleaseDefaults(project.config.release, channel), channel, releaseIdentity(project.config, meta));
+    const facts = withReleaseDefaults(project.config.release, channel);
+    const todos = releaseTodos(facts, channel, releaseIdentity({ ...project.config, release: facts }, meta));
     checks.push(todos.length ? check('Release metadata', 'TODO', todos.join('; ')) : check('Release metadata', 'PASS', 'release: block complete'));
   }
   return checks;

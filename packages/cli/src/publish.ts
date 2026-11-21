@@ -468,7 +468,8 @@ export async function publishProject(options: PublishOptions): Promise<PublishSu
     }
   }
   printManualSteps(print, manualSteps);
-  const posted = entries.filter((entry) => entry.platform === 'tiktok' && entry.status === 'uploaded');
+  // A direct post that TikTok is still processing goes live by itself, like a finished one.
+  const posted = entries.filter((entry) => entry.platform === 'tiktok' && (entry.status === 'uploaded' || (options.tiktokMode === 'direct' && entry.status === 'processing')));
   if (posted.length) print(`Posted ${posted.length} video(s) on TikTok directly; everything else is private or a draft.`);
   else print('Nothing was made public. Review each video on its platform and publish it yourself.');
   return { plan, entries, manualSteps };

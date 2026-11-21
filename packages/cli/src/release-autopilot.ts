@@ -7,6 +7,7 @@ import {
   ConfigError,
   ProjectConfigSchema,
   ValidationError,
+  approvalHolds,
   autopilotAttention,
   mainVideoId,
   planAutopilot,
@@ -29,13 +30,15 @@ import {
   type SocialPlatform,
   type SocialPostRequest,
 } from '@coreslopper/providers';
-import { appendAutopilotEntry, autopilotReadiness, lastRunPath, loadAutopilotLog } from './autopilot-state.js';
+import { appendAutopilotEntry, appendAutopilotEntryUnlocked, autopilotReadiness, lastRunPath, loadAutopilotLog } from './autopilot-state.js';
 import { publishProject, type PublishOptions, type PublishSummary } from './publish.js';
 import { saveEnvValue } from './publish-auth.js';
 import { boardProjectDirs } from './release-board.js';
 import { projectReleaseContext } from './release-board-data.js';
-import { loadStatus, runCalendar, statusPath, updateStatus } from './release-calendar.js';
+import { acquireHolderLock } from './file-lock.js';
+import { loadStatus, runCalendar, statusPath, updateStatus, withReleaseLock } from './release-calendar.js';
 import { micrositeSong } from './release-microsite.js';
+import { probeVideo } from './short.js';
 import { announcementText, feedVideo, linkedinPostText, mediaFile, xTexts } from './release-texts.js';
 
 export { appendAutopilotEntry, autopilotLogPath, autopilotReadiness, loadAutopilotLog } from './autopilot-state.js';
@@ -47,11 +50,14 @@ export { appendAutopilotEntry, autopilotLogPath, autopilotReadiness, loadAutopil
 // review/release-status.json (what is live, with URLs).
 
 async function writeStatus(projectRoot: string, change: (status: ReleaseStatus) => void): Promise<ReleaseStatus> {
-  const status = await loadStatus(projectRoot);
-  change(status);
-  await writeJsonAtomic(statusPath(projectRoot), status);
-  return status;
+  return withReleaseLock(projectRoot, async () => {
+    const status = await loadStatus(projectRoot);
+    change(status);
+    await writeJsonAtomic(statusPath(projectRoot), status);
+    return status;
+  });
 }
+
 
 /**
  * The user's one click: approve the release. A proposed release day becomes
@@ -122,7 +128,9 @@ export interface AutopilotDeps {
 function defaultDeps(): AutopilotDeps {
   const saveSecret = (key: string, value: string) => saveEnvValue(key, value);
   return {
-    publish: publishProject,
+    // Like the publish command: probe the videos, and keep the refresh token TikTok rotates.
+    publish: (publishOptions) =>
+      publishProject({ probe: probeVideo, onTikTokRefreshToken: (token) => saveEnvValue('TIKTOK_REFRESH_TOKEN', token), ...publishOptions }),
     youtube: () => new YouTubePublisher(),
     social: (platform) => {
       if (platform === 'x') return new XPublisher({ saveSecret });
@@ -165,24 +173,8 @@ export interface AutopilotRunResult {
 const LOCK_STALE_MS = 2 * 3_600_000;
 
 /** One run at a time: a timer round that starts while a long upload runs leaves it alone. */
-async function acquireLock(root: string): Promise<(() => Promise<void>) | undefined> {
-  const path = join(root, '.cache', 'release-run.lock');
-  await mkdir(dirname(path), { recursive: true });
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    try {
-      const handle = await open(path, 'wx');
-      await handle.writeFile(JSON.stringify({ pid: process.pid, at: new Date().toISOString() }));
-      await handle.close();
-      return () => rm(path, { force: true });
-    } catch {
-      const info = await stat(path).catch(() => undefined);
-      const holder = await readFile(path, 'utf8').then((text) => JSON.parse(text) as { pid?: number }).catch(() => ({}) as { pid?: number });
-      const alive = typeof holder.pid === 'number' && processAlive(holder.pid);
-      if (alive && info && Date.now() - info.mtimeMs < LOCK_STALE_MS) return undefined;
-      await rm(path, { force: true });
-    }
-  }
-  return undefined;
+function acquireLock(root: string): Promise<(() => Promise<void>) | undefined> {
+  return acquireHolderLock(join(root, '.cache', 'release-run.lock'), { staleMs: LOCK_STALE_MS, alive: processAlive });
 }
 
 function processAlive(pid: number): boolean {
@@ -214,7 +206,10 @@ export async function runAutopilot(options: AutopilotOptions): Promise<Autopilot
         deps.log(`${slug}: skipped (${redactSecrets((error as Error).message)})`);
       }
     }
-    if (!options.dryRun) await writeTextAtomic(lastRunPath(options.root), `${deps.now().toISOString()}\n`);
+    if (!options.dryRun) {
+      const every = Number(deps.env.CORESLOPPER_TIMER_EVERY);
+      await writeTextAtomic(lastRunPath(options.root), `${JSON.stringify({ at: deps.now().toISOString(), ...(every > 0 ? { every } : {}) })}\n`);
+    }
     return result;
   } finally {
     await release();
@@ -239,7 +234,10 @@ async function runProject(dir: string, slug: string, options: AutopilotOptions, 
       premiere: context.schedule.release.premiere,
     });
   };
-  if (!context.calendar || !context.status.approval) return { slug, approved: Boolean(context.status.approval), acted, attention: [] };
+  if (!context.calendar || !approvalHolds(context.status, context.calendar)) {
+    if (context.status.approval && context.calendar) deps.log(`${slug}: approved for ${context.status.approval.release_date}, but the release is now on ${context.calendar.release_date}: approve it again on the board`);
+    return { slug, approved: false, acted, attention: [] };
+  }
 
   // First the uploads that wait to go public: the posts that link to them follow in the same run.
   for (const item of (await plan()).filter((entry) => entry.state === 'pending' && entry.action?.kind === 'youtube')) {
@@ -257,10 +255,33 @@ async function runProject(dir: string, slug: string, options: AutopilotOptions, 
       acted.push({ id: item.id, status: 'running' });
       continue;
     }
-    // A post that links to the main video is planned again: an earlier action in this run may have changed things.
-    const current = (await plan()).find((entry) => entry.id === item.id);
-    if (current?.state !== 'due') continue;
-    acted.push(await execute(dir, current, context, deps));
+    // Claim it under the project's lock: plan it again from the files as they are now (an earlier action
+    // in this run, or a click on the board, may have changed things) and log it as running in the same breath.
+    const claimed = await withReleaseLock(dir, async () => {
+      const fresh = planAutopilot({
+        calendar: context.calendar!,
+        status: await loadStatus(dir),
+        log: await loadAutopilotLog(dir),
+        settings,
+        now: deps.now(),
+        ready,
+        premiere: context.schedule.release.premiere,
+      }).find((entry) => entry.id === item.id);
+      if (fresh?.state !== 'due') return undefined;
+      await appendAutopilotEntryUnlocked(dir, { event: item.id, status: 'running', at: deps.now().toISOString() });
+      return fresh;
+    });
+    if (!claimed) continue;
+    context = await projectReleaseContext(dir, options.root);
+    acted.push(await execute(dir, claimed, context, deps));
+  }
+  if (!options.dryRun) {
+    context = await projectReleaseContext(dir, options.root);
+    const comment = await ensurePinnedComment(dir, context, deps, ready).catch((error: Error) => {
+      deps.log(`${slug} ${COMMENT_EVENT}: could not check the main video (${redactSecrets(error.message)})`);
+      return undefined;
+    });
+    if (comment) acted.push(comment);
   }
   const attention = autopilotAttention(await plan());
   for (const item of attention) deps.log(`${slug} ${item.id}: needs you (${item.state}${item.block ? `: ${item.block}` : ''})`);
@@ -276,35 +297,60 @@ async function pollYouTube(dir: string, item: AutopilotEventPlan, context: Conte
   const video = await deps.youtube().videoStatus(id);
   if (video.privacyStatus !== 'public') return undefined;
   const url = item.last?.url ?? (item.action?.kind === 'youtube' && item.action.item !== 'main' ? `https://youtube.com/shorts/${id}` : `https://youtu.be/${id}`);
-  const steps: string[] = [];
-  // The main video is live: post the pinned comment (pinning stays a click in Studio).
-  const pinned = context.data?.main.pinned_comment;
-  if (item.id === 'youtube' && pinned) {
-    try {
-      await deps.youtube().postComment(id, pinned);
-      steps.push('Pin the comment under the video in YouTube Studio.');
-    } catch (error) {
-      steps.push(`Post and pin the comment yourself: ${pinned} (${redactSecrets((error as Error).message)})`);
-    }
-  }
-  await appendAutopilotEntry(dir, { event: item.id, status: 'posted', at: deps.now().toISOString(), remote_id: id, url, manual_steps: steps });
+  await appendAutopilotEntry(dir, { event: item.id, status: 'posted', at: deps.now().toISOString(), remote_id: id, url });
   await markLive(dir, item.id, url, deps.now());
   deps.log(`${context.input.slug} ${item.id}: live at ${url}`);
   return { id: item.id, status: 'posted' as const, url };
 }
 
 async function markLive(dir: string, id: string, url: string | undefined, now: Date) {
-  await updateStatus(dir, id, { done: true, ...(url ? { url } : {}) }, now);
-  await writeStatus(dir, (status) => {
-    status.items[id] = { ...status.items[id]!, by: 'autopilot' };
-  });
+  await updateStatus(dir, id, { done: true, by: 'autopilot', ...(url ? { url } : {}) }, now);
 }
 
-/** One due event: log the attempt, act, log the outcome. */
+/** The log event of the pinned comment under the main video: not a calendar event, one attempt per release. */
+export const COMMENT_EVENT = 'youtube:comment';
+
+/**
+ * Once the main video is live (seen public by the runner, or ticked off on the
+ * board), post the pinned comment once; pinning stays a click in Studio. The
+ * attempt is logged as running first, and any entry stops further attempts but
+ * a plain failure, which is retried up to `retries` times.
+ */
+async function ensurePinnedComment(dir: string, context: Context, deps: AutopilotDeps, ready: Record<string, boolean>) {
+  const pinned = context.data?.main.pinned_comment;
+  const settings = context.schedule.autopilot;
+  const item = context.status.items.youtube;
+  if (!pinned || !item?.done || item.manual || !settings.platforms.includes('youtube') || !ready.youtube) return undefined;
+  const log = await loadAutopilotLog(dir);
+  const id = mainVideoId(context.status, log);
+  const entries = log.entries.filter((entry) => entry.event === COMMENT_EVENT);
+  const failures = entries.filter((entry) => entry.status === 'failed' && !entry.uncertain).length;
+  if (!id || entries.some((entry) => entry.status !== 'failed' || entry.uncertain) || failures >= settings.retries) return undefined;
+  if ((await deps.youtube().videoStatus(id)).privacyStatus !== 'public') return undefined;
+  await appendAutopilotEntry(dir, { event: COMMENT_EVENT, status: 'running', at: deps.now().toISOString() });
+  try {
+    const { commentId } = await deps.youtube().postComment(id, pinned);
+    await appendAutopilotEntry(dir, { event: COMMENT_EVENT, status: 'posted', at: deps.now().toISOString(), remote_id: commentId, manual_steps: ['Pin the comment under the video in YouTube Studio.'] });
+    deps.log(`${context.input.slug} ${COMMENT_EVENT}: posted; pin it in YouTube Studio`);
+    return { id: COMMENT_EVENT, status: 'posted' as const };
+  } catch (error) {
+    const message = redactSecrets((error as Error).message);
+    await appendAutopilotEntry(dir, { event: COMMENT_EVENT, status: 'failed', at: deps.now().toISOString(), error: message, ...(markedUncertain(error) ? { uncertain: true } : {}) });
+    deps.log(`${context.input.slug} ${COMMENT_EVENT}: failed: ${message}`);
+    return { id: COMMENT_EVENT, status: 'failed' as const, error: message };
+  }
+}
+
+/** A YouTube comment POST is never retried by the adapter: a lost answer may have posted it. */
+function markedUncertain(error: unknown): boolean {
+  if ((error as { uncertain?: boolean }).uncertain) return true;
+  const status = (error as { status?: number }).status;
+  return status === undefined || status >= 500;
+}
+
+/** One claimed event: act, log the outcome. */
 async function execute(dir: string, item: AutopilotEventPlan, context: Context, deps: AutopilotDeps) {
   const slug = context.input.slug;
-  const started = deps.now().toISOString();
-  await appendAutopilotEntry(dir, { event: item.id, status: 'running', at: started });
   deps.log(`${slug} ${item.id}: ${item.action!.kind}...`);
   try {
     const outcome = await act(dir, item, context, deps);
@@ -350,13 +396,16 @@ async function act(dir: string, item: AutopilotEventPlan, context: Context, deps
     if (!entry) throw new ValidationError(`publish planned no ${platform} upload for ${action.item}`);
     if (entry.status === 'failed') throw new Error(entry.error ?? `the ${platform} upload failed`);
     if (platform === 'tiktok') {
-      const direct = (settings.tiktok_direct || deps.env.TIKTOK_DIRECT_POST === '1') && entry.status === 'uploaded';
+      const directMode = settings.tiktok_direct || deps.env.TIKTOK_DIRECT_POST === '1';
+      // A direct post goes live by itself, also one TikTok is still processing: never an inbox step for it.
+      if (directMode && (entry.status === 'uploaded' || entry.status === 'processing')) {
+        return { status: 'posted', remote_id: entry.remote_id, url: entry.url, warnings: entry.warnings, manual_steps: [] };
+      }
       return {
-        status: direct ? 'posted' : 'draft',
+        status: 'draft',
         remote_id: entry.remote_id,
-        url: direct ? entry.url : undefined,
         warnings: entry.warnings,
-        manual_steps: direct ? [] : summary.manualSteps.length ? summary.manualSteps : ['Post the draft from the TikTok inbox.'],
+        manual_steps: summary.manualSteps.length ? summary.manualSteps : ['Post the draft from the TikTok inbox.'],
       };
     }
     const studio = entry.remote_id ? `https://studio.youtube.com/video/${entry.remote_id}/edit` : 'YouTube Studio';

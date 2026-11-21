@@ -75,10 +75,12 @@ describe('autopilot actions', () => {
 });
 
 describe('autopilot plan', () => {
-  it('does nothing before the approval', () => {
+  it('does nothing before the approval, nor after the release day moved', () => {
     const states = plan('2026-12-11T17:30:00Z', { version: 1, items: {} });
     expect(states.get('x')!.state).toBe('unapproved');
     expect(states.get('pitch')!.state).toBe('manual');
+    const moved = plan('2026-12-11T17:30:00Z', { ...approved, approval: { at: '2026-11-22T10:00:00Z', release_date: '2026-12-04' } });
+    expect(moved.get('x')!.state).toBe('unapproved');
   });
 
   it('uploads YouTube videos ahead of their time and posts the rest at it', () => {
@@ -139,6 +141,9 @@ describe('autopilot plan', () => {
     expect(plan('2026-12-11T19:20:00Z', approved, unsure).get(id)!).toMatchObject({ state: 'stuck', needsUser: true });
     const forced: AutopilotLog = { version: 1, entries: [entry(id, 'force', '2026-12-12T11:05:00Z')] };
     expect(plan('2026-12-12T11:06:00Z', approved, forced).get(id)!.state).toBe('due');
+    // "Try again" on a late post that failed asks for one more attempt, not for "Post now" as well.
+    const failedLate: AutopilotLog = { version: 1, entries: [entry(id, 'failed', '2026-12-11T19:01:00Z', { fatal: true, error: 'token expired' }), entry(id, 'retry', '2026-12-12T11:05:00Z')] };
+    expect(plan('2026-12-12T11:06:00Z', approved, failedLate).get(id)!.state).toBe('due');
   });
 
   it('runs the links step once the Spotify link is on the board, however late', () => {

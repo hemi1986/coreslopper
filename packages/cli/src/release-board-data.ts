@@ -111,6 +111,8 @@ export interface BoardAutopilotEvent {
 
 export interface BoardAutopilot {
   approval?: { at: string; release_date: string };
+  /** The release day moved since the approval: nothing goes out until the user approves the new day. */
+  approvalStale: boolean;
   /** Why the release cannot be approved yet. */
   blockers: string[];
   ready: Record<AutopilotPlatform, boolean>;
@@ -118,6 +120,8 @@ export interface BoardAutopilot {
   notes: string[];
   /** When release-run last finished a round. */
   lastRun?: string;
+  /** Minutes between the timer's rounds, when a timer ran it. */
+  lastRunEvery?: number;
   /** Events the autopilot posts, and events that stay manual. */
   automatic: number;
   manual: number;
@@ -392,7 +396,8 @@ export async function projectReleaseContext(projectRoot: string, root: string) {
   const channel = await loadChannel(root);
   const limits = platformLimits(channel);
   const song = await songJson(project);
-  const identity = releaseIdentity(project.config, song);
+  const releaseFacts = withReleaseDefaults(project.config.release, channel);
+  const identity = releaseIdentity({ ...project.config, release: releaseFacts }, song);
   const data: UploadData | undefined = existsSync(uploadPaths(project.paths.root).data) ? await loadUploadData(project.paths.root).catch(() => undefined) : undefined;
   const language = project.config.release?.language ?? (typeof song.language === 'string' ? song.language : undefined) ?? data?.language ?? channel?.language ?? 'en';
   const l = releaseLabels(language);
@@ -411,7 +416,7 @@ export async function projectReleaseContext(projectRoot: string, root: string) {
     artist: identity.artist,
     title: identity.title,
     data,
-    release: withReleaseDefaults(project.config.release, channel),
+    release: releaseFacts,
     channel,
     limits,
     chapters: data?.main.chapters ?? (timing ? chaptersFromSections(timing) : []),
@@ -740,10 +745,11 @@ export async function boardAutopilot(options: {
   const automatic = plans.filter((plan) => plan.action && plan.state !== 'manual').length;
   return {
     ...(options.status.approval ? { approval: options.status.approval } : {}),
+    approvalStale: Boolean(options.status.approval && options.calendar && options.status.approval.release_date !== options.calendar.release_date),
     blockers,
     ready,
     notes,
-    lastRun: await lastRun(options.root),
+    ...(await lastRun(options.root).then((run) => (run ? { lastRun: run.at, ...(run.every ? { lastRunEvery: run.every } : {}) } : {}))),
     automatic,
     manual: plans.length - automatic,
     events,

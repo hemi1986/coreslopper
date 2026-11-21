@@ -25,7 +25,7 @@ import {
 } from '../packages/cli/src/release-autopilot.ts';
 import { boardProject } from '../packages/cli/src/release-board-data.ts';
 import { boardHandler } from '../packages/cli/src/release-board.ts';
-import { runLine, timerPlan } from '../packages/cli/src/release-timer.ts';
+import { timerPlan } from '../packages/cli/src/release-timer.ts';
 import { cleanupFixtures, fakeDeps, fixture } from './helpers/release-fixture.ts';
 
 afterEach(async () => {
@@ -215,6 +215,67 @@ describe('release autopilot', () => {
     expect(t.social.get('instagram')!.calls.map((call) => call.event)).toEqual(['announce:instagram']);
   });
 
+  it('asks again when the release day moved after the approval', async () => {
+    const t = await setup();
+    await approveRelease(t.dir, { root: t.root, now: new Date(t.at('distributor')) });
+    const path = join(t.dir, 'project.yaml');
+    const config = parse(await readFile(path, 'utf8'));
+    config.release.release_date = '2026-12-18';
+    await writeFile(path, stringify(config));
+    await buildRelease({ projectDir: t.dir, deps: fakeDeps() });
+    const moved = (await loadCalendar(t.dir))!;
+    t.clock.now = new Date(Date.parse(moved.events.find((event) => event.id === 'announce:x')!.at) + 60_000);
+    expect((await t.run()).projects[0]!.approved).toBe(false);
+    expect(t.social.get('x')!.calls).toEqual([]);
+    expect((await boardProject(t.dir, t.root, { now: t.clock.now })).autopilot).toMatchObject({ approvalStale: true });
+    expect(t.lines.join('\n')).toContain('approve it again');
+  });
+
+  it('posts the pinned comment once when the user ticks the main video off first', async () => {
+    const t = await setup();
+    await approveRelease(t.dir, { root: t.root, now: new Date(t.at('distributor')) });
+    t.clock.now = new Date(t.at('youtube') - 23 * 3_600_000);
+    await t.run();
+    const videoId = (await loadAutopilotLog(t.dir)).entries.find((entry) => entry.event === 'youtube' && entry.remote_id)!.remote_id!;
+    // The user starts the Premiere and ticks the video off on the board, before a round saw it public.
+    t.youtube.statuses.set(videoId, { privacyStatus: 'public', uploadStatus: 'processed' });
+    await updateStatus(t.dir, 'youtube', { done: true, url: `https://youtu.be/${videoId}`, by: 'user' }, t.clock.now);
+    t.moveTo('youtube', 3);
+    await t.run();
+    await t.run();
+    const comments = t.youtube.videoCalls.filter((call) => call.method === 'postComment');
+    expect(comments).toEqual([{ method: 'postComment', videoId, text: 'Welcher Moment ist eurer?' }]);
+  });
+
+  it('records a direct TikTok post that is still processing as live, without an inbox step', async () => {
+    const t = await setup({ env: { TIKTOK_DIRECT_POST: '1' } });
+    await approveRelease(t.dir, { root: t.root, now: new Date(t.at('distributor')) });
+    await runAutopilot({
+      root: t.root,
+      deps: {
+        publish: async () =>
+          ({ plan: { steps: [] }, manualSteps: [], entries: [{ platform: 'tiktok', item: 'Z1-intro', file: 'x', file_hash: 'a'.repeat(64), status: 'processing', remote_id: 'p1', mock: false, warnings: ['TikTok was still processing the post; it goes live once done.'], at: 'now' }] }) as never,
+        youtube: () => t.youtube,
+        social: () => new MockSocialAdapter('x'),
+        env: { ...ENV, TIKTOK_DIRECT_POST: '1' },
+        now: () => new Date(t.at('short:Z1-intro:tiktok') + 60_000),
+        log: () => undefined,
+      },
+      project: 'neon',
+    });
+    const log = await loadAutopilotLog(t.dir);
+    expect(log.entries.filter((entry) => entry.event === 'short:Z1-intro:tiktok').map((entry) => entry.status)).toEqual(['running', 'posted']);
+    expect(log.entries.find((entry) => entry.event === 'short:Z1-intro:tiktok' && entry.status === 'posted')!.manual_steps).toEqual([]);
+    expect((await loadStatus(t.dir)).items['short:Z1-intro:tiktok']).toMatchObject({ done: true, by: 'autopilot' });
+  });
+
+  it('treats X without its client secret as not set up', async () => {
+    const t = await setup({ env: { X_CLIENT_SECRET: '' } });
+    await approveRelease(t.dir, { root: t.root, now: new Date(t.at('distributor')) });
+    t.moveTo('announce:x');
+    expect((await boardProject(t.dir, t.root, { now: t.clock.now })).autopilot.events['announce:x']).toMatchObject({ state: 'blocked', block: 'credentials' });
+  });
+
   it('writes nothing on a dry run and keeps a second run out while one holds the lock', async () => {
     const t = await setup();
     await approveRelease(t.dir, { root: t.root, now: new Date(t.at('distributor')) });
@@ -226,6 +287,12 @@ describe('release autopilot', () => {
     await mkdir(join(t.root, '.cache'), { recursive: true });
     await writeFile(join(t.root, '.cache', 'release-run.lock'), JSON.stringify({ pid: process.pid }));
     expect((await t.run()).locked).toBe(true);
+    // A lock caught before its holder wrote its PID is held, not taken over.
+    await writeFile(join(t.root, '.cache', 'release-run.lock'), '');
+    expect((await t.run()).locked).toBe(true);
+    // The lock of a process that died is taken over.
+    await writeFile(join(t.root, '.cache', 'release-run.lock'), JSON.stringify({ pid: 2 ** 22 + 12345 }));
+    expect((await t.run()).locked).toBeUndefined();
   });
 
   it('fixes a proposed release day in project.yaml on approval, keeping its comments', async () => {
@@ -251,33 +318,60 @@ describe('release autopilot', () => {
     const takeover = await call(handler, 'POST', '/api/projects/neon/autopilot', { id: 'x', action: 'manual' });
     expect(JSON.parse(takeover.body).autopilot.events.x.state).toBe('manual');
   });
+
+  it('refuses writes from any page but the board itself', async () => {
+    const t = await setup();
+    const handler = boardHandler({ root: t.root, refresh: async () => undefined });
+    // A foreign page's simple POST (no preflight): text/plain, its own origin.
+    const foreign = await call(handler, 'POST', '/api/projects/neon/approve', '{}', { host: '127.0.0.1:4848', origin: 'https://evil.example', 'content-type': 'text/plain' });
+    expect(foreign.status).toBe(403);
+    expect((await call(handler, 'POST', '/api/projects/neon/approve', {}, { host: '127.0.0.1:4848', 'content-type': 'text/plain' })).status).toBe(403);
+    expect((await call(handler, 'POST', '/api/projects/neon/approve', {}, { ...BOARD_HEADERS, origin: 'http://127.0.0.1:9999' })).status).toBe(403);
+    // DNS rebinding: a foreign host name that resolves to 127.0.0.1.
+    expect((await call(handler, 'POST', '/api/projects/neon/approve', {}, { ...BOARD_HEADERS, host: 'evil.example:4848', origin: 'http://evil.example:4848' })).status).toBe(403);
+    expect((await call(handler, 'POST', '/api/projects/neon/approve', {}, { ...BOARD_HEADERS, 'sec-fetch-site': 'cross-site' })).status).toBe(403);
+    expect((await loadStatus(t.dir)).approval).toBeUndefined();
+    expect((await call(handler, 'POST', '/api/projects/neon/approve', {})).status).toBe(200);
+  });
 });
 
 describe('release timer', () => {
-  it('runs release-run in the workspace from the Windows Task Scheduler under WSL', () => {
-    const plan = timerPlan({ root: '/home/me/my video', kind: 'windows-task', env: { WSL_DISTRO_NAME: 'Ubuntu' } });
-    expect(plan.install[0]!.slice(0, 9)).toEqual(['schtasks.exe', '/Create', '/F', '/SC', 'MINUTE', '/MO', '5', '/TN', 'coreslopper-release-run']);
-    expect(plan.install[0]!.at(-1)).toContain("wsl.exe -d Ubuntu -- bash -lc");
-    expect(runLine('/home/me/my video')).toBe("cd '/home/me/my video' && mkdir -p .cache && npm run --silent cli -- release-run >> .cache/release-run.log 2>&1");
+  it('runs one short script from the Windows Task Scheduler under WSL, with the installing Node on PATH', () => {
+    const plan = timerPlan({ root: "/home/me/it's my video", kind: 'windows-task', env: { WSL_DISTRO_NAME: 'Ubuntu' }, home: '/home/me', nodeBin: '/home/me/.nvm/versions/node/v24/bin', everyMinutes: 10 });
+    expect(plan.install[0]!.slice(0, 9)).toEqual(['schtasks.exe', '/Create', '/F', '/SC', 'MINUTE', '/MO', '10', '/TN', 'coreslopper-release-run']);
+    expect(plan.install[0]!.at(-1)).toBe('conhost.exe --headless wsl.exe -d Ubuntu -- /bin/bash /home/me/.coreslopper/release-run.sh');
+    const script = plan.files[0]!;
+    expect(script).toMatchObject({ path: '/home/me/.coreslopper/release-run.sh', mode: 0o755 });
+    expect(script.content).toContain(`export PATH='/home/me/.nvm/versions/node/v24/bin':"$PATH"`);
+    expect(script.content).toContain('export CORESLOPPER_TIMER_EVERY=10');
+    expect(script.content).toContain(`cd '/home/me/it'\\''s my video' || exit 1`);
+    expect(script.content).toContain('npm run --silent cli -- release-run >> .cache/release-run.log 2>&1');
+    expect(() => timerPlan({ root: '/w', kind: 'windows-task', env: { WSL_DISTRO_NAME: 'Ubuntu' }, home: `/home/${'x'.repeat(250)}` })).toThrow(/261/);
   });
 
-  it('writes a systemd user timer and a launchd agent', () => {
-    const systemd = timerPlan({ root: '/w', kind: 'systemd', home: '/home/me', everyMinutes: 10 });
+  it('writes a systemd user timer and a launchd agent around the same script', () => {
+    const systemd = timerPlan({ root: '/w', kind: 'systemd', home: '/home/me', everyMinutes: 10, nodeBin: '/usr/bin' });
     expect(systemd.files.map((file) => file.path)).toEqual([
+      '/home/me/.coreslopper/release-run.sh',
       '/home/me/.config/systemd/user/coreslopper-release-run.service',
       '/home/me/.config/systemd/user/coreslopper-release-run.timer',
     ]);
-    expect(systemd.files[1]!.content).toContain('OnUnitActiveSec=10min');
-    const launchd = timerPlan({ root: '/w', kind: 'launchd', home: '/Users/me' });
-    expect(launchd.files[0]!.content).toContain('<integer>300</integer>');
+    expect(systemd.files[1]!.content).toContain('ExecStart=/bin/bash /home/me/.coreslopper/release-run.sh');
+    expect(systemd.files[2]!.content).toContain('OnUnitActiveSec=10min');
+    const launchd = timerPlan({ root: '/w', kind: 'launchd', home: '/Users/me', nodeBin: '/opt/homebrew/bin' });
+    expect(launchd.files[1]!.content).toContain('<integer>300</integer>');
+    expect(launchd.files[1]!.content).toContain('<string>/Users/me/.coreslopper/release-run.sh</string>');
     expect(() => timerPlan({ root: '/w', kind: 'systemd', everyMinutes: 0 })).toThrow(/minutes/);
   });
 });
 
-async function call(handler: ReturnType<typeof boardHandler>, method: string, url: string, body?: unknown) {
+/** What the board page sends with a write. */
+const BOARD_HEADERS = { host: '127.0.0.1:4848', origin: 'http://127.0.0.1:4848', 'content-type': 'application/json' };
+
+async function call(handler: ReturnType<typeof boardHandler>, method: string, url: string, body?: unknown, headers: Record<string, string> = BOARD_HEADERS) {
   const { Readable } = await import('node:stream');
-  const req = Readable.from(body === undefined ? [] : [Buffer.from(JSON.stringify(body))]) as unknown as import('node:http').IncomingMessage;
-  Object.assign(req, { method, url, headers: {} });
+  const req = Readable.from(body === undefined ? [] : [Buffer.from(typeof body === 'string' ? body : JSON.stringify(body))]) as unknown as import('node:http').IncomingMessage;
+  Object.assign(req, { method, url, headers });
   let status = 0;
   let text = '';
   const res = {

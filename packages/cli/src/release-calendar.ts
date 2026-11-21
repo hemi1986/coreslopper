@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { readdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import { withFileLock } from './file-lock.js';
 import { stringify } from 'yaml';
 import {
   ReleaseCalendarSchema,
@@ -25,6 +26,9 @@ import {
 
 export const calendarPath = (projectRoot: string) => join(projectRoot, 'review', 'calendar.yaml');
 export const statusPath = (projectRoot: string) => join(projectRoot, 'review', 'release-status.json');
+/** One lock per project around every write of the release status and the autopilot log: the board and `release-run` both write them. */
+export const releaseLockPath = (projectRoot: string) => join(projectRoot, 'review', '.release.lock');
+export const withReleaseLock = <T>(projectRoot: string, fn: () => Promise<T>) => withFileLock(releaseLockPath(projectRoot), fn);
 
 export async function loadCalendar(projectRoot: string): Promise<ReleaseCalendar | undefined> {
   const path = calendarPath(projectRoot);
@@ -110,18 +114,24 @@ export async function loadStatus(projectRoot: string): Promise<ReleaseStatus> {
   return existsSync(path) ? readJsonFile(path, ReleaseStatusSchema) : { version: 1, items: {} };
 }
 
-/** Mark one calendar event (or any board item) done or open, and record its live URL. */
+/** Mark one calendar event (or any board item) done or open, by the user or the autopilot, and record its live URL. */
 export async function updateStatus(
   projectRoot: string,
   id: string,
-  change: { done?: boolean; url?: string | null },
+  change: { done?: boolean; url?: string | null; by?: 'user' | 'autopilot' },
   now: Date,
 ): Promise<ReleaseStatus> {
+  return withReleaseLock(projectRoot, () => updateStatusUnlocked(projectRoot, id, change, now));
+}
+
+async function updateStatusUnlocked(projectRoot: string, id: string, change: { done?: boolean; url?: string | null; by?: 'user' | 'autopilot' }, now: Date): Promise<ReleaseStatus> {
   const status = await loadStatus(projectRoot);
   const item = { ...(status.items[id] ?? { done: false }) };
   if (change.done !== undefined) {
     item.done = change.done;
     item.at = change.done ? now.toISOString() : undefined;
+    if (change.done && change.by) item.by = change.by;
+    else if (!change.done) delete item.by;
   }
   if (change.url === null || change.url === '') delete item.url;
   else if (change.url !== undefined) item.url = change.url;

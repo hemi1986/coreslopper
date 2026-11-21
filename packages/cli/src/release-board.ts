@@ -80,6 +80,26 @@ async function body(req: IncomingMessage): Promise<unknown> {
   return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
 }
 
+const LOOPBACK_HOST = /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/i;
+
+/**
+ * Whether a write request comes from the board's own page. Any page in the
+ * user's browser can send a simple POST to 127.0.0.1, and one approval posts
+ * a release in public: a write needs a loopback Host (no DNS rebinding), an
+ * Origin of that same host when the browser sends one, and a JSON body
+ * (which a cross-site page cannot send without a preflight the board never answers).
+ */
+export function trustedWrite(req: Pick<IncomingMessage, 'headers'>): string | undefined {
+  const host = req.headers.host ?? '';
+  if (!LOOPBACK_HOST.test(host)) return 'writes are accepted from the board on 127.0.0.1 only';
+  const origin = req.headers.origin;
+  if (origin !== undefined && origin !== `http://${host}`) return 'writes are accepted from the board page only';
+  const site = req.headers['sec-fetch-site'];
+  if (site !== undefined && site !== 'same-origin' && site !== 'none') return 'writes are accepted from the board page only';
+  if (!/^application\/json\b/i.test(req.headers['content-type'] ?? '')) return 'writes need content-type application/json';
+  return undefined;
+}
+
 /** Serve a file of a release folder, with byte ranges so videos seek. */
 async function serveMedia(req: IncomingMessage, res: ServerResponse, base: string, rel: string): Promise<void> {
   const target = resolve(base, rel);
@@ -139,6 +159,10 @@ export function boardHandler(options: BoardOptions = {}) {
     try {
       const url = new URL(req.url ?? '/', 'http://localhost');
       const path = decodeURIComponent(url.pathname);
+      if (req.method !== 'GET') {
+        const refused = trustedWrite(req);
+        if (refused) return json(res, { error: refused }, 403);
+      }
       if (req.method === 'GET' && path === '/') {
         const page = await readFile(fileURLToPath(new URL('./release-board.html', import.meta.url)), 'utf8');
         return send(res, 200, page, 'text/html; charset=utf-8');
@@ -178,8 +202,7 @@ export function boardHandler(options: BoardOptions = {}) {
         if (change.url !== undefined && change.url !== null && (typeof change.url !== 'string' || (change.url && !/^https?:\/\//.test(change.url)))) {
           throw new ValidationError('url must start with http:// or https://');
         }
-        const status = await updateStatus(dir, change.id, { done: change.done as boolean | undefined, url: change.url as string | null | undefined }, now());
-        await writeBy(dir, change.id, change.done as boolean | undefined);
+        const status = await updateStatus(dir, change.id, { done: change.done as boolean | undefined, url: change.url as string | null | undefined, by: 'user' }, now());
         // A live URL changes the X and LinkedIn texts and the microsite data: lay them out again in the background.
         if (change.url !== undefined) void scheduleRefresh(dir);
         return json(res, status);
@@ -242,19 +265,6 @@ export function boardHandler(options: BoardOptions = {}) {
       return json(res, { error: (error as Error).message }, status);
     }
   };
-}
-
-/** Record who ticked an item: the user on the board. */
-async function writeBy(dir: string, id: string, done: boolean | undefined): Promise<void> {
-  if (done === undefined) return;
-  const { loadStatus, statusPath } = await import('./release-calendar.js');
-  const { writeJsonAtomic } = await import('@coreslopper/core');
-  const status = await loadStatus(dir);
-  const item = status.items[id];
-  if (!item) return;
-  if (done) item.by = 'user';
-  else delete item.by;
-  await writeJsonAtomic(statusPath(dir), status);
 }
 
 /** Start the board; resolves once it listens. */

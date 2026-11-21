@@ -55,8 +55,8 @@ export const AiShareSchema = z.enum(['none', 'partial', 'full']);
  * every field the user has not given is reported as a TODO, never invented.
  */
 export const ReleaseMetadataSchema = z.object({
-  /** Where the song goes to streaming services; `manual` for any distributor without a form layout here. */
-  distributor: z.enum(['distrokid', 'manual']).default('manual'),
+  /** Where the song goes to streaming services; `manual` (or unset) for any distributor without a form layout here. */
+  distributor: z.enum(['distrokid', 'manual']).optional(),
   artist: z.string().min(1).optional(),
   title: z.string().min(1).optional(),
   featured_artists: z.array(z.string().min(1)).default([]),

@@ -216,7 +216,9 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
   const channel = await loadChannel(root);
   const limits = platformLimits(channel);
   const song = await songJson(project);
-  const identity = releaseIdentity(project.config, song);
+  // The channel's release defaults fill what the project leaves out, also the artist.
+  const releaseFacts = withReleaseDefaults(project.config.release, channel);
+  const identity = releaseIdentity({ ...project.config, release: releaseFacts }, song);
   const slug = project.config.slug;
   const todos: string[] = [];
   const errors: string[] = [];
@@ -228,7 +230,6 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
   else todos.push('review/upload.yaml is missing: write the platform texts (video-qa release.md)');
   const language = project.config.release?.language ?? (typeof song.language === 'string' ? song.language : undefined) ?? data?.language ?? channel?.language ?? 'en';
 
-  const releaseFacts = withReleaseDefaults(project.config.release, channel);
   if (music) todos.push(...releaseTodos(releaseFacts, channel, identity));
   todos.push(...channelTodos(channel));
   await mkdir(dir, { recursive: true });
@@ -493,9 +494,8 @@ async function deriveReleaseMedia(context: {
         const key = sha256(JSON.stringify(spec));
         const same = await writer.unchanged(image.path, (entry) => entry.spec.key === key);
         if (!same && !context.stills) {
-          const kept = await writer.unchanged(image.path, () => true);
-          if (kept) await writer.generated(image.path, image.kind, kept.spec, kept.source);
-          else todos.push(`${image.path} is not composed yet: run release without the quick refresh`);
+          // An image whose date or title no longer matches is dropped, never posted: the post falls back to the cover until a full release composes it again.
+          todos.push(`${image.path} is not composed for the current date and title yet: run release`);
           continue;
         }
         if (!same) {

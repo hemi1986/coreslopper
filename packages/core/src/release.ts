@@ -191,7 +191,7 @@ export function withReleaseDefaults(release: ReleaseMetadata | undefined, channe
   const pick = <K extends keyof ReleaseMetadata>(key: K) => base[key] ?? (defaults as Partial<ReleaseMetadata>)[key];
   return ReleaseMetadataSchema.parse({
     ...base,
-    distributor: base.distributor !== 'manual' ? base.distributor : (defaults.distributor ?? base.distributor),
+    distributor: pick('distributor'),
     artist: pick('artist'),
     primary_genre: pick('primary_genre'),
     secondary_genre: pick('secondary_genre'),
