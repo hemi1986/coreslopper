@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="de">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Release-Board</title>
+<title>Release board</title>
 <style>
   :root {
     --bg: #f6f5f2; --panel: #ffffff; --ink: #1d1d1f; --muted: #6b6b70; --line: #e3e1dc;
@@ -85,7 +85,7 @@
 <body>
 <div class="app">
   <aside>
-    <h1 id="board-title">Release-Board</h1>
+    <h1 id="board-title">Release board</h1>
     <button class="nav-item" data-view="calendar" id="nav-calendar"></button>
     <div id="nav-projects"></div>
   </aside>
@@ -108,7 +108,7 @@
       week: 'Week of', save: 'Save', progress: 'done', noEvents: 'No events.', open_file: 'open', failed: 'Error'
     }
   };
-  var lang = 'de';
+  var lang = (navigator.language || 'en').toLowerCase().indexOf('de') === 0 ? 'de' : 'en';
   var t = function (key) { return (L[lang] || L.en)[key]; };
   var state = { projects: [], view: 'calendar', project: null, tab: null, openOnly: true, data: null, focus: null };
 
@@ -323,6 +323,8 @@
 
   function render() {
     syncHash();
+    document.documentElement.lang = lang;
+    document.getElementById('board-title').textContent = lang === 'de' ? 'Release-Board' : 'Release board';
     renderNav();
     if (state.view === 'project' && state.data) renderProject(); else renderCalendar();
   }

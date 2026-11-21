@@ -5,8 +5,10 @@ import { stringify } from 'yaml';
 import {
   ReleaseCalendarSchema,
   ReleaseStatusSchema,
+  ValidationError,
   buildCalendar,
   loadReleaseSchedule,
+  zonedToday,
   readJsonFile,
   readYamlFile,
   writeJsonAtomic,
@@ -130,7 +132,15 @@ export async function updateStatus(
 }
 
 /** `calendar <project>`: plan the calendar alone, from the upload data and the Shorts in renders/shorts/. */
-export async function runCalendar(options: { projectDir: string; root: string; replan?: boolean; now?: Date; log?: (line: string) => void }): Promise<ReleaseCalendar> {
+export async function runCalendar(options: {
+  projectDir: string;
+  root: string;
+  replan?: boolean;
+  /** Mark every event up to the end of this day (`YYYY-MM-DD` or `today`) as done: for a song that is already out. */
+  doneUntil?: string;
+  now?: Date;
+  log?: (line: string) => void;
+}): Promise<ReleaseCalendar> {
   const { loadProject, releaseIdentity } = await import('@coreslopper/core');
   const { listShorts, shortName } = await import('./release-files.js');
   const { loadUploadData, uploadPaths } = await import('./upload-text.js');
@@ -152,6 +162,15 @@ export async function runCalendar(options: { projectDir: string; root: string; r
     { root: options.root, now: options.now ?? new Date(), replan: options.replan },
   );
   const log = options.log ?? ((line: string) => console.log(line));
+  if (options.doneUntil) {
+    const now = options.now ?? new Date();
+    const until = options.doneUntil === 'today' ? zonedToday(now, calendar.timezone) : options.doneUntil;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(until)) throw new ValidationError('--done-until takes YYYY-MM-DD or today');
+    const status = await loadStatus(project.paths.root);
+    const past = calendar.events.filter((event) => event.at.slice(0, 10) <= until && !status.items[event.id]?.done);
+    for (const event of past) await updateStatus(project.paths.root, event.id, { done: true }, now);
+    log(`Marked ${past.length} event(s) up to ${until} as done.`);
+  }
   log(`Release calendar: ${calendarPath(project.paths.root)}`);
   log(`  Release day ${calendar.release_date}${calendar.proposed ? ' (proposed: set release.release_date in project.yaml to fix it)' : ''}, ${calendar.events.length} events`);
   for (const event of calendar.events) log(`  ${event.at.slice(0, 16).replace('T', ' ')}  ${event.platform.padEnd(11)} ${event.step}${event.item !== 'main' ? ` ${event.item}` : ''}`);

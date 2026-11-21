@@ -36,7 +36,7 @@ import { buildRelease, type ReleaseDeps } from '../packages/cli/src/release.ts';
 import { releaseChecks } from '../packages/cli/src/release-qa.ts';
 import { boardProject } from '../packages/cli/src/release-board-data.ts';
 import { boardHandler } from '../packages/cli/src/release-board.ts';
-import { loadCalendar } from '../packages/cli/src/release-calendar.ts';
+import { loadCalendar, loadStatus, runCalendar } from '../packages/cli/src/release-calendar.ts';
 import {
   canvasArgs,
   canvasProblems,
@@ -136,6 +136,7 @@ function uploadYaml() {
     },
     shorts: [short('Z1-intro', 1), short('Z2-chorus', 2), short('Z3-outro', 3)],
     spotify: { artist_pick: 'Neu: Neon Rain', pitch: 'Treibender Synthwave mit Regen und Neon.' },
+    instagram_post: { caption: 'Neon Rain, das ganze Video im Feed.', hashtags: ['#synthwave'] },
     announcement: { text: 'Freitag: Neon Rain.', hashtags: ['#synthwave'] },
     x: { post: 'Neon Rain ist da. Zwölf Sekunden Regen.', hashtags: ['#synthwave'], reply: 'Ganzes Video:', media: 'Z1-intro' },
     linkedin: {
@@ -643,6 +644,10 @@ describe('release board', () => {
     const x = board.platforms.find((platform) => platform.id === 'x')!.posts.find((post) => post.id === 'x')!;
     expect(x.fields.find((field) => field.label === 'Antwort mit Link')?.value).toBe('Ganzes Video: [Link zum Hauptvideo]');
     expect(board.platforms.find((platform) => platform.id === 'linkedin')!.skipped).toBeUndefined();
+    // The square render is the feed version: the Instagram feed post and LinkedIn carry it.
+    const feed = board.platforms.find((platform) => platform.id === 'instagram')!.posts.find((post) => post.id === 'instagram-post')!;
+    expect(feed.files.map((entry) => entry.path)).toEqual(['video/neon-1x1.mp4', 'streaming/cover-3000x3000.jpg']);
+    expect(board.platforms.find((platform) => platform.id === 'linkedin')!.posts[0]!.files.map((entry) => entry.path)).toEqual(['video/neon-1x1.mp4']);
     // Every post with a date is a calendar event, so its done state is the calendar's.
     const ids = new Set(board.calendar.map((event) => event.id));
     for (const post of board.platforms.flatMap((platform) => platform.posts)) if (post.at) expect(ids.has(post.id)).toBe(true);
@@ -674,5 +679,19 @@ describe('release board', () => {
     expect(events.find((event: { id: string }) => event.id === 'youtube')).toMatchObject({ project: 'neon', done: true, label: 'Hauptvideo als YouTube-Premiere (youtube.md)' });
     const ics = await request(handler, 'GET', '/calendar.ics');
     expect(ics.body).toContain('SUMMARY:Neon Rain: Hauptvideo als YouTube-Premiere (youtube.md)');
+  });
+
+  it('marks a published song done up to a day and keeps the rest open', async () => {
+    const dir = await fixture();
+    await buildRelease({ projectDir: dir, deps: fakeDeps() });
+    const lines: string[] = [];
+    const calendar = await runCalendar({ projectDir: dir, root: join(dir, '..', '..'), doneUntil: '2026-12-11', now: new Date('2026-12-14T08:00:00Z'), log: (line) => lines.push(line) });
+    const status = await loadStatus(dir);
+    const done = calendar.events.filter((event) => status.items[event.id]?.done).map((event) => event.id);
+    expect(done).toEqual(expect.arrayContaining(['distributor', 'pitch', 'youtube', 'short:Z1-intro:tiktok']));
+    expect(done).not.toContain('links');
+    expect(done).not.toContain('short:Z2-chorus:youtube');
+    expect(lines.join('\n')).toContain(`Marked ${done.length} event(s) up to 2026-12-11 as done.`);
+    await expect(runCalendar({ projectDir: dir, root: join(dir, '..', '..'), doneUntil: 'yesterday', log: () => undefined })).rejects.toThrow('--done-until');
   });
 });

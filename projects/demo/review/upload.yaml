@@ -43,3 +43,24 @@ shorts:
 spotify:
   artist_pick: "Neon Rain — the demo that started it all"
   pitch: "A short, neon-soaked synthwave sketch: warm analog pads, a gated drum pulse, and a night walk through a rain-lit city."
+instagram_post:
+  caption: "Twelve seconds of neon rain, now as the full video 🌧️ Chrome reflections, a grid horizon, and a city that never sleeps."
+  hashtags: ['#synthwave', '#neon', '#cyberpunk']
+announcement:
+  text: "Friday: Neon Rain. Twelve seconds of a city that never switches its lights off."
+  hashtags: ['#synthwave', '#neon']
+x:
+  post: "Neon Rain: twelve seconds of chrome, rain, and a grid horizon. Headphones on."
+  hashtags: ['#synthwave']
+  reply: "Full video:"
+  media: N1-rain
+linkedin:
+  decision: skip
+  reason: "A mood piece without a work, business, tech, or society angle; it would read as an ad on LinkedIn."
+microsite:
+  teaser: "Twelve seconds of neon rain: the demo of the coreslopper workflow."
+  text: |
+    Neon Rain is a twelve-second night walk through a rain-lit city: chrome reflections, a grid horizon, and lights that never go out.
+
+    It is the demo project of coreslopper and uses motion graphics only, rendered locally with Remotion.
+  quote: "City lights are calling"

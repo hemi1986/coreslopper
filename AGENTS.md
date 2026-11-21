@@ -190,7 +190,7 @@ The root package is published as `coreslopper`. `npm run build` copies the track
 
 ## Skills
 
-Own skills: `new-video`, `video-brief`, `video-treatment`, `audio-analysis`, `style-bible`, `character-bible`, `storyboard`, `remotion-motion`, `ai-clips`, `footage`, `assembly-render`, `video-qa`, and for series and episodes `new-series`, `new-episode`, `voice-track`, `episode-track`. Outside the pipeline: `model-bench` compares models and servers before a model switch.
+Own skills: `new-video`, `video-brief`, `video-treatment`, `audio-analysis`, `style-bible`, `character-bible`, `storyboard`, `remotion-motion`, `ai-clips`, `footage`, `assembly-render`, `video-qa`, and for series and episodes `new-series`, `new-episode`, `voice-track`, `episode-track`. Outside the pipeline: `model-bench` compares models and servers before a model switch; `release-backfill` brings an existing or already published project into the release board and calendar.
 
 Vendored from Matt Pocock (MIT, see `docs/THIRD_PARTY.md`): `grill-me`, `grilling`, `writing-for-agents`, `domain-modeling`.
 

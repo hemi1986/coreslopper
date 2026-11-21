@@ -34,6 +34,8 @@ export interface ReleaseTextInput {
   /** Paths inside the release folder. */
   files: {
     master?: string;
+    /** Every format's video, by format id (`16x9`, `9x16`, `1x1`, ...). */
+    videos?: Record<string, string>;
     subtitles?: string;
     thumbnails: string[];
     shorts: { name: string; video: string; thumbnail?: string; tiktokCover?: string }[];
@@ -85,6 +87,7 @@ interface Labels {
     sticker: string;
     post: string;
     postImage: string;
+    postVideo: (file: string) => string;
   };
   tt: { heading: string; description: string; cover: string; coverUpload: (file: string) => string; coverFrame: string; settings: string; visibility: string; aiLabel: string; schedule: string; overlayDefault: (handle: string) => string; afterPost: string; pinned: string };
   sp: {
@@ -168,6 +171,7 @@ const EN: Labels = {
     sticker: 'Add a link sticker to the YouTube video (or the Spotify link after release)',
     post: 'Feed post for the release',
     postImage: 'Image: the streaming cover or thumbnail 1',
+    postVideo: (file) => `Video: \`${file}\` (the main video in the feed format)`,
   },
   tt: {
     heading: 'TikTok',
@@ -327,6 +331,7 @@ const DE: Labels = {
     sticker: 'Link-Sticker zum YouTube-Video setzen (nach dem Release: Spotify-Link)',
     post: 'Feed-Post zum Release',
     postImage: 'Bild: das Streaming-Cover oder Thumbnail 1',
+    postVideo: (file) => `Video: \`${file}\` (das Hauptvideo im Feed-Format)`,
   },
   tt: {
     heading: 'TikTok',
@@ -567,7 +572,8 @@ function instagramText(input: ReleaseTextInput, l: Labels): string {
   }
   const post = input.data?.instagram_post;
   if (post) {
-    lines.push(`## ${l.ig.post}`, '', `_${l.ig.postImage}_`, '', ...block([post.caption.trim(), post.hashtags.join(' ')].filter(Boolean).join('\n\n')), '');
+    const video = feedVideo(input);
+    lines.push(`## ${l.ig.post}`, '', `_${video ? l.ig.postVideo(video) : l.ig.postImage}_`, '', ...block([post.caption.trim(), post.hashtags.join(' ')].filter(Boolean).join('\n\n')), '');
   }
   return `${lines.join('\n').trimEnd()}\n`;
 }
@@ -743,9 +749,14 @@ export function linkedinPostText(post: { post?: string; hashtags: string[] }, yo
   return [post.post?.trim() ?? '', youtubeUrl, post.hashtags.join(' ')].filter(Boolean).join('\n\n');
 }
 
-/** The release file a post's `media` names: the master (or the square render) or a Short. */
+/** The feed version of the main video: the 4:5 render, else the 1:1 render; undefined without either. */
+export function feedVideo(input: Pick<ReleaseTextInput, 'files'>): string | undefined {
+  return input.files.videos?.['4x5'] ?? input.files.videos?.['1x1'];
+}
+
+/** The release file a post's `media` names: for `main` the feed version (4:5 or 1:1), else the master; or a Short. */
 export function mediaFile(input: Pick<ReleaseTextInput, 'files'>, media: string | undefined): string | undefined {
-  if (!media || media === 'main') return input.files.master;
+  if (!media || media === 'main') return feedVideo(input) ?? input.files.master;
   return input.files.shorts.find((short) => short.name === media)?.video;
 }
 

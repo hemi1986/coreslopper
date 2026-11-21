@@ -278,6 +278,7 @@ export function platformTextProblems(
       errors.push(`${short.name}: the Instagram and TikTok captions are identical; write one per platform`);
     }
   }
+  if (!data.instagram_post) missing.push('instagram_post');
   if (data.instagram_post) {
     const caption = [data.instagram_post.caption, data.instagram_post.hashtags.join(' ')].join('\n\n');
     if (chars(caption) > limits.instagram.caption) errors.push(`instagram post: caption has ${chars(caption)} characters, limit ${limits.instagram.caption}`);

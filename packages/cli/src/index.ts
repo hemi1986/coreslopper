@@ -316,10 +316,11 @@ program
       '(release day, Shorts slots, posting times), without colliding with other projects. Keeps times already planned.',
   )
   .option('--replan', 'Plan again from scratch instead of keeping the planned times')
-  .action((project: string | undefined, options: { replan?: boolean }) =>
+  .option('--done-until <date>', 'Mark every event up to this day (YYYY-MM-DD or today) as done, for a song that is already out')
+  .action((project: string | undefined, options: { replan?: boolean; doneUntil?: string }) =>
     run(async () => {
       const { runCalendar } = await import('./release-calendar.js');
-      await runCalendar({ projectDir: projectDirFromArg(project), root: repoRoot(), replan: options.replan });
+      await runCalendar({ projectDir: projectDirFromArg(project), root: repoRoot(), replan: options.replan, doneUntil: options.doneUntil });
     }),
   );
 

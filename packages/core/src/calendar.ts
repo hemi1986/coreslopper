@@ -183,7 +183,8 @@ export function buildCalendar(input: CalendarInput, context: CalendarContext): R
     push('linkedin', 'linkedin', 'post', at(day, posts.linkedin_time));
   }
 
-  // Shorts: one per slot day across all projects, at most per_song_per_week of this song a week.
+  // Shorts: one per slot day across all projects, at most per_song_per_week of this song a week,
+  // never before today (a song released earlier gets its open Shorts from now on).
   const shortTimes = schedule.shorts.times;
   const occupied = new Set([
     ...context.others.flatMap((calendar) => calendar.events.filter((event) => event.step === 'short').map(eventDay)),
@@ -196,9 +197,10 @@ export function buildCalendar(input: CalendarInput, context: CalendarContext): R
   }
   const perWeek = (day: string) => [...placed.values()].filter((other) => weekOf(other) === weekOf(day)).length;
   const usedDays = () => new Set(placed.values());
+  const today = zonedToday(context.now, tz);
   for (const [index, short] of input.shorts.entries()) {
     if (placed.has(short.name)) continue;
-    let day = releaseDate;
+    let day = releaseDate < today ? today : releaseDate;
     for (let guard = 0; guard < 400; guard += 1) {
       const releaseSlot = index === 0 && day === releaseDate && schedule.shorts.first_on_release_day;
       const slotDay = schedule.shorts.weekdays.includes(weekdayOf(day)) || releaseSlot;

@@ -24,6 +24,7 @@ import {
   announcementText,
   calendarEventLabel,
   distributorRows,
+  feedVideo,
   linkedinPostText,
   mediaFile,
   releaseLabels,
@@ -208,6 +209,9 @@ const BOARD = {
     igCover: (s?: number) => (s !== undefined ? `Titelbild: ${s.toFixed(1)} s ins Reel (oder Thumbnail hochladen)` : 'Titelbild mit sichtbarem Hook'),
     sticker: 'Link-Sticker zum Hauptvideo',
     feedImage: 'Bild: Streaming-Cover (4:5 zuschneiden)',
+    feedVideo: 'Hauptvideo (Feed-Format)',
+    feedVideoCheck: 'Hauptvideo im Feed-Format als Beitrag; das Cover-Bild als Titelbild',
+    longReel: 'Länger als 3 min: Instagram empfiehlt das Video Nicht-Followern nicht; die Reels der Shorts tragen die Reichweite',
     canvasCheck: 'Canvas in Spotify for Artists hochladen (Song → Canvas)',
     spotifyUrl: 'Spotify-Link des Songs im Board eintragen, sobald er live ist',
     linksStep: 'Spotify-Link in YouTube-Beschreibung und angepinnten Kommentar',
@@ -268,6 +272,9 @@ const BOARD = {
     igCover: (s?: number) => (s !== undefined ? `Cover: ${s.toFixed(1)} s into the Reel (or upload the thumbnail)` : 'Cover with the hook visible'),
     sticker: 'Link sticker to the main video',
     feedImage: 'Image: the streaming cover (crop to 4:5)',
+    feedVideo: 'Main video (feed format)',
+    feedVideoCheck: 'Main video in the feed format as the post; the cover image as its cover',
+    longReel: 'Longer than 3 min: Instagram does not recommend it to non-followers; the Shorts’ Reels carry the reach',
     canvasCheck: 'Upload the Canvas in Spotify for Artists (song → Canvas)',
     spotifyUrl: 'Enter the song’s Spotify link in the board once it is live',
     linksStep: 'Spotify link into the YouTube description and the pinned comment',
@@ -296,6 +303,8 @@ export function filesFromManifest(manifest: ReleaseManifest | undefined, masterF
   };
   for (const file of manifest.files) {
     const name = /^shorts\/(.+?)-(9x16\.mp4|thumb\.jpg|tiktok\.jpg)$/.exec(file.path)?.[1];
+    const format = file.kind === 'video' ? /-(\d+x\d+)\.mp4$/.exec(file.path)?.[1] : undefined;
+    if (format) files.videos = { ...files.videos, [format]: file.path };
     if (file.kind === 'video' && file.path.endsWith(`-${masterFormat}.mp4`)) files.master = file.path;
     else if (file.kind === 'subtitles') files.subtitles = file.path;
     else if (file.kind === 'thumbnail') files.thumbnails.push(file.path);
@@ -354,6 +363,7 @@ export async function boardProject(projectRoot: string, root: string): Promise<B
     files,
     calendar,
     premiere: schedule.release.premiere,
+    durationSeconds: timing?.audio.duration,
   };
   const at = (id: string) => calendar?.events.find((event) => event.id === id)?.at;
   const heading = (id: string, fallback: string) => {
@@ -424,9 +434,9 @@ export async function boardProject(projectRoot: string, root: string): Promise<B
       id: 'instagram-post',
       heading: heading('instagram-post', l.ig.post),
       at: at('instagram-post'),
-      files: file(b.cover, files.cover),
+      files: feedVideo(input) ? [...file(b.feedVideo, feedVideo(input)), ...file(b.cover, files.cover)] : file(b.cover, files.cover),
       fields: field(b.caption, caption, { limit: limits.instagram.caption, unit: 'chars', note: `${hashtagCount(data.instagram_post.caption, data.instagram_post.hashtags)}/${limits.instagram.hashtags} Hashtags` }),
-      checklist: [b.feedImage, b.igAi],
+      checklist: [feedVideo(input) ? b.feedVideoCheck : b.feedImage, b.igAi, ...((input.durationSeconds ?? 0) > 180 ? [b.longReel] : [])],
       url: true,
     });
   }

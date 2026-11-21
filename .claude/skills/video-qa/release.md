@@ -131,7 +131,9 @@ shorts:
       pinned_comment: "<optional>"
     platforms: [youtube, tiktok]
     # x: { post: "<the Short's line for X>", hashtags: ['#topic'] }   # optional: the Short also goes to X
-# instagram_post: { caption: "...", hashtags: [...] }   # optional feed post for the release
+instagram_post:                    # the main video in the feed format (4:5 or 1:1 render) on the release day
+  caption: "<the hook in the first 125 characters, then one line of context; no link>"
+  hashtags: ['#topic']             # at most 5, counting those in the caption
 spotify:
   artist_pick: "<one line pinned on the artist profile>"
   pitch: "<at most 500 characters: mood, genre, instruments, story>"
@@ -151,7 +153,7 @@ linkedin:
 
     <a personal story: what the song is about at work, in society, or in tech, and how it was made>
   hashtags: ['#KI']                # at most three
-  media: main                      # main or a Short name
+  media: main                      # main (the 4:5 or 1:1 render) or a Short name
 microsite:
   teaser: "<one or two sentences for the release list and link previews>"
   text: |

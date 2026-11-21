@@ -12,6 +12,7 @@
 - `/model-bench` — skill that compares models, workflows, or ComfyUI servers on the bench cases in `bench/` and scores them with `art-director` agents.
 - `npm run cli -- review <slug>` — the user opens a render in the review player; notes land in `review/notes/`. On a fix pass, follow the review-notes section of `assembly-render`.
 - `/series-status <series>` — read-only series overview: canon, episodes, stages, spend, length.
+- `/release-backfill <slug>` — skill that brings an existing or already published project into the release calendar: asks what is out, writes the missing release texts, plans the open slots, marks the past done.
 - `npm run cli -- release-board` — the user's local release page: per project and platform the files, texts, and settings, the release calendar of all projects, and checkboxes for what is posted.
 - `npm run cli -- publish <slug>` — uploads a finished release package (YouTube private, TikTok drafts); a user command, not a stage. See `docs/publishing.md`.
 

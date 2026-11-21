@@ -886,7 +886,7 @@ export const UploadDataSchema = z
     language: z.string().min(2),
     main: UploadMainSchema,
     shorts: z.array(UploadShortSchema).default([]),
-    /** An Instagram feed post announcing the release. */
+    /** The Instagram feed post of the release: the main video in the feed format (4:5 or 1:1 render), or the cover without one. */
     instagram_post: z.object({ caption: z.string().min(1), hashtags: z.array(HashtagSchema).default([]) }).optional(),
     /** Spotify for Artists: the Artist Pick message and the editorial pitch. */
     spotify: z.object({ artist_pick: z.string().min(1).optional(), pitch: z.string().min(1).optional() }).optional(),

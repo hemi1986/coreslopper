@@ -148,6 +148,12 @@ describe('release calendar', () => {
     expect(late.events.find((event) => event.id === 'links')?.at.slice(0, 10)).toBe('2026-12-27');
   });
 
+  it('plans the open Shorts of a song released earlier from today on', () => {
+    const calendar = buildCalendar(input('old', ['O1-hook', 'O2-chorus'], { releaseDate: '2026-10-02' }), { schedule, now, others: [] });
+    expect(calendar.events.find((event) => event.id === 'youtube')?.at).toBe('2026-10-02T18:00:00+02:00');
+    expect(shortDays(calendar)).toEqual(['O1-hook@2026-11-23', 'O2-chorus@2026-11-30']);
+  });
+
   it('skips a release day another project holds', () => {
     expect(nextReleaseDay(schedule, now, ['2026-12-18', '2027-01-08'])).toBe('2027-01-15');
     const noHolidays = ReleaseScheduleSchema.parse({ version: 1, release: { skip: [] } });

@@ -2,6 +2,20 @@
 
 What each platform takes for a release, as researched on 2026-11-21 from official help pages where they exist. **(unverified)** marks a figure only third parties state. Platforms change these often: `PLATFORM_LIMITS` in `packages/core/src/schema.ts` holds the enforced numbers, and `config/channel.yaml` can override them.
 
+## Which file goes where
+
+The release board assigns each file of the release folder to its posts:
+
+| File | Goes to |
+|---|---|
+| `video/<slug>-16x9.mp4` (master) | YouTube main video; Spotify music video (beta, 16:9 only) |
+| `video/<slug>-4x5.mp4` or `-1x1.mp4` (feed format) | Instagram feed post of the release; LinkedIn post |
+| `shorts/<name>-9x16.mp4` | YouTube Shorts, TikTok, Instagram Reels, X posts, Instagram story |
+| `thumbnails/thumb-1.jpg` (2, 3) | YouTube thumbnail (Test & compare); YouTube post |
+| `shorts/<name>-thumb.jpg` / `-tiktok.jpg` | Shorts and Reel cover / TikTok cover (3:4) |
+| `streaming/cover-3000x3000.jpg` | Distributor; announcement; Instagram feed post cover |
+| `streaming/canvas-9x16.mp4` | Spotify Canvas |
+
 ## YouTube (long-form)
 
 | Field | Rule | Source |

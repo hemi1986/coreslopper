@@ -252,6 +252,7 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
     const hash = await writer.place(source, path, 'video', { ...format, duration: timing?.audio.duration, measured: facts });
     if (recordedFile && recordedFile !== hash) warnings.push(`${rel} differs from the render recorded in state.json`);
     if (format.id === formatId(project.config.formats.master.aspect)) files.master = path;
+    files.videos = { ...files.videos, [format.id]: path };
   }
 
   // Subtitles: the episode's English subtitles, or the lyrics as SRT.
