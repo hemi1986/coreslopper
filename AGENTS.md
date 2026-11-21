@@ -59,12 +59,13 @@ AGENTS.md          This file: the project description agents read
 CLAUDE.md          @AGENTS.md + Claude Code specifics
 config/            models.yaml and defaults.yaml
 comfyui/           README + workflows/ (tagged API exports) + sources/ for local ComfyUI generation
+compose.yaml       The board and its watchdog in a container (image in docker/)
 docs/              glossary.md, architecture.md, pipeline.md, ADRs, third-party notices
 packages/
   core/            Zod schemas, state, timing resolver, hash, cost, project loader
   providers/       image, video, lip-sync, and audio operations; fal.ai + Higgsfield + Topview + ComfyUI + mock; cache/manifest runner;
                    publish adapters (YouTube, TikTok, mock), post adapters (X, LinkedIn, Instagram)
-  cli/             validate, status, new, render, contact-sheet, stage-*, estimate, doctor
+  cli/             validate, status, new, render, contact-sheet, stage-*, estimate, doctor, board (page in src/board/), watch
                    npx entry, onboarding, tool checks, workspace init
   remotion/        MusicVideo composition, motion components, effects, 3D
 schema/            Generated JSON Schema for cross-language validation
@@ -111,7 +112,7 @@ A project with `kind: episode` is one episode of a series ([ADR 0016](docs/adr/0
 
 From `audio-analysis` (or `voice-track`) on, no stage waits for a human. A stage can stop the pipeline only on a hard stop: budget exceeded, missing credentials, or a validation/QA failure that cannot be fixed after its retries.
 
-Publishing is not a stage. After `qa-export` the user approves the release on the release board, and the release autopilot (`release-run`, on a timer) posts each calendar event a platform API can post at its time; the rest stays on the board for the user ([ADR 0029](docs/adr/0029-release-autopilot.md)). `publish` uploads YouTube videos as private and TikTok videos as inbox drafts by hand ([ADR 0023](docs/adr/0023-publish-command.md), [docs/publishing.md](docs/publishing.md)). Agents and stage runners never approve a release, run `release-run`, or install its timer.
+Publishing is not a stage. After `qa-export` the user approves the release on the release board, and the release autopilot (`release-run`, on a timer) posts each calendar event a platform API can post at its time; the rest stays on the board for the user ([ADR 0029](docs/adr/0029-release-autopilot.md)). `publish` uploads YouTube videos as private and TikTok videos as inbox drafts by hand ([ADR 0023](docs/adr/0023-publish-command.md), [docs/publishing.md](docs/publishing.md)). Agents and stage runners never approve a release, run `release-run` or `watch`, or install the timer.
 
 ## Context discipline
 
@@ -146,7 +147,7 @@ npm run schema
 | `npm run cli -- render <project> [--format <id>]` | Render with Remotion in segments; the default is the master format. `--frames <a>-<b>` renders a test range; `--subtitles en` burns in episode subtitles. |
 | `npm run cli -- thumbnail <project> --still <file> --text "<a\|b>" --out <file>` | Compose a 1280x720 JPEG thumbnail with the brand fonts and palette; `--format 9x16` for a 1080x1920 Short thumbnail, `--format 1x1` for the 3000x3000 streaming cover (artist and title only); `--tag`, `--layout left\|right\|bottom`, `--accent <role>`, `--focus x,y`. |
 | `npm run cli -- short <project> --from <anchor\|s> --to <anchor\|s> --name <stem>` | Cut a Short (at most 60 s) from `renders/9x16.mp4` into `renders/shorts/<stem>-9x16.mp4`; anchors like `section:chorus_1:end-0.5`. |
-| `npm run cli -- review <project> [--format <id>] [--video <file>]` | Open a render in the review player (play, step frames, type notes); notes go to `review/notes/<video>.json`. |
+| `npm run cli -- review <project> [--format <id>] [--video <file>]` | The desktop review player (play, step frames, type notes); notes go to `review/notes/<video>.json`. The board's review view writes the same notes and sends them to the agent as review rounds (`review/rounds/`). |
 | `npm run cli -- media-link <project> [--move]` | Move `assets/` and `renders/` to `CORESLOPPER_MEDIA_DIR` and symlink them. |
 | `npm run cli -- new <slug> --budget <usd>` | Create a project from the template. |
 | `npm run cli -- new <slug> --kind episode --series <s> --episode <n> --budget <usd>` | Create an episode of a series. |
@@ -161,13 +162,16 @@ npm run schema
 | `npm run cli -- qa <project> [--determinism <frame>]` | Write `review/report.md`; optionally check frame hashes. |
 | `npm run cli -- release <project> [--no-render] [--canvas-from <anchor\|s>] [--canvas-seconds <n>]` | Build `renders/release/`: every format, thumbnails, Shorts, WAV, cover, canvas, lyrics, platform texts, README, manifest; renders only missing or stale formats; idempotent. |
 | `npm run cli -- calendar <project> [--replan] [--done-until <date>]` | Plan `review/calendar.yaml` (when what goes online where) in the next free slots of `config/release-schedule.yaml`, without colliding with other projects; `release` does it too. `--done-until` marks a published song's past events done. |
-| `npm run cli -- release-board [--port <n>]` | User command: a local page over all release folders, per platform files, texts, limits, settings, and links, the calendar of all projects (`.ics`), and what is posted (`review/release-status.json`). |
+| `npm run cli -- board [--port <n>] [--host <a>]` | User command (alias `release-board`): the workspace's local page. Production: every project and series with stages, budget, queue, reviews, renders, and the next Claude Code command. Release: per platform files, texts, limits, settings, and links, the calendar of all projects (`.ics`), and what is posted (`review/release-status.json`). |
 | `npm run cli -- upload-text <project>` | Render `review/upload.md` (a pointer to the release folder) from `review/upload.yaml`. |
 | `npm run cli -- publish <project> [--platform youtube\|tiktok\|all] [--only main\|shorts\|<name>] [--schedule <iso>] [--dry-run] [--force]` | User command, never a stage: upload the release package to YouTube (private or scheduled) and TikTok (inbox drafts); idempotent through `review/publish.json`. |
 | `npm run cli -- publish-auth youtube\|tiktok\|x\|linkedin\|instagram` | One-time consent; stores the tokens in `.env`. |
 | `npm run cli -- release-approve <project> [--revoke]` | User command: approve a release for the autopilot (the board's button); a proposed release day becomes `release.release_date`. |
 | `npm run cli -- release-run [--project <slug>] [--dry-run] [--plan]` | The release autopilot's round: post what is due of every approved release by API; run by the timer, never by a stage. |
-| `npm run cli -- release-timer [show\|install\|remove\|status] [--every <min>]` | User command: the timer that runs `release-run` (Windows Task Scheduler under WSL, systemd, launchd). |
+| `npm run cli -- watch [--every <min>] [--no-autopilot]` | The watchdog round: `release-run`, then the production scan (stage, render, queue, budget events and stalled stages in `.cache/watch/`); run by the timer or the board container (`board --watch`, `docker compose up -d`), never by a stage. |
+| `npm run cli -- release-timer [show\|install\|remove\|status] [--every <min>]` | User command: the timer that runs `watch` (Windows Task Scheduler under WSL, systemd, launchd); not with the board container. |
+| `npm run cli -- lyrics <project> --file <txt> [--propose]` | Write `lyrics.txt` once every line sits under a section tag; `--propose` prints proposed tags (repeated blocks become `[Chorus]`). |
+| `npm run cli -- reference list\|add\|link\|remove [<project> \| --series <s>]` | The user references (`references.yaml`, files in `assets/references/`): mood boards, photos, storyboards, concepts, footage, voices, links, with kind, subject, and note. |
 | `npm run cli -- import-song <project>` | Register `audio/song.wav` and `audio/stems/vocals.wav` in `song.json`; converts other formats. |
 | `npm run cli -- normalize-audio <project> --input <file>` | Normalize audio to −14 LUFS / −1 dBTP. |
 | `npm run cli -- footage <project> --input <file> --name <name>` | Normalize a footage proxy. |
@@ -236,6 +240,7 @@ CI runs without API keys and uses the mock provider. GPU tests are opt-in.
 - `docs/adr/` — architecture decision records.
 - `docs/THIRD_PARTY.md` — vendored skills, licenses, fonts, providers.
 - `docs/mcp.md` — optional exploration MCP servers; provider adapters.
+- `docs/board.md` — the board: production view, the watchdog, and the board container.
 - `docs/publishing.md` — `publish` and the release autopilot: YouTube, TikTok, X, LinkedIn, and Instagram setup, limits, quota.
 - `docs/release-platforms.md` — what each platform takes (fields, limits, links), posting times, legal notes for Germany.
 - `docs/adr/0024-release-folder-manual-distribution.md` — the release folder and the manual distributor upload.

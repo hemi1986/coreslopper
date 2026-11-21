@@ -145,7 +145,7 @@ npx coreslopper status my-video
 
 Rendering and asset generation use the workspace's own dependencies, so run them through `npm run cli -- ...`.
 
-When a project is done, publish from the release board (`npm run cli -- release-board`): **Approve release** there lets the autopilot post it at the calendar times once you set up the platforms and the timer (`npm run cli -- release-timer install`, [publishing.md](publishing.md#release-autopilot)). Your release rules (weekday, times, time zone, Short slots) go in `config/release-schedule.yaml`; copy `templates/channel/release-schedule.yaml` to start. `init` and `update` never create or overwrite it, like `config/channel.yaml`.
+When a project is done, publish from the board's release view (`npm run cli -- board`): **Approve release** there lets the autopilot post it at the calendar times once you set up the platforms and the watchdog: the board container (`docker compose up -d`, [board.md](board.md)) or the timer (`npm run cli -- release-timer install`, [publishing.md](publishing.md#release-autopilot)). Your release rules (weekday, times, time zone, Short slots) go in `config/release-schedule.yaml`; copy `templates/channel/release-schedule.yaml` to start. `init` and `update` never create or overwrite it, like `config/channel.yaml`.
 
 For real lyric alignment and stem separation, add the optional WhisperX and Demucs extras:
 

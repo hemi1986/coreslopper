@@ -38,7 +38,7 @@ Done when the command succeeds. On failure, show the error and stop; never creat
 
 ### 2. Bible
 
-Use the `grilling` skill until the series is decided: premise, tone, world rules, the recurring characters and how each may appear (display rule), the recurring sets, the languages of speech and subtitles, the episode length, and the episode plan. Then write `bible.md` along its template headings.
+Read the user references (`npm run cli -- reference list --series <slug>`) and open every file first; ground the grilling in them and record material the user hands over in chat with `reference add --series`. Use the `grilling` skill until the series is decided: premise, tone, world rules, the recurring characters and how each may appear (display rule), the recurring sets, the languages of speech and subtitles, the episode length, and the episode plan. Then write `bible.md` along its template headings.
 
 Done when the grilling frontier is empty, the user confirmed shared understanding, and every heading of `bible.md` is filled.
 
@@ -63,7 +63,7 @@ Generate through the series budget: `npm run cli -- generate --series <slug> --b
 - **Plates**: one empty frame per plate, as an `image.edit` of the set's start frame that moves the camera to the plate's `angle` (same room, same light, nobody in it), saved as `sets/<id>/plates/<plate>.png` and recorded in `ref`.
 - **Props**: one reference per prop alone on a neutral ground, saved under `props/<id>/` and recorded in `refs`.
 - **Character states** of the canon: an `image.edit` of the sheet per state, saved as `characters/<id>/states/<state>.png` and recorded in `ref` (see `.claude/skills/character-bible/SKILL.md`).
-- **Reference voices** for every character with speech: a recording by the user, or, with `providers.audio: comfyui`, an `audio.voice_design` take ("(voice description)text"). Save it as `characters/<id>/voice.wav` and record `voice.ref` and the exact `voice.transcript` in `characters.yaml`.
+- **Reference voices** for every character with speech: a recording by the user (a user reference of kind `voice` whose `subject` names the character), or, with `providers.audio: comfyui`, an `audio.voice_design` take ("(voice description)text"). Save it as `characters/<id>/voice.wav` and record `voice.ref` and the exact `voice.transcript` in `characters.yaml`.
 
 Record the filed paths in `sheet`, `refs`, and `ref`. Review every sheet, set frame, plate, prop, and state as soon as it exists with `npm run cli -- review-image series/<slug> --image <png> --ref <kind:id>`; it fails an image only for a blocking defect. Regenerate what fails with its `fix_prompt` (a new seed, the same `out`), or repair one region with `npm run cli -- patch --series <slug> --image <png> --box <x,y,w,h> --prompt "…" --ref <kind:id> --replace`. The generation queue (`queue`) works on projects only; a canon is small enough for this loop by hand.
 

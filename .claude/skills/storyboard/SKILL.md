@@ -16,6 +16,7 @@ license: MIT
 
 - `treatment.md`, `timing.json`, `timing.overrides.json`
 - `style.yaml`, `characters.yaml`, `sets.yaml` (plates, props) when present
+- The user references in `references.yaml` of kind `storyboard` and `footage`: shots the user drew or filmed keep their framing and timing unless the treatment changed them.
 - `docs/glossary.md`
 - The storyboard schema in `packages/core/src/schema.ts`
 

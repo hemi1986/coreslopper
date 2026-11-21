@@ -1,0 +1,32 @@
+# The board and its watchdog in a container: `docker compose up -d`, then open
+# http://127.0.0.1:4848. See docs/board.md. Run either this container or
+# `release-timer install` on the computer, not both.
+services:
+  board:
+    build: ./docker
+    image: coreslopper-board
+    restart: unless-stopped
+    ports:
+      # Published on the computer's loopback only: the board writes approvals.
+      - "127.0.0.1:${CORESLOPPER_BOARD_PORT:-4848}:4848"
+    environment:
+      # Release times are planned in this zone unless config/release-schedule.yaml sets one.
+      TZ: ${TZ:-UTC}
+      # Linux: the owner of the files the board writes (defaults to the workspace's owner).
+      CORESLOPPER_UID: ${CORESLOPPER_UID:-}
+      CORESLOPPER_GID: ${CORESLOPPER_GID:-}
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+      # Renders and assets linked to a media drive (media-link) resolve at the same path inside.
+      # CORESLOPPER_MEDIA_MOUNT is the folder to mount when CORESLOPPER_MEDIA_DIR contains {slug};
+      # without a media drive this mounts an empty volume instead.
+      - ${CORESLOPPER_MEDIA_MOUNT:-${CORESLOPPER_MEDIA_DIR:-no_media_dir}}:${CORESLOPPER_MEDIA_MOUNT:-${CORESLOPPER_MEDIA_DIR:-/no-media-dir}}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4848/api/production').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 1m
+      timeout: 10s
+      start_period: 5m
+volumes:
+  node_modules:
+  no_media_dir:

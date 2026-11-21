@@ -9,6 +9,7 @@ import {
   stageTable,
 } from '@coreslopper/core';
 import { join, relative } from 'node:path';
+import { openRoundSummaries } from './board-review.js';
 import { listThumbnails } from './thumbnail-files.js';
 import { listShorts, shortName, shortPaths } from './release-files.js';
 
@@ -53,6 +54,8 @@ export async function printStatus(projectDir: string): Promise<void> {
       console.log('Release: renders/release/manifest.json is unreadable; run release');
     }
   }
+  // An open review round is answered before the next stage (/video-next reads this line).
+  for (const line of await openRoundSummaries(projectDir)) console.log(`Review: ${line}`);
   console.log(`Next: ${next ? `${next.id} (${next.skills.join(', ')})${interactive ? ' · interactive' : ''}` : 'done'}`);
   if (!existsSync(loaded.paths.state)) console.log('Note: state.json does not exist yet; showing the initial state.');
 }

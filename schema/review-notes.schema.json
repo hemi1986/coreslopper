@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "video": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fps": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "notes": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "frame": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "seconds": {
+            "type": "number",
+            "minimum": 0
+          },
+          "time": {
+            "type": "string"
+          },
+          "end_frame": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "end_seconds": {
+            "type": "number",
+            "minimum": 0
+          },
+          "end_time": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1
+          },
+          "round": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "created": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "frame",
+          "seconds",
+          "time",
+          "text"
+        ],
+        "additionalProperties": {}
+      }
+    }
+  },
+  "required": [
+    "video",
+    "fps"
+  ],
+  "additionalProperties": {}
+}
