@@ -36,6 +36,7 @@ import {
 } from './release-texts.js';
 import { loadUploadData, uploadPaths } from './upload-text.js';
 import { releaseDir, songJson } from './release.js';
+import { DERIVED_PATHS } from './release-images.js';
 
 // The release board's view of one project: per platform the posts to make,
 // each with its files (paths inside renders/release/), the texts to paste
@@ -167,6 +168,12 @@ const NOTES = {
 
 const BOARD = {
   de: {
+    announceStory: 'Story-Bild mit Termin',
+    announcePost: 'Post-Bild mit Termin',
+    teaserFile: 'Teaser (10 s)',
+    storyImage: 'Story-Bild',
+    feedImageFile: 'Feed-Bild (4:5)',
+    feedImageCheck: 'Feed-Bild als Beitrag',
     master: 'Hauptvideo',
     upload: 'Thumbnail (Upload)',
     alt: (n: number) => `Thumbnail ${n} (Testen und vergleichen)`,
@@ -230,6 +237,12 @@ const BOARD = {
     noLinkedin: 'Noch keine Entscheidung: linkedin in review/upload.yaml',
   },
   en: {
+    announceStory: 'Story image with the date',
+    announcePost: 'Post image with the date',
+    teaserFile: 'Teaser (10 s)',
+    storyImage: 'Story image',
+    feedImageFile: 'Feed image (4:5)',
+    feedImageCheck: 'The feed image as the post',
     master: 'Main video',
     upload: 'Thumbnail (upload)',
     alt: (n: number) => `Thumbnail ${n} (Test & compare)`,
@@ -318,6 +331,11 @@ export function filesFromManifest(manifest: ReleaseManifest | undefined, masterF
     else if (file.kind === 'canvas') files.canvas = file.path;
     else if (file.kind === 'lyrics' && file.path.endsWith('.txt')) files.lyricsTxt = file.path;
     else if (file.kind === 'lyrics' && file.path.endsWith('.lrc')) files.lyricsLrc = file.path;
+    else if (file.path === DERIVED_PATHS.announceStory) files.announceStory = file.path;
+    else if (file.path === DERIVED_PATHS.announcePost) files.announcePost = file.path;
+    else if (file.path === DERIVED_PATHS.teaser) files.teaser = file.path;
+    else if (file.path === DERIVED_PATHS.story) files.story = file.path;
+    else if (file.path === DERIVED_PATHS.feedImage) files.feedImage = file.path;
   }
   files.thumbnails.sort();
   files.shorts.sort((a, b) => a.name.localeCompare(b.name));
@@ -388,7 +406,7 @@ export async function boardProject(projectRoot: string, root: string): Promise<B
   // YouTube
   const youtube: BoardPost[] = [];
   if (announcement) {
-    youtube.push({ id: 'announce:youtube', heading: heading('announce:youtube', l.announce.heading), at: at('announce:youtube'), files: file(b.cover, files.cover), fields: field(b.text, announcement), checklist: [], url: true });
+    youtube.push({ id: 'announce:youtube', heading: heading('announce:youtube', l.announce.heading), at: at('announce:youtube'), files: files.announcePost ? file(b.announcePost, files.announcePost) : file(b.cover, files.cover), fields: field(b.text, announcement), checklist: [], url: true });
   }
   const description = youtubeDescriptionText(input, l);
   youtube.push({
@@ -425,14 +443,22 @@ export async function boardProject(projectRoot: string, root: string): Promise<B
   const instagramPosts: BoardPost[] = [];
   const xPosts: BoardPost[] = [];
   if (announcement) {
-    instagramPosts.push({ id: 'announce:instagram', heading: heading('announce:instagram', l.announce.heading), at: at('announce:instagram'), files: file(b.cover, files.cover), fields: field(b.story, announcement), checklist: [], url: false });
+    instagramPosts.push({
+      id: 'announce:instagram',
+      heading: heading('announce:instagram', l.announce.heading),
+      at: at('announce:instagram'),
+      files: files.announceStory ? [...file(b.announceStory, files.announceStory), ...file(b.teaserFile, files.teaser)] : file(b.cover, files.cover),
+      fields: field(b.story, announcement),
+      checklist: [],
+      url: false,
+    });
   }
   const firstStory = data?.shorts.find((short) => short.instagram?.story)?.instagram?.story;
   instagramPosts.push({
     id: 'story',
     heading: heading('story', l.ig.story),
     at: at('story'),
-    files: [...file(b.thumb, files.shorts[0]?.thumbnail), ...file(b.video, files.shorts[0]?.video)],
+    files: [...(files.story ? file(b.storyImage, files.story) : file(b.thumb, files.shorts[0]?.thumbnail)), ...file(b.video, files.shorts[0]?.video)],
     fields: field(b.story, firstStory),
     checklist: [b.sticker],
     pointer: videoUrl,
@@ -443,14 +469,18 @@ export async function boardProject(projectRoot: string, root: string): Promise<B
       id: 'instagram-post',
       heading: heading('instagram-post', l.ig.post),
       at: at('instagram-post'),
-      files: feedVideo(input) ? [...file(b.feedVideo, feedVideo(input)), ...file(b.cover, files.cover)] : file(b.cover, files.cover),
+      files: feedVideo(input)
+        ? [...file(b.feedVideo, feedVideo(input)), ...file(b.cover, files.cover)]
+        : files.feedImage
+          ? file(b.feedImageFile, files.feedImage)
+          : file(b.cover, files.cover),
       fields: field(b.caption, caption, { limit: limits.instagram.caption, unit: 'chars', note: `${hashtagCount(data.instagram_post.caption, data.instagram_post.hashtags)}/${limits.instagram.hashtags} Hashtags` }),
-      checklist: [feedVideo(input) ? b.feedVideoCheck : b.feedImage, b.igAi, ...((input.durationSeconds ?? 0) > 180 ? [b.longReel] : [])],
+      checklist: [feedVideo(input) ? b.feedVideoCheck : files.feedImage ? b.feedImageCheck : b.feedImage, b.igAi, ...((input.durationSeconds ?? 0) > 180 ? [b.longReel] : [])],
       url: true,
     });
   }
   if (announcement && data?.x) {
-    xPosts.push({ id: 'announce:x', heading: heading('announce:x', l.announce.heading), at: at('announce:x'), files: file(b.cover, files.cover), fields: field(b.post, announcement, { limit: limits.x.post, unit: 'chars', counting: 'x' }), checklist: [], url: true });
+    xPosts.push({ id: 'announce:x', heading: heading('announce:x', l.announce.heading), at: at('announce:x'), files: files.teaser ? file(b.teaserFile, files.teaser) : files.announcePost ? file(b.announcePost, files.announcePost) : file(b.cover, files.cover), fields: field(b.post, announcement, { limit: limits.x.post, unit: 'chars', counting: 'x' }), checklist: [], url: true });
   }
   if (data?.x) {
     const texts = xTexts(data.x, videoUrl);

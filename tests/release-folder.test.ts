@@ -177,6 +177,13 @@ async function fixture(options: { release?: boolean; upload?: boolean } = {}): P
     await writeFile(join(dir, 'renders', 'shorts', `${name}-tiktok.jpg`), Buffer.concat([jpeg(1080, 1440), Buffer.from(name)]));
   }
   await writeFile(join(dir, 'renders', 'cover-3000x3000.jpg'), jpeg(3000, 3000));
+  // The recipe `thumbnail` writes beside the cover: the still the announcement images are composed from.
+  await mkdir(join(dir, 'assets', 'image'), { recursive: true });
+  await writeFile(join(dir, 'assets', 'image', 'hero.png'), 'still');
+  await writeFile(
+    join(dir, 'renders', 'cover-3000x3000.recipe.json'),
+    JSON.stringify({ version: 1, still: 'assets/image/hero.png', format: '1x1', text: 'NEON STATIC|NEON RAIN', focus: '0.5,0.35' }),
+  );
   await writeFile(join(dir, 'audio', 'song.wav'), 'RIFF song');
   if (options.upload !== false) await writeFile(join(dir, 'review', 'upload.yaml'), stringify(uploadYaml()));
   return dir;
@@ -185,12 +192,20 @@ async function fixture(options: { release?: boolean; upload?: boolean } = {}): P
 interface FakeDeps extends Partial<ReleaseDeps> {
   ffmpegCalls: string[][];
   renders: string[];
+  thumbnails: { text: string; format?: string; out: string }[];
 }
 
 function fakeDeps(overrides: Partial<ReleaseDeps> = {}, probes: Record<string, MediaProbe> = {}): FakeDeps {
   const deps: FakeDeps = {
     ffmpegCalls: [],
     renders: [],
+    thumbnails: [],
+    thumbnail: async (options) => {
+      deps.thumbnails.push({ text: options.text, format: options.format, out: options.out });
+      const size = { '9x16': [1080, 1920], '16x9': [1280, 720], '4x5': [1080, 1350] }[options.format ?? '16x9'] ?? [1280, 720];
+      await writeFile(options.out, Buffer.concat([jpeg(size[0]!, size[1]!), Buffer.from(options.text)]));
+      return options.out;
+    },
     probe: fixtureProbe(probes),
     ffmpeg: async (args) => {
       deps.ffmpegCalls.push(args);
@@ -442,6 +457,10 @@ describe('release folder', () => {
     expect(result.errors).toEqual([]);
     expect(await tree(result.dir)).toEqual([
       'README.md',
+      'announce/post-16x9.jpg',
+      'announce/story-9x16.jpg',
+      'announce/teaser-9x16.mp4',
+      'instagram/story-9x16.jpg',
       'audio/Neon Static - Neon Rain.wav',
       'calendar.ics',
       'shorts/Z1-intro-9x16.mp4',
@@ -483,6 +502,60 @@ describe('release folder', () => {
     expect(result.todos.filter((todo) => !todo.includes('canvas window'))).toEqual([]);
     expect(await readFile(join(result.dir, 'README.md'), 'utf8')).toContain('## Offene TODOs');
     expect(deps.renders).toEqual([]);
+  });
+
+  it('composes the announcement with the release date and again only when the date moves', async () => {
+    const dir = await fixture();
+    const deps = fakeDeps();
+    await buildRelease({ projectDir: dir, deps });
+    // Release day Friday 11 December 2026, the main video at 18:00; the 1:1 render is the feed post, so no feed image.
+    expect(deps.thumbnails.map((call) => [call.out.split('/release/')[1], call.format, call.text])).toEqual([
+      ['announce/story-9x16.jpg', '9x16', 'NEON RAIN|FR 11.12. 18 UHR'],
+      ['announce/post-16x9.jpg', '16x9', 'NEON RAIN|FR 11.12. 18 UHR'],
+      ['instagram/story-9x16.jpg', '9x16', 'NEON RAIN|AUF YOUTUBE'],
+    ]);
+    const board = await boardProject(dir, join(dir, '..', '..'));
+    const announce = board.platforms.find((platform) => platform.id === 'instagram')!.posts.find((post) => post.id === 'announce:instagram')!;
+    expect(announce.files.map((file) => file.path)).toEqual(['announce/story-9x16.jpg', 'announce/teaser-9x16.mp4']);
+    const x = board.platforms.find((platform) => platform.id === 'x')!.posts.find((post) => post.id === 'announce:x')!;
+    expect(x.files.map((file) => file.path)).toEqual(['announce/teaser-9x16.mp4']);
+    expect(await readFile(join(dir, 'renders', 'release', 'texts', 'instagram.md'), 'utf8')).toContain('Story: `announce/story-9x16.jpg`');
+
+    deps.thumbnails.length = 0;
+    await buildRelease({ projectDir: dir, deps });
+    expect(deps.thumbnails).toEqual([]);
+
+    // The user moves the release a week: the dated images follow, the story image stays.
+    const config = parse(await readFile(join(dir, 'project.yaml'), 'utf8'));
+    config.release.release_date = '2026-12-18';
+    await writeFile(join(dir, 'project.yaml'), stringify(config));
+    const moved = await buildRelease({ projectDir: dir, deps, stills: false });
+    expect(deps.thumbnails).toEqual([]);
+    expect(moved.todos.filter((todo) => todo.includes('not composed'))).toEqual([]);
+    await buildRelease({ projectDir: dir, deps });
+    expect(deps.thumbnails.map((call) => call.text)).toEqual([
+      'NEON RAIN|FR 18.12. 18 UHR',
+      'NEON RAIN|FR 18.12. 18 UHR',
+    ]);
+  });
+
+  it('composes a 4:5 feed image without a feed-format render, and asks for a still without a recipe', async () => {
+    const dir = await fixture();
+    await rm(join(dir, 'renders', '1x1.mp4'));
+    const config = parse(await readFile(join(dir, 'project.yaml'), 'utf8'));
+    config.formats.derivatives = config.formats.derivatives.filter((format: { aspect: string }) => format.aspect !== '1:1');
+    await writeFile(join(dir, 'project.yaml'), stringify(config));
+    const deps = fakeDeps();
+    await buildRelease({ projectDir: dir, deps });
+    expect(deps.thumbnails.find((call) => call.format === '4x5')?.text).toBe('NEON RAIN');
+    const board = await boardProject(dir, join(dir, '..', '..'));
+    const feed = board.platforms.find((platform) => platform.id === 'instagram')!.posts.find((post) => post.id === 'instagram-post')!;
+    expect(feed.files.map((file) => file.path)).toEqual(['instagram/feed-4x5.jpg']);
+
+    await rm(join(dir, 'renders', 'cover-3000x3000.recipe.json'));
+    await rm(join(dir, 'renders', 'release'), { recursive: true });
+    const result = await buildRelease({ projectDir: dir, deps: fakeDeps() });
+    expect(result.todos.some((todo) => todo.includes('set announcement.image'))).toBe(true);
   });
 
   it('is idempotent: a second run runs no ffmpeg job and rewrites nothing', async () => {

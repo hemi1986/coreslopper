@@ -44,6 +44,14 @@ export interface ReleaseTextInput {
     canvas?: string;
     lyricsTxt?: string;
     lyricsLrc?: string;
+    /** The announcement a week before: the 9:16 story and the 16:9 post image with the release date, and the teaser. */
+    announceStory?: string;
+    announcePost?: string;
+    teaser?: string;
+    /** The release-day story image. */
+    story?: string;
+    /** The 4:5 feed image, when there is no feed-format render. */
+    feedImage?: string;
   };
   durationSeconds?: number;
 }
@@ -125,7 +133,7 @@ interface Labels {
     short: (name: string, platform: string) => string;
     platforms: Record<'distributor' | 'spotify' | 'youtube' | 'shorts' | 'tiktok' | 'instagram' | 'x' | 'linkedin' | 'microsite', string>;
   };
-  announce: { heading: string; image: string };
+  announce: { heading: string; image: string; files: (story?: string, post?: string, teaser?: string) => string };
   videoLink: string;
   x: { heading: string; post: string; reply: string; media: (file: string) => string; replyNote: string; short: string };
   li: { heading: string; skipped: (reason: string) => string; reason: string; post: string; hook: (n: number, limit: number) => string; media: (file: string) => string; noLinkNote: string };
@@ -245,12 +253,17 @@ const EN: Labels = {
       page: 'Publish the song page on the microsite',
       links: 'Add the Spotify link to the YouTube description and the pinned comment',
     },
-    announce: { instagram: 'Announcement: Instagram story with the cover', youtube: 'Announcement: YouTube post with the cover', x: 'Announcement on X with the cover' },
+    announce: { instagram: 'Announcement: Instagram story', youtube: 'Announcement: YouTube post', x: 'Announcement on X' },
     post: { instagram: 'Instagram feed post', x: 'Post on X with the video; YouTube link in the reply', linkedin: 'LinkedIn post' },
     short: (name, platform) => `${name} on ${platform}`,
     platforms: { distributor: 'Distributor', spotify: 'Spotify', youtube: 'YouTube', shorts: 'YouTube Shorts', tiktok: 'TikTok', instagram: 'Instagram', x: 'X', linkedin: 'LinkedIn', microsite: 'Microsite' },
   },
-  announce: { heading: 'Announcement', image: 'Image: the streaming cover' },
+  announce: {
+    heading: 'Announcement',
+    image: 'Image: the streaming cover',
+    files: (story, post, teaser) =>
+      [story && `Story: \`${story}\``, post && `post image: \`${post}\``, teaser && `teaser for X: \`${teaser}\``].filter(Boolean).join(' · '),
+  },
   videoLink: 'link to the main video',
   x: {
     heading: 'X',
@@ -405,12 +418,17 @@ const DE: Labels = {
       page: 'Song-Seite auf der Microsite veröffentlichen',
       links: 'Spotify-Link in YouTube-Beschreibung und angepinnten Kommentar eintragen',
     },
-    announce: { instagram: 'Ankündigung: Instagram-Story mit Cover', youtube: 'Ankündigung: YouTube-Post mit Cover', x: 'Ankündigung auf X mit Cover' },
+    announce: { instagram: 'Ankündigung: Instagram-Story', youtube: 'Ankündigung: YouTube-Post', x: 'Ankündigung auf X' },
     post: { instagram: 'Instagram-Feed-Post', x: 'Post auf X mit Video; YouTube-Link als Antwort', linkedin: 'LinkedIn-Beitrag' },
     short: (name, platform) => `${name} auf ${platform}`,
     platforms: { distributor: 'Distributor', spotify: 'Spotify', youtube: 'YouTube', shorts: 'YouTube Shorts', tiktok: 'TikTok', instagram: 'Instagram', x: 'X', linkedin: 'LinkedIn', microsite: 'Microsite' },
   },
-  announce: { heading: 'Ankündigung', image: 'Bild: das Streaming-Cover' },
+  announce: {
+    heading: 'Ankündigung',
+    image: 'Bild: das Streaming-Cover',
+    files: (story, post, teaser) =>
+      [story && `Story: \`${story}\``, post && `Post-Bild: \`${post}\``, teaser && `Teaser für X: \`${teaser}\``].filter(Boolean).join(' · '),
+  },
   videoLink: 'Link zum Hauptvideo',
   x: {
     heading: 'X',
@@ -524,7 +542,7 @@ function youtubeText(input: ReleaseTextInput, l: Labels): string {
   lines.push('', `## ${l.pinned}`, '', ...block(main?.pinned_comment ?? l.todo('main.pinned_comment in review/upload.yaml')));
   lines.push('', `## ${l.community}`, '', ...block(main?.community_post ?? l.todo('main.community_post in review/upload.yaml')));
   const announcement = announcementText(input);
-  if (announcement) lines.push('', `## ${l.announce.heading}`, '', `_${l.announce.image}_`, '', ...block(announcement));
+  if (announcement) lines.push('', `## ${l.announce.heading}`, '', announceImageLine(input, l), '', ...block(announcement));
   if (main?.summary_en) lines.push('', `## ${l.english}`, '', ...block(`${main.summary_en.title}\n\n${main.summary_en.description}`));
   lines.push('', `## ${l.checklist}`, '');
   lines.push(checkbox(l.yt.visibility), checkbox(l.yt.synthetic(synthetic)), checkbox(l.yt.kids(main?.made_for_kids ?? false)));
@@ -558,7 +576,7 @@ function instagramText(input: ReleaseTextInput, l: Labels): string {
   const lines = [`# ${l.ig.heading}`, ''];
   const youtube = channelLink(input.channel, 'youtube', l);
   const announcement = announcementText(input);
-  if (announcement) lines.push(`## ${l.announce.heading} (${l.ig.story})`, '', `_${l.announce.image}_`, '', ...block(announcement), '');
+  if (announcement) lines.push(`## ${l.announce.heading} (${l.ig.story})`, '', announceImageLine(input, l), '', ...block(announcement), '');
   for (const file of input.files.shorts) {
     const ig = shortFor(input, file.name)?.instagram;
     lines.push(`## ${l.ig.reel}: ${file.name}`, '', `**${l.file}:** \`${file.video}\``, '');
@@ -704,6 +722,12 @@ function planText(input: ReleaseTextInput, l: Labels): string {
 }
 
 /** The release announcement, the same text on every platform it goes to. */
+/** Which files the announcement uses: the composed images and teaser, or the cover before they exist. */
+function announceImageLine(input: ReleaseTextInput, l: Labels): string {
+  const { announceStory, announcePost, teaser } = input.files;
+  return announceStory || announcePost || teaser ? l.announce.files(announceStory, announcePost, teaser) : `_${l.announce.image}_`;
+}
+
 export function announcementText(input: ReleaseTextInput): string | undefined {
   const a = input.data?.announcement;
   return a ? [a.text.trim(), a.hashtags.join(' ')].filter(Boolean).join('\n\n') : undefined;
@@ -726,7 +750,7 @@ function xText(input: ReleaseTextInput, l: Labels): string {
   const lines = [`# ${l.x.heading}`, ''];
   const youtube = youtubeTarget(l);
   const announcement = announcementText(input);
-  if (announcement) lines.push(`## ${l.announce.heading}`, '', `_${l.announce.image}_`, '', ...block(announcement), '');
+  if (announcement) lines.push(`## ${l.announce.heading}`, '', announceImageLine(input, l), '', ...block(announcement), '');
   const x = input.data?.x;
   if (x) {
     const texts = xTexts(x, youtube);
