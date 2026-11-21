@@ -89,11 +89,12 @@
       "externalDeps": 0,
       "consumers": [],
       "hasTests": false,
-      "adopted": false,
+      "adopted": true,
       "role": "shared",
       "roleReasons": [
         "library/shared package"
-      ]
+      ],
+      "adoptedAt": "2026-11-21"
     },
     {
       "name": "coreslopper-audio-analysis",
@@ -388,7 +389,9 @@
         "3 layers: cli, remotion, tests",
         "3 packages",
         "7 files"
-      ]
+      ],
+      "adopted": true,
+      "adoptedAt": "2026-11-21"
     },
     {
       "name": "generate",
@@ -487,7 +490,9 @@
         "3 layers: cli, remotion, tests",
         "3 packages",
         "4 files"
-      ]
+      ],
+      "adopted": true,
+      "adoptedAt": "2026-11-21"
     },
     {
       "name": "board",
@@ -890,6 +895,20 @@
     },
     {
       "name": "series",
+      "terms": [],
+      "tables": [],
+      "files": [],
+      "packages": [],
+      "layers": [],
+      "score": 0,
+      "reasons": [
+        "marked adopted manually"
+      ],
+      "adopted": true,
+      "adoptedAt": "2026-11-21"
+    },
+    {
+      "name": "render",
       "terms": [],
       "tables": [],
       "files": [],

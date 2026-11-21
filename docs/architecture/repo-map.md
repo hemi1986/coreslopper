@@ -6,7 +6,7 @@
 - **Tooling:** npm workspaces
 - **Workspaces:** `packages/*`
 - **Packages:** 6 (0 apps/services, 4 libraries)
-- **Adopted:** 0 of 6
+- **Adopted:** 1 of 6
 - **Tool graph:** manifests only
 
 ## Packages
@@ -16,7 +16,7 @@
 | @coreslopper/cli | `packages/cli` | library | shared | TypeScript | – | – | – |
 | @coreslopper/core | `packages/core` | library | layer | TypeScript | – | – | – |
 | @coreslopper/providers | `packages/providers` | library | layer | TypeScript | – | – | – |
-| @coreslopper/remotion | `packages/remotion` | library | shared | TypeScript | – | – | – |
+| @coreslopper/remotion | `packages/remotion` | library | shared | TypeScript | – | – | yes |
 | coreslopper-audio-analysis | `scripts/audio-analysis` | package | domain | Python | – | – | – |
 | coreslopper-review-player | `scripts/review-player` | package | domain | Python | – | – | – |
 
@@ -39,10 +39,10 @@ Files that share a concept stem or a table across layers. These are suggestions 
 | timing | core, remotion, scripts, tests | 6 | – | 4 layers: core, remotion, scripts, tests; 4 packages; 6 files | yes |
 | episode | cli, core, tests | 6 | – | 3 layers: cli, core, tests; 3 packages; 6 files | – |
 | release | cli, core, tests | 20 | – | 3 layers: cli, core, tests; 3 packages; 20 files | – |
-| thumbnail | cli, remotion, tests | 7 | – | 3 layers: cli, remotion, tests; 3 packages; 7 files | – |
+| thumbnail | cli, remotion, tests | 7 | – | 3 layers: cli, remotion, tests; 3 packages; 7 files | yes |
 | generate | cli, scripts, tests | 7 | – | 3 layers: cli, scripts, tests; 2 packages; 7 files | – |
 | bench | cli, core, tests | 4 | – | 3 layers: cli, core, tests; 3 packages; 4 files | – |
-| media | cli, remotion, tests | 4 | – | 3 layers: cli, remotion, tests; 3 packages; 4 files | – |
+| media | cli, remotion, tests | 4 | – | 3 layers: cli, remotion, tests; 3 packages; 4 files | yes |
 | board | cli, tests | 7 | – | 2 layers: cli, tests; 2 packages; 7 files | – |
 | publish | cli, tests | 8 | – | 2 layers: cli, tests; 2 packages; 8 files | – |
 | sery | cli, tests | 5 | – | 2 layers: cli, tests; 2 packages; 5 files | – |
@@ -60,6 +60,7 @@ Files that share a concept stem or a table across layers. These are suggestions 
 | storyboard | – | 0 | – | marked adopted manually | yes |
 | generation | – | 0 | – | marked adopted manually | yes |
 | series | – | 0 | – | marked adopted manually | yes |
+| render | – | 0 | – | marked adopted manually | yes |
 
 Adopt a concept slice with:
 

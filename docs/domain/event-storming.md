@@ -64,6 +64,9 @@ flowchart LR
     CMD_NormalizeSongLoudness["Normalize song loudness"]:::cmd
     CMD_SeparateLeadStem["Separate lead stem"]:::cmd
     CMD_RestartComfyUI["Restart ComfyUI"]:::cmd
+    CMD_RenderStill["Render a still"]:::cmd
+    CMD_LinkProjectMedia["Link a project's media"]:::cmd
+    CMD_CheckDeterminism["Check determinism"]:::cmd
     subgraph BC_Timing["Timing"]
         CMD_WriteLyrics["Write lyrics"]:::cmd
         CMD_AnalyzeSong["Analyze song"]:::cmd
@@ -161,6 +164,24 @@ flowchart LR
         EVT_LibraryCharacterDeleted["Library character deleted"]:::evt
         EVT_LibraryCharacterUseRefused["Library character use refused"]:::evt
     end
+    subgraph BC_Render["Render"]
+        CMD_RenderPreview["Render a preview"]:::cmd
+        CMD_RenderPassage["Render a passage"]:::cmd
+        CMD_RenderFormat["Render a format"]:::cmd
+        CMD_CutShort["Cut a Short"]:::cmd
+        CMD_ComposeImage["Compose an image"]:::cmd
+        EVT_PreviewRendered["Preview rendered"]:::evt
+        EVT_PassageRendered["Passage rendered"]:::evt
+        EVT_FormatRendered["⭐ Format rendered"]:::evt
+        EVT_StillRendered["Still rendered"]:::evt
+        EVT_RenderFailed["Render failed"]:::evt
+        EVT_ShortCut["⭐ Short cut"]:::evt
+        EVT_ShortRefused["Short refused"]:::evt
+        EVT_ImageComposed["⭐ Image composed"]:::evt
+        EVT_ImageCompositionRefused["Image composition refused"]:::evt
+        EVT_ProjectMediaLinked["Project media linked"]:::evt
+        EVT_DeterminismChecked["Determinism checked"]:::evt
+    end
     ACT_User(["User"]):::act
     ACT_Orchestrator(["Orchestrator"]):::act
     ACT_SetupSkill(["Setup skill"]):::act
@@ -172,6 +193,7 @@ flowchart LR
     EXT_ComfyUI[["ComfyUI server"]]:::ext
     EXT_AudioModels[["Local audio models"]]:::ext
     EXT_FFmpeg[["FFmpeg"]]:::ext
+    EXT_Remotion[["Remotion and headless Chrome"]]:::ext
     POL_RunNextStage{{"Run the next autonomous stage"}}:::pol
     POL_HardStop{{"A hard stop fails the stage and halts the pipeline"}}:::pol
     POL_AnswerOpenRounds{{"Open review rounds are answered before the next autonomous stage"}}:::pol
@@ -183,6 +205,7 @@ flowchart LR
     POL_RestartComfyUIOnFailure{{"A failed local generation restarts ComfyUI before the next try"}}:::pol
     POL_ValidateEveryScriptEdit{{"Every script edit is validated"}}:::pol
     POL_ImportFinishedCharacters{{"The characters of a finished character bible go into the library"}}:::pol
+    POL_LinkNewProjectMedia{{"A new project's media go to the media directory"}}:::pol
     RM_Status[("Status")]:::rm
     RM_NextAction[("Next action")]:::rm
     RM_ProductionView[("Production view")]:::rm
@@ -204,6 +227,9 @@ flowchart LR
     RM_Subtitles[("Subtitles")]:::rm
     RM_CharacterLibrary[("Character library")]:::rm
     RM_UserReferences[("User references")]:::rm
+    RM_RenderProgress[("Render progress")]:::rm
+    RM_Renders[("Renders")]:::rm
+    RM_RenderChecks[("Render checks")]:::rm
     ACT_SetupSkill --> CMD_CreateProject
     CMD_CreateProject --> EVT_ProjectCreated
     ACT_Orchestrator --> CMD_StartStage
@@ -345,6 +371,27 @@ flowchart LR
     CMD_RemoveLibraryFile --> EVT_LibraryFileRemoved
     ACT_User --> CMD_DeleteLibraryCharacter
     CMD_DeleteLibraryCharacter --> EVT_LibraryCharacterDeleted
+    ACT_StageRunner --> CMD_RenderPreview
+    CMD_RenderPreview --> EVT_PreviewRendered
+    CMD_RenderPreview --> EVT_RenderFailed
+    ACT_StageRunner --> CMD_RenderPassage
+    CMD_RenderPassage --> EVT_PassageRendered
+    CMD_RenderPassage --> EVT_RenderFailed
+    ACT_StageRunner --> CMD_RenderFormat
+    CMD_RenderFormat --> EVT_FormatRendered
+    CMD_RenderFormat --> EVT_RenderFailed
+    ACT_StageRunner --> CMD_RenderStill
+    CMD_RenderStill --> EVT_StillRendered
+    ACT_StageRunner --> CMD_CutShort
+    CMD_CutShort --> EVT_ShortCut
+    CMD_CutShort --> EVT_ShortRefused
+    ACT_StageRunner --> CMD_ComposeImage
+    CMD_ComposeImage --> EVT_ImageComposed
+    CMD_ComposeImage --> EVT_ImageCompositionRefused
+    ACT_User --> CMD_LinkProjectMedia
+    CMD_LinkProjectMedia --> EVT_ProjectMediaLinked
+    ACT_StageRunner --> CMD_CheckDeterminism
+    CMD_CheckDeterminism --> EVT_DeterminismChecked
     EVT_StageCompleted --> POL_RunNextStage
     EVT_StageSkipped --> POL_RunNextStage
     POL_RunNextStage --> CMD_StartStage
@@ -372,6 +419,8 @@ flowchart LR
     EVT_StageCompleted --> POL_ImportFinishedCharacters
     EVT_CharacterBibleWritten --> POL_ImportFinishedCharacters
     POL_ImportFinishedCharacters --> CMD_ImportCharacters
+    EVT_ProjectCreated --> POL_LinkNewProjectMedia
+    POL_LinkNewProjectMedia --> CMD_LinkProjectMedia
     EVT_StageStarted -.-> RM_Status
     EVT_StageCompleted -.-> RM_Status
     EVT_StageFailed -.-> RM_Status
@@ -486,6 +535,21 @@ flowchart LR
     RM_UserReferences -.-> ACT_User
     RM_UserReferences -.-> ACT_SetupSkill
     RM_UserReferences -.-> ACT_StageRunner
+    EVT_PreviewRendered -.-> RM_RenderProgress
+    EVT_PassageRendered -.-> RM_RenderProgress
+    EVT_FormatRendered -.-> RM_RenderProgress
+    EVT_RenderFailed -.-> RM_RenderProgress
+    RM_RenderProgress -.-> ACT_User
+    EVT_PreviewRendered -.-> RM_Renders
+    EVT_PassageRendered -.-> RM_Renders
+    EVT_FormatRendered -.-> RM_Renders
+    RM_Renders -.-> ACT_User
+    EVT_FormatRendered -.-> RM_RenderChecks
+    EVT_ShortCut -.-> RM_RenderChecks
+    EVT_ImageComposed -.-> RM_RenderChecks
+    EVT_DeterminismChecked -.-> RM_RenderChecks
+    RM_RenderChecks -.-> ACT_StageRunner
+    RM_RenderChecks -.-> ACT_User
     classDef evt fill:#a3391f,stroke:#e65100,color:#fff
     classDef cmd fill:#64b5f6,stroke:#0d47a1,color:#000
     classDef pol fill:#ce93d8,stroke:#4a148c,color:#000
@@ -832,6 +896,47 @@ flowchart LR
     classDef hs fill:#e57373,stroke:#b71c1c,color:#fff
 ```
 
+### From the resolved storyboard to the videos and images of a release
+
+```mermaid
+flowchart LR
+    ACT_StageRunner(["Stage runner"]):::act
+    CMD_RenderPreview["Render a preview"]:::cmd
+    EVT_PreviewRendered["Preview rendered"]:::evt
+    CMD_RenderFormat["Render a format"]:::cmd
+    EVT_FormatRendered["⭐ Format rendered"]:::evt
+    CMD_RenderStill["Render a still"]:::cmd
+    EVT_StillRendered["Still rendered"]:::evt
+    CMD_CheckDeterminism["Check determinism"]:::cmd
+    EVT_DeterminismChecked["Determinism checked"]:::evt
+    CMD_CutShort["Cut a Short"]:::cmd
+    EVT_ShortCut["⭐ Short cut"]:::evt
+    CMD_ComposeImage["Compose an image"]:::cmd
+    EVT_ImageComposed["⭐ Image composed"]:::evt
+    RM_RenderChecks[("Render checks")]:::rm
+    ACT_StageRunner --> CMD_RenderPreview
+    CMD_RenderPreview --> EVT_PreviewRendered
+    EVT_PreviewRendered --> CMD_RenderFormat
+    CMD_RenderFormat --> EVT_FormatRendered
+    EVT_FormatRendered --> CMD_RenderStill
+    CMD_RenderStill --> EVT_StillRendered
+    EVT_StillRendered --> CMD_CheckDeterminism
+    CMD_CheckDeterminism --> EVT_DeterminismChecked
+    EVT_DeterminismChecked --> CMD_CutShort
+    CMD_CutShort --> EVT_ShortCut
+    EVT_ShortCut --> CMD_ComposeImage
+    CMD_ComposeImage --> EVT_ImageComposed
+    EVT_ImageComposed --> RM_RenderChecks
+    classDef evt fill:#a3391f,stroke:#e65100,color:#fff
+    classDef cmd fill:#64b5f6,stroke:#0d47a1,color:#000
+    classDef pol fill:#ce93d8,stroke:#4a148c,color:#000
+    classDef rm fill:#81c784,stroke:#1b5e20,color:#000
+    classDef act fill:#a3751f,stroke:#f57f17,color:#000
+    classDef ext fill:#f48fb1,stroke:#880e4f,color:#000
+    classDef agg fill:#ffe082,stroke:#ff6f00,color:#000
+    classDef hs fill:#e57373,stroke:#b71c1c,color:#fff
+```
+
 ## Bounded Contexts & Aggregates
 
 | Context | Purpose | Aggregates | Events |
@@ -845,6 +950,7 @@ flowchart LR
 | Series (`BC-Series`) | Keeps a series' umbrella budget and episode plan and creates its episodes, and turns an episode's script into takes, an episode track with speaker stems, subtitles and lip-sync audio – the episode's replacement for the song | Series, Script, Take registry, Episode track | Series created, Episode created, Episode refused, Canon spend recorded, Script written, Script revised, Script validated, Take generated, Ambience generated, Take imported, Voice track stopped, Episode track built, Subtitles written, Lip-sync audio cut |
 | Bibles (`BC-Bibles`) | Holds what a production must look and sound like before any shot is generated – the style bible, the character bible with its character states, the set bible with plates and prop references, and the user references – per music video, or once per series canon that every episode reads and may only add to | Style bible, Character bible, Set bible, User references | Style bible written, Character bible written, Character state added, Set bible written, Plate added, Prop reference added, User reference added, User reference updated, User reference removed, Library character used |
 | Character library (`BC-CharacterLibrary`) | Keeps the workspace's reusable characters across productions – takes the characters of finished character bibles in and copies a character's identity, and the states the user chooses, into a new music video or series canon | Library character | Library character created, Library character extended, Library character updated, Library file added, Library file removed, Library character deleted, Library character use refused |
+| Render (`BC-Render`) | Turns a validated project into its videos and images – a render per format from one composition, previews for checks, Shorts cut from the 9:16 render, and composed images (thumbnails, covers, feed images) from a generated image and the style bible – and keeps a project's media in the media directory | Render, Short, Composed image | Preview rendered, Passage rendered, Format rendered, Still rendered, Render failed, Short cut, Short refused, Image composed, Image composition refused, Project media linked, Determinism checked |
 
 ## Aggregates
 
@@ -867,3 +973,6 @@ flowchart LR
 | Set bible (`AGG-SetBible`) | Bibles | as-is | sets.yaml of a music video or series canon, parsed whole with SetBibleSchema (packages/core/src/schema.ts:496-541); plates in sets/<set>/plates/, props in props/<id>/ beside it<br>written by the style-bible skill in style-character (music video) and by new-series (canon); validated by the hook on every edit (packages/cli/src/validate-file.ts:86-97) |
 | User references (`AGG-UserReferences`) | Bibles | as-is | references.yaml of a project or series canon with ReferencesSchema (packages/core/src/schema.ts:1460-1489), files in assets/references/<br>every change is a read, a change and an atomic save in board-wizard.ts (packages/cli/src/board-wizard.ts:72-178), used by the reference command and the board wizard; validate-file checks unique ids and that every file exists (packages/cli/src/validate-file.ts:234-243) |
 | Library character (`AGG-LibraryCharacter`) | Character library | as-is | library/characters/<id>/character.yaml with LibraryCharacterSchema (packages/core/src/schema.ts:1422-1458) and the character's files beside it; validate-file checks that the id is the folder and that every named file exists (packages/cli/src/validate-file.ts:246-258)<br>every write – import, new, add-file, update, remove – reads the entry, changes it and saves it atomically in character-library.ts (packages/cli/src/character-library.ts:63-66,206-428) |
+| Render (`AGG-Render`) | Render | as-is | one file per format and variant, renders/[preview-]<format>[.en].mp4, written whole – rendered in segments under .cache/render/, joined, the song muxed once, and only then copied over the old file (packages/cli/src/render.ts:182-184,293-445)<br>a whole render of a format – not a preview, not --frames, not --out – is recorded in state.json artifacts as render:<file>:inputs (the hash of the props, the song's bytes and crf 18) and render:<file>:sha256 (render.ts:267-291,431-433); release renders a format again when it is missing or its recorded inputs hash differs from the current one (packages/cli/src/release.ts:237-262) |
+| Short (`AGG-Short`) | Render | as-is | renders/shorts/<name>-9x16.mp4, cut whole by short from renders/9x16.mp4 with one ffmpeg re-encode – crf 18, a 0.15 s fade-in and a 0.4 s fade-out (packages/cli/src/short.ts:22-24,132-175,200-233); its thumbnail and TikTok cover lie beside it as <name>-thumb.jpg and <name>-tiktok.jpg (packages/cli/src/release-files.ts:26-34) |
+| Composed image (`AGG-ComposedImage`) | Render | as-is | one JPEG and its recipe <name>.recipe.json beside it, written by thumbnail in one run – a Remotion still of the Thumbnail composition, encoded at falling JPEG quality until it fits the limit, then the recipe (packages/cli/src/thumbnail.ts:183-217; packages/cli/src/thumbnail-recipe.ts:35-58)<br>five formats with fixed sizes and limits – 16x9 1280x720, 9x16 1080x1920, 3x4 1080x1440, 4x5 1080x1350, 1x1 3000x3000; under 2 MB, under 10 MB for 1x1 (packages/remotion/src/lib/thumbnail.ts:12-18,60-66) |

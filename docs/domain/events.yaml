@@ -15,7 +15,7 @@
 # Slices adopted 2026-11-21: project and stage pipeline (confirmed); human review (confirmed); art-director verdicts and the
 # generation queue (decided by recommendation, not reviewed by the user – see the adoption report); song timing and lyrics
 # (decided by recommendation, four answers from the user); storyboard and generation (decided by recommendation, four answers from the user each).
-# Slices adopted 2026-11-22: series; bibles and the character library (decided by recommendation, four answers from the user each).
+# Slices adopted 2026-11-22: series; bibles and the character library; render (decided by recommendation, four answers from the user each).
 # See docs/domain/adoption-report.md.
 
 version: 1
@@ -51,7 +51,10 @@ external_systems:
     description: Demucs (vocal separation), WhisperX (speech recognition and word alignment), librosa (beats, onsets, energy) and the MelBand-Roformer karaoke model (lead stem), run locally by the song analysis (ADR 0008, 0026)
   - id: EXT-FFmpeg
     name: FFmpeg
-    description: Converts recordings and generated audio to 48 kHz mono WAV, mixes the episode track and the speaker stems, raises the mix to the loudness target and cuts lip-sync audio segments (packages/cli/src/episode-track.ts, media.ts)
+    description: Converts recordings and generated audio to 48 kHz mono WAV, mixes the episode track and the speaker stems, raises the mix to the loudness target and cuts lip-sync audio segments (packages/cli/src/episode-track.ts, media.ts); joins a render's segments and muxes the song, and cuts Shorts (packages/cli/src/render.ts, short.ts)
+  - id: EXT-Remotion
+    name: Remotion and headless Chrome
+    description: Renders the MusicVideo and Thumbnail compositions frame by frame in a headless Chrome; pinned to one exact version (package.json), installed with the workspace, the browser fetched with npx remotion browser ensure (ADR 0007)
 
 bounded_contexts:
   - id: BC-Pipeline
@@ -81,6 +84,9 @@ bounded_contexts:
   - id: BC-CharacterLibrary
     name: Character library
     purpose: Keeps the workspace's reusable characters across productions – takes the characters of finished character bibles in and copies a character's identity, and the states the user chooses, into a new music video or series canon
+  - id: BC-Render
+    name: Render
+    purpose: Turns a validated project into its videos and images – a render per format from one composition, previews for checks, Shorts cut from the 9:16 render, and composed images (thumbnails, covers, feed images) from a generated image and the style bible – and keeps a project's media in the media directory
 
 aggregates:
   - id: AGG-Project
@@ -325,6 +331,47 @@ aggregates:
       - An import keeps the entry's identity, fills in only what is missing and appends references and states; a state id that exists with another image becomes <state>-<slug>; every later import is recorded in the history (the code does this, character-library.ts:206-279)
       - Every file in the entry's folder is named by character.yaml (decided 2026-11-22, HS-132; a re-import with a changed sheet or voice, or a skipped state, leaves an unnamed file – gap register)
       - The library belongs to the user – update and init never overwrite it; its media are gitignored and character.yaml stays tracked (the code does this, packages/cli/src/update.ts:43-45; .gitignore)
+  - id: AGG-Render
+    name: Render
+    context: BC-Render
+    status: as-is
+    evidence:
+      - one file per format and variant, renders/[preview-]<format>[.en].mp4, written whole – rendered in segments under .cache/render/, joined, the song muxed once, and only then copied over the old file (packages/cli/src/render.ts:182-184,293-445)
+      - a whole render of a format – not a preview, not --frames, not --out – is recorded in state.json artifacts as render:<file>:inputs (the hash of the props, the song's bytes and crf 18) and render:<file>:sha256 (render.ts:267-291,431-433); release renders a format again when it is missing or its recorded inputs hash differs from the current one (packages/cli/src/release.ts:237-262)
+    invariants:
+      - Every format of a project is a render of the one MusicVideo composition at the format's size and the master's frame rate; a derivative is rendered again, never cropped from the master (the code does this, packages/remotion/src/Root.tsx:7-24; render.ts:60-71)
+      - The song is the only sound – clips and footage are muted, and the song is muxed once after the segments are joined (the code does this, packages/remotion/src/components/MediaLayer.tsx:78; render.ts:375-429)
+      - A recorded render is the file it records – only a whole render of the format writes renders/<format>.mp4 (decided 2026-11-22, HS-146; a --frames render overwrites it unrecorded – gap register)
+      - A recorded render is current only while everything that decides its pixels and sound is unchanged – the props, the song, the asset files and the renderer's code (decided 2026-11-22, HS-147; the inputs hash leaves out asset bytes and code – gap register)
+      - A preview is never recorded and never goes into the release (the code does this, render.ts:431; release.ts:239-262)
+      - One render of a project runs at a time (decided 2026-11-22, HS-155; only the skill says so, and two renders of the same output share and delete one work folder – gap register)
+  - id: AGG-Short
+    name: Short
+    context: BC-Render
+    status: as-is
+    evidence:
+      - renders/shorts/<name>-9x16.mp4, cut whole by short from renders/9x16.mp4 with one ffmpeg re-encode – crf 18, a 0.15 s fade-in and a 0.4 s fade-out (packages/cli/src/short.ts:22-24,132-175,200-233); its thumbnail and TikTok cover lie beside it as <name>-thumb.jpg and <name>-tiktok.jpg (packages/cli/src/release-files.ts:26-34)
+    invariants:
+      - A Short is cut from the project's 9:16 render – the source is renders/9x16.mp4, 9:16 within 0.01, and the window lies inside it (the code does this, short.ts:200-221)
+      - A Short is at most 60 s and should be 30–50 s – longer is refused, outside 30–50 s only warns (the code does this, short.ts:117-127; release-files.ts:60-65)
+      - The name starts with a letter or digit and has only letters, digits and hyphens (the code does this, short.ts:203)
+      - A Short starts and ends on a section boundary, never mid-word (decided 2026-11-22, HS-149 – short warns; any anchor or second passes today – gap register)
+      - A Short is cut from the current 9:16 render (decided 2026-11-22, HS-148; neither short nor release checks it or cuts again – gap register)
+      - Each video gets three Shorts, each with a 9:16 thumbnail (QA warns with fewer, packages/cli/src/qa.ts:126-174)
+  - id: AGG-ComposedImage
+    name: Composed image
+    context: BC-Render
+    status: as-is
+    evidence:
+      - one JPEG and its recipe <name>.recipe.json beside it, written by thumbnail in one run – a Remotion still of the Thumbnail composition, encoded at falling JPEG quality until it fits the limit, then the recipe (packages/cli/src/thumbnail.ts:183-217; packages/cli/src/thumbnail-recipe.ts:35-58)
+      - five formats with fixed sizes and limits – 16x9 1280x720, 9x16 1080x1920, 3x4 1080x1440, 4x5 1080x1350, 1x1 3000x3000; under 2 MB, under 10 MB for 1x1 (packages/remotion/src/lib/thumbnail.ts:12-18,60-66)
+    invariants:
+      - The image has its format's exact size and stays under the limit, and a 1x1 cover is RGB, or the command fails (the code does this, thumbnail.ts:206-213; packages/cli/src/thumbnail-files.ts:43-58)
+      - The hook is at most three lines of four words; a cover carries artist and title only – no tag, URL, handle, price or platform name (the code does this, packages/remotion/src/lib/thumbnail.ts:84-85; thumbnail.ts:125-129)
+      - The colours come from the style bible's roles – the first slab on primary, the other slabs and the tag on the accent, the text colour by WCAG contrast (the code does this, thumbnail.ts:57-82; packages/remotion/src/lib/thumbnail.ts)
+      - The same image, text and options give the same pixels on the same machine with the pinned Remotion version (the code does this as far as the browser's font measurement is stable, packages/remotion/src/Thumbnail.tsx:28-89; tests/thumbnail-render.test.ts, opt-in)
+      - Every composed image has its recipe, so release can compose more images from the same source (the code does this, thumbnail.ts:213; release.ts reads it)
+      - It reads at a quarter of its size, a cover at 64 px – the art director judges this, no code checks it (decided 2026-11-22, HS-152)
 
 events:
   - id: EVT-ProjectCreated
@@ -678,6 +725,64 @@ events:
     context: BC-CharacterLibrary
     data: [Library character, Target production, Reason]
     description: "The target is an episode (it takes its characters from the series canon), the target has its own character with that id, or a chosen state does not exist; nothing is copied (character-library.ts:452-470)"
+  - id: EVT-PreviewRendered
+    name: Preview rendered
+    aggregate: AGG-Render
+    data: [Format, Scale, Preview file]
+    description: "render --preview: the whole format at half scale and crf 22 as renders/preview-<format>.mp4, never recorded; the assembly stage's output (packages/cli/src/render.ts:182-184,383-385; packages/core/src/state.ts:75-80)"
+  - id: EVT-PassageRendered
+    name: Passage rendered
+    aggregate: AGG-Render
+    data: [Format, Frames, File]
+    description: "render --frames <start>-<end>: a test render of one passage, never recorded; without --out it writes renders/<format>.mp4, the whole render's file (render.ts:301-303,431; HS-146)"
+  - id: EVT-FormatRendered
+    name: Format rendered
+    aggregate: AGG-Render
+    pivotal: true
+    data: [Format, Width, Height, Frame rate, Subtitles, Inputs hash, File hash]
+    description: "A whole render of one format, recorded in state.json (render.ts:267-291,431-433); with --subtitles en the burned-in version renders/<format>.en.mp4, recorded the same way"
+  - id: EVT-StillRendered
+    name: Still rendered
+    context: BC-Render
+    data: [Format, Frame, Scale, Still file]
+    description: "render --still <frame>: one frame as renders/still-<frame>.png; the name has no format and --out is ignored, so a still of another format replaces it (render.ts:316-331)"
+  - id: EVT-RenderFailed
+    name: Render failed
+    aggregate: AGG-Render
+    data: [Render, Error]
+    description: "The progress file keeps the first line of the error; the watch reports render-failed, and render-interrupted after 15 min without progress (packages/cli/src/render-progress.ts:38-45; packages/core/src/watch.ts:104-118)"
+  - id: EVT-ShortCut
+    name: Short cut
+    aggregate: AGG-Short
+    pivotal: true
+    data: [Short name, From, To, Duration, Source render]
+    description: "short --from --to --name cuts renders/shorts/<name>-9x16.mp4 from the 9:16 render (packages/cli/src/short.ts:200-233)"
+  - id: EVT-ShortRefused
+    name: Short refused
+    context: BC-Render
+    data: [Short name, Reason]
+    description: "No 9:16 render, a render that is not 9:16, an empty window or one over 60 s, or a bad name; nothing is written (short.ts:117-127,200-221)"
+  - id: EVT-ImageComposed
+    name: Image composed
+    aggregate: AGG-ComposedImage
+    pivotal: true
+    data: [Image, Format, Source image, Hook, Tag, Layout, Focus, Zoom, Accent, Font, Scrim, Text offset, Recipe]
+    description: "thumbnail: a thumbnail, a Short's thumbnail, a TikTok cover, the cover or a feed image, with its recipe (packages/cli/src/thumbnail.ts:183-217); release composes the announcement, story and feed images from the cover's recipe"
+  - id: EVT-ImageCompositionRefused
+    name: Image composition refused
+    context: BC-Render
+    data: [Image, Reason]
+    description: "Too many lines or words, a layout for a vertical or square format, a cover text with a tag, URL, handle, price or platform name, or no JPEG quality under the limit (thumbnail.ts:117-148,206-213)"
+  - id: EVT-ProjectMediaLinked
+    name: Project media linked
+    context: BC-Render
+    data: [Project, Media directory, Moved]
+    description: "assets/ and renders/ become links into CORESLOPPER_MEDIA_DIR, and the project's .gitignore names them (packages/cli/src/media-dir.ts:41-97)"
+  - id: EVT-DeterminismChecked
+    name: Determinism checked
+    context: BC-Render
+    data: [Frame, First hash, Second hash, Result]
+    description: "qa --determinism <frame>: two stills of one frame at scale 0.25 from one bundle, compared by SHA-256; without the flag QA reports N/A (packages/cli/src/qa.ts:383-417)"
 
 commands:
   - id: CMD-CreateProject
@@ -1168,6 +1273,74 @@ commands:
     aggregate: AGG-LibraryCharacter
     produces: [EVT-LibraryCharacterDeleted]
     description: "character remove or the board; the productions keep their copies"
+  - id: CMD-RenderPreview
+    name: Render a preview
+    actor: ACT-StageRunner
+    aggregate: AGG-Render
+    produces: [EVT-PreviewRendered, EVT-RenderFailed]
+    description: "render <project> [--format <id>] --preview, after validate, in assembly and in every fix pass (workspace/.claude/skills/assembly-render/SKILL.md)"
+    rules:
+      - The project validates first; render runs validateProject (the code does this, packages/cli/src/render.ts:137-180)
+  - id: CMD-RenderPassage
+    name: Render a passage
+    actor: ACT-StageRunner
+    aggregate: AGG-Render
+    produces: [EVT-PassageRendered, EVT-RenderFailed]
+    description: "render <project> --frames <start>-<end> [--out <file>]: the fix pass's first check of a changed range (assembly-render, Review rounds step 4)"
+    rules:
+      - A passage is a preview – never recorded, and written beside the format's render, never over it (decided 2026-11-22, HS-146; without --out it overwrites renders/<format>.mp4 – gap register)
+  - id: CMD-RenderFormat
+    name: Render a format
+    actor: ACT-StageRunner
+    aggregate: AGG-Render
+    produces: [EVT-FormatRendered, EVT-RenderFailed]
+    description: "render <project> [--format <id>] [--subtitles en]; without --format the master. The stage runner renders the master in assembly and every configured format in qa-export; release renders a format again when it is missing or stale (render.ts:293-445; packages/cli/src/release.ts:237-262)"
+    rules:
+      - The format is the master or a configured derivative, one of 16x9, 9x16, 1x1 and 4x5; the size comes from project.yaml, the frame rate is always the master's (the code does this, render.ts:46-71; HS-150)
+      - Subtitles only for an episode with a script, English only, inside the format's safe area (the code does this, packages/cli/src/index.ts:225-227; packages/remotion/src/components/Subtitles.tsx:16-18)
+      - Every asset of a shot lies inside the workspace (the code does this, render.ts:88-96)
+      - The render runs in segments of 60 s that resume after an interruption; a 3D shot renders with concurrency 1 and software GL (the code does this, render.ts:333-369)
+      - Derivatives come after the master passes, one at a time; a shot whose subject leaves a vertical or square frame gets a focus point (skill rule, assembly-render step 6)
+  - id: CMD-RenderStill
+    name: Render a still
+    actor: ACT-StageRunner
+    produces: [EVT-StillRendered]
+    description: "render <project> [--format <id>] --still <frame> [--still-scale <n>]: QA's stills at section boundaries and highlighted words, and one still per shot before a derivative (video-qa step 4; assembly-render step 6)"
+  - id: CMD-CutShort
+    name: Cut a Short
+    actor: ACT-StageRunner
+    aggregate: AGG-Short
+    produces: [EVT-ShortCut, EVT-ShortRefused]
+    description: "short <project> --from <time point> --to <time point> --name <name>, in qa-export; the agent picks the three windows (user, 2026-11-22)"
+    rules:
+      - A time point is a number of seconds or an anchor – section, line, word, beat, downbeat – with an optional offset (the code does this, packages/cli/src/short.ts:39-99)
+      - The window starts and ends on a section boundary and makes sense without the section before it (video-qa; decided 2026-11-22, HS-149 – short warns otherwise; gap register)
+  - id: CMD-ComposeImage
+    name: Compose an image
+    actor: ACT-StageRunner
+    aggregate: AGG-ComposedImage
+    produces: [EVT-ImageComposed, EVT-ImageCompositionRefused]
+    description: "thumbnail <project> --still <image> --text <hook> --out <file> [--format --layout --focus --zoom --accent --font --tag --scrim --text-offset]; the agent picks the image and writes the hook (workspace/.claude/skills/video-qa/thumbnails.md), and the art director judges the result"
+    rules:
+      - The source is a generated image – a keyframe or a reference image – never a frame of a clip (skill rule, thumbnails.md)
+      - The three thumbnails of a video show three different subjects; the user takes one of them as it is (skill rule; user, 2026-11-22)
+  - id: CMD-LinkProjectMedia
+    name: Link a project's media
+    actor: ACT-User
+    produces: [EVT-ProjectMediaLinked]
+    description: "media-link <project> [--move] [--media-dir <template>], and POL-LinkNewProjectMedia when a project is created (packages/cli/src/index.ts:995-1007; packages/cli/src/media-dir.ts:41-97)"
+    rules:
+      - "The media directory is CORESLOPPER_MEDIA_DIR with {slug} replaced by the project's folder name, or the folder name appended (the code does this, media-dir.ts:19-23)"
+      - A folder with content moves only with --move, and a link that points elsewhere is refused (the code does this, media-dir.ts:45-80)
+      - A series canon's folders go to the media directory too (decided 2026-11-22, HS-154; new-series does not link them – gap register)
+  - id: CMD-CheckDeterminism
+    name: Check determinism
+    actor: ACT-StageRunner
+    produces: [EVT-DeterminismChecked]
+    description: "qa <project> --determinism <frame> in qa-export (video-qa step 5)"
+    rules:
+      - Determinism holds on one machine with the pinned Remotion version; it is not promised across machines (decided 2026-11-22, HS-151)
+      - Every QA pass runs the check (decided 2026-11-22, HS-151; only with the flag today – gap register)
 
 policies:
   - id: POL-RunNextStage
@@ -1224,6 +1397,11 @@ policies:
     when: [EVT-StageCompleted, EVT-CharacterBibleWritten]
     then: [CMD-ImportCharacters]
     description: "Code for a music video – stage-done style-character imports every character with a file, and a failure only warns (packages/cli/src/index.ts:786-794); for a series canon a step of the new-series skill (SKILL.md:70). Decided: code for both kinds (HS-131; gap register)"
+  - id: POL-LinkNewProjectMedia
+    name: A new project's media go to the media directory
+    when: [EVT-ProjectCreated]
+    then: [CMD-LinkProjectMedia]
+    description: "createProject links assets/ and renders/ when CORESLOPPER_MEDIA_DIR is set, for a music video and an episode (packages/cli/src/new-project.ts:182-186); new-series does not (HS-154)"
 
 read_models:
   - id: RM-Status
@@ -1347,6 +1525,24 @@ read_models:
     used_by: [ACT-User, ACT-SetupSkill, ACT-StageRunner]
     fields: [Reference id, Kind, File or link, Title, Subject, Note]
     description: "reference list and the board wizard; the setup skills open every file before the first grilling question, the bible and storyboard skills read the kinds they need"
+  - id: RM-RenderProgress
+    name: Render progress
+    fed_by: [EVT-PreviewRendered, EVT-PassageRendered, EVT-FormatRendered, EVT-RenderFailed]
+    used_by: [ACT-User]
+    fields: [Render, Frames done, Frames total, Started at, Updated at, Error]
+    description: "review/progress/<file>.json, written at most every 2 s while a render runs, removed when it finishes, kept with the error when it fails; the board shows it, and the watch reports failed, interrupted and ready renders (packages/cli/src/render-progress.ts:9-46; packages/cli/src/board-production.ts:204-221; packages/core/src/watch.ts:104-118)"
+  - id: RM-Renders
+    name: Renders
+    fed_by: [EVT-PreviewRendered, EVT-PassageRendered, EVT-FormatRendered]
+    used_by: [ACT-User]
+    fields: [Render, Modified]
+    description: "The video files at the top of renders/, listed by the board's production and review views (board-production.ts:147-158); Shorts in renders/shorts/ are not listed (HS-28)"
+  - id: RM-RenderChecks
+    name: Render checks
+    fed_by: [EVT-FormatRendered, EVT-ShortCut, EVT-ImageComposed, EVT-DeterminismChecked]
+    used_by: [ACT-StageRunner, ACT-User]
+    fields: [Master render, Formats, Thumbnails, Shorts, Short thumbnails, Determinism]
+    description: "qa's render checks in review/report.md: the master exists (FAIL), each derivative exists (WARN), three valid 1280x720 JPEGs in renders/thumbnails/, three Shorts of at most 60 s with a 9x16 thumbnail, and determinism (packages/cli/src/qa.ts:107-174,350-417); none checks that a render is current (HS-147)"
 
 hotspots:
   - id: HS-1
@@ -2059,6 +2255,101 @@ hotspots:
     refs: [AGG-LibraryCharacter]
     status: resolved
     resolution: "Later: the CLI covers it, and the user has not used the library yet – gap, low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-143
+    question: "Render, previews, Shorts, thumbnails and the media directory: one context or several?"
+    refs: [BC-Render]
+    status: resolved
+    resolution: "One context, Render: everything that turns a validated project into its videos and images, and where they are kept. Release, upload texts and publishing stay outside (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-144
+    question: "Which consistency boundaries does the code show?"
+    refs: [AGG-Render, AGG-Short, AGG-ComposedImage]
+    status: resolved
+    resolution: "Three as-is aggregates: a render (one file per format and variant with its record in state.json), a Short (one file cut whole) and a composed image (the JPEG and its recipe). Stills, the media links and the progress file are no aggregates (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-145
+    question: "Master, derivative, preview, test render, still, cover, composed image, media drive: which words are domain terms?"
+    refs: [AGG-Render, AGG-ComposedImage, CMD-LinkProjectMedia]
+    status: resolved
+    resolution: "New: Master Format, Derivative Format, Render Record, Composed Image, Media Directory. Preview covers a half-scale render, a passage (--frames) and a single frame (--still) – none is recorded or released. Render is one whole format. 'media drive' and 'test render' are avoided (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-146
+    question: "render --frames without --out writes renders/<format>.mp4, the recorded render's file, without recording it. release then takes the passage as the current render and only warns that the hash differs. Rule?"
+    refs: [AGG-Render, CMD-RenderPassage]
+    status: resolved
+    resolution: "A passage is a preview: it gets its own file and never replaces a whole render. Gap, high – the fix pass renders a passage after every review round, and release can place it in the release folder (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-147
+    question: "The inputs hash that decides whether a render is current covers the props, the song and crf, but not the bytes of the assets or the renderer's code; QA and short check only that the file exists. Rule?"
+    refs: [AGG-Render, RM-RenderChecks]
+    status: resolved
+    resolution: "A render is current while the props, the song, the asset files and the renderer's code are unchanged; release, QA and short use the same check. Gap, medium (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-148
+    question: "A Short is cut from renders/9x16.mp4 without checking that the render is current, and release never cuts again, so a Short can show an older video. Rule?"
+    refs: [AGG-Short]
+    status: resolved
+    resolution: "A Short records the 9:16 render it was cut from; release cuts it again, or reports it, when that render changed. Gap, medium – the agent picks the Shorts and the user wants every social channel now (user, 2026-11-22) (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-149
+    question: "The glossary and video-qa say a Short is cut on section boundaries and never mid-word; short accepts any anchor or second. Enforce?"
+    refs: [AGG-Short, CMD-CutShort]
+    status: resolved
+    resolution: "short warns when a window does not start and end on a section boundary; it does not refuse. Gap, low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-150
+    question: "A derivative renders at the master's frame rate and ignores its own fps; the format ids are four fixed values, but FormatSchema accepts any aspect, and the lists sit in render.ts, Remotion's types and the thumbnail formats. Rule?"
+    refs: [AGG-Render, CMD-RenderFormat]
+    status: resolved
+    resolution: "Every format of a project has the master's frame rate – intended; a derivative's own fps should be refused or dropped. The format ids are one closed list in core. Gap, low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-151
+    question: "ADR 0007 says determinism is enforced and frame-hash tests prove it; QA runs the check only with --determinism, in one process, and CI hashes only thumbnails. What is promised?"
+    refs: [CMD-CheckDeterminism, EVT-DeterminismChecked]
+    status: resolved
+    resolution: "Determinism holds on one machine with the pinned Remotion version, not across machines. QA runs the check on every pass. Gap, low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-152
+    question: "The glossary says a Thumbnail is not a cover, but the cover, the TikTok covers and the feed images are made by the thumbnail command with the same rules and a recipe. One term or several? And is 'readable at 320x180' checked?"
+    refs: [AGG-ComposedImage, CMD-ComposeImage]
+    status: resolved
+    resolution: "Thumbnail and Cover stay separate terms for what an image represents; Composed Image is the term for every image the command makes. Readability is the art director's judgement; MIN_READABLE_SIZE is unused – dead, low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-153
+    question: "style.motion.easing is in the schema and the style bible, but no component reads it; Backdrops hard-code their easing. Keep?"
+    refs: [AGG-Render]
+    status: resolved
+    resolution: "Dead: remove it until a component reads it, like blend (HS-80). Gap, low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-154
+    question: "A new music video or episode links its media into CORESLOPPER_MEDIA_DIR; a new series does not, so the canon's sheets, plates and props stay in the workspace. Rule?"
+    refs: [CMD-LinkProjectMedia, POL-LinkNewProjectMedia]
+    status: resolved
+    resolution: "A series canon's folders go to the media directory as well. Gap, medium – the user keeps media in a separate folder (user, 2026-11-22) (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-155
+    question: "Nothing stops two renders of one project: two renders of the same output share and delete one work folder, and recordRender saves state.json without a lock (G-1). Rule?"
+    refs: [AGG-Render]
+    status: resolved
+    resolution: "One render of a project at a time, held by a lock like the queue's. Gap, low – the skill already renders one after another (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-156
+    question: "Logic exists twice: colour resolution (core palette for the video, a strict copy in thumbnail.ts), the format lists, the render artifact key (a literal in release.ts), crf 18 (in the render and in the hash), 3D detection by component name. Rule?"
+    refs: [AGG-Render, AGG-ComposedImage]
+    status: resolved
+    resolution: "One source each: colours and format ids in core, the artifact keys and encoder settings in render.ts. Gap, low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-157
+    question: "render --still writes renders/still-<frame>.png for every format and ignores --out; thumbnail copies its source into .cache/thumbnail/ and never removes it. Fix?"
+    refs: [CMD-RenderStill, CMD-ComposeImage]
+    status: resolved
+    resolution: "A still is named by format and frame and honours --out; the thumbnail cache is cleaned like the render work folder. Gap, low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-158
+    question: "The CLI imports Remotion's source by relative path, and eleven Remotion files import types from @coreslopper/core's main entry, while the conventions say Remotion uses core/browser only. Intended?"
+    refs: [BC-Render]
+    status: resolved
+    resolution: "Intended: the CLI owns all input and output and reaches Remotion's types, layout helpers and webpack override by relative path; Remotion takes runtime values only from core/browser, and type imports from core are erased. The conventions say so now (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-159
+    question: "The glossary term Animatic (a timed preview of the storyboard before final assets) has no code or skill. Keep it?"
+    refs: [BC-Render]
+    status: resolved
+    resolution: "No: remove it from the glossary; a Preview covers what the project renders before the master (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-160
+    question: "Texts drifted: ADR 0007 (a composition per format), ADR 0018, the Remotion README and types (two or three thumbnail formats, the repository as publicDir), assembly-render (a 1920x1080 master, --format 16x9 steps, the advice to mute clips, 9:16 and 1:1 without 4:5), remotion-motion (no MOTION_COMPONENTS, no 4:5), video-qa ('16:9 master'). Fix?"
+    refs: [BC-Render]
+    status: resolved
+    resolution: "Yes, as one text fix; ADRs 0007 and 0018 stay as they are and ADR 0044 amends them. Gap, medium – the master is not always 16:9 and every social format is used from now on (user, 2026-11-22) (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-161
+    question: "Does the render slice need an ADR beside 0007 and 0018?"
+    refs: [BC-Render]
+    status: resolved
+    resolution: "ADR 0044 (proposed) records one composition for every format, derivatives re-rendered with focus points, the render record and when a render is current, previews never recorded, Shorts cut from the current 9:16 render, one command for every composed image with its recipe, determinism per machine and version, and the media directory; it amends 0007 and 0018 (recommendation, not reviewed by the user – delegated, 2026-11-22)"
 
 flows:
   - id: FLOW-AutonomousStage
@@ -2091,3 +2382,6 @@ flows:
   - id: FLOW-ContinuityReferences
     name: From the treatment to approved continuity references
     sequence: [ACT-StageRunner, CMD-WriteSetBible, EVT-SetBibleWritten, CMD-AddCharacterState, EVT-CharacterStateAdded, CMD-AddQueueItem, EVT-QueueItemAdded, CMD-RunQueue, EVT-AttemptGenerated, POL-JudgeEveryAttempt, CMD-GiveVerdict, EVT-VerdictGiven, CMD-ApplyVerdict, EVT-AttemptFiled]
+  - id: FLOW-Render
+    name: From the resolved storyboard to the videos and images of a release
+    sequence: [ACT-StageRunner, CMD-RenderPreview, EVT-PreviewRendered, CMD-RenderFormat, EVT-FormatRendered, CMD-RenderStill, EVT-StillRendered, CMD-CheckDeterminism, EVT-DeterminismChecked, CMD-CutShort, EVT-ShortCut, CMD-ComposeImage, EVT-ImageComposed, RM-RenderChecks]

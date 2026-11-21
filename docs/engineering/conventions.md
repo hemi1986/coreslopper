@@ -1,6 +1,6 @@
 # Engineering conventions – coreslopper
 
-> How the code is built here, recovered by `/adopt` (slices: project and stage pipeline; human review; generation queue and verdicts; timing; storyboard; generation – 2026-11-21). The ADRs
+> How the code is built here, recovered by `/adopt` (slices: project and stage pipeline; human review; generation queue and verdicts; timing; storyboard; generation – 2026-11-21; series; bibles and the character library; render – 2026-11-22). The ADRs
 > decide WHAT; this file says HOW. Sections other slices own are marked as such. When code and this file
 > disagree, raise it – don't silently follow either.
 
@@ -10,13 +10,13 @@
 |---|---|---|
 | `packages/core/src/` | Zod schemas (`schema.ts`, the source of truth, ADR 0004), state machine (`state.ts`), project loader (`project.ts`), budget checks (`cost.ts`), pure read models (`production.ts`), timing, hashes, errors | nothing outside core |
 | `packages/providers/src/` | generation, publish and post adapters, the cache/manifest runner | core |
-| `packages/remotion/src/` | Remotion compositions and motion components | core (`@coreslopper/core/browser` only) |
+| `packages/remotion/src/` | Remotion compositions and motion components: pure functions of props and frame, no file access | core: runtime values from `@coreslopper/core/browser` only; `import type` from `@coreslopper/core` is erased and allowed |
 | `packages/cli/src/` | every command (`index.ts` wires them), the board server and its static page (`board/*.js`), the watchdog | core, providers, remotion |
 | `scripts/` | Python helpers (audio analysis, review player) and the runtime build | – |
 | `workspace/` | the workspace root: media skills, agents, commands, hook | – |
 
 Packages resolve each other through `tsconfig.json` `paths` and the matching `resolve.alias` in
-`vitest.config.ts`, not through manifest dependencies. `cli` reaches `remotion` with a relative path.
+`vitest.config.ts`, not through manifest dependencies. `cli` reaches `remotion` with a relative path (`src/types.ts`, `src/lib/thumbnail.ts`, `webpack-override.ts`; `bundle()` takes `src/index.ts`); `remotion` has no `exports` field (HS-158).
 
 ## Monorepo and shared libraries
 
@@ -61,6 +61,17 @@ state in memory), one core transition (`setStageRunning`, `setStageDone`, `setSt
   reference kinds are repeated in the CLI and the board's JS (G-132). Library, `references.yaml` and character-use
   writes are atomic but unlocked (G-130). An episode's bibles are the canon's: read them through `loadProject`,
   never from the episode folder.
+- Rendering: the CLI owns all input, output and encoding. `buildVideoProps` (`packages/cli/src/render.ts`) turns
+  the validated project into serializable props, `stagePublicDir` links only the referenced folders into a staged
+  public dir, `bundle()` and `renderMedia`/`renderStill` from `@remotion/*` do the frames, ffmpeg (`resolveBinary`,
+  `.tools/ffmpeg/` first) joins segments and muxes the song. Work files stay in `.cache/render/`; only the finished
+  file is copied into `renders/`, which may be a link into the media directory. Limits come from
+  `CORESLOPPER_RENDER_CONCURRENCY`, `CORESLOPPER_VIDEO_CACHE_MB`, `CORESLOPPER_MEDIA_CACHE_MB` and
+  `CORESLOPPER_SEGMENT_SECONDS`. A whole render records its inputs and file hash in `state.json` through
+  `renderArtifactKeys`; read them through that function, not a literal (G-147). Renders take no lock (HS-155).
+- Composed images: `thumbnail.ts` builds `ThumbnailProps` and renders one still of `Thumbnail`; layout and colour
+  maths are pure functions in `packages/remotion/src/lib/thumbnail.ts`, and every image gets its recipe. Remotion
+  is pinned to one exact version in `package.json`; determinism is promised per machine and version (HS-151).
 - Long-running work is a background process with its own lock file and a `wait` command (`queue run` /
   `queue wait`, `assets/queue.lock`); a stage runner starts it with the Bash tool's `run_in_background`.
 - Agent judgement inside a command runs headless: `claude -p --agent <name> --json-schema <schema>`
@@ -145,4 +156,10 @@ directory. `tests/helpers/release-fixture.ts` builds release projects.
 | Keyframe references | `shotReferences(project, shot)` on an inline `LoadedProject` and `Shot` with files in a temp folder | unit | `tests/character-characterization.test.ts` |
 | Episode audio | `voiceTrack`, `importTakes`, `episodeTrack` on a temp copy of the demo canon and episode, mock provider; skipped without ffmpeg | integration | `tests/episode-track.test.ts` |
 | Provider adapter | the adapter with a fake `fetchImpl` (cloud) or a fake ComfyUI server | unit | `tests/fal-provider.test.ts`, `tests/topview.test.ts`, `tests/comfyui.test.ts` |
+| Render props and formats | `buildVideoProps`, `formatConfig`, `masterFormatId`, `outputPath`, `renderInputsHash` on an inline config or the demo projects | unit | `tests/episode-render.test.ts`, `tests/render-characterization.test.ts` |
+| Short window | `parseTimePoint`, `shortWindow`, `shortFfmpegArgs` on an inline `Timing` | unit | `tests/release.test.ts` |
+| Composed-image layout | the pure functions of `packages/remotion/src/lib/thumbnail.ts`, `buildThumbnailProps`, `thumbnailProblems` on a JPEG header | unit | `tests/thumbnail.test.ts`, `tests/render-characterization.test.ts` |
+| Thumbnail recipe | `writeRecipe` / `readRecipe` on a temp copy of a project | integration | `tests/render-characterization.test.ts` |
+| Media directory | `mediaDirFor`, `linkProjectMedia(dir, { mediaDir })` in a temp folder | integration | `tests/media-dir.test.ts` |
+| Remotion render | a real still or JPEG; opt-in with `CORESLOPPER_RENDER_TESTS=1` (needs Chrome) | integration | `tests/thumbnail-render.test.ts` |
 | Agent instruction | not testable deterministically | – | `workspace/.claude/commands/video-next.md` |

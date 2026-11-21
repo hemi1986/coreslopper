@@ -1349,3 +1349,228 @@ thumbnails, Shorts and the media dir. These are the readers of the style bible's
 | HS-140 | ADR 0043 | recommendation | `docs/adr/0043-bibles-and-character-identity.md` |
 | HS-141 | Drifted texts fixed together | recommendation | G-134 |
 | HS-142 | Board import options later | recommendation; low | G-135 |
+
+# Adoption – render
+Date: 2026-11-22 · Commit: e5a39c3 · Slice: renders per format, previews, Shorts, composed images (thumbnails, covers, feed images) and the media directory, with the shared library `packages/remotion` (concept `render`) · Analysts: 3 lenses
+
+## Scope
+
+- **Slice:**
+  - remotion (shared library): `MusicVideo.tsx`, `Thumbnail.tsx`, `Root.tsx`, `fonts.ts`, `types.ts`,
+    `lib/thumbnail.ts`, `components/*`, `remotion.config.ts`, `webpack-override.ts`, README;
+  - core: `FormatSchema` and `formats`, the style bible's renderer fields (roles, typography, motion) in
+    `schema.ts`; `palette.ts`; `browser.ts`;
+  - cli: `render.ts`, `render-progress.ts`, `short.ts`, `thumbnail.ts`, `thumbnail-files.ts`,
+    `thumbnail-recipe.ts`, `media-dir.ts`; the render helpers of `media.ts`; QA's render checks in `qa.ts`; the
+    Short helpers in `release-files.ts`; the `render`, `thumbnail`, `short`, `media-link` and `qa` commands;
+  - workspace: the skills `assembly-render`, `video-qa` (`SKILL.md`, `thumbnails.md`) and `remotion-motion`.
+- **Out of scope:**
+  - the release package and folder, `release.md`, upload texts and data, the feed post's format: slice `release`;
+  - the watch round and the board container: slice `publish`; `init`, `update`, `migrate-layout`, the runtime
+    build: slice `workspace`;
+  - the timing helpers in `packages/remotion/src/lib/timing.ts` and `hooks/useTiming.ts`: already adopted
+    (timing); the storyboard's terms in `ShotRenderer.tsx` (G-73, G-75, G-77, G-80, G-83): already adopted
+    (storyboard).
+- **Intent:** domain model, as for the earlier slices. **Language:** artifacts `en`, UI `en`.
+- **Since the last slice:** no code change. `slice.ts --cluster thumbnail` and `--cluster media` found the seeds;
+  the scope was completed by hand from the commands and their callers.
+
+| Layer | Files |
+|---|---|
+| remotion (shared library) | compositions, components, `lib/thumbnail.ts`, `types.ts`, `fonts.ts`, config |
+| core (domain) | `FormatSchema`, style renderer fields in `schema.ts`; `palette.ts`; `browser.ts`; `assembly` and `qa-export` in `state.ts` |
+| cli (application) | `render.ts`, `render-progress.ts`, `short.ts`, `thumbnail*.ts`, `media-dir.ts`, render helpers in `media.ts`, render checks in `qa.ts`, Short helpers in `release-files.ts` |
+| workspace (orchestration) | `assembly-render`, `video-qa` (`SKILL.md`, `thumbnails.md`), `remotion-motion` |
+| tests | `episode-render`, `thumbnail`, `thumbnail-render` (opt-in), `media-dir`, `brand-palette`, `lyric-display`, `board-watch`, Short parts of `release` |
+
+## How this slice was decided
+
+As in the earlier slices, there were no code-level questions. Every technical hotspot was decided by the
+recommendation and is marked "not reviewed by the user – delegated". The user answered four questions about how
+they work:
+1. They upload the 16:9 video; 9:16 so far only as Shorts. They have not used 1:1 yet, because Instagram was not
+   ready, but they want to serve every social channel from now on.
+2. They take one of the three thumbnails as it is.
+3. The agent picks the Shorts.
+4. Their media live in a separate folder (`CORESLOPPER_MEDIA_DIR`).
+
+How the answers shaped the model:
+- Answer 1 makes every derivative format a real output. The skill texts that assume a 16:9 master or leave out
+  4:5 become a medium gap (G-141).
+- Answers 2 and 3 put the agent's judgement first: the composed image's readability stays with the art director,
+  and a Short that shows an older video is a medium gap, because nobody looks (G-139).
+- Answer 4 makes the canon missing from the media directory a medium gap (G-140).
+
+ADR 0044 stays `Proposed`.
+
+## What the repository is (facts)
+
+- **One composition.** `MusicVideo` renders every format, sized by props through `calculateMetadata`.
+  `Thumbnail` renders one frame in five formats. ADR 0007's "a composition per format" is stale.
+- **Formats.** There are four ids: 16x9, 9x16, 1x1 and 4x5. The master id comes from `formats.master.aspect`. A
+  derivative takes its own size but always the master's fps. The defaults are a 16:9 master with 9:16 and 1:1.
+- **Render.** The output is `renders/[preview-]<format>[.en].mp4`.
+  - A preview is half scale at crf 22; a whole render is crf 18.
+  - It renders in 60 s segments that resume, under `.cache/render/`. ffmpeg joins them and muxes the song.
+  - Concurrency is 2–4, or 1 with software GL for a 3D shot.
+  - Assets must lie inside the workspace. Clips and footage are muted.
+- **Render record.** A whole render writes `render:<file>:inputs` (props, song bytes, crf) and
+  `render:<file>:sha256` into `state.json`. `release` renders a missing or stale format again. `--frames` without
+  `--out` writes the whole render's file and records nothing.
+- **Progress.** `review/progress/<file>.json` is written every 2 s. It is removed on success and kept with the
+  error on failure. The board shows it; the watch reports failed, interrupted and ready renders.
+- **Shorts.** `short` cuts `renders/9x16.mp4` with a re-encode: crf 18, fades of 0.15 s and 0.4 s. Over 60 s is
+  refused; outside 30–50 s warns. It accepts any anchor. Nothing ties a Short to its source render.
+- **Composed images.** The `thumbnail` command makes five formats with exact sizes and size limits: 1280x720,
+  1080x1920, 1080x1440, 1080x1350, and the cover at 3000x3000 in RGB.
+  - The hook has at most three lines of four words. The cover refuses a tag and link text.
+  - Colours come from the style bible's roles, and the text colour is picked by WCAG contrast.
+  - The JPEG quality steps down until the image fits. A recipe lies beside it.
+  - `MIN_READABLE_SIZE` is unused.
+- **QA.**
+  - The master render is required (FAIL), and each derivative is checked (WARN).
+  - It expects three 1280x720 thumbnails, and three Shorts with their 9x16 thumbnails.
+  - Determinism is checked only with `--determinism`.
+- **Media directory.** `CORESLOPPER_MEDIA_DIR`, where `{slug}` is the folder name. `createProject` and
+  `media-link` turn `assets/` and `renders/` into links; `new-series` does not.
+- **Architecture.**
+  - The CLI imports Remotion's source by relative path. Remotion takes runtime values only from `core/browser`.
+  - Remotion is pinned to 4.0.541 as a devDependency and installed with the workspace.
+  - There are no locks.
+  - Colour resolution, format lists and the record keys exist twice.
+- **History.** 196 commits, low churn: segments and media dir `b133e35`, thumbnails `7027d42`, progress
+  `e7c2599`. There are no reverts or TODOs.
+
+## Domain model (decided by recommendation)
+
+- **Context:** `BC-Render` – Render: a project's videos and images, and where they are kept.
+- **Aggregates (all `as-is`):**
+  - `AGG-Render`:
+    - one composition for every format at the master's frame rate, derivatives never cropped;
+    - the song the only sound;
+    - a recorded render is its file;
+    - current while props, song, asset files and code are unchanged;
+    - a preview never recorded;
+    - one render at a time.
+  - `AGG-Short`:
+    - cut from the 9:16 render, at most 60 s, 30–50 s expected;
+    - on section boundaries;
+    - from the current render;
+    - three per video.
+  - `AGG-ComposedImage`:
+    - exact size and limit, an RGB cover;
+    - hook and cover text limits;
+    - style-bible colours;
+    - same inputs, same pixels on one machine;
+    - always a recipe;
+    - readability judged by the art director.
+- **Commands:** render a preview, a passage, a format and a still; cut a Short; compose an image; link a project's
+  media; check determinism.
+- **Policy:** a new project's media go to the media directory (`POL-LinkNewProjectMedia`).
+- **Read models:** render progress, renders, render checks. **Flow:** `FLOW-Render`.
+- **Glossary:**
+  - New: **Master Format**, **Derivative Format**, **Render Record**, **Composed Image**, **Media Directory**.
+  - Sharpened: **Render** (one whole format, never a crop), **Preview** (half scale, passage or frame; never
+    recorded or released), **Thumbnail** (a composed image; the user picks one), **Short** (from the current 9:16
+    render, picked by the agent), **Cover** (a composed image), **Thumbnail Recipe** (beside every composed image).
+  - Removed: **Animatic** (no code or skill uses it).
+- **ADR:** 0044 (Proposed), which amends 0007 and 0018.
+
+## Package documentation written
+
+- `.claude/rules/render.md` – path-scoped slice doc, including `packages/remotion/**`. It is the one mechanism for
+  the shared library too, so there is no package `AGENTS.md`. Nothing is left `[OPEN]`.
+- `docs/engineering/conventions.md`:
+  - Remotion's import rule as practised;
+  - how a render and a composed image run;
+  - six seams (render props and formats, Short window, composed-image layout, recipe, media directory, the
+    opt-in Remotion render).
+- `docs/architecture/data-model.md`, `docs/domain/context-map.as-is.md` – the three aggregates, `BC-Render`, and
+  the edges that pointed to "Render – not adopted".
+
+## Contradictions found and how they were resolved
+
+| Contradiction | Resolution |
+|---|---|
+| ADR 0007: a composition per format (16x9, 9x16, 1x1), versus one `MusicVideo` sized by props, plus 4x5 | one composition (ADR 0044) |
+| ADR 0007: frame-hash tests prove determinism, versus a flag-only QA check and thumbnail-only CI hashes | per machine and version, checked every QA pass (G-144) |
+| Glossary: a cover is not a thumbnail, versus the cover made by `thumbnail --format 1x1` | Composed Image for both; Thumbnail and Cover name what the image represents |
+| ADR 0018, README, `types.ts`: one to three thumbnail sizes, versus five | five composed-image formats (G-141) |
+| Glossary Preview "low-resolution or short", versus `--frames` writing the whole render's file | a passage is a preview with its own file (G-137) |
+| Glossary and `video-qa`: Shorts on section boundaries, versus any anchor | `short` warns (G-142) |
+| `release` re-renders stale formats, versus Shorts never cut again | a Short belongs to its 9:16 render (G-139) |
+| Render record "everything that decides the pixels", versus no asset bytes or code | asset files and code count (G-138) |
+| `assembly-render`: a 1920x1080 master and `--format 16x9`, versus the configurable master (same skill, Episodes) | text fix (G-141) |
+| `assembly-render`: "forgetting to mute AI clips", versus always muted in code | text fix (G-141) |
+| README: add to `MOTION_COMPONENTS`, versus `remotion-motion` naming only the switch | both (slice doc, G-141) |
+| Conventions: Remotion imports only `core/browser`, versus type imports from core's main entry | type imports are erased and allowed (conventions) |
+| `style.motion.easing` in the schema, versus no reader | dead (G-145) |
+| `video-qa`: "the six thumbnails and the cover" | three for the video plus one per Short; no contradiction |
+
+## Rules and checks
+
+| Rule | Enforcement | State |
+|---|---|---|
+| Every format renders at the master's frame rate | `tests/render-characterization.test.ts`, `tests/episode-render.test.ts` | green |
+| The props carry the resolved shots, effective timing and bibles, serializable, with relative font paths | `tests/render-characterization.test.ts` | green |
+| The render record is two `state.json` artifacts; the inputs hash follows the props and the song's bytes | `tests/render-characterization.test.ts` | green |
+| A composed image keeps its recipe beside it, defaults left out; a broken recipe reads as none | `tests/render-characterization.test.ts` | green |
+| A composed image has its format's size and stays under the limit; only the cover must be RGB | `tests/render-characterization.test.ts` | green |
+| Short windows, limits, fades and names; thumbnail text, layout and colours; the media directory; render names and safe areas | existing `tests/release.test.ts`, `thumbnail.test.ts`, `media-dir.test.ts`, `episode-render.test.ts` | green |
+| Same inputs give the same thumbnail pixels | `tests/thumbnail-render.test.ts` (opt-in, `CORESLOPPER_RENDER_TESTS=1`) | green in CI |
+| The slice stays inside the package import direction | slice 1 boundary rule and `tests/package-boundaries.test.ts` | green |
+| Passages never over a render, a complete render record, Shorts tied to their render, the canon in the media directory, section boundaries, determinism every pass, one render at a time | documentation until stories build them (G-137–G-148) | – |
+
+## Gap register (candidates – stories only with --stories)
+
+13 candidates, G-137 to G-149, in `docs/domain/gap-register.md`:
+- 8 *exist but contradict*. The highest are G-137 (a passage overwrites the recorded render, high), G-138 (the
+  record misses assets and code) and G-141 (drifted skill texts), both medium.
+- 4 are *missing*: G-139 (Shorts tied to their render) and G-140 (the canon in the media directory), both medium;
+  G-146 (a render lock) and G-149 (tests), both low.
+- 1 is *dead*: G-145 (`style.motion.easing`, `MIN_READABLE_SIZE`).
+
+## Deliberately left alone
+
+- Production code, the skills, and ADRs 0007 and 0018, which are accepted. ADR 0044 amends them. Only the glossary
+  was corrected.
+- The release folder, the feed post's format (1:1 by default, 4:5 optional), the announcement images and
+  `release.md`: the release slice.
+- The watch round's render events and the board container's media mount: the publish slice. `migrate-layout`
+  following media links: the workspace slice.
+- The storyboard's render gaps (G-73, G-75, G-77, G-80, G-83): already recorded by the storyboard slice.
+- `resolveBinary` using `which` (POSIX only), and the example-font fallback: platform details, not domain.
+- The Remotion licence (`docs/THIRD_PARTY.md`): unchanged.
+
+## Open hotspots
+
+None. HS-143 to HS-161 are resolved, four of them partly by the user's answers.
+
+## Next slice
+
+`release` per the adoption plan: the release package and folder, texts, images, microsite, QA, the calendar, the
+board's release view and approval. It reads this slice's render records, Shorts and recipes.
+
+## Decision log
+
+| # | Decision | How | Written to |
+|---|---|---|---|
+| HS-148 | A Short belongs to the 9:16 render it was cut from; release cuts again or reports | user (the agent picks Shorts; every social channel from now on, 2026-11-22) and recommendation; medium | `AGG-Short`, ADR 0044, G-139 |
+| HS-152 | Composed Image for every image of the command; readability by the art director | user (takes one thumbnail as it is) and recommendation | glossary, `AGG-ComposedImage`, G-145 |
+| HS-154 | A series canon goes to the media directory too | user (media in a separate folder) and recommendation; medium | `CMD-LinkProjectMedia`, ADR 0044, G-140 |
+| HS-160 | Drifted texts fixed together | user (every social format from now on) and recommendation; medium | G-141 |
+| HS-143 | One context, Render | recommendation | `BC-Render` |
+| HS-144 | Three as-is aggregates: render, Short, composed image | recommendation | the three aggregates |
+| HS-145 | Master Format, Derivative Format, Render Record, Composed Image, Media Directory; Preview covers passages and frames | recommendation | glossary |
+| HS-146 | A passage is a preview with its own file | recommendation; high | `AGG-Render`, `CMD-RenderPassage`, ADR 0044, G-137 |
+| HS-147 | A render is current while props, song, asset files and code are unchanged; one check for release, QA and short | recommendation; medium | `AGG-Render`, glossary (Render Record), ADR 0044, G-138 |
+| HS-149 | `short` warns off a section boundary | recommendation; low | `AGG-Short`, `CMD-CutShort`, G-142 |
+| HS-150 | Every format at the master's frame rate; one closed list of format ids in core | recommendation; low | `CMD-RenderFormat`, G-143 |
+| HS-151 | Determinism per machine and pinned version; QA checks it every pass | recommendation; low | `CMD-CheckDeterminism`, ADR 0044, G-144 |
+| HS-153 | `style.motion.easing` removed until a component reads it | recommendation; low | G-145 |
+| HS-155 | One render of a project at a time, by a lock | recommendation; low | `AGG-Render`, ADR 0044, G-146 |
+| HS-156 | One source for colours, format ids, record keys and encoder settings | recommendation; low | conventions, G-147 |
+| HS-157 | Stills named by format and frame; the thumbnail cache cleaned | recommendation; low | G-148 |
+| HS-158 | The CLI reaches Remotion by relative path; Remotion's runtime imports from `core/browser` only | recommendation | conventions |
+| HS-159 | Animatic removed from the glossary | recommendation | glossary |
+| HS-161 | ADR 0044 | recommendation | `docs/adr/0044-render-records-and-composed-images.md` |

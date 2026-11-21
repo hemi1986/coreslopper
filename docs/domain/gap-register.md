@@ -24,6 +24,9 @@
 | GAP-AGG-SetBible | as-is boundary | [AGG-SetBible](events.yaml) | [BC-Bibles](context-map.as-is.md#bc-bibles--bibles) | – | sets.yaml of a music video or series canon, parsed whole with SetBibleSchema (packages/core/src/schema.ts:496-541); plates in sets/<set>/plates/, props in props/<id>/ beside it<br>written by the style-bible skill in style-character (music video) and by new-series (canon); validated by the hook on every edit (packages/cli/src/validate-file.ts:86-97) | Decide the target boundary |
 | GAP-AGG-UserReferences | as-is boundary | [AGG-UserReferences](events.yaml) | [BC-Bibles](context-map.as-is.md#bc-bibles--bibles) | – | references.yaml of a project or series canon with ReferencesSchema (packages/core/src/schema.ts:1460-1489), files in assets/references/<br>every change is a read, a change and an atomic save in board-wizard.ts (packages/cli/src/board-wizard.ts:72-178), used by the reference command and the board wizard; validate-file checks unique ids and that every file exists (packages/cli/src/validate-file.ts:234-243) | Decide the target boundary |
 | GAP-AGG-LibraryCharacter | as-is boundary | [AGG-LibraryCharacter](events.yaml) | [BC-CharacterLibrary](context-map.as-is.md#bc-characterlibrary--character-library) | – | library/characters/<id>/character.yaml with LibraryCharacterSchema (packages/core/src/schema.ts:1422-1458) and the character's files beside it; validate-file checks that the id is the folder and that every named file exists (packages/cli/src/validate-file.ts:246-258)<br>every write – import, new, add-file, update, remove – reads the entry, changes it and saves it atomically in character-library.ts (packages/cli/src/character-library.ts:63-66,206-428) | Decide the target boundary |
+| GAP-AGG-Render | as-is boundary | [AGG-Render](events.yaml) | [BC-Render](context-map.as-is.md#bc-render--render) | – | one file per format and variant, renders/[preview-]<format>[.en].mp4, written whole – rendered in segments under .cache/render/, joined, the song muxed once, and only then copied over the old file (packages/cli/src/render.ts:182-184,293-445)<br>a whole render of a format – not a preview, not --frames, not --out – is recorded in state.json artifacts as render:<file>:inputs (the hash of the props, the song's bytes and crf 18) and render:<file>:sha256 (render.ts:267-291,431-433); release renders a format again when it is missing or its recorded inputs hash differs from the current one (packages/cli/src/release.ts:237-262) | Decide the target boundary |
+| GAP-AGG-Short | as-is boundary | [AGG-Short](events.yaml) | [BC-Render](context-map.as-is.md#bc-render--render) | – | renders/shorts/<name>-9x16.mp4, cut whole by short from renders/9x16.mp4 with one ffmpeg re-encode – crf 18, a 0.15 s fade-in and a 0.4 s fade-out (packages/cli/src/short.ts:22-24,132-175,200-233); its thumbnail and TikTok cover lie beside it as <name>-thumb.jpg and <name>-tiktok.jpg (packages/cli/src/release-files.ts:26-34) | Decide the target boundary |
+| GAP-AGG-ComposedImage | as-is boundary | [AGG-ComposedImage](events.yaml) | [BC-Render](context-map.as-is.md#bc-render--render) | – | one JPEG and its recipe <name>.recipe.json beside it, written by thumbnail in one run – a Remotion still of the Thumbnail composition, encoded at falling JPEG quality until it fits the limit, then the recipe (packages/cli/src/thumbnail.ts:183-217; packages/cli/src/thumbnail-recipe.ts:35-58)<br>five formats with fixed sizes and limits – 16x9 1280x720, 9x16 1080x1920, 3x4 1080x1440, 4x5 1080x1350, 1x1 3000x3000; under 2 MB, under 10 MB for 1x1 (packages/remotion/src/lib/thumbnail.ts:12-18,60-66) | Decide the target boundary |
 <!-- kataster:gap-register:end -->
 
 ## Gaps found by the adoption of the project and stage pipeline (2026-11-21)
@@ -335,3 +338,42 @@ Decisions (by recommendation, not reviewed by the user):
   ADR 0043 (proposed) records them.
 - The canon's spend for an episode's appended references stays on the episode budget (ADR 0025); name replacement
   in Wan prompts for canon generations (`seriesTarget` passes no characters) is the generation slice's.
+
+## Gaps found by the adoption of the render slice (2026-11-22)
+
+Candidates only – no stories until the user asks (`/adopt <scope> --stories`). Priority is a suggestion.
+
+| # | Class | Gap | Evidence | Source | Priority |
+|---|---|---|---|---|---|
+| G-137 | Exists but contradicts | `render --frames` without `--out` writes `renders/<format>.mp4`, the recorded render's file, and records nothing; `release` then takes the passage as current and only warns that the file hash differs. The fix pass renders a passage after every review round | `packages/cli/src/render.ts:182-184,299-303,431-433`; `packages/cli/src/release.ts:239-262`; `workspace/.claude/skills/assembly-render/SKILL.md` Review rounds step 4 | HS-146 | high |
+| G-138 | Exists but contradicts | The render record's inputs hash covers the props, the song and crf, but not the bytes of the assets or the renderer's code, and the segment cache is keyed the same way; QA's `Master render` check and `short` check only that the file exists | `render.ts:275-279,355-358`; `packages/cli/src/qa.ts:350-372`; `packages/cli/src/short.ts:200-221` | HS-147 | medium |
+| G-139 | Missing | A Short does not record the 9:16 render it was cut from, and `release` never cuts again, so a Short can show an older video | `short.ts:200-233`; `release.ts:237-262` | HS-148 | medium |
+| G-140 | Missing | `new-series` does not link a series canon's `assets/` and `renders/` into `CORESLOPPER_MEDIA_DIR`; the canon's sheets, plates and props stay in the workspace | `packages/cli/src/new-series.ts:67-104`; `packages/cli/src/new-project.ts:182-186` | HS-154 | medium |
+| G-141 | Exists but contradicts | Drifted texts: ADR 0007 (a composition per format, frame-hash tests); ADR 0018, `packages/remotion/README.md`, `types.ts:122` and the `thumbnail` help (two or three thumbnail formats, the repository as `publicDir`); `assembly-render` (a 1920x1080 master, `--format 16x9` steps, "forgetting to mute AI clips", 9:16 and 1:1 without 4:5); `remotion-motion` (no `MOTION_COMPONENTS`, no 4:5); `video-qa` ("16:9 master") | the files named | HS-160 | medium |
+| G-142 | Exists but contradicts | `short` accepts any anchor or second; the section-boundary rule lives only in the glossary and `video-qa` | `short.ts:39-99`; `docs/glossary.md` Short; `workspace/.claude/skills/video-qa/SKILL.md` | HS-149 | low |
+| G-143 | Exists but contradicts | A derivative's own `fps` is ignored silently; `FormatSchema.aspect` accepts any text while four format ids exist; the ids are listed in `render.ts`, Remotion's types and the thumbnail formats | `render.ts:46-71`; `packages/core/src/schema.ts:3-8`; `packages/remotion/src/types.ts:3`; `packages/remotion/src/lib/thumbnail.ts:12-18` | HS-150 | low |
+| G-144 | Exists but contradicts | QA checks determinism only with `--determinism`, in one process; CI hashes only thumbnails, no video frame | `qa.ts:383-417`; `docs/adr/0007-remotion-deterministic-renderer.md`; `tests/thumbnail-render.test.ts` | HS-151 | low |
+| G-145 | Dead | `style.motion.easing` is never read (the backdrops hard-code their easing); `MIN_READABLE_SIZE` is never used | `schema.ts:404`; `packages/remotion/src/components/Backdrops.tsx:97`; `lib/thumbnail.ts:114` | HS-153, HS-152 | low |
+| G-146 | Missing | No lock around a render: two renders of the same output share and delete one work folder; `recordRender` saves `state.json` without a lock (see G-1) | `render.ts:282-291,306-313,430` | HS-155 | low |
+| G-147 | Exists but contradicts | Logic twice: colour resolution (core palette for the video, a strict copy in `thumbnail.ts`), the record keys as a literal in `release.ts`, crf 18 in the render and in the hash, 3D detection by component name | `packages/cli/src/thumbnail.ts:57-82`; `packages/core/src/palette.ts:79-97`; `release.ts:242`; `render.ts:277,335-339,383` | HS-156 | low |
+| G-148 | Exists but contradicts | `render --still` writes `renders/still-<frame>.png` for every format and ignores `--out`; `thumbnail` copies its source into `.cache/thumbnail/` and never removes it | `render.ts:316-331`; `thumbnail.ts:151-154` | HS-157 | low |
+| G-149 | Missing | No test of `renderProject` (segments, resume, mux, the record), `cutShort` end to end, `checkThumbnails`, QA's determinism check, or the `--frames` overwrite; covered now by `tests/render-characterization.test.ts`: the master frame rate for derivatives, the props, the record keys and inputs hash, the recipe round trip, and the composed-image file checks | `tests/render-characterization.test.ts`; `tests/release.test.ts`; `tests/thumbnail.test.ts` | analyst | low |
+
+Decisions (by recommendation, not reviewed by the user):
+
+- GAP-AGG-Render, GAP-AGG-Short and GAP-AGG-ComposedImage: the boundaries stay as recovered (`as-is`).
+- Exists and is intended:
+  - one `MusicVideo` composition for every format at the master's frame rate, derivatives rendered again with focus
+    points (user: 16:9 today, every social format from now on);
+  - the song as the only sound, clips and footage muted;
+  - previews at half scale, never recorded;
+  - renders in resumable segments with work files outside `renders/`;
+  - Shorts cut by the agent from the 9:16 render, at most 60 s, with short fades (user: the agent picks them);
+  - three thumbnails of different subjects, one taken as it is (user), and one command for every composed image
+    with its recipe;
+  - the media directory through links, so every project path keeps working (user: media in a separate folder);
+  - the CLI reaching Remotion by relative path, Remotion taking runtime values only from `core/browser`.
+
+  ADR 0044 (proposed) records them.
+- 1:1 serves the Instagram feed by default (`config/defaults.yaml`); 4:5 stays optional per project. The feed
+  post's choice of format is the release slice's.

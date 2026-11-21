@@ -197,11 +197,15 @@ A grid of the storyboard's shots for a fast visual review on the board: per shot
 _Avoid_: thumbnail sheet, shot overview
 
 **Thumbnail**:
-The still that represents a finished video on a platform such as YouTube: a generated still with the hook on solid slabs. The main video gets three 1280x720 thumbnails of different subjects; each Short gets one at 1080x1920.
+The composed image that represents a finished video on a platform such as YouTube: a generated image with the hook on solid slabs. The main video gets three 1280x720 thumbnails of different subjects, and the user picks one; each Short gets one at 1080x1920.
 _Avoid_: poster, cover, preview image
 
+**Composed Image**:
+An image the `thumbnail` command makes from a generated image, the hook, and the style bible's colours and fonts: a thumbnail, a Short's thumbnail, a TikTok cover, the cover, or a feed or announcement image. It has its format's exact size, stays under the size limit, and keeps its **Thumbnail Recipe** beside it; the same inputs give the same pixels. The art director judges whether it reads at a quarter of its size.
+_Avoid_: graphic, artwork
+
 **Short**:
-A vertical excerpt of the finished video for YouTube Shorts and similar feeds: 9:16, 30–50 s (never over 60 s), cut from the 9:16 render on section boundaries, stored as `renders/shorts/<name>-9x16.mp4`. Each video gets three.
+A vertical excerpt of the finished video for YouTube Shorts and similar feeds: 9:16, 30–50 s (never over 60 s), cut from the current 9:16 render on section boundaries with a short fade in and out, stored as `renders/shorts/<name>-9x16.mp4`. The agent picks the excerpts. Each video gets three.
 _Avoid_: clip (an AI clip is a generated shot), teaser, reel
 
 **Upload Data**:
@@ -229,7 +233,7 @@ How much of the lyrics, music, vocals, and instrumental an AI tool made (none, p
 _Avoid_: AI tag, disclaimer
 
 **Cover**:
-The square 3000x3000 image a song carries in streaming stores, showing artist and title only.
+The square 3000x3000 image a song carries in streaming stores, showing artist and title only. A composed image, made like a thumbnail from the strongest generated image; its recipe carries the release's announcement images.
 _Avoid_: artwork, thumbnail (a **Thumbnail** represents a video)
 
 **Canvas**:
@@ -281,7 +285,7 @@ The release's posts a week before: a story and a post image with the release dat
 _Avoid_: teaser post, pre-save
 
 **Thumbnail Recipe**:
-`<image>.recipe.json` beside a composed thumbnail: the still, focus, and options it was made from, so `release` can compose further images from the same still.
+`<image>.recipe.json` beside every composed image: the source image, focus, text, and options it was made from, so `release` can compose further images from the same source.
 _Avoid_: preset, template (a **Template** seeds a project)
 
 **Microsite**:
@@ -317,10 +321,6 @@ _Avoid_: private video (a YouTube upload that is not public)
 **Publish Plan**:
 What a publish run will upload and skip, with the problems and the quota it found, before any network call. A dry run prints only the plan.
 _Avoid_: preview (a **Preview** is a render)
-
-**Animatic**:
-A low-fidelity, timed preview of the storyboard before final assets.
-_Avoid_: previz
 
 **Manifest**:
 The append-only record of every **Generation** of a project or series canon in `assets/manifest.jsonl`: operation, role, provider, model, prompt, seed, references, planned cost, whether it was reused from the cache, and whether it failed. A reuse is recorded at $0. Its costs add up to the project's recorded spend.
@@ -443,12 +443,24 @@ The automated critic that checks coverage, sync, readability, determinism, and m
 _Avoid_: tester
 
 **Render**:
-The encoded video output for one format.
-_Avoid_: export
+The encoded video of one whole format of a project: `renders/<format>.mp4`, or `renders/<format>.en.mp4` with burned-in subtitles. Every format is rendered from the same composition at its own size and the master's frame rate; a derivative is rendered again, never cropped from the master. The song is the only sound.
+_Avoid_: export, video file
+
+**Master Format**:
+The format a project is made for, `formats.master` in `project.yaml`: usually 16:9 for a music video and 9:16 for a series. `render` without `--format` renders it, and every check, preview, and fix pass starts with it.
+_Avoid_: main format, primary format
+
+**Derivative Format**:
+Another format of the same project, from `formats.derivatives`: 9:16, 1:1, or 4:5. It is rendered after the master passes, and a shot whose subject would leave the frame gets a focus point.
+_Avoid_: crop, variant
+
+**Render Record**:
+The two entries a whole render leaves in `state.json`: the hash of everything it was made from and the hash of the file. A render is current while its props, the song, the asset files, and the renderer's code are unchanged; `release` renders a stale or missing format again.
+_Avoid_: render cache, render log
 
 **Preview**:
-A low-resolution or short render used for automated checks and human inspection.
-_Avoid_: draft
+A render for checks and inspection: a whole format at half scale (`renders/preview-<format>.mp4`), a passage (`--frames`), or one frame (`--still`). A preview is never recorded, never replaces a render, and never goes into the release.
+_Avoid_: draft, test render
 
 **Project**:
 One music video or one episode, stored in `projects/<slug>/`, with its own config, state, artifacts, and budget.
@@ -461,6 +473,10 @@ _Avoid_: project type, mode
 **Template**:
 The skeleton copied by `npm run cli -- new` (called from the `new-video` skill) into a new project.
 _Avoid_: boilerplate
+
+**Media Directory**:
+The folder outside the workspace that holds a project's large media, set with `CORESLOPPER_MEDIA_DIR` (`{slug}` stands for the project's folder). A project's `assets/` and `renders/` are links into it, so every project path keeps working; a new project is linked when it is created, an existing one with `media-link`.
+_Avoid_: media drive, media link (the command)
 
 **Export**:
 The final step that produces all format renders, the review report, and the release package; also the optional extraction of a project into its own repository.

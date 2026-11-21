@@ -3,7 +3,7 @@
 > Recovered from code by `/adopt` on 2026-11-21 at b195086. This is **not a target**.
 > Target: [context-map.md](context-map.md) · Gap register: [gap-register.md](gap-register.md).
 
-Adopted slices: project and stage pipeline; human review; art-director verdicts and the generation queue (decided by recommendation); song timing and lyrics (decided by recommendation, four answers from the user); the storyboard (decided by recommendation, four answers from the user); generation and the provider adapters (decided by recommendation, four answers from the user); series budget, script, takes and the episode track (decided by recommendation, four answers from the user); the bibles, user references and the character library (decided by recommendation, four answers from the user). Other areas – release, render, model bench – appear only as neighbours until their own slice is adopted.
+Adopted slices: project and stage pipeline; human review; art-director verdicts and the generation queue (decided by recommendation); song timing and lyrics (decided by recommendation, four answers from the user); the storyboard (decided by recommendation, four answers from the user); generation and the provider adapters (decided by recommendation, four answers from the user); series budget, script, takes and the episode track (decided by recommendation, four answers from the user); the bibles, user references and the character library (decided by recommendation, four answers from the user); render, Shorts, composed images and the media directory (decided by recommendation, four answers from the user). Other areas – release, publishing, the workspace, model bench – appear only as neighbours until their own slice is adopted.
 
 ```mermaid
 flowchart LR
@@ -17,7 +17,7 @@ flowchart LR
   BC-CharacterLibrary -->|character use copies an identity and chosen states into a bible| BC-Bibles
   BC-Bibles -->|character import copies characters with files into the library| BC-CharacterLibrary
   BC-Bibles -->|sheets, states, plates and props generated and judged as queue items| BC-GenerationQueue
-  BC-Bibles -->|palette, typography, grain| Render
+  BC-Bibles -->|palette roles, typography, grain| BC-Render
   BC-GenerationQueue -->|every attempt is a one-item batch: budget, cache, manifest, spend| BC-Generation
   BC-Generation -->|planned cost of every new generation recorded as spend| BC-Pipeline
   BC-Generation -->|cloud adapters: fal.ai, Higgsfield, Topview| Providers[Cloud providers - external]
@@ -26,19 +26,26 @@ flowchart LR
   BC-Series -->|takes and ambience through runBatch on the episode budget; canon generations on the series budget| BC-Generation
   BC-Series -->|mix, stems, conversion, lip-sync segments| FFmpeg[FFmpeg - external]
   BC-Series -->|episode track writes timing.json; overrides move sound and picture| BC-Timing
-  BC-Series -->|subtitle cues, episode.wav| Render
+  BC-Series -->|subtitle cues, chat lines, episode.wav| BC-Render
   BC-GenerationQueue -->|items built from storyboard shots and their references| BC-Storyboard
   BC-GenerationQueue -->|needs-fix count, failed verdicts| BC-Pipeline
   BC-Pipeline -->|audio-analysis stage runs the song analysis| BC-Timing
   BC-Timing -->|effective timing, anchors resolved to seconds| BC-Storyboard
   BC-Pipeline -->|storyboard stage, shared by both kinds| BC-Storyboard
   BC-Storyboard -->|continuity references to style tokens, characters, sets, plates, props, character states| BC-Bibles
-  BC-Storyboard -->|resolved shots as render props| Render
+  BC-Storyboard -->|resolved shots as render props| BC-Render
   BC-Storyboard -->|episode: scenes as sections, chat lines, lip-sync limit| BC-Series
-  BC-Timing -->|effective timing as render props| Render[Render - not adopted]
+  BC-Timing -->|effective timing as render props; anchors for Short windows| BC-Render
   BC-Review -->|sections and beats on the review timeline| BC-Timing
   BC-Timing -->|echo spans, lead stem for lip-sync segments| Lipsync[Lip-sync audio - not adopted]
   BC-Timing -->|lyrics, effective timing for canvas, Shorts, texts| Release
+  BC-Pipeline -->|assembly and qa-export stages render, cut Shorts and compose images| BC-Render
+  BC-Pipeline -->|a new project is linked into the media directory| BC-Render
+  BC-Render -->|whole renders with render records, Shorts, composed images and recipes; stale formats rendered again| Release
+  BC-Render -->|renders and render progress on the board| BC-Review
+  BC-Render -->|segments joined, song muxed, Shorts cut| FFmpeg
+  BC-Render -->|compositions rendered frame by frame| Remotion[Remotion and headless Chrome - external]
+  BC-GenerationQueue -->|thumbnails and covers judged by the art director| BC-Render
 ```
 
 ## Contexts
@@ -298,3 +305,38 @@ Boundaries:
 - The board serves library files but never `character.yaml` or dot files; writes follow the board's same-origin
   rules.
 - A series canon comes in through a skill step, not code (HS-131); the user has not used the library yet.
+
+### BC-Render – Render
+Purpose (as recovered, decided by recommendation HS-143): turns a validated project into its videos and images – a
+render per format from one composition, previews for checks, Shorts cut from the 9:16 render, and composed images
+(thumbnails, covers, feed images) from a generated image and the style bible – and keeps a project's media in the
+media directory (ADR 0007, ADR 0018, ADR 0044 proposed).
+Core terms: Render, Master Format, Derivative Format, Render Record, Preview, Short, Composed Image, Thumbnail,
+Cover, Thumbnail Recipe, Media Directory.
+Evidence:
+- one `MusicVideo` composition sized by props for every format, and a `Thumbnail` composition
+  (`packages/remotion/src/Root.tsx:7-44`); the CLI builds the props from the loaded project – resolved shots,
+  effective timing, style, characters, chat lines and subtitles, brand fonts (`packages/cli/src/render.ts:137-180`)
+- `render` writes `renders/[preview-]<format>[.en].mp4` in segments that resume, joins them and muxes the song
+  (`render.ts:293-445`); a whole render leaves its render record in `state.json` (`render.ts:267-291,431-433`),
+  which `release` compares to decide what to render again (`packages/cli/src/release.ts:237-262`)
+- `short` cuts `renders/shorts/<name>-9x16.mp4` from `renders/9x16.mp4` (`packages/cli/src/short.ts:200-233`);
+  `thumbnail` composes a JPEG in one of five formats with its recipe (`packages/cli/src/thumbnail.ts:183-217`,
+  `thumbnail-recipe.ts`)
+- `media-link` and project creation link `assets/` and `renders/` into `CORESLOPPER_MEDIA_DIR`
+  (`packages/cli/src/media-dir.ts:19-97`, `new-project.ts:182-186`)
+- the progress file `review/progress/<file>.json`, read by the board and the watch
+  (`packages/cli/src/render-progress.ts`, `board-production.ts:204-221`, `packages/core/src/watch.ts:104-118`);
+  QA's render checks (`packages/cli/src/qa.ts:107-174,350-417`)
+Boundaries:
+- Reads only: the resolved storyboard (BC-Storyboard), the effective timing (BC-Timing), the style and character
+  bibles (BC-Bibles), an episode's script, chat lines and subtitle cues (BC-Series). It writes nothing of theirs.
+- The CLI owns all input, output and encoding; `packages/remotion` is a pure function of props and frame and takes
+  runtime values only from `@coreslopper/core/browser` (HS-158).
+- Release (not adopted) places the renders, Shorts and composed images in the release folder and renders a missing
+  or stale format again; it composes the announcement images from the cover's recipe.
+- The art director judges thumbnails and covers (BC-GenerationQueue's agent, run by hand in `video-qa`).
+- The render record lives in `AGG-Project`'s `state.json` and is saved without a lock (G-1, HS-155).
+- A passage render without `--out` replaces the recorded render's file (HS-146); a Short is not tied to the render it
+  was cut from (HS-148); a series canon is not linked into the media directory (HS-154).
+

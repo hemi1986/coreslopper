@@ -1,7 +1,7 @@
 # Logical data model – coreslopper
 
 > **As-is** for the adopted slices, recovered from `packages/core/src/schema.ts` (Zod is the source, ADR 0004).
-> Slices: project and stage pipeline (2026-11-21); human review (2026-11-21); generation queue and verdicts (2026-11-21, decided by recommendation). Open points are hotspots in `docs/domain/events.yaml`.
+> Slices: project and stage pipeline (2026-11-21); human review (2026-11-21); generation queue and verdicts (2026-11-21, decided by recommendation); timing, storyboard and generation (2026-11-21), series, bibles and the character library, render (2026-11-22), each decided by recommendation with four answers from the user. Open points are hotspots in `docs/domain/events.yaml`.
 
 ## Aggregates
 
@@ -444,6 +444,54 @@ plain names inside the folder, stored once by content (`packages/cli/src/charact
 **Derived**: where a library character is used (every `characters.yaml` naming it in `library`) and its cover (the
 sheet, else the first image reference), computed by `listLibrary` on every read.
 
+### AGG-Render – Render (as-is)
+
+One file per format and variant in `renders/` (`packages/cli/src/render.ts:182-184`), written whole: rendered in
+segments under `.cache/render/<slug>-<format>…/`, joined, the song muxed, then copied over the old file
+(`render.ts:293-445`). A whole render's **render record** lives in `state.json` `artifacts` of AGG-Project.
+
+| Attribute | Type | Required | Source |
+|---|---|---|---|
+| Format | `16x9` \| `9x16` \| `1x1` \| `4x5`; the master format or a configured derivative | yes | EVT-FormatRendered |
+| Size, frame rate | width and height of the format in `project.yaml`; always the master's fps (HS-150) | yes | EVT-FormatRendered |
+| Variant | whole render `<format>.mp4`, subtitled `<format>.en.mp4` (episode, English only), preview `preview-<format>.mp4` (half scale, crf 22) | yes | EVT-FormatRendered, EVT-PreviewRendered |
+| Encoding | H.264, yuv420p, crf 18 (preview 22); the song as AAC 192 kbit/s, 48 kHz | yes | EVT-FormatRendered |
+| Inputs hash | `render:<file>:inputs` – SHA-256 of the props, the song's bytes and crf 18; should cover asset bytes and the renderer's code (HS-147) | whole renders | EVT-FormatRendered |
+| File hash | `render:<file>:sha256` | whole renders | EVT-FormatRendered |
+
+**Not recorded**: previews, passages (`--frames`; today written over `<format>.mp4` without `--out`, HS-146), and
+stills (`renders/still-<frame>.png`). **Derived**: the render progress `review/progress/<file>.json` while a render
+runs (frames done and total, started, updated, error), removed on success.
+
+### AGG-Short – Short (as-is)
+
+`renders/shorts/<name>-9x16.mp4`, cut whole from `renders/9x16.mp4` by one ffmpeg re-encode
+(`packages/cli/src/short.ts:200-233`). Its thumbnail `<name>-thumb.jpg` (9x16) and TikTok cover `<name>-tiktok.jpg`
+(3x4) lie beside it (`packages/cli/src/release-files.ts:26-34`).
+
+| Attribute | Type | Required | Source |
+|---|---|---|---|
+| Name | starts with a letter or digit; letters, digits, hyphens | yes | EVT-ShortCut |
+| Window | from and to as seconds or anchors with an offset; at most 60 s, 30–50 s expected; on section boundaries (HS-149) | yes | EVT-ShortCut |
+| Encoding | crf 18, fade-in 0.15 s, fade-out 0.4 s, the format's own fps | yes | EVT-ShortCut |
+| Source render | the 9:16 render it was cut from – not recorded today (HS-148) | decided | EVT-ShortCut |
+
+### AGG-ComposedImage – Composed image (as-is)
+
+A JPEG and its recipe `<name>.recipe.json` (`ThumbnailRecipeSchema`, `packages/cli/src/thumbnail-recipe.ts:12-58`),
+written by `thumbnail` (`packages/cli/src/thumbnail.ts:183-217`). Thumbnails sit in `renders/thumbnails/`, Short
+thumbnails and TikTok covers beside the Short, the cover at `renders/cover-3000x3000.jpg`.
+
+| Attribute | Type | Required | Source |
+|---|---|---|---|
+| Format | `16x9` 1280x720, `9x16` 1080x1920, `3x4` 1080x1440, `4x5` 1080x1350, `1x1` 3000x3000 (RGB) | yes | EVT-ImageComposed |
+| File | JPEG under 2 MB (1x1: under 10 MB), quality 90 down to 64 | yes | EVT-ImageComposed |
+| Source image | a generated image, relative to the project when inside it | yes | EVT-ImageComposed |
+| Hook, tag | at most three lines of four words (`\|` between lines); the tag in `mono`; no tag or link text on a cover | hook yes | EVT-ImageComposed |
+| Layout, focus, zoom, scrim, text offset | `left` \| `right` \| `bottom` (only 16x9 chooses); focus x,y 0–1; zoom 1–4; scrim 0–1; offset ±300 px | no | EVT-ImageComposed |
+| Accent, font | a style-bible palette key or role (default `accent`); a typography key (default `display`) | no | EVT-ImageComposed |
+| Recipe | version 1 and every input above | yes | EVT-ImageComposed |
+
 ## Lifecycle
 
 Stage state as the code allows it today. Every transition is accepted from every status (HS-11); the diagram
@@ -522,4 +570,11 @@ erDiagram
   SHOT }o--o| PLATE : "keyframe is an edit of"
   SHOT }o--o{ PROP_REFERENCE : "shows"
   SHOT }o--o{ CHARACTER_STATE : "names"
+  PROJECT ||--o{ RENDER : "one per format and variant"
+  RENDER }o--|| SHOT : "renders every resolved"
+  RENDER ||--o{ SHORT : "the 9:16 render is cut into"
+  SHORT ||--o| COMPOSED_IMAGE : "thumbnail, TikTok cover"
+  PROJECT ||--o{ COMPOSED_IMAGE : "thumbnails, cover, feed images"
+  COMPOSED_IMAGE ||--|| THUMBNAIL_RECIPE : "beside it"
+  COMPOSED_IMAGE }o--|| STYLE_BIBLE : "colours and fonts from"
 ```
