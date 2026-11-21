@@ -275,3 +275,143 @@ art director's verdicts, which now share no word with human review.
 | Q7 | Shorts are not reviewed in the board. | HS-28 |
 | Q8 | A note is sent in exactly one round. | invariant |
 | Q9 | A range note's section is the one at its start – intended. | `CMD-SendReviewRound` |
+
+---
+
+# Adoption – generation-queue-and-verdicts
+Date: 2026-11-21 · Commit: 7c7b81e · Slice: art-director verdicts and the generation queue (concept `verdict`) · Analysts: 3 lenses
+
+## Scope
+
+- **Slice:** the art director's verdicts (`review-image`, `verdicts.jsonl`, `verdicts`), the generation queue
+  with its items and attempts (`queue add|run|status|wait|retry|accept|drop`), the region patch (`patch`), the
+  comparison sheet as a helper, and the art-director agent. No shared library.
+- **Out of scope:** generate batches, cache, manifest and provider adapters (slice `generation`), the model
+  bench, the contact sheet, human review.
+- **Intent:** domain model, as for the earlier slices. **Language:** artifacts `en`, UI `en`.
+- **Since the last slice:** no code change (same day).
+
+| Layer | Files |
+|---|---|
+| cli (application, and here also domain) | `packages/cli/src/queue.ts`, `review-image.ts`, `verdicts.ts`, `patch.ts`, `image-ops.ts` (sheet, frames, crop and paste), the commands in `index.ts`; queue and verdict parts of `board-production.ts`, `board/production.js`, `production-watch.ts`; `comfy.ts` as the queue uses it |
+| core | `packages/core/src/production.ts` (`queueCounts` only) |
+| workspace (orchestration) | `workspace/.claude/agents/art-director.md`, `stage-runner.md` rule 10; `ai-clips/SKILL.md` steps 3–6; queue parts of `character-bible`, `style-bible`, `new-series` |
+| tests | `tests/queue.test.ts`, `review-image.test.ts`, `image-ops.test.ts`, `runner-commands.test.ts`, `board-production.test.ts` (queue parts) |
+
+## How this slice was decided
+
+The user had the product written with Claude and uses it; they cannot judge code-level questions and said so.
+Round 1 (12 questions) was answered "all yes" without a view of their own; the six questions of round 2 were
+decided by the recommendation without asking. **Every decision of this slice is a recommendation, not reviewed
+by the user** – hotspots carry "delegated" in their resolution, and ADR 0038 stays `Proposed`. Later slices
+work the same way: no code-level questions, only questions about what the user sees and does.
+
+## What the repository is (facts)
+
+- One `assets/queue.json` per project, written whole (temp file and rename) without a lock; one `queue run` per
+  project behind a check-then-write pid lock. Six statuses: pending, generating, reviewing, passed, needs-fix,
+  error.
+- Every attempt is a file; only a pass, an accept, or an item without a verdict target reaches `out`.
+- The art director runs headless (`claude -p --agent art-director`, JSON schema) in the background, at most
+  `--reviews` started at once, though not strictly.
+- Only a blocking defect fails (prompt text plus `notesOnlyPass`); a failed image requeues itself with the fix
+  prompt up to 3 attempts, a failed clip waits. `queue retry` has no cap.
+- Every verdict goes to `verdicts.jsonl` and, in the queue, into its attempt; `accept` writes none and checks no
+  status; `patch` writes an attempt file outside the queue.
+- All of it lives in `cli`; core only counts statuses. No ADR recorded it. One commit (`73063bc`) introduced the
+  queue; `review-image.ts` changed five times in two days.
+
+## Domain model (decided by recommendation)
+
+- **Context:** `BC-GenerationQueue` – Generation queue. It generates through the not-yet-adopted generation
+  slice (budget, cache, manifest, spend), builds items from storyboard shots, and feeds the board and watchdog
+  with its needs-fix count and failed verdicts.
+- **Aggregate:** `AGG-GenerationQueue` (`as-is`, evidence the whole-file write, cross-item `after` and order,
+  the per-project run lock). Invariants: only an approved attempt is filed; an item starts after the items it
+  derives from; attempts numbered by the queue, patches included; one run per project; at most 3 local and 1
+  cloud attempt since the last replace; a user's accept is final; no change while generating or reviewing; no
+  lost write.
+- **Commands:** add queue item, run the queue, give a verdict (art director), apply a verdict (queue run),
+  requeue (`queue retry`), accept attempt, drop queue item, patch a region. **Policies:** judge every attempt;
+  apply every verdict. **Read models:** queue status, latest verdicts.
+- **Glossary:** new **Verdict**, **Blocking Defect**, **Verdict Note**; sharpened **Art Director** (every image
+  and clip, references, thumbnails, covers; bench scores are not verdicts), **Attempt** (the cap, approved =
+  pass or accept, requeue), **Generation Queue**, **Region Patch** (an attempt of its item).
+- **ADR:** 0038 (Proposed) records the queue's decisions; amends ADR 0002.
+
+## Package documentation written
+
+- `.claude/rules/verdict.md` – path-scoped slice doc; nothing left `[OPEN]`.
+- `docs/engineering/conventions.md` – the queue as the exception to rules in core, background processes with a
+  wait command, headless agents, two seams.
+- `docs/architecture/data-model.md`, `docs/domain/context-map.as-is.md` – `AGG-GenerationQueue`,
+  `BC-GenerationQueue`.
+
+## Contradictions found and how they were resolved
+
+| Contradiction | Resolution |
+|---|---|
+| "review" for the art director (code, UI) vs the user's review | Verdict; the art director judges (G-43) |
+| `note:` issues vs Review Note | Verdict Note, beside Blocking Defect |
+| `queue retry`, `--tries` vs "retry" avoided | requeue; tries are technical (G-44) |
+| `passed` for pass, accept, and unjudged | approved attempt, filed, filed unjudged (G-41) |
+| `art-director.md` "fail on any doubt", text answer vs the prompt's blocking-defect rule and JSON | the blocking-defect rule for every verdict (G-38) |
+| Glossary "stills and keyframes" vs everything the art director judges | definition sharpened |
+| Verdict in `verdicts.jsonl` and in the attempt | the log is the record, the attempt a copy (G-42 for the two readers) |
+| `ai-clips` "three attempts per clip", "3 + one cloud" vs no cap on retry | the cap is an invariant (G-34) |
+| `patch` "files it as the next attempt" vs not in the queue, wrong log for a canon | a patch is an attempt of its item (G-35, G-36, G-47) |
+| `accept` without guard vs "the user's eye wins" | accept is final and refused while running (G-33) |
+| Queue schema in `cli` vs ADR 0004 | accident (G-39) |
+
+## Rules and checks
+
+| Rule | Enforcement | State |
+|---|---|---|
+| Fix prompt `none` → needs-fix at attempt 1; replace keeps and continues attempts; a known id is skipped; drop keeps files and refuses a reviewing item; accept of attempt n files it with its note | `tests/queue-characterization.test.ts` | green |
+| Pass files, fail requeues with fix prompt and focus, clips wait, attempt cap for images, budget stop, re-review | existing `tests/queue.test.ts`, `tests/review-image.test.ts` | green |
+| Accept final and guarded, attempt cap for all, patch as attempt, no lost write, one run | documentation until stories build them (G-32–G-35) | – |
+| The slice stays inside `cli`'s allowed imports | slice 1 boundary rule and test | green |
+
+## Gap register (candidates – stories only with --stories)
+
+17 candidates G-32 to G-48 in `docs/domain/gap-register.md`: 15 *exists but contradicts* (highest: G-32 no
+lock on `queue.json`, G-33 accept without guard), 1 *missing* (G-37 accept in the verdict views), 1 *dead*
+(G-48 `QueueAttempt.provider`).
+
+## Deliberately left alone
+
+- Production code, `art-director.md`, `ai-clips/SKILL.md`, and the docs that contradict the model.
+- `EVT-VerdictGiven` belongs to no aggregate on purpose: the verdict log is outside the queue (the validator
+  warns).
+- The series board view showing no canon verdicts (an analyst's inference, not checked).
+
+## Open hotspots
+
+None. HS-29 to HS-46 are resolved by recommendation.
+
+## Next slice
+
+`timing` (song analysis, timing resolver, overrides, anchors, lyrics), per the adoption plan.
+
+## Decision log
+
+| # | Decision | How | Written to |
+|---|---|---|---|
+| HS-46 | The whole queue stays the aggregate (as-is) | agreed without review | `AGG-GenerationQueue` |
+| HS-36 | `verdicts.jsonl` is the record; the attempt a copy | agreed without review | data model, G-42 |
+| HS-30 | Verdict; the art director judges | agreed without review | glossary, G-43 |
+| HS-31 | Blocking Defect and Verdict Note | agreed without review | glossary |
+| HS-32 | requeue; tries technical | agreed without review | glossary (Attempt), G-44 |
+| HS-33 | approved attempt, filed, filed unjudged | agreed without review | glossary, G-41 |
+| HS-35 | Art Director sharpened | agreed without review | glossary |
+| HS-34 | Blocking-defect rule for every verdict | agreed without review | `CMD-GiveVerdict`, G-38 |
+| HS-41 | No lost write, one run per project | agreed without review | invariant, G-32 |
+| HS-44 | ADR 0038 | agreed without review | `docs/adr/0038-generation-queue-and-verdicts.md` |
+| HS-45 | Domain logic in `cli` is an accident | agreed without review | G-39 |
+| HS-43 | Canon judged by hand – intended | agreed without review | gap register decisions |
+| HS-29 | Context "Generation queue" | recommendation | `BC-GenerationQueue` |
+| HS-37 | Accept shows as accepted in the verdict views | recommendation | `RM-LatestVerdicts`, G-37 |
+| HS-38 | No change while running; no requeue of a passed item; replace cascades | recommendation | invariants, data model, G-33, G-40 |
+| HS-39 | 3 local + 1 cloud attempt since the last replace | recommendation | invariant, glossary, G-34 |
+| HS-40 | A region patch is an attempt of its item | recommendation | invariant, glossary, G-35, G-36 |
+| HS-42 | The user accepts anything, final; the runner only after the cloud attempt | recommendation | `CMD-AcceptAttempt` |

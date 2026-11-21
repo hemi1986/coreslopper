@@ -12,7 +12,8 @@
 #
 # Glossary: docs/glossary.md (ships to every workspace). CONTEXT.md points there.
 #
-# Slices adopted 2026-11-21: project and stage pipeline (confirmed); human review (DRAFT).
+# Slices adopted 2026-11-21: project and stage pipeline (confirmed); human review (confirmed); art-director verdicts and the
+# generation queue (decided by recommendation, not reviewed by the user – see the adoption report).
 # See docs/domain/adoption-report.md.
 
 version: 1
@@ -30,10 +31,19 @@ actors:
   - id: ACT-BoardWizard
     name: Board wizard
     description: The board's + New form; it may complete the setup stage and nothing else (ADR 0037, proposed)
+  - id: ACT-ArtDirector
+    name: Art director
+    description: The automated critic, run headless by review-image (claude -p --agent art-director) for every queue attempt and single verdicts
+  - id: ACT-QueueRun
+    name: Queue run
+    description: The one queue run process per project (queue run) that generates ready items in order and hands every attempt to the art director
 
 external_systems:
   - id: EXT-Provider
     name: Generation provider
+  - id: EXT-ComfyUI
+    name: ComfyUI server
+    description: The local generation server; the queue run restarts it through COMFYUI_RESTART_COMMAND when a generation fails or hangs
 
 bounded_contexts:
   - id: BC-Pipeline
@@ -42,6 +52,9 @@ bounded_contexts:
   - id: BC-Review
     name: Review
     purpose: The user's frame-accurate notes on renders, sent to the agent in rounds and answered note by note
+  - id: BC-GenerationQueue
+    name: Generation queue
+    purpose: Gets every generated image and clip of a project approved before anything derives from it – generate an attempt, give it a verdict, requeue it with the fix prompt, or file it
 
 aggregates:
   - id: AGG-Project
@@ -78,6 +91,23 @@ aggregates:
       - A round is open until a valid replies file answers every note of it; an unreadable round counts as open, never as nothing open (confirmed 2026-11-21; the code counts any replies file – gap register)
       - Notes and rounds belong to the user; only the board and the desktop player write them, the agent writes only replies (confirmed 2026-11-21; an instruction only – gap register)
       - Every writer of notes – the board and the desktop player – keeps sent notes unchanged and loses no other writer's change; a note's frame is floor(seconds × format fps) (confirmed 2026-11-21; the desktop player breaks all three – gap register)
+  - id: AGG-GenerationQueue
+    name: Generation queue
+    context: BC-GenerationQueue
+    status: as-is
+    evidence:
+      - assets/queue.json per project, read, changed and written whole on every change (packages/cli/src/queue.ts:101-119)
+      - an item waits for the items in its after list across the whole queue (queue.ts:524-529); order numbers are taken from the whole queue (queue.ts:127)
+      - one queue run per project, pid lock assets/queue.lock (queue.ts:562-578,671-674)
+    invariants:
+      - Only an approved attempt is filed at the item's out path – a pass verdict, a hand accept, or an item without a verdict target (the code does this, queue.ts:689-693,493,775-782)
+      - An item starts only when every item in its after list has passed or is not in the queue (the code does this, queue.ts:524-529)
+      - Attempts of an item are numbered by the queue without gaps, region patches included; a replaced item keeps its attempts and keeps counting (decided 2026-11-21, HS-40; the code numbers patches separately – gap register)
+      - At most one queue run works on a project at a time (decided 2026-11-21, HS-41; the pid lock is check-then-write, queue.ts:671-674 – gap register)
+      - An item has at most 3 local attempts and one cloud attempt since its last replace, clips included (decided 2026-11-21, HS-39; only the automatic requeue of images is capped – gap register)
+      - A user's accept is final; no automatic step undoes it (decided 2026-11-21, HS-42; a verdict that lands after an accept overwrites it today – gap register)
+      - An item that is generating or reviewing is not accepted, requeued, replaced or dropped (decided 2026-11-21, HS-38; accept has no check – gap register)
+      - No writer of queue.json loses another writer's change (decided 2026-11-21, HS-41; no lock around read-modify-write – gap register)
 
 events:
   - id: EVT-ProjectCreated
@@ -136,6 +166,58 @@ events:
     aggregate: AGG-ProjectReview
     pivotal: true
     data: [Round number, Answered at, Render with the fixes, Reply per note with status]
+  - id: EVT-QueueItemAdded
+    name: Queue item added
+    aggregate: AGG-GenerationQueue
+    data: [Item id, Kind, Generation item, Out path, Verdict target, After, Chain from, Order]
+  - id: EVT-QueueItemReplaced
+    name: Queue item replaced
+    aggregate: AGG-GenerationQueue
+    data: [Item id, Generation item, Next attempt number]
+  - id: EVT-AttemptGenerated
+    name: Attempt generated
+    aggregate: AGG-GenerationQueue
+    data: [Item id, Attempt number, Attempt file, Seed, Provider]
+  - id: EVT-AttemptGenerationFailed
+    name: Attempt generation failed
+    aggregate: AGG-GenerationQueue
+    data: [Item id, Attempt number, Error]
+  - id: EVT-VerdictGiven
+    name: Verdict given
+    context: BC-GenerationQueue
+    pivotal: true
+    description: "Recorded in verdicts.jsonl (the record of every verdict, HS-36); a queue attempt holds a copy the queue run decides from"
+    data: [Subject, Attempt number, Image, Clip, Verdict, Score, Issues, Fix prompt, Start frame PSNR, Judged at]
+  - id: EVT-AttemptFiled
+    name: Attempt filed
+    aggregate: AGG-GenerationQueue
+    pivotal: true
+    data: [Item id, Attempt number, Out path]
+  - id: EVT-QueueItemRequeued
+    name: Queue item requeued
+    aggregate: AGG-GenerationQueue
+    data: [Item id, Next attempt number, Fix prompt, Seed, Focus, Order]
+  - id: EVT-QueueItemNeedsFix
+    name: Queue item needs a fix
+    aggregate: AGG-GenerationQueue
+    data: [Item id, Attempt number, Focus, Note]
+  - id: EVT-AttemptAccepted
+    name: Attempt accepted
+    aggregate: AGG-GenerationQueue
+    data: [Item id, Attempt number, Note]
+  - id: EVT-QueueItemDropped
+    name: Queue item dropped
+    aggregate: AGG-GenerationQueue
+    data: [Item id]
+  - id: EVT-RegionPatched
+    name: Region patched
+    aggregate: AGG-GenerationQueue
+    description: "An attempt of its queue item (HS-40); the code writes the attempt file and assets/review/patches.jsonl but not queue.json – gap register"
+    data: [Image, Box, Prompt, References, Attempt number, Attempt file, Subject]
+  - id: EVT-QueueRunStopped
+    name: Queue run stopped
+    aggregate: AGG-GenerationQueue
+    data: [Reason, Items needing a fix]
 
 commands:
   - id: CMD-CreateProject
@@ -234,6 +316,75 @@ commands:
     produces: [EVT-ReviewRoundAnswered]
     rules:
       - Reply status is fixed, partly, not-fixed or question
+  - id: CMD-AddQueueItem
+    name: Add queue item
+    actor: ACT-StageRunner
+    aggregate: AGG-GenerationQueue
+    produces: [EVT-QueueItemAdded, EVT-QueueItemReplaced]
+    rules:
+      - Items come from storyboard.yaml (keyframes, clips) or a hand-written batch with id and out; a known id is skipped unless replace is asked for
+      - Replacing a passed item returns every passed item after it to pending, as a stage reset does (HS-38; missing – gap register)
+      - A generating or reviewing item cannot be replaced (the code refuses, queue.ts:179)
+  - id: CMD-RunQueue
+    name: Run the queue
+    actor: ACT-StageRunner
+    aggregate: AGG-GenerationQueue
+    produces: [EVT-AttemptGenerated, EVT-AttemptGenerationFailed, EVT-QueueRunStopped]
+    rules:
+      - Generates ready items lowest order first through generate (budget, cache, manifest, spend)
+      - A budget or config error puts the item back to pending and stops the run; a validation error marks it error; other failures are tried again with a ComfyUI restart in between
+      - A killed run's generating items go back to pending on the next run
+  - id: CMD-GiveVerdict
+    name: Give a verdict
+    actor: ACT-ArtDirector
+    produces: [EVT-VerdictGiven]
+    rules:
+      - Fail only for a blocking defect; any other issue is a verdict note and the verdict stays pass; a fail with verdict notes only becomes a pass – for every verdict, also outside the queue (HS-34)
+      - A clip is judged by its first, middle and last frame; a first frame below 20 dB PSNR against its keyframe is pointed out for comparison
+      - From attempt 2 on, the art director checks the focus and new blocking defects and raises no new verdict notes
+  - id: CMD-ApplyVerdict
+    name: Apply a verdict
+    actor: ACT-QueueRun
+    aggregate: AGG-GenerationQueue
+    produces: [EVT-AttemptFiled, EVT-QueueItemRequeued, EVT-QueueItemNeedsFix]
+    rules:
+      - A pass files the attempt at out, which makes the items after it ready
+      - A failed image with a usable fix prompt and fewer than max attempts is requeued with the fix prompt as its prompt, seed + 1, the blocking issues as focus and a new order
+      - Any other fail – a clip, an audio item, a fix prompt "none", the limit reached – leaves the item needing a fix
+  - id: CMD-RetryQueueItem
+    name: Retry queue item
+    actor: ACT-StageRunner
+    aggregate: AGG-GenerationQueue
+    produces: [EVT-QueueItemRequeued]
+    description: "Requeue an item by hand; the command is spelled queue retry (HS-32)"
+    rules:
+      - Optional new prompt, changed item fields, a provider for one attempt (cloud fallback) or a seed
+      - An unchanged item whose last attempt has no verdict is only judged again
+      - Refused for a passed item; redo a filed item with a replace (HS-38; the code allows it – gap register)
+      - The stage runner may give one attempt a cloud provider (cloud fallback) after 3 failed local attempts
+  - id: CMD-AcceptAttempt
+    name: Accept attempt
+    actor: ACT-User
+    aggregate: AGG-GenerationQueue
+    produces: [EVT-AttemptAccepted, EVT-AttemptFiled]
+    rules:
+      - The given attempt, or the best one (highest score, the later on a tie), is filed at out and the item counts as passed
+      - The user may accept any attempt; the stage runner only the best one after the cloud attempt failed, writing its last issues into the batch notes (HS-42)
+  - id: CMD-DropQueueItem
+    name: Drop queue item
+    actor: ACT-StageRunner
+    aggregate: AGG-GenerationQueue
+    produces: [EVT-QueueItemDropped]
+    rules:
+      - Refused while generating or reviewing; the item's files stay
+  - id: CMD-PatchRegion
+    name: Patch a region
+    actor: ACT-StageRunner
+    aggregate: AGG-GenerationQueue
+    produces: [EVT-RegionPatched]
+    rules:
+      - Crops the box, runs it as an image edit through generate (cache, manifest, budget), pastes it back with a soft edge; pixels outside the box do not change
+      - The patched image is the next attempt of the image's queue item (HS-40; the code numbers it from verdicts.jsonl and leaves queue.json alone – gap register)
 
 policies:
   - id: POL-RunNextStage
@@ -256,6 +407,16 @@ policies:
     when: [EVT-ReviewRoundAnswered]
     then: [CMD-ResetStage]
     description: An orchestrator rule (/video-next "Review rounds" step 4), only when the fix pass changed a render; ADR 0032's unconditional wording is a gap
+  - id: POL-JudgeEveryAttempt
+    name: Every attempt with a verdict target is judged
+    when: [EVT-AttemptGenerated]
+    then: [CMD-GiveVerdict]
+    description: "In the background while the queue run generates on (at most --reviews, default 2, started at once); an item without a verdict target is filed directly"
+  - id: POL-ApplyVerdict
+    name: The queue run applies every verdict
+    when: [EVT-VerdictGiven]
+    then: [CMD-ApplyVerdict]
+    description: A verdict on a queue attempt files it, requeues it, or leaves the item waiting for a fix
 
 read_models:
   - id: RM-Status
@@ -284,6 +445,18 @@ read_models:
     fed_by: [EVT-ReviewRoundSent, EVT-ReviewRoundAnswered]
     used_by: [ACT-Orchestrator, ACT-User]
     fields: [Round number, Render, Note count, Round file, Replies file]
+  - id: RM-QueueStatus
+    name: Queue status
+    fed_by: [EVT-QueueItemAdded, EVT-QueueItemReplaced, EVT-AttemptGenerated, EVT-AttemptGenerationFailed, EVT-AttemptFiled, EVT-QueueItemRequeued, EVT-QueueItemNeedsFix, EVT-AttemptAccepted, EVT-QueueItemDropped]
+    used_by: [ACT-StageRunner, ACT-User]
+    fields: [Item id, Queue item status, Attempt number, Blocked by, Note, Error, Blocking issues]
+    description: queue status and queue wait; the board's queue counts and items and the watchdog's needs-fix pulse read the same file loosely
+  - id: RM-LatestVerdicts
+    name: Latest verdicts
+    fed_by: [EVT-VerdictGiven, EVT-AttemptAccepted]
+    used_by: [ACT-Orchestrator, ACT-StageRunner, ACT-User]
+    fields: [Subject, Verdict, Score, Attempt number, Image or clip, Blocking issues]
+    description: "verdicts [--failed] and the board's failed verdicts: the last verdict per subject, a clip apart from its keyframe; an accepted subject shows as accepted, not failed (HS-37; missing – gap register). Read twice today (verdicts.ts, board-production.ts)"
 
 hotspots:
   - id: HS-1
@@ -426,6 +599,96 @@ hotspots:
     refs: [CMD-AddReviewNote]
     status: resolved
     resolution: "Shorts are not reviewed in the board; the 9:16 render they are cut from is. Intended as is; the desktop player covers special cases. (user, 2026-11-21)"
+  - id: HS-29
+    question: "What is the context called – 'Generation queue' (the glossary term and the board's word) or 'Art direction' (the job: get every generated asset approved)?"
+    refs: [BC-GenerationQueue]
+    status: resolved
+    resolution: "The context is Generation queue (BC-GenerationQueue), after the glossary term and the board's word (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-30
+    question: "There is no glossary term for the art director's judgement. Is it a Verdict, with every 'review' word for the art director (review-image, status reviewing, the review target, failedReviews, 'reviewer') a code spelling and a gap?"
+    refs: [EVT-VerdictGiven, CMD-GiveVerdict]
+    status: resolved
+    resolution: "Verdict is the term: one judgement of the art director on one attempt or image; the art director judges. Every review word for it in code and UI (review-image, status reviewing, the item field review, failedReviews, reviewer, \"Art-director reviews\") is a spelling and a gap (recommendation; the user agreed without reviewing it – delegated, 2026-11-21)"
+  - id: HS-31
+    question: "Only a blocking defect fails; everything else is an issue prefixed 'note:'. 'Note' collides with Review Note. What are the two kinds of issue called?"
+    refs: [CMD-GiveVerdict]
+    status: resolved
+    resolution: "Blocking Defect (the fixed list that fails a verdict) and Verdict Note (any other issue; never fails). Avoid note alone and minor issue; the note: prefix is a spelling (recommendation; the user agreed without reviewing it – delegated, 2026-11-21)"
+  - id: HS-32
+    question: "'queue retry' and RetryOptions use 'retry', which the glossary avoids for Attempt; '--tries' is a third counter (provider calls inside one attempt). Which words apply?"
+    refs: [CMD-RetryQueueItem, CMD-RunQueue]
+    status: resolved
+    resolution: "The verb is requeue: the queue run requeues a failed image, the stage runner requeues an item with queue retry (a spelling, gap). Tries inside one attempt are technical, no domain term (recommendation; the user agreed without reviewing it – delegated, 2026-11-21)"
+  - id: HS-33
+    question: "Status passed covers three cases: a pass verdict, an item without a verdict target, and a hand accept. The glossary says 'approved' and 'filed'. Which words, and must the three cases stay distinguishable?"
+    refs: [EVT-AttemptFiled, EVT-AttemptAccepted]
+    status: resolved
+    resolution: "An approved attempt has a pass verdict or an accept; filed means copied to the item's out path; an item without a verdict target is filed unjudged. Status passed stays, but the three cases must stay distinguishable – today only an accept marks itself (gap) (recommendation; the user agreed without reviewing it – delegated, 2026-11-21)"
+  - id: HS-34
+    question: "art-director.md says 'any drift is a fail', 'fail it on any doubt', palette and light are axes, and answers in text; the queue's prompt fails only for a blocking defect and forces JSON. Which fail rule holds for every verdict?"
+    refs: [CMD-GiveVerdict]
+    status: resolved
+    resolution: "The blocking-defect rule holds for every verdict, also when the art director runs as a subagent (thumbnails); art-director.md's strictness wording and text answer are a gap. Bench rubric scores are not verdicts (recommendation; the user agreed without reviewing it – delegated, 2026-11-21)"
+  - id: HS-35
+    question: "The glossary says the art director judges 'stills and keyframes'; it judges clips (by frames), sheets, states, plates, props, thumbnails and bench results too. Sharpen the definition?"
+    refs: [ACT-ArtDirector]
+    status: resolved
+    resolution: "Sharpened: the art director judges every generated image and clip (by its frames), continuity references, thumbnails and covers, and scores bench results against a rubric (recommendation; the user agreed without reviewing it – delegated, 2026-11-21)"
+  - id: HS-36
+    question: "A verdict is written twice: the full line to verdicts.jsonl and verdict, score, issues, fix prompt into the queue attempt; verdicts outside the queue (review-image by hand, the series canon) exist only in the log. Which is the record?"
+    refs: [EVT-VerdictGiven, RM-LatestVerdicts]
+    status: resolved
+    resolution: "verdicts.jsonl is the record of every verdict; the queue attempt holds a copy the queue run decides from (intended). The two readers of the log are a gap (recommendation; the user agreed without reviewing it – delegated, 2026-11-21)"
+  - id: HS-37
+    question: "An accept writes no verdict, so an accepted subject stays failed in 'verdicts --failed', which the orchestrator reads, and on the board. How must the read models show an accepted attempt?"
+    refs: [EVT-AttemptAccepted, RM-LatestVerdicts]
+    status: resolved
+    resolution: "An accept is its own event; the latest-verdicts view shows an accepted subject as accepted, and verdicts --failed leaves it out. Missing today – gap (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-38
+    question: "Which transitions are legal? accept has no status check (a running review can later overwrite the accept); retry from passed regenerates a filed item; replace resets a passed item whose dependants may already be filed."
+    refs: [CMD-AcceptAttempt, CMD-RetryQueueItem, CMD-AddQueueItem]
+    status: resolved
+    resolution: "accept, retry and drop are refused while an item is generating or reviewing; retry is refused for a passed item (redo it with add --replace); replacing a passed item returns every passed item after it to pending, as a stage reset does (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-39
+    question: "The instructions cap an item at 3 local attempts and one cloud attempt (clips 3); the code caps only the automatic requeue of images, retry has no limit, and attempts kept from before a replace count. What is the rule, and does a replace start the count again?"
+    refs: [AGG-GenerationQueue, CMD-RetryQueueItem]
+    status: resolved
+    resolution: "At most 3 local attempts and one cloud attempt per item, clips included, counted since the item's last replace; the queue enforces it for the automatic requeue and for queue retry. Only the requeue of images is capped today – gap (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-40
+    question: "A region patch writes an attempt file but not into queue.json, numbering from verdicts.jsonl while the queue numbers from queue.json (the same -a<n> file can be written twice); for a series canon it reads the wrong log. Is a region patch an attempt of its queue item?"
+    refs: [EVT-RegionPatched, CMD-PatchRegion]
+    status: resolved
+    resolution: "A region patch is an attempt of its queue item: recorded in queue.json and numbered by the queue, so there is one counter. The series canon reading the wrong verdict log is a bug – gap (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-41
+    question: "queue.json changes are read-modify-write without a lock between processes (add, retry, accept, drop during a run), and the run lock is check-then-write. Is 'no lost write, one run per project' an invariant as for state.json and review notes?"
+    refs: [AGG-GenerationQueue]
+    status: resolved
+    resolution: "Invariant: no writer of queue.json loses another writer's change, and at most one queue run works on a project. Neither is enforced (no lock around read-modify-write; check-then-write run lock) – gap (recommendation; the user agreed without reviewing it – delegated, 2026-11-21)"
+  - id: HS-42
+    question: "Who may accept an attempt? ai-clips lets the stage runner accept the best attempt after the cloud attempt fails, and says 'the user's eye wins'."
+    refs: [CMD-AcceptAttempt]
+    status: resolved
+    resolution: "The user may accept any attempt at any time, and a user's accept is never undone by the agent; the stage runner may accept the best attempt only after the cloud attempt failed, with its last issues in the batch notes (as ai-clips says) (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-43
+    question: "The series canon is judged with review-image and patch by hand; the new-series skill says the queue is for projects only. Intended, or a gap?"
+    refs: [BC-GenerationQueue]
+    status: resolved
+    resolution: "Intended: the series canon is judged with review-image and patch by hand, since it is built interactively with the user; the queue is for projects (recommendation; the user agreed without reviewing it – delegated, 2026-11-21)"
+  - id: HS-44
+    question: "No ADR records the queue's decisions (headless art director with a JSON schema, one run per project, background verdicts, attempts as files, the one-attempt cloud fallback, the ComfyUI restart, notes never fail). Record them in one proposed ADR?"
+    refs: [BC-GenerationQueue]
+    status: resolved
+    resolution: "One ADR records the queue's decisions: ADR 0038 (Proposed) (recommendation; the user agreed without reviewing it – delegated, 2026-11-21)"
+  - id: HS-45
+    question: "The slice's domain logic (queue states and transitions, verdict type and schema, the blocking-defect rule) lives in cli; core only counts statuses. Decision or accident?"
+    refs: [AGG-GenerationQueue]
+    status: resolved
+    resolution: "Accident: queue states and transitions, the verdict type and schema, and the blocking-defect rule belong in core (schema.ts, ADR 0004); nothing moves now – gap (recommendation; the user agreed without reviewing it – delegated, 2026-11-21)"
+  - id: HS-46
+    question: "The consistency boundary in code is the whole queue.json of a project (dependencies and order across items), not one item. Keep the aggregate as recovered (as-is)?"
+    refs: [AGG-GenerationQueue]
+    status: resolved
+    resolution: "The whole queue of a project stays the aggregate as recovered (as-is) (recommendation; the user agreed without reviewing it – delegated, 2026-11-21)"
 
 flows:
   - id: FLOW-AutonomousStage
@@ -434,3 +697,6 @@ flows:
   - id: FLOW-ReviewRound
     name: From a note to its reply
     sequence: [ACT-User, CMD-AddReviewNote, EVT-ReviewNoteAdded, CMD-SendReviewRound, EVT-ReviewRoundSent, POL-AnswerOpenRounds, CMD-AnswerReviewRound, EVT-ReviewRoundAnswered, POL-RebuildQaAfterFixes]
+  - id: FLOW-QueueItem
+    name: From a queue item to a filed attempt
+    sequence: [ACT-StageRunner, CMD-AddQueueItem, EVT-QueueItemAdded, CMD-RunQueue, EVT-AttemptGenerated, POL-JudgeEveryAttempt, CMD-GiveVerdict, EVT-VerdictGiven, POL-ApplyVerdict, CMD-ApplyVerdict, EVT-AttemptFiled]

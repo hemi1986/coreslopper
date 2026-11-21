@@ -35,7 +35,7 @@ Files that share a concept stem or a table across layers. These are suggestions 
 
 | Concept | Layers | Files | Tables | Why | Adopted |
 |---|---|---|---|---|---|
-| review | cli, core, scripts, tests | 9 | – | 4 layers: cli, core, scripts, tests; 4 packages; 9 files | yes |
+| review | cli, core, scripts, tests | 10 | – | 4 layers: cli, core, scripts, tests; 4 packages; 10 files | yes |
 | timing | core, remotion, scripts, tests | 5 | – | 4 layers: core, remotion, scripts, tests; 4 packages; 5 files | – |
 | episode | cli, core, tests | 6 | – | 3 layers: cli, core, tests; 3 packages; 6 files | – |
 | release | cli, core, tests | 20 | – | 3 layers: cli, core, tests; 3 packages; 20 files | – |
@@ -50,12 +50,13 @@ Files that share a concept stem or a table across layers. These are suggestions 
 | init | cli, tests | 3 | – | 2 layers: cli, tests; 2 packages; 3 files | – |
 | lipsync | cli, tests | 3 | – | 2 layers: cli, tests; 2 packages; 3 files | – |
 | production | cli, core | 3 | – | 2 layers: cli, core; 2 packages; 3 files | – |
+| state | core, tests | 3 | – | 2 layers: core, tests; 2 packages; 3 files | – |
 | autopilot | cli, core | 2 | – | 2 layers: cli, core; 2 packages; 2 files | – |
 | clip | cli, tests | 2 | – | 2 layers: cli, tests; 2 packages; 2 files | – |
 | comfyui | providers, tests | 2 | – | 2 layers: providers, tests; 2 packages; 2 files | – |
 | contact | cli, tests | 2 | – | 2 layers: cli, tests; 2 packages; 2 files | – |
-| fal | providers, tests | 2 | – | 2 layers: providers, tests; 2 packages; 2 files | – |
 | pipeline | – | 0 | – | marked adopted manually | yes |
+| verdict | – | 0 | – | marked adopted manually | yes |
 
 Adopt a concept slice with:
 

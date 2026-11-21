@@ -1,6 +1,6 @@
 # Engineering conventions – coreslopper
 
-> How the code is built here, recovered by `/adopt` (slices: project and stage pipeline; human review – 2026-11-21). The ADRs
+> How the code is built here, recovered by `/adopt` (slices: project and stage pipeline; human review; generation queue and verdicts – 2026-11-21). The ADRs
 > decide WHAT; this file says HOW. Sections other slices own are marked as such. When code and this file
 > disagree, raise it – don't silently follow either.
 
@@ -50,6 +50,14 @@ state in memory), one core transition (`setStageRunning`, `setStageDone`, `setSt
 - IDs: project and series slugs (kebab-case folder names), stage IDs from the kind's stage list in `state.ts`.
 - Orchestration rules – interactive gate, review-mode stop, hard stops, batch size – live in agent instructions
   (`workspace/.claude/commands/video-next.md`), not in code.
+- The generation queue is the exception to "rules in core": its states, transitions and Zod schema live in
+  `packages/cli/src/queue.ts`, the verdict type and the blocking-defect rule in `review-image.ts` (gap G-39).
+  `queue.json` is written whole through temp file and rename, without a lock (G-32).
+- Long-running work is a background process with its own lock file and a `wait` command (`queue run` /
+  `queue wait`, `assets/queue.lock`); a stage runner starts it with the Bash tool's `run_in_background`.
+- Agent judgement inside a command runs headless: `claude -p --agent <name> --json-schema <schema>`
+  (`review-image.ts` `claudeRunner`), binary and timeout from `CORESLOPPER_CLAUDE_BIN` and
+  `CORESLOPPER_REVIEW_TIMEOUT_MS`.
 
 ## Read models
 
@@ -81,5 +89,7 @@ directory. `tests/helpers/release-fixture.ts` builds release projects.
 | Command | the CLI command or the function it calls, on a project in a temp directory | integration | `tests/episode.test.ts` |
 | Read model | the read-model function on a project in a temp directory | integration | `tests/board-production.test.ts` |
 | Page, form, flow | the board's HTTP API | integration | `tests/board-review.test.ts` |
+| Queue run | `runQueue(dir, { deps })` with injected `generate`, `review`, `restart`, `log` (`QueueDeps`) | integration | `tests/queue.test.ts` |
+| Headless agent | `reviewImage(dir, { runner })` with a fake runner returning the JSON | unit | `tests/review-image.test.ts` |
 | Python helper | the helper's functions | unit (pytest, `npm run python:test`) | `scripts/review-player/tests/test_review_notes.py` |
 | Agent instruction | not testable deterministically | – | `workspace/.claude/commands/video-next.md` |

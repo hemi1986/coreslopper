@@ -9,6 +9,7 @@
 |---|---|---|---|---|---|---|
 | GAP-AGG-Project | as-is boundary | [AGG-Project](events.yaml) | [BC-Pipeline](context-map.as-is.md#bc-pipeline--pipeline) | – | state.json per project, loaded and saved as one document (packages/core/src/project.ts:171-184,233-236)<br>stage transitions mutate one State (packages/core/src/state.ts:250-324)<br>budget ledger inside the same State (packages/core/src/state.ts:326-341) | Decide the target boundary |
 | GAP-AGG-ProjectReview | as-is boundary | [AGG-ProjectReview](events.yaml) | [BC-Review](context-map.as-is.md#bc-review--review) | – | one lock per project review folder, review/.notes.lock, around every note change and every send (packages/cli/src/board-review.ts:38,202,238)<br>round numbers from all rounds of the project (packages/core/src/review.ts:37; board-review.ts:242)<br>notes per render in review/notes/<video-stem>.json, rounds in review/rounds/<NNN>.json (board-review.ts:50,62-78) | Decide the target boundary |
+| GAP-AGG-GenerationQueue | as-is boundary | [AGG-GenerationQueue](events.yaml) | [BC-GenerationQueue](context-map.as-is.md#bc-generationqueue--generation-queue) | – | assets/queue.json per project, read, changed and written whole on every change (packages/cli/src/queue.ts:101-119)<br>an item waits for the items in its after list across the whole queue (queue.ts:524-529); order numbers are taken from the whole queue (queue.ts:127)<br>one queue run per project, pid lock assets/queue.lock (queue.ts:562-578,671-674) | Decide the target boundary |
 <!-- kataster:gap-register:end -->
 
 ## Gaps found by the adoption of the project and stage pipeline (2026-11-21)
@@ -60,6 +61,41 @@ Decisions for human review:
 - Exists and is intended: rounds numbered once per project; open rounds oldest first; a note on a cut belongs
   to both shots; a range note's section is the one at its start; Shorts are reviewed through their 9:16 render;
   board writes limited to the board's own origin; the board writes review files (ADR 0032 covers it).
+
+## Gaps found by the adoption of the generation queue and verdicts (2026-11-21)
+
+Candidates only. The decisions behind them were made by recommendation and not reviewed by the user
+(delegated); priority is a suggestion.
+
+| # | Class | Gap | Evidence | Source | Priority |
+|---|---|---|---|---|---|
+| G-32 | Exists but contradicts | `queue.json` changes are read-modify-write without a lock between processes: a `queue add`, `retry`, `accept` or `drop` during a run can be lost; the run lock is check-then-write | `packages/cli/src/queue.ts:111-119,671-674` | HS-41 | high |
+| G-33 | Exists but contradicts | `accept` checks no status; a verdict that lands after an accept overwrites the accepted item | `queue.ts:484-500,694` | HS-38, HS-42 | high |
+| G-34 | Exists but contradicts | The attempt cap holds only for the automatic requeue of images: `queue retry` has no limit, no cap on cloud attempts, and attempts kept from before a replace count | `queue.ts:434-473,705`; `workspace/.claude/skills/ai-clips/SKILL.md` step 6 | HS-39 | medium |
+| G-35 | Exists but contradicts | A region patch is not recorded in `queue.json` and numbers its attempt from `verdicts.jsonl`; `queue accept --attempt` cannot pick it, and a later queue attempt can write the same `-a<n>` file | `packages/cli/src/patch.ts:73-77`; `queue.ts:461,766` | HS-40 | medium |
+| G-36 | Exists but contradicts | `patch --series` reads `<series>/assets/review/verdicts.jsonl`; `review-image` writes `<series>/review/verdicts.jsonl`, so a canon patch is always attempt 2 | `patch.ts:73`; `review-image.ts:300`; `verdicts.ts:33-35` | HS-40 | medium |
+| G-37 | Missing | An accept writes no verdict: `verdicts --failed`, which the orchestrator reads, and the board still show an accepted subject as failed | `queue.ts:484-501`; `verdicts.ts:42-50`; `board-production.ts:297` | HS-37 | medium |
+| G-38 | Exists but contradicts | `art-director.md` fails "on any doubt", counts palette and light, and answers in text; the rule is: only a blocking defect fails, JSON verdict | `workspace/.claude/agents/art-director.md` "Review axes", "Response"; `review-image.ts:106-108` | HS-34 | medium |
+| G-39 | Exists but contradicts | The queue's schema and transitions, the verdict type and schema, and the blocking-defect rule live in `cli`; no schema in `schema.ts` or `schema/` (ADR 0004) | `queue.ts:31-80`; `review-image.ts:13-49,159` | HS-45 | medium |
+| G-40 | Exists but contradicts | `queue retry` requeues a passed item; replacing a passed item leaves the passed items after it filed | `queue.ts:434-437,179-193` | HS-38 | low |
+| G-41 | Exists but contradicts | Status `passed` does not tell a pass verdict from an item filed unjudged | `queue.ts:775-782` | HS-33 | low |
+| G-42 | Exists but contradicts | The verdict log and the queue are read twice, with different parsing: `verdicts.ts` / `queue.ts` and `board-production.ts` | `verdicts.ts:7-21`; `board-production.ts:163-205` | HS-36 | low |
+| G-43 | Exists but contradicts | The art director's verdicts use review words: `review-image`, status `reviewing`, the item field `review`, `--reviews`, `failedReviews`, "reviewer" (continues G-28) | `queue.ts:27,31,34,607`; `index.ts:1068`; `board-production.ts:297` | HS-30 | low |
+| G-44 | Exists but contradicts | The command and its options say retry (`queue retry`, `RetryOptions`); the domain verb is requeue | `index.ts:1329`; `queue.ts:419-434` | HS-32 | low |
+| G-45 | Exists but contradicts | `--reviews` reads as a cap, but a verdict started right after a generation ignores it; up to `reviews + 2` run at once | `queue.ts:784,813,820` | analyst | low |
+| G-46 | Exists but contradicts | `queue wait` reports an item in `error` as `needs-fix` | `queue.ts:851-872` | analyst | low |
+| G-47 | Exists but contradicts | `ai-clips` says a patch is "filed as the next attempt"; the queue does not know it (follows G-35) | `ai-clips/SKILL.md` step 6 | HS-40 | low |
+| G-48 | Dead | `QueueAttempt.provider` is written and read by no code or view | `queue.ts:773` | analyst | low |
+
+Decisions (by recommendation, not reviewed by the user):
+
+- GAP-AGG-GenerationQueue: the boundary stays as recovered (`as-is`).
+- Exists and is intended: one run per project working the items in order; attempts kept as files and only an
+  approved one filed; verdicts in the background so the GPU never waits; verdict notes never fail and never
+  requeue; a failed image requeues itself with the fix prompt, a new seed and its blocking defects as focus; a
+  failed clip waits for the stage runner; the one-attempt cloud fallback; the ComfyUI restart; `drop` keeps the
+  files; the append-only verdict log that skips torn lines; the series canon judged by hand (HS-43). ADR 0038
+  (proposed) records them.
 
 ## Decisions
 

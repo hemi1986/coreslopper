@@ -287,15 +287,15 @@ A JSON or YAML array of one or more generation requests executed with budget, ca
 _Avoid_: job
 
 **Generation Queue**:
-The list of a project's open generations in `assets/queue.json`, worked by `queue run`: each item is generated, reviewed, and filed at its `out` path once approved; an item waits for the items it derives from.
+The list of a project's open generations in `assets/queue.json`, worked by one `queue run` at a time: each item is generated, judged by the art director, and filed at its `out` path once an attempt is approved; a failed image is requeued with the verdict's fix prompt; an item waits for the items it derives from.
 _Avoid_: worker, job list
 
 **Attempt**:
-One generated version of a queue item, kept as `attempts/<name>-a<n>` next to its `out` path with its verdict. Only an approved attempt is filed.
+One generated or patched version of a queue item, kept as `attempts/<name>-a<n>` next to its `out` path with its verdict. An item has at most three local attempts and one cloud attempt since it was last replaced. An attempt is approved by a pass verdict or an accept; only an approved attempt is filed. Putting an item back for its next attempt is a requeue.
 _Avoid_: retry, version
 
 **Region Patch**:
-An edit of one box of an image that is pasted back with a soft edge (`patch`), so everything outside the box stays unchanged.
+An edit of one box of an image that is pasted back with a soft edge (`patch`), so everything outside the box stays unchanged. The result is the next attempt of the image's queue item.
 _Avoid_: inpaint, crop fix
 
 **Provider Adapter**:
@@ -351,8 +351,20 @@ The coarse state of a whole project, derived from its stage states and shown on 
 _Avoid_: project stage, project status
 
 **Art Director**:
-The automated critic that judges stills and keyframes against the style bible and character references.
+The automated critic that gives a verdict on every generated image and clip (a clip by its frames), on continuity references, thumbnails, and covers, against the style bible, the character references, and the canon. It also scores bench results against a case rubric; those scores are not verdicts.
 _Avoid_: reviewer
+
+**Verdict**:
+The art director's judgement of one attempt or image: pass or fail, a score from 0 to 10, its issues, and a fix prompt for the next attempt. Every verdict is recorded in `verdicts.jsonl`; the latest verdict per shot or reference counts. Only a blocking defect fails.
+_Avoid_: review, rating
+
+**Blocking Defect**:
+An issue that fails a verdict, from a fixed list: a wrong or drifted character identity, wrong anatomy, a wrong continuity state or attachment or something physically impossible, a missing or wrong named prop, character, or plate, misspelled screen text, a break with an approved neighbouring frame, a recognizable real person or trademark.
+_Avoid_: error, fail reason
+
+**Verdict Note**:
+Any issue in a verdict that is not a blocking defect, such as light, texture, or taste. It never fails a verdict and never causes a new attempt.
+_Avoid_: note (alone), minor issue
 
 **QA Checker**:
 The automated critic that checks coverage, sync, readability, determinism, and manifest/cost consistency.

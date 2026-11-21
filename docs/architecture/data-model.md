@@ -1,7 +1,7 @@
 # Logical data model – coreslopper
 
 > **As-is** for the adopted slices, recovered from `packages/core/src/schema.ts` (Zod is the source, ADR 0004).
-> Slices: project and stage pipeline (2026-11-21); human review (draft, 2026-11-21). Open points are hotspots in `docs/domain/events.yaml`.
+> Slices: project and stage pipeline (2026-11-21); human review (2026-11-21); generation queue and verdicts (2026-11-21, decided by recommendation). Open points are hotspots in `docs/domain/events.yaml`.
 
 ## Aggregates
 
@@ -58,7 +58,7 @@ mechanical flag (no reader). Music video: `setup`✋ `brief`✋ `treatment`✋ `
 `storyboard` `assets` `assembly` `qa-export`. Episode: `setup`✋ `script`✋ `voice-track` `episode-track`
 `storyboard` `assets` `assembly` `qa-export`. Order is list order; there are no other dependencies.
 
-### AGG-ProjectReview – Project review (as-is, draft)
+### AGG-ProjectReview – Project review (as-is)
 
 Files in `projects/<slug>/review/`. The board changes notes and sends rounds under one lock per project
 (`review/.notes.lock`); the desktop player writes notes without it; the agent writes replies.
@@ -91,6 +91,67 @@ stateDiagram-v2
   sent --> open
   open --> answered: Review round answered
 ```
+
+### AGG-GenerationQueue – Generation queue (as-is)
+
+One file per project, `assets/queue.json` (`{version: 1, items}`), read, changed and written whole through a
+temp file and a rename (`packages/cli/src/queue.ts:111-119`). The Zod schema lives in the CLI, not in
+`schema.ts` (gap). The run lock is `assets/queue.lock` with the run's pid.
+
+**Queue item**
+
+| Attribute | Type | Required | Source |
+|---|---|---|---|
+| Item id | QueueItemId (`keyframe:<shot>`, `clip:<shot>`, or hand-written) | yes | EVT-QueueItemAdded |
+| Kind | `image` \| `clip` \| `audio` (from the generation operation) | yes | EVT-QueueItemAdded |
+| Generation item | the batch item as `generate` takes it | yes | EVT-QueueItemAdded, EVT-QueueItemReplaced, EVT-QueueItemRequeued |
+| Out path | ProjectPath (an episode may file under `../<series>/`) | yes | EVT-QueueItemAdded |
+| Verdict target | ShotId or reference label (`sheet:`, `state:`, `plate:`, `prop:`), one of both | no – absent: filed unjudged | EVT-QueueItemAdded |
+| After | list of QueueItemId (an id not in the queue counts as done) | default empty | EVT-QueueItemAdded |
+| Chain from | QueueItemId of a clip whose last frame starts this one | no | EVT-QueueItemAdded |
+| Provider for the next attempt | ProviderKind (cloud fallback), cleared after one attempt | no | CMD-RetryQueueItem |
+| Status | QueueItemStatus | default `pending` | every event |
+| Attempt number | next or last attempt | default 1 | EVT-AttemptGenerated, EVT-QueueItemRequeued |
+| Order | Integer; a requeued item gets a new, higher one | yes | EVT-QueueItemAdded, EVT-QueueItemRequeued |
+| Focus | the blocking defects the next verdict checks first | no | EVT-QueueItemRequeued, EVT-QueueItemNeedsFix |
+| Note, Error | Text | no | EVT-QueueItemNeedsFix, EVT-AttemptAccepted, EVT-AttemptGenerationFailed |
+
+**Attempt (inside the item)** – Attempt number, Attempt file (`<out dir>/attempts/<name>-a<n>.<ext>`), Seed,
+Provider (written, read by no code), and a copy of its verdict: Verdict, Score, Issues, Fix prompt. Source:
+EVT-AttemptGenerated, EVT-VerdictGiven.
+
+**Verdict log (`assets/review/verdicts.jsonl`; series canon `<series>/review/verdicts.jsonl`)** – append-only,
+the record of every verdict (HS-36), outside the aggregate: Image, Subject (ShotId or reference label), Attempt
+number, Verdict (`pass` \| `fail`), Score (0–10), Issues (blocking defects and verdict notes, `note:` prefix),
+Fix prompt, Judged at (`reviewedAt`), Clip, Start frame PSNR. Source: EVT-VerdictGiven. The latest line per
+subject counts; a clip counts apart from its keyframe.
+
+**Patch log (`assets/review/patches.jsonl`)** – Image, Box, Prompt, References, Attempt file. Source:
+EVT-RegionPatched.
+
+```mermaid
+stateDiagram-v2
+  [*] --> pending: Queue item added
+  pending --> generating: ready (every item in after passed)
+  generating --> reviewing: Attempt generated (with a verdict target)
+  generating --> passed: Attempt generated (no verdict target, filed unjudged)
+  generating --> error: Attempt generation failed
+  generating --> pending: budget or config stop, killed run
+  reviewing --> passed: pass verdict, attempt filed
+  reviewing --> pending: failed image requeued with the fix prompt
+  reviewing --> needs_fix: failed clip, fix prompt none, or the cap reached
+  reviewing --> error: the verdict could not be given
+  needs_fix --> pending: requeued by hand (queue retry)
+  error --> pending: requeued by hand (queue retry)
+  needs_fix --> passed: attempt accepted
+  pending --> passed: attempt accepted
+  passed --> pending: replaced
+```
+
+Decided 2026-11-21 by recommendation (HS-38, HS-39, HS-41, HS-42), ahead of the code: no accept, requeue,
+replace or drop while `generating` or `reviewing`; no requeue of a `passed` item (a replace redoes it, and
+returns every passed item after it to `pending`); at most three local attempts and one cloud attempt since the
+last replace; a user's accept is final; no lost write and one run per project.
 
 ## Lifecycle
 
@@ -130,4 +191,9 @@ erDiagram
   PROJECT ||--o{ REVIEW_ROUND : "numbered rounds"
   REVIEW_ROUND ||--|{ REVIEW_NOTE : "freezes"
   REVIEW_ROUND ||--o| REPLIES : "answered by"
+  PROJECT ||--o| GENERATION_QUEUE : "assets/queue.json"
+  GENERATION_QUEUE ||--o{ QUEUE_ITEM : "ordered items"
+  QUEUE_ITEM }o--o{ QUEUE_ITEM : "after, chain from"
+  QUEUE_ITEM ||--o{ ATTEMPT : "numbered attempts"
+  ATTEMPT ||--o{ VERDICT : "judged in verdicts.jsonl"
 ```

@@ -188,6 +188,7 @@
     {
       "name": "review",
       "terms": [
+        "characterization",
         "image",
         "note",
         "player",
@@ -202,6 +203,7 @@
         "scripts/review-player/review_notes.py",
         "scripts/review-player/review_player.py",
         "scripts/review-player/tests/test_review_notes.py",
+        "tests/review-characterization.test.ts",
         "tests/review-image.test.ts",
         "tests/review.test.ts"
       ],
@@ -221,7 +223,7 @@
       "reasons": [
         "4 layers: cli, core, scripts, tests",
         "4 packages",
-        "9 files"
+        "10 files"
       ],
       "adopted": true,
       "adoptedAt": "2026-11-21"
@@ -691,6 +693,33 @@
       ]
     },
     {
+      "name": "state",
+      "terms": [
+        "characterization",
+        "state"
+      ],
+      "tables": [],
+      "files": [
+        "packages/core/src/state.ts",
+        "tests/state-characterization.test.ts",
+        "tests/state.test.ts"
+      ],
+      "packages": [
+        "?",
+        "packages/core"
+      ],
+      "layers": [
+        "core",
+        "tests"
+      ],
+      "score": 11,
+      "reasons": [
+        "2 layers: core, tests",
+        "2 packages",
+        "3 files"
+      ]
+    },
+    {
       "name": "autopilot",
       "terms": [
         "autopilot",
@@ -795,32 +824,21 @@
       ]
     },
     {
-      "name": "fal",
-      "terms": [
-        "fal"
-      ],
+      "name": "pipeline",
+      "terms": [],
       "tables": [],
-      "files": [
-        "packages/providers/src/fal.ts",
-        "tests/fal-provider.test.ts"
-      ],
-      "packages": [
-        "?",
-        "packages/providers"
-      ],
-      "layers": [
-        "providers",
-        "tests"
-      ],
-      "score": 10,
+      "files": [],
+      "packages": [],
+      "layers": [],
+      "score": 0,
       "reasons": [
-        "2 layers: providers, tests",
-        "2 packages",
-        "2 files"
-      ]
+        "marked adopted manually"
+      ],
+      "adopted": true,
+      "adoptedAt": "2026-11-21"
     },
     {
-      "name": "pipeline",
+      "name": "verdict",
       "terms": [],
       "tables": [],
       "files": [],
