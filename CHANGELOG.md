@@ -1,5 +1,51 @@
 # Changelog
 
+## [0.9.0](https://github.com/hemi1986/coreslopper/compare/v0.8.0...v0.9.0) (2026-11-21)
+
+
+### Features
+
+* **ai-clips:** Pika H3 reference-to-video as the default for clips without lip-sync ([f5600f3](https://github.com/hemi1986/coreslopper/commit/f5600f3125453b78701443d4921e2d3bb23dcf32))
+* **bench:** run image-to-video cases as reference-to-video (as: referenceToVideo) ([83e262d](https://github.com/hemi1986/coreslopper/commit/83e262d91b8d12daeeb467328da588c23369c2a4))
+* **board:** production view of every project and series, the board as the workspace's hub ([07aef79](https://github.com/hemi1986/coreslopper/commit/07aef796525d2e21e78003ceea7c287e52285cdd))
+* **board:** watchdog round, render progress, and the board container ([e7c2599](https://github.com/hemi1986/coreslopper/commit/e7c2599cab0686096692470c2d604e7d3de61240))
+* **board:** web review player and review rounds the agent answers ([42b6e99](https://github.com/hemi1986/coreslopper/commit/42b6e99d62367432cfc2e5a99ec76d20ce6a6ad2))
+* **board:** wizard for new music videos, series, and episodes, with user references ([a2fc0a7](https://github.com/hemi1986/coreslopper/commit/a2fc0a7e6dce274aed5d0d097449edc2e34f4ead))
+* **comfyui:** Pika H3 Flex FL2VA, Pika frame count, required tags, model locks in config ([7347be5](https://github.com/hemi1986/coreslopper/commit/7347be54fda57999b29623542f7f3ccfa9ad85e3))
+* **comfyui:** Pika H3 Flex FL2VA, Pika frame count, required tags, model locks in config ([ff93c33](https://github.com/hemi1986/coreslopper/commit/ff93c33437a1d2145671abd91562f94228f26aff))
+* generation queue, patch, and runner commands for mechanical steps ([8017b96](https://github.com/hemi1986/coreslopper/commit/8017b9685bfdf135becd1e5cad01c4f48768419e))
+* generation queue, patch, and runner commands for mechanical steps ([73063bc](https://github.com/hemi1986/coreslopper/commit/73063bc237362d81a739761cadd67d25a6e3294c))
+* **lipsync:** Pika H3 lip-sync with an anchored vocal as the first local choice ([cb849c7](https://github.com/hemi1986/coreslopper/commit/cb849c7fd60f76ed4625de9db1d53a2ee279e77f))
+* **lipsync:** Pika H3 lip-sync with an anchored vocal as the first local choice ([6bfc386](https://github.com/hemi1986/coreslopper/commit/6bfc3862b5e661e00c41c19f0d1e7696d8fe2d13))
+* **publish:** social post adapter contract for the release autopilot ([3532a64](https://github.com/hemi1986/coreslopper/commit/3532a641e8a93d64350846ab47819112e64a0d42))
+* **publish:** X, LinkedIn, and Instagram post adapters; YouTube status, description, and comment calls; TikTok direct post ([ba29b3c](https://github.com/hemi1986/coreslopper/commit/ba29b3c56b1b053abd9deedff5799c3e138fc27f))
+* **release-board:** optional channel motto top right; tasks say done, posts say posted ([c022d9d](https://github.com/hemi1986/coreslopper/commit/c022d9dbf5a0d6cc2fa99d743e42868787de43dd))
+* **release:** announcement, story, and feed images with the release date, the teaser, and the 4:5 thumbnail format ([4af5277](https://github.com/hemi1986/coreslopper/commit/4af5277547ac6d8ef12b64065c9a5b1dfc32d6dc))
+* **release:** channel release defaults, autopilot doctor checks, schedule and channel templates ([2fa41ca](https://github.com/hemi1986/coreslopper/commit/2fa41ca8895b20cf115db3f3ba1af0cdb5959d40))
+* **release:** release autopilot — one approval, then the calendar posts by API ([e5cabdd](https://github.com/hemi1986/coreslopper/commit/e5cabdd754f83576d24f9ff472523c73ef779c22))
+* **release:** release board, cross-project release calendar, X/LinkedIn/microsite texts ([eac7dba](https://github.com/hemi1986/coreslopper/commit/eac7dbabc538fab310250affe6a7068372751589))
+* **release:** release board, cross-project release calendar, X/LinkedIn/microsite texts ([bea73af](https://github.com/hemi1986/coreslopper/commit/bea73af9b9610e45932ecc4bcd3d63bfc4ef1792))
+* **release:** release-backfill skill, feed format for Instagram and LinkedIn, board language ([769f4cc](https://github.com/hemi1986/coreslopper/commit/769f4ccfe8dc07bf48b5a50c1e51d38ede6cf7dd))
+* **release:** the release autopilot — approval on the board, release-run, release-timer, publish-auth for X, LinkedIn, Instagram ([ac7ca26](https://github.com/hemi1986/coreslopper/commit/ac7ca267256256c94ec21fa6888a7600c62f48f9))
+* review-image command and per-image art-director review loop ([ad4d298](https://github.com/hemi1986/coreslopper/commit/ad4d298682dfe13bf38cf192eabbd0ce27f6c802))
+* review-image command and per-image art-director review loop ([e4eaf95](https://github.com/hemi1986/coreslopper/commit/e4eaf959b4c1a7ed4f437e1998df8f03ab9cfa54))
+
+
+### Bug Fixes
+
+* **autopilot:** missing credentials need the user only once a post is due ([c776275](https://github.com/hemi1986/coreslopper/commit/c7762756cdf8223c8bb7573718508f8619e4a570))
+* **autopilot:** review findings — board writes only from its own page, approval per release day, locks, TikTok tokens and direct posts, timer PATH ([e44dde1](https://github.com/hemi1986/coreslopper/commit/e44dde1f11113fad9dfa52c2baaa0765469e7b86))
+* land --scrim and --text-offset ([#41](https://github.com/hemi1986/coreslopper/issues/41)) on main ([c81e8b1](https://github.com/hemi1986/coreslopper/commit/c81e8b13c42b8a525b2360ab65434d21cf45a360))
+* land the board ([#58](https://github.com/hemi1986/coreslopper/issues/58)–[#61](https://github.com/hemi1986/coreslopper/issues/61)) on main ([dcaa7fb](https://github.com/hemi1986/coreslopper/commit/dcaa7fbdc5044580918d1e5179aff10bbd64b4a4))
+* land the runner commands ([#53](https://github.com/hemi1986/coreslopper/issues/53)) on main ([1280f8f](https://github.com/hemi1986/coreslopper/commit/1280f8f4c3a43f724a1eded5eea7fb3232d20ddb))
+
+
+### Documentation
+
+* **release:** release board, calendar, and backfill in README, publishing, architecture, onboarding ([225f0ee](https://github.com/hemi1986/coreslopper/commit/225f0ee978663139f7514d567eaf37643e56faa8))
+* **skills:** video-qa and release-backfill reviewed with writing-for-agents ([1def34e](https://github.com/hemi1986/coreslopper/commit/1def34e50a2e30bb2b3975d21a1f2777ceaceacc))
+* the release autopilot — ADR 0029, publishing setup for X, LinkedIn, Instagram, glossary, skills, README ([967ff38](https://github.com/hemi1986/coreslopper/commit/967ff3876cb77bc0947fc9a451132b7470770220))
+
 ## [0.8.0](https://github.com/hemi1986/coreslopper/compare/v0.7.0...v0.8.0) (2026-11-19)
 
 
