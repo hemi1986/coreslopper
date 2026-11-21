@@ -6,13 +6,13 @@ license: MIT
 
 # New Series
 
-This skill builds a series **canon** in `series/<slug>/` with the user, in the main session: `series.yaml`, `bible.md`, `style.yaml`, `characters.yaml`, `sets.yaml`, and the references under `characters/<id>/` and `sets/<id>/`. Episodes read the canon and never change it, so everything an episode needs to look and sound like the series is decided here.
+This skill builds a series **canon** in `projects/<slug>/` with the user, in the main session: `series.yaml`, `bible.md`, `style.yaml`, `characters.yaml`, `sets.yaml`, and the references under `characters/<id>/` and `sets/<id>/`. Episodes read the canon and never change it, so everything an episode needs to look and sound like the series is decided here.
 
 Talk to the user in their language. Write every canon file in English, except reference-voice transcripts, which stay in the spoken language.
 
 ## Start or resume
 
-1. If the user named a slug and `series/<slug>/series.yaml` exists, run `npm run cli -- series-status <slug>` and resume at the first unfinished step: an empty bible → step 2, no characters or sets → step 3, characters or sets without references or speaking characters without a reference voice → step 4.
+1. If the user named a slug and `projects/<slug>/series.yaml` exists, run `npm run cli -- series-status <slug>` and resume at the first unfinished step: an empty bible → step 2, no characters or sets → step 3, characters or sets without references or speaking characters without a reference voice → step 4.
 2. Otherwise start at step 1.
 
 ## Steps
@@ -56,7 +56,7 @@ Done when `npm run cli -- series-status <slug>` lists every character, set, and 
 
 ### 4. References
 
-Generate through the series budget: `npm run cli -- generate --series <slug> --batch <file>` estimates, checks the series budget and batch cap, caches, and writes `series/<slug>/assets/manifest.jsonl`. Use `--dry-run` first. Give every item its `"out"` path inside the canon (`characters/<id>/sheet.png`, `sets/<id>/plates/<plate>.png`, …): `generate` files the result there, so nothing is copied by hand.
+Generate through the series budget: `npm run cli -- generate --series <slug> --batch <file>` estimates, checks the series budget and batch cap, caches, and writes `projects/<slug>/assets/manifest.jsonl`. Use `--dry-run` first. Give every item its `"out"` path inside the canon (`characters/<id>/sheet.png`, `sets/<id>/plates/<plate>.png`, …): `generate` files the result there, so nothing is copied by hand.
 
 - **Characters** shown on screen (`full`, `screen-only`, `silhouette`): a character sheet with `image.character_sheet`, then 2–4 references with `image.edit` from the sheet. Follow `.claude/skills/character-bible/SKILL.md` for descriptions and review. A `silhouette` character gets a silhouette sheet with no readable face.
 - **Sets**: one or more start frames per set with `image.keyframe` from the set's `prompt` plus the style's look keywords, at the master format's size.
@@ -65,7 +65,7 @@ Generate through the series budget: `npm run cli -- generate --series <slug> --b
 - **Character states** of the canon: an `image.edit` of the sheet per state, saved as `characters/<id>/states/<state>.png` and recorded in `ref` (see `.claude/skills/character-bible/SKILL.md`).
 - **Reference voices** for every character with speech: a recording by the user (a user reference of kind `voice` whose `subject` names the character), or, with `providers.audio: comfyui`, an `audio.voice_design` take ("(voice description)text"). Save it as `characters/<id>/voice.wav` and record `voice.ref` and the exact `voice.transcript` in `characters.yaml`.
 
-Record the filed paths in `sheet`, `refs`, and `ref`. Review every sheet, set frame, plate, prop, and state as soon as it exists with `npm run cli -- review-image series/<slug> --image <png> --ref <kind:id>`; it fails an image only for a blocking defect. Regenerate what fails with its `fix_prompt` (a new seed, the same `out`), or repair one region with `npm run cli -- patch --series <slug> --image <png> --box <x,y,w,h> --prompt "…" --ref <kind:id> --replace`. The generation queue (`queue`) works on projects only; a canon is small enough for this loop by hand.
+Record the filed paths in `sheet`, `refs`, and `ref`. Review every sheet, set frame, plate, prop, and state as soon as it exists with `npm run cli -- review-image projects/<slug> --image <png> --ref <kind:id>`; it fails an image only for a blocking defect. Regenerate what fails with its `fix_prompt` (a new seed, the same `out`), or repair one region with `npm run cli -- patch --series <slug> --image <png> --box <x,y,w,h> --prompt "…" --ref <kind:id> --replace`. The generation queue (`queue`) works on projects only; a canon is small enough for this loop by hand.
 
 Done when every on-screen character has a sheet and at least one reference, every set has at least one reference frame and every plate its image, every prop and state its reference, every speaking character has a reference voice with its transcript, the art director passed them, and `npm run cli -- character import <slug> --series` took the characters into the workspace library.
 
@@ -75,6 +75,6 @@ Report the series path, the series budget with canon spend (`series-status`), an
 
 ## Rules
 
-- References, voices, and generations stay under `series/<slug>/characters/`, `sets/`, `props/`, and `assets/`, which are gitignored; the YAML canon and `state.json` are tracked.
+- References, voices, and generations stay under `projects/<slug>/characters/`, `sets/`, `props/`, and `assets/`, which are gitignored; the YAML canon and `state.json` are tracked.
 - Change a character or set only before its first episode is generated: canon files are shared by every episode, and a changed reference changes the cache keys of every later generation. Episodes may append plates, props, and character states; they never change existing ones.
 - Never echo API keys.

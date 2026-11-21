@@ -73,11 +73,11 @@ export interface ProjectPaths {
 }
 
 /**
- * The folder of a series canon. Series live in `series/<slug>/` next to the
- * `projects/` folder that holds the episode.
+ * The folder of a series canon. A series is a project of its own,
+ * `projects/<slug>/` with a series.yaml, next to its episodes (ADR 0035).
  */
 export function seriesDir(projectDir: string, series: string): string {
-  return join(dirname(dirname(resolve(projectDir))), 'series', series);
+  return join(dirname(resolve(projectDir)), series);
 }
 
 /**

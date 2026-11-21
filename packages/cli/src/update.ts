@@ -12,6 +12,7 @@ import {
   runtimeDir as defaultRuntimeDir,
   type WorkspaceMarker,
 } from './workspace.js';
+import { LEGACY_LAYOUT_HINT, legacySeries } from './migrate-layout.js';
 
 /** Directories that never belong to the shipped workflow. */
 export const SKIPPED_DIRECTORIES = new Set([
@@ -225,9 +226,13 @@ export async function updateWorkspace(options: UpdateOptions): Promise<UpdateRes
     if (!dryRun) await install(join(runtime, path), join(target, path));
   };
 
+  // A series canon still in the old series/ folder must not get a second copy in projects/ before migrate-layout moves it.
+  const legacy = new Set(legacySeries(target));
   for (const [path, upstreamHash] of Object.entries(upstream)) {
     nextFiles[path] = upstreamHash;
     if (USER_OWNED_FILES.has(path)) continue;
+    const projectSlug = /^projects\/([^/]+)\//.exec(path)?.[1];
+    if (projectSlug && legacy.has(projectSlug)) continue;
 
     const local = join(target, path);
     const localExists = existsSync(local);
@@ -287,6 +292,7 @@ export async function updateWorkspace(options: UpdateOptions): Promise<UpdateRes
   }
 
   const warnings: string[] = [];
+  if (legacy.size) warnings.push(LEGACY_LAYOUT_HINT);
   if (dirtyGit && !dryRun) {
     warnings.push('The workspace had uncommitted changes before the update; "git diff" now mixes them with the update.');
   }

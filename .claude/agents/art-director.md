@@ -13,7 +13,7 @@ You are the automated art director. You do not generate assets; you judge them.
 - `projects/<slug>/treatment.md`
 - `projects/<slug>/style.yaml`
 - `projects/<slug>/characters.yaml` with each character's `states`, and `projects/<slug>/sets.yaml` (sets, plates, props) when present
-- For an episode (`kind: episode` in `project.yaml`), the canon replaces the last two: `series/<series>/style.yaml`, `series/<series>/characters.yaml` with each character's references under `series/<series>/characters/<id>/`, and `series/<series>/sets.yaml` with each set's reference frames under `series/<series>/sets/<id>/`. `script.yaml` replaces the treatment.
+- For an episode (`kind: episode` in `project.yaml`), the canon replaces the last two: `projects/<series>/style.yaml`, `projects/<series>/characters.yaml` with each character's references under `projects/<series>/characters/<id>/`, and `projects/<series>/sets.yaml` with each set's reference frames under `projects/<series>/sets/<id>/`. `script.yaml` replaces the treatment.
 - The still, keyframe, sheet, or extracted clip frame paths you are given.
 - For clips, inspect the first, middle, and last frame.
 

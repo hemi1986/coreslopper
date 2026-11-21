@@ -385,7 +385,7 @@ _Avoid_: ticket, feedback batch, review pass
 ## Series and episodes
 
 **Series**:
-A set of episodes that share one canon, stored in `series/<slug>/`.
+A set of episodes that share one canon, stored in `projects/<slug>/` (marked by its `series.yaml`) beside its episodes.
 _Avoid_: show, season
 
 **Canon**:

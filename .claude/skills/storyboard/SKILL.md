@@ -42,7 +42,7 @@ license: MIT
 
 For a project with `kind: episode` the storyboard covers the episode track instead of a song. What changes:
 
-- Inputs: `script.yaml` replaces the treatment and lyrics. Style, characters, and sets come from the series canon in `series/<series>/`; the project has no copies. You never change existing canon entries from an episode; you may only append plates, props, and character states (see "Continuity references").
+- Inputs: `script.yaml` replaces the treatment and lyrics. Style, characters, and sets come from the series canon in `projects/<series>/`; the project has no copies. You never change existing canon entries from an episode; you may only append plates, props, and character states (see "Continuity references").
 - Each scene is one section. Anchor shots to `section` and `line` edges; an episode has no beats, so `beat` and `downbeat` anchors fail.
 - A shot in a set names it in `refs.sets`. It must be the set of the shot's scene, and so must its plate; a cutaway to another place is its own scene in the script.
 - Show chat lines with `motion.component: ChatWindow` and `motion.props.lines: [<chat line ids>]`, chat lines of the shot's own scene. The window types each message at the script's typing speed.

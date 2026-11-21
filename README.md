@@ -121,7 +121,9 @@ Uploading stays yours: the board tells you what to post, and `publish` can uploa
 
 ## Series and episodes
 
-Besides music videos, coreslopper makes episodes of a series from a script instead of a song. A **series** has a canon in `series/<slug>/`: bible, style, characters, sets, reference images and voices, and an episode plan. Each **episode** is its own project that reads this canon and builds its audio from `script.yaml`: generated or recorded takes per line, ambience per scene, and English subtitles.
+Besides music videos, coreslopper makes episodes of a series from a script instead of a song. A **series** is a folder in `projects/` like every video, beside its episodes, with its canon: bible, style, characters, sets, reference images and voices, and an episode plan. Each **episode** is its own project that reads this canon and builds its audio from `script.yaml`: generated or recorded takes per line, ambience per scene, and English subtitles.
+
+A workspace from before series moved into `projects/` runs `npm run cli -- migrate-layout` once ([docs/onboarding.md](docs/onboarding.md#updating-a-workspace)).
 
 **Create the series once:**
 

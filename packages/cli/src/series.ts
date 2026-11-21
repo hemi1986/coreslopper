@@ -1,5 +1,5 @@
 import { existsSync, readdirSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import {
   CharacterBibleSchema,
   ProjectConfigSchema,
@@ -39,9 +39,9 @@ export interface SeriesBudget {
   remainingUsd?: number;
 }
 
-/** The episode projects of a series, from `projects/` next to `series/`. */
+/** The episode projects of a series: its siblings in `projects/` whose project.yaml names it. */
 async function episodeConfigs(seriesDir: string, slug: string) {
-  const projectsDir = join(seriesDir, '..', '..', 'projects');
+  const projectsDir = dirname(resolve(seriesDir));
   const configs: Array<{ dir: string; config: ProjectConfig }> = [];
   for (const entry of existsSync(projectsDir) ? readdirSync(projectsDir, { withFileTypes: true }) : []) {
     if (!entry.isDirectory()) continue;
@@ -88,7 +88,7 @@ export interface SeriesStatus {
 export function seriesDirFromArg(arg: string, root = repoRoot()): string {
   const direct = resolve(process.cwd(), arg);
   if (existsSync(join(direct, 'series.yaml'))) return direct;
-  const named = join(root, 'series', arg);
+  const named = join(root, 'projects', arg);
   if (existsSync(join(named, 'series.yaml'))) return named;
   throw new ValidationError(`Series "${arg}" not found: neither ${direct} nor ${named} has a series.yaml.`);
 }
@@ -96,8 +96,7 @@ export function seriesDirFromArg(arg: string, root = repoRoot()): string {
 /**
  * Collect the state of a series: its canon (characters with reference voice
  * and references, sets with references) and every episode, planned or not,
- * with its stage, spend, and length. Episodes are found in `projects/` next to
- * `series/`.
+ * with its stage, spend, and length. Episodes are its siblings in `projects/`.
  */
 export async function collectSeriesStatus(seriesDir: string): Promise<SeriesStatus> {
   const series = await readYamlFile(join(seriesDir, 'series.yaml'), SeriesSchema);

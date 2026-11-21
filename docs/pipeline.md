@@ -225,7 +225,7 @@ The demo is motion-only and uses no paid provider. It is the fastest way to chec
 
 ## Episodes
 
-An episode of a series is a project with `kind: episode` (see [ADR 0016](adr/0016-episode-projects.md)). Its canon (style, characters, sets) lives in `series/<series>/`; its audio is built from `script.yaml` instead of a song. The stages:
+An episode of a series is a project with `kind: episode` (see [ADR 0016](adr/0016-episode-projects.md)). Its canon (style, characters, sets) lives in `projects/<series>/`; its audio is built from `script.yaml` instead of a song. The stages:
 
 `setup` ✋, `script` ✋, `voice-track`, `episode-track`, `storyboard`, `assets`, `assembly`, `qa-export`.
 
@@ -269,12 +269,12 @@ npm run cli -- generate --series night-desk --batch canon-batch.json
 npm run cli -- series-status night-desk
 ```
 
-`series.yaml` `budget_usd` is an umbrella: canon generations are booked in `series/<slug>/state.json` and `series/<slug>/assets/manifest.jsonl`, each episode keeps its own budget, and `new --kind episode` refuses an episode whose budget does not fit in what is left.
+`series.yaml` `budget_usd` is an umbrella: canon generations are booked in `projects/<slug>/state.json` and `projects/<slug>/assets/manifest.jsonl`, each episode keeps its own budget, and `new --kind episode` refuses an episode whose budget does not fit in what is left.
 
 The demo episode runs on the mock provider:
 
 ```bash
-npm run demo:episode            # placeholder reference voices for series/demo-series
+npm run demo:episode            # placeholder reference voices for projects/demo-series
 npm run cli -- voice-track projects/demo-episode
 npm run cli -- episode-track projects/demo-episode
 npm run cli -- render projects/demo-episode

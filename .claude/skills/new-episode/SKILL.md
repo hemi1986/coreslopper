@@ -6,7 +6,7 @@ license: MIT
 
 # New Episode
 
-This skill runs the two **interactive stages** of an episode in the main session, with the user: `setup` and `script`. The series and its canon (`series/<series>/`: `series.yaml`, `bible.md`, `style.yaml`, `characters.yaml`, `sets.yaml`) exist already; an episode reads the canon and never changes it; its storyboard may only append plates, props, and character states (ADR 0025).
+This skill runs the two **interactive stages** of an episode in the main session, with the user: `setup` and `script`. The series and its canon (`projects/<series>/`: `series.yaml`, `bible.md`, `style.yaml`, `characters.yaml`, `sets.yaml`) exist already; an episode reads the canon and never changes it; its storyboard may only append plates, props, and character states (ADR 0025).
 
 Talk to the user in their language. Write every project file in English, except `text_de`, which is the German spoken or on-screen text.
 
@@ -21,7 +21,7 @@ Talk to the user in their language. Write every project file in English, except 
 
 Ask in one round, with a recommended answer for each:
 
-- **Series**: one of the folders in `series/`. Read its `series.yaml`.
+- **Series**: one of the folders in `projects/` with a `series.yaml`. Read it.
 - **Episode number**: recommend the first episode of the plan in `series.yaml` that has no project yet (`grep -l "series: <series>" projects/*/project.yaml`).
 - **Slug**: recommend `<series>-<nn>` with a two-digit number.
 - **Budget in USD**. Mandatory. Never invent it.

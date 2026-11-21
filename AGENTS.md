@@ -36,7 +36,7 @@ npm run cli -- contact-sheet projects/demo
 npm run cli -- render projects/demo --format 16x9
 ```
 
-The demo is a 12-second motion-only project. It needs no API keys. `projects/demo-episode` is a 9:16 demo episode of `series/demo-series` on the mock provider: `npm run demo:episode`, then `voice-track`, `episode-track`, and `render` (see `docs/pipeline.md`).
+The demo is a 12-second motion-only project. It needs no API keys. `projects/demo-episode` is a 9:16 demo episode of `projects/demo-series` on the mock provider: `npm run demo:episode`, then `voice-track`, `episode-track`, and `render` (see `docs/pipeline.md`).
 
 Create a real project:
 
@@ -77,8 +77,7 @@ templates/series/  Series canon template used by the new-series skill
 templates/channel/ Optional config/channel.yaml (links, footer, hashtag sets) and config/release-schedule.yaml templates
 brand/example/     Neutral synthwave/cyberpunk brand kit with OFL fonts
 bench/             Model bench: cases, targets, budget (fixtures and runs gitignored)
-projects/          Video projects and episodes (media gitignored)
-series/            Series canons: series.yaml, bible, style, characters, sets (references gitignored)
+projects/          Every production: music videos and episodes (project.yaml), series canons (series.yaml); media gitignored
 runtime/           Generated npm runtime snapshot (gitignored)
 dist/              Generated npx bundle (gitignored)
 ```
@@ -101,7 +100,7 @@ The song always exists already; the workflow never writes lyrics or generates mu
 
 ### Episodes
 
-A project with `kind: episode` is one episode of a series ([ADR 0016](docs/adr/0016-episode-projects.md)). Its style, characters, and sets come from the canon in `series/<series>/`, and its audio is built from `script.yaml` instead of a song.
+A project with `kind: episode` is one episode of a series ([ADR 0016](docs/adr/0016-episode-projects.md)). Its style, characters, and sets come from the canon in `projects/<series>/`, and its audio is built from `script.yaml` instead of a song.
 
 | # | Stage ID | Skill(s) | Output |
 |---|---|---|---|
@@ -157,7 +156,7 @@ npm run schema
 | `npm run cli -- episode-track <project>` | Episode: place takes, write `timing.json`, mix the episode track and speaker stems. |
 | `npm run cli -- subtitles <project>` | Episode: write `renders/<slug>.en.srt`. |
 | `npm run cli -- series-status <series>` | Series canon, budget, planned and created episodes, stages, spend, length. |
-| `npm run cli -- new-series <slug> --budget <usd> [--format <id>]` | Create a series canon in `series/<slug>/`. |
+| `npm run cli -- new-series <slug> --budget <usd> [--format <id>]` | Create a series canon in `projects/<slug>/`. |
 | `npm run cli -- generate --series <series> --batch <file>` | Run a canon generation batch against the series budget. |
 | `npm run cli -- generate <project> --batch <file> [--provider <p>] [--lipsync-provider <p>]` | Run a cached, budget-checked generation batch; an item's `out` files its result at that path; `--provider` overrides the project provider for one batch (lip-sync keeps its own), `--lipsync-provider` the lip-sync provider. |
 | `npm run cli -- qa <project> [--determinism <frame>]` | Write `review/report.md`; optionally check frame hashes. |
@@ -173,6 +172,7 @@ npm run schema
 | `npm run cli -- release-timer [show\|install\|remove\|status] [--every <min>]` | User command: the timer that runs `watch` (Windows Task Scheduler under WSL, systemd, launchd); not with the board container. |
 | `npm run cli -- lyrics <project> --file <txt> [--propose]` | Write `lyrics.txt` once every line sits under a section tag; `--propose` prints proposed tags (repeated blocks become `[Chorus]`). |
 | `npm run cli -- reference list\|add\|link\|remove [<project> \| --series <s>]` | The user references (`references.yaml`, files in `assets/references/`): mood boards, photos, storyboards, concepts, footage, voices, links, with kind, subject, and note. |
+| `npm run cli -- migrate-layout [--dry-run]` | Move series canons from the old `series/<slug>/` to `projects/<slug>/` and rewrite the paths into them (ADR 0035); the user runs it once per old workspace. |
 | `npm run cli -- character list\|import\|new\|add-file\|use\|remove` | The workspace character library (`library/characters/<id>/`): `import <project> [--series] [--id] [--into]` takes characters in (runs by itself at `stage-done … style-character`); `use <project> <id> [--series] [--states <ids>\|all]` copies one into a music video or canon with `library: <id>`. |
 | `npm run cli -- import-song <project>` | Register `audio/song.wav` and `audio/stems/vocals.wav` in `song.json`; converts other formats. |
 | `npm run cli -- normalize-audio <project> --input <file>` | Normalize audio to −14 LUFS / −1 dBTP. |

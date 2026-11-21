@@ -35,7 +35,7 @@ import { createProject } from '../packages/cli/src/new-project.ts';
 
 const root = process.cwd();
 const episodeDir = join(root, 'projects/demo-episode');
-const seriesDir = join(root, 'series/demo-series');
+const seriesDir = join(root, 'projects/demo-series');
 
 const temporary: string[] = [];
 afterEach(async () => {
@@ -46,9 +46,9 @@ afterEach(async () => {
 async function workspace(): Promise<{ dir: string; episode: string; series: string }> {
   const dir = await mkdtemp(join(tmpdir(), 'coreslopper-episode-'));
   temporary.push(dir);
-  await cp(seriesDir, join(dir, 'series/demo-series'), { recursive: true });
+  await cp(seriesDir, join(dir, 'projects/demo-series'), { recursive: true });
   await cp(episodeDir, join(dir, 'projects/demo-episode'), { recursive: true });
-  return { dir, episode: join(dir, 'projects/demo-episode'), series: join(dir, 'series/demo-series') };
+  return { dir, episode: join(dir, 'projects/demo-episode'), series: join(dir, 'projects/demo-series') };
 }
 
 async function editYaml(path: string, edit: (value: any) => void): Promise<void> {

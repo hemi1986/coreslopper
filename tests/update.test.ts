@@ -183,3 +183,16 @@ describe('workspace update', () => {
     expect(compareVersions('0.0.0-stage', '0.1.0')).toBe(-1);
   });
 });
+
+describe('update with the old series layout', () => {
+  it('adds no projects/<slug>/ copy of a canon that still lives in series/<slug>/, and says to migrate', async () => {
+    const v1 = await runtimeFixture('9.9.0', { 'series/night/series.yaml': 'slug: night\n' });
+    const target = await workspaceFrom(v1);
+    const v2 = await runtimeFixture('9.9.1', { 'projects/night/series.yaml': 'slug: night\n', 'projects/other/README.md': 'new\n' });
+    const result = await updateWorkspace({ targetDir: target, runtimeDir: v2, install: false });
+    expect(existsSync(join(target, 'projects', 'night'))).toBe(false);
+    expect(existsSync(join(target, 'projects', 'other', 'README.md'))).toBe(true);
+    expect(await read(target, 'series/night/series.yaml')).toBe('slug: night\n');
+    expect(result.warnings.join('\n')).toMatch(/migrate-layout/);
+  });
+});

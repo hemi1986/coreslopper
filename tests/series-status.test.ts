@@ -31,7 +31,7 @@ describe('series status', () => {
   it('finds unplanned episodes, duplicates, and other series apart', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'coreslopper-series-'));
     temporary.push(dir);
-    await cp(join(root, 'series/demo-series'), join(dir, 'series/demo-series'), { recursive: true });
+    await cp(join(root, 'projects/demo-series'), join(dir, 'projects/demo-series'), { recursive: true });
     for (const [slug, episode, series] of [
       ['ep-01', 1, 'demo-series'],
       ['ep-01-copy', 1, 'demo-series'],
@@ -44,7 +44,7 @@ describe('series status', () => {
       Object.assign(config, { slug, episode, series });
       await writeFile(path, stringify(config));
     }
-    const status = await collectSeriesStatus(join(dir, 'series/demo-series'));
+    const status = await collectSeriesStatus(join(dir, 'projects/demo-series'));
     expect(status.episodes.map((episode) => episode.episode)).toEqual([1, 2, 7]);
     expect(status.episodes[0]!.error).toMatch(/also in projects\//);
     expect(status.episodes[2]).toMatchObject({ slug: 'ep-07', next: 'voice-track' });

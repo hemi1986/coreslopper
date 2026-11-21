@@ -179,13 +179,22 @@ npx coreslopper@latest update
 
 Merge each `.coreslopper-new` file into the original and delete it. `--force` overwrites changed files instead.
 
-`projects/` belongs to you: `update` adds new upstream files there but never overwrites or deletes anything. `.env`, `.mcp.json` (if you added one), and `GETTING_STARTED.md` are never touched. `package-lock.json` always follows upstream. Afterwards `update` runs `npm install` and `uv sync`; pass `--no-install` to skip them.
+`projects/` and `library/` belong to you: `update` adds new upstream files there but never overwrites or deletes anything. `.env`, `.mcp.json` (if you added one), and `GETTING_STARTED.md` are never touched. `package-lock.json` always follows upstream. Afterwards `update` runs `npm install` and `uv sync`; pass `--no-install` to skip them.
 
 | Flag | Effect |
 |---|---|
 | `--dry-run` | List the changes without writing anything. |
 | `--force` | Overwrite locally changed files; also allows a downgrade. |
 | `--no-install` | Skip `npm install` and `uv sync`. |
+
+**Series moved into `projects/`.** Since [ADR 0035](adr/0035-series-in-projects.md) a series canon is a folder in `projects/` like every other production. A workspace with series in `series/` keeps working only after one move: commit, then
+
+```bash
+npm run cli -- migrate-layout --dry-run   # what moves, which paths are rewritten
+npm run cli -- migrate-layout
+```
+
+It moves each `series/<slug>/` to `projects/<slug>/`, rewrites the paths of episodes and other projects that point into it (`../../series/<slug>/` becomes `../<slug>/`), and stops without a change when a slug exists in both places. `update` and `doctor` remind you until it ran.
 
 Workspaces created before `update` existed have no baseline, so every file that differs from upstream counts as a conflict. Commit, then run `npx coreslopper@latest update --force` once; it records the baseline for later updates.
 

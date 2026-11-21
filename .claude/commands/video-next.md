@@ -34,7 +34,7 @@ Repeat until the project is done or a hard stop occurs:
 
 1. Determine the next stage and its skills from the `Next:` line of `status`. The autonomous stage IDs are:
    - music video: `audio-analysis`, `style-character`, `storyboard`, `assets`, `assembly`, `qa-export`;
-   - episode: `voice-track`, `episode-track`, `storyboard`, `assets`, `assembly`, `qa-export`. An episode has no style stage: its style, characters, and sets are the series canon in `series/<series>/`, which a stage runner reads and never writes.
+   - episode: `voice-track`, `episode-track`, `storyboard`, `assets`, `assembly`, `qa-export`. An episode has no style stage: its style, characters, and sets are the series canon in `projects/<series>/`, which a stage runner reads and never writes.
 2. Mark it running: `npm run cli -- stage-start projects/<slug> <stage>`.
 3. Dispatch **one** `stage-runner` subagent with a fresh context. The prompt must include:
    - the project path,

@@ -11,7 +11,7 @@ Stage `voice-track` of an episode project. It produces one **take** per audible 
 ## Inputs
 
 - `script.yaml` — the authoritative text; validated against the canon before anything runs.
-- The series canon: each speaker's reference voice (`voice.ref`, `voice.transcript` in `series/<series>/characters.yaml`).
+- The series canon: each speaker's reference voice (`voice.ref`, `voice.transcript` in `projects/<series>/characters.yaml`).
 - `takes.json` — the take registry: source (`generated` or `imported`), duration, text hash, file hash.
 - User recordings in `audio/lines/<line-id>.wav` (or `.mp3`, `.flac`, …).
 

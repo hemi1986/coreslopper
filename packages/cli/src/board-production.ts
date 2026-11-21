@@ -126,9 +126,9 @@ export async function projectDirs(root: string): Promise<string[]> {
     .sort();
 }
 
-/** Series folders of a workspace: every `series/<slug>/` with a series.yaml. */
+/** Series folders of a workspace: every `projects/<slug>/` with a series.yaml. */
 export async function seriesDirs(root: string): Promise<string[]> {
-  const dir = join(root, 'series');
+  const dir = join(root, 'projects');
   const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
   return entries
     .filter((entry) => entry.isDirectory() && SLUG.test(entry.name) && existsSync(join(dir, entry.name, 'series.yaml')))

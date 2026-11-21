@@ -652,7 +652,7 @@ export interface BatchRunResult {
 
 /**
  * Resolve an item's `out`. It stays inside the project (or canon) folder; an
- * episode may also file into its series canon (`../../series/<series>/…`), where
+ * episode may also file into its series canon (`../<series>/…`), where
  * new plates, props, and character states go (ADR 0025).
  */
 export function resolveOut(root: string, out: string, canon?: string): string {

@@ -231,7 +231,7 @@ export async function reviewImage(projectDir: string, options: ReviewImageOption
   if (options.clip && options.images?.length) throw new ValidationError('Pass --image or --clip, not both.');
   if (!options.clip && !options.images?.length) throw new ValidationError('Pass --image <png> or --clip <mp4>.');
   if (options.clip && !options.shot) throw new ValidationError('A clip review needs --shot <id>.');
-  // A series canon (series/<slug>/series.yaml) has no storyboard; its verdicts go to review/.
+  // A series canon (projects/<slug>/series.yaml) has no storyboard; its verdicts go to review/.
   const isSeries = existsSync(join(projectDir, 'series.yaml'));
   if (isSeries && options.shot) throw new ValidationError('A series canon has no shots; pass --ref.');
   const project = isSeries ? undefined : await loadProject(projectDir);

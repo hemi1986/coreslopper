@@ -6,13 +6,13 @@
  * it only lets the mock pipeline find the files. Real series record or design
  * their reference voices.
  *
- * Usage: node scripts/fixtures/generate-voice-refs.mjs series/demo-series
+ * Usage: node scripts/fixtures/generate-voice-refs.mjs projects/demo-series
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { parse } from 'yaml';
 
-const seriesDir = resolve(process.argv[2] ?? 'series/demo-series');
+const seriesDir = resolve(process.argv[2] ?? 'projects/demo-series');
 const bible = parse(readFileSync(join(seriesDir, 'characters.yaml'), 'utf8'));
 const sampleRate = 48_000;
 
