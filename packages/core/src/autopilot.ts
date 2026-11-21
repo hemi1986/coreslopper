@@ -162,7 +162,8 @@ function planEvent(event: CalendarEvent, context: AutopilotContext): AutopilotEv
   const dueAt = new Date(due).toISOString();
   const withDue = { ...plan, dueAt };
   if (!status.approval) return { ...withDue, state: 'unapproved' };
-  if (context.ready && context.ready[platform] === false) return { ...withDue, state: 'blocked', block: 'credentials', needsUser: true };
+  // Missing credentials show from the approval on; they need the user once the post is due.
+  if (context.ready && context.ready[platform] === false) return { ...withDue, state: 'blocked', block: 'credentials', needsUser: now.getTime() >= due };
 
   const latest = entries.at(-1);
   if (latest?.status === 'running') {

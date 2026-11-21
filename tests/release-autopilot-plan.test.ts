@@ -154,6 +154,9 @@ describe('autopilot plan', () => {
     expect(states.get('short:N1-hook:x')!.state).toBe('manual');
     expect(states.get('short:N1-hook:tiktok')!.state).toBe('done');
     expect(states.get('short:N1-hook:instagram')!).toMatchObject({ state: 'blocked', block: 'credentials', needsUser: true });
+    // Before the Reel's time (20:00 in Berlin) it shows as blocked, but is not yet the user's problem.
+    const early = planAutopilot({ calendar, status, log: emptyLog, settings, now: new Date('2026-12-11T18:30:00Z'), ready: { instagram: false } });
+    expect(early.find((item) => item.id === 'short:N1-hook:instagram')!).toMatchObject({ state: 'blocked', needsUser: false });
     const off = planAutopilot({ calendar, status: approved, log: emptyLog, settings: { ...settings, platforms: ['youtube'] }, now: new Date('2026-12-11T19:30:00Z') });
     expect(off.find((item) => item.id === 'linkedin')!.state).toBe('manual');
   });
