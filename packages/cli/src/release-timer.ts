@@ -5,8 +5,10 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { ValidationError } from '@coreslopper/core';
 
-// The timer that runs `release-run` every few minutes, so the release
-// autopilot posts at the calendar times. Under WSL the Windows Task Scheduler
+// The timer that runs the watchdog round (`watch`: `release-run` and the
+// production scan) every few minutes, so the release autopilot posts at the
+// calendar times and the board sees stalled stages and finished renders.
+// The board container runs the same round itself and needs no timer. Under WSL the Windows Task Scheduler
 // starts it (WSL itself stops when no terminal is open); on Linux a systemd
 // user timer; on macOS a launchd agent. A user command: it changes the
 // computer's scheduler only when the user runs `release-timer install`.
@@ -38,8 +40,8 @@ export function detectTimerKind(env: NodeJS.ProcessEnv = process.env, platform =
 export const scriptPath = (home: string) => join(home, '.coreslopper', 'release-run.sh');
 
 /**
- * The script one timer round runs: `release-run` in the workspace, appending to
- * `.cache/release-run.log`. PATH starts with the directory of the Node.js that
+ * The script one timer round runs: `watch` in the workspace, appending to
+ * `.cache/watch.log`. PATH starts with the directory of the Node.js that
  * installed the timer, since a timer's shell does not load nvm or a profile;
  * `CORESLOPPER_TIMER_EVERY` tells the board how often a round is due.
  */
@@ -47,12 +49,12 @@ export function runScript(root: string, options: { nodeBin: string; every: numbe
   const quote = (value: string) => `'${value.replace(/'/g, `'\\''`)}'`;
   return [
     '#!/bin/bash',
-    '# Written by `npm run cli -- release-timer install`; runs the coreslopper release autopilot once.',
+    '# Written by `npm run cli -- release-timer install`; runs one coreslopper watchdog round (release autopilot and production scan).',
     `export PATH=${quote(options.nodeBin)}:"$PATH"`,
     `export CORESLOPPER_TIMER_EVERY=${options.every}`,
     `cd ${quote(root)} || exit 1`,
     'mkdir -p .cache',
-    'exec npm run --silent cli -- release-run >> .cache/release-run.log 2>&1',
+    'exec npm run --silent cli -- watch >> .cache/watch.log 2>&1',
     '',
   ].join('\n');
 }
@@ -84,8 +86,8 @@ export function timerPlan(options: { root: string; everyMinutes?: number; kind?:
   }
   if (kind === 'systemd') {
     const dir = join(home, '.config', 'systemd', 'user');
-    const service = `[Unit]\nDescription=coreslopper release autopilot (release-run)\n\n[Service]\nType=oneshot\nExecStart=/bin/bash ${script}\n`;
-    const timer = `[Unit]\nDescription=Run the coreslopper release autopilot every ${every} minutes\n\n[Timer]\nOnBootSec=2min\nOnUnitActiveSec=${every}min\nPersistent=true\n\n[Install]\nWantedBy=timers.target\n`;
+    const service = `[Unit]\nDescription=coreslopper watchdog (release autopilot and production scan)\n\n[Service]\nType=oneshot\nExecStart=/bin/bash ${script}\n`;
+    const timer = `[Unit]\nDescription=Run the coreslopper watchdog every ${every} minutes\n\n[Timer]\nOnBootSec=2min\nOnUnitActiveSec=${every}min\nPersistent=true\n\n[Install]\nWantedBy=timers.target\n`;
     return {
       kind,
       files: [scriptFile, { path: join(dir, `${TIMER_NAME}.service`), content: service }, { path: join(dir, `${TIMER_NAME}.timer`), content: timer }],
@@ -145,7 +147,7 @@ export async function releaseTimer(action: 'show' | 'install' | 'remove' | 'stat
       if (file.mode) await chmod(file.path, file.mode);
     }
     for (const command of plan.install) exec(command);
-    log(`✔ release-run runs every ${options.everyMinutes ?? 5} minutes (${plan.kind}); its output goes to .cache/release-run.log`);
+    log(`✔ The watchdog round (release-run and the production scan) runs every ${options.everyMinutes ?? 5} minutes (${plan.kind}); its output goes to .cache/watch.log`);
     return plan;
   }
   if (action === 'remove') {
@@ -157,14 +159,14 @@ export async function releaseTimer(action: 'show' | 'install' | 'remove' | 'stat
       }
     }
     for (const file of plan.files) if (existsSync(file.path)) await rm(file.path);
-    log('✔ The release-run timer is removed; approved releases no longer post by themselves.');
+    log('✔ The watchdog timer is removed; approved releases no longer post by themselves.');
     return plan;
   }
   for (const command of plan.status) {
     try {
       exec(command);
     } catch {
-      log('The release-run timer is not installed.');
+      log('The watchdog timer is not installed.');
     }
   }
   return plan;

@@ -45,7 +45,7 @@ The pipeline and `publish` need no MCP server. The song is always supplied by th
 - Generated media belongs to the project, not the workflow repo.
 - Do not overwrite `timing.overrides.json` or `project.yaml` from a stage runner.
 - A paid batch must pass the cost estimate and the project budget before the first call.
-- `publish`, `publish-auth`, `release-approve`, `release-run`, and `release-timer` run only when the user asks for them; `/video-next` and stage runners never run them. `publish` uploads private videos and drafts; only the user's approval on the release board lets the autopilot post publicly.
+- `publish`, `publish-auth`, `release-approve`, `release-run`, `watch`, `release-timer`, and `docker compose` for the board run only when the user asks for them; `/video-next` and stage runners never run them. `publish` uploads private videos and drafts; only the user's approval on the release board lets the autopilot post publicly.
 
 ## Skill frontmatter
 

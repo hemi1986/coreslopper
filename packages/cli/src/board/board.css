@@ -133,3 +133,6 @@ table.list td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .shots figure { margin: 0; font-size: 12px; }
 .shots img { width: 100%; border-radius: 6px; display: block; background: var(--chip); }
 .shots figcaption { color: var(--muted); margin-top: 3px; }
+ul.activity { list-style: none; padding: 0; margin: 0 0 20px; font-size: 13px; }
+ul.activity li { padding: 4px 0; border-bottom: 1px solid var(--line); }
+ul.activity a { color: var(--accent); }

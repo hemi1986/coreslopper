@@ -334,11 +334,40 @@ program
   )
   .option('--port <n>', 'Port', (value) => Number(value), 4848)
   .option('--host <address>', 'Address to listen on; 0.0.0.0 only inside a container whose port is published to 127.0.0.1', '127.0.0.1')
-  .action((options: { port: number; host: string }) =>
+  .option('--watch <minutes>', 'Also run the watchdog round (release-run and the production scan) every N minutes, as the container does', (value) => Number(value))
+  .action((options: { port: number; host: string; watch?: number }) =>
     run(async () => {
       const { startBoard } = await import('./release-board.js');
       const { url } = await startBoard({ root: repoRoot(), port: options.port, host: options.host });
       console.log(`Board: ${url.replace('://0.0.0.0:', '://127.0.0.1:')}  (Ctrl+C to stop)`);
+      if (options.watch !== undefined) {
+        if (!(options.watch >= 1)) throw new ValidationError('--watch takes minutes, at least 1');
+        const { watchLoop } = await import('./production-watch.js');
+        watchLoop({ root: repoRoot(), everyMinutes: options.watch });
+        console.log(`Watchdog: a round every ${options.watch} minute(s); do not also run release-timer.`);
+      }
+      await new Promise(() => undefined);
+    }),
+  );
+
+program
+  .command('watch')
+  .description(
+    'One watchdog round: the release autopilot (release-run) and the production scan, which records stage, render, queue, and budget ' +
+      'events and stalled stages in .cache/watch/ for the board. Run by the timer or the board container; never by a pipeline stage.',
+  )
+  .option('--every <minutes>', 'Keep running and start a round every N minutes', (value) => Number(value))
+  .option('--no-autopilot', 'Only the production scan')
+  .action((options: { every?: number; autopilot: boolean }) =>
+    run(async () => {
+      const { watchLoop, watchRound } = await import('./production-watch.js');
+      if (options.every === undefined) {
+        const { errors } = await watchRound({ root: repoRoot(), autopilot: options.autopilot, every: Number(process.env.CORESLOPPER_TIMER_EVERY) || undefined });
+        if (errors.length) process.exitCode = 1;
+        return;
+      }
+      if (!(options.every >= 1)) throw new ValidationError('--every takes minutes, at least 1');
+      watchLoop({ root: repoRoot(), everyMinutes: options.every });
       await new Promise(() => undefined);
     }),
   );
@@ -384,7 +413,7 @@ program
 
 program
   .command('release-timer [action]')
-  .description('The timer that runs release-run: show (default) | install | remove | status. WSL: Windows Task Scheduler; Linux: systemd user timer; macOS: launchd.')
+  .description('The timer that runs the watchdog round (watch: release-run and the production scan): show (default) | install | remove | status. WSL: Windows Task Scheduler; Linux: systemd user timer; macOS: launchd. Not needed when the board container runs.')
   .option('--every <minutes>', 'Minutes between runs', (value) => Number(value), 5)
   .action((action: string | undefined, options: { every: number }) =>
     run(async () => {

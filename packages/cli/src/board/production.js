@@ -21,7 +21,19 @@ addStrings({
       canon: 'Canon fertigstellen:', episode: 'Nächste geplante Episode anlegen:', 'series-done': 'Alle geplanten Episoden sind angelegt.'
     },
     canon: 'Canon', characters: 'Figuren', sets: 'Sets', episodes: 'Episoden', notCreated: 'nicht angelegt', gaps: 'Lücken im Canon', format: 'Format',
-    uncommitted: 'frei', canonSpent: 'Canon', episodeBudgets: 'Episoden-Budgets', updated: 'aktualisiert vor'
+    uncommitted: 'frei', canonSpent: 'Canon', episodeBudgets: 'Episoden-Budgets', updated: 'aktualisiert vor',
+    activity: 'Aktivität', watchdog: function (at) { return 'Watchdog: letzte Runde vor ' + at; },
+    noWatchdog: 'Der Watchdog ist noch nie gelaufen: Board-Container starten oder npm run cli -- release-timer install.',
+    staleWatchdog: 'Der Watchdog hat mehrere Runden verpasst: läuft der Container oder der Timer?',
+    stalled: function (at) { return 'Seit ' + at + ' hat sich keine Datei geändert. Läuft Claude Code noch?'; },
+    rendering: 'Render', interrupted: 'abgebrochen?', renderFailed: 'fehlgeschlagen',
+    events: {
+      'stage-started': function (e) { return e.stage + ' gestartet'; }, 'stage-done': function (e) { return e.stage + ' fertig'; },
+      'stage-failed': function (e) { return e.stage + ' fehlgeschlagen'; }, 'render-ready': function (e) { return 'Render fertig: ' + e.file; },
+      'render-failed': function (e) { return 'Render fehlgeschlagen: ' + e.file; }, 'render-interrupted': function (e) { return 'Render bleibt stehen: ' + e.file; },
+      stalled: function (e) { return (e.stage || 'Stage') + ' hängt (keine Dateiänderung)'; }, 'needs-fix': function (e) { return e.detail + ' Queue-Element(e) brauchen einen Fix'; },
+      budget: function (e) { return e.detail + ' des Budgets ausgegeben'; }, unreadable: function (e) { return 'nicht lesbar: ' + e.detail; }
+    }
   },
   en: {
     production: 'Production', projects: 'Projects', series: 'Series', noWork: 'No project or series in this workspace yet.',
@@ -41,11 +53,25 @@ addStrings({
       canon: 'Finish the canon:', episode: 'Create the next planned episode:', 'series-done': 'Every planned episode exists.'
     },
     canon: 'Canon', characters: 'Characters', sets: 'Sets', episodes: 'Episodes', notCreated: 'not created', gaps: 'Gaps in the canon', format: 'Format',
-    uncommitted: 'uncommitted', canonSpent: 'canon', episodeBudgets: 'episode budgets', updated: 'updated'
+    uncommitted: 'uncommitted', canonSpent: 'canon', episodeBudgets: 'episode budgets', updated: 'updated',
+    activity: 'Activity', watchdog: function (at) { return 'Watchdog: last round ' + at + ' ago'; },
+    noWatchdog: 'The watchdog has never run: start the board container or npm run cli -- release-timer install.',
+    staleWatchdog: 'The watchdog has missed several rounds: is the container or the timer running?',
+    stalled: function (at) { return 'No file has changed for ' + at + '. Is Claude Code still running?'; },
+    rendering: 'Render', interrupted: 'interrupted?', renderFailed: 'failed',
+    events: {
+      'stage-started': function (e) { return e.stage + ' started'; }, 'stage-done': function (e) { return e.stage + ' done'; },
+      'stage-failed': function (e) { return e.stage + ' failed'; }, 'render-ready': function (e) { return 'Render ready: ' + e.file; },
+      'render-failed': function (e) { return 'Render failed: ' + e.file; }, 'render-interrupted': function (e) { return 'Render stopped moving: ' + e.file; },
+      stalled: function (e) { return (e.stage || 'A stage') + ' is stalled (no file changes)'; }, 'needs-fix': function (e) { return e.detail + ' queue item(s) need a fix'; },
+      budget: function (e) { return e.detail + ' of the budget spent'; }, unreadable: function (e) { return 'unreadable: ' + e.detail; }
+    }
   }
 });
 
 const view = { key: null, json: null };
+let activity = { events: [], stalled: [] };
+const RENDER_STALE_MIN = 15;
 
 function stageLabel(project, id) {
   const stage = project.stages && project.stages.filter(function (s) { return s.id === id; })[0];
@@ -73,6 +99,37 @@ function stageStrip(stages) {
   }));
 }
 
+function progressRows(project) {
+  return (project.progress || []).map(function (p) {
+    const share = p.framesTotal ? Math.round(100 * p.framesDone / p.framesTotal) : 0;
+    const stale = !p.error && p.updatedAt && Date.now() - Date.parse(p.updatedAt) > RENDER_STALE_MIN * 60000;
+    const state = p.error ? t('renderFailed') : stale ? t('interrupted') : share + '%';
+    return el('div', { class: 'meta' + (p.error || stale ? ' error' : '') }, [
+      t('rendering') + ' ' + p.output + ' · ' + state, p.error ? el('div', { text: p.error }) : null,
+      el('div', { class: 'budget' }, [el('i', { class: p.error || stale ? 'over' : '', style: 'width:' + share + '%' })])
+    ]);
+  });
+}
+
+function stalledNote(project) {
+  if (activity.stalled.indexOf(project.slug) < 0 || project.phase !== 'running') return null;
+  return el('div', { class: 'meta error', text: t('stalled')(project.lastActivity ? ago(project.lastActivity) : '?') });
+}
+
+function eventLine(e) {
+  const words = t('events')[e.kind];
+  return el('li', {}, [
+    el('span', { class: 'when', text: local(e.at) + ' · ' }),
+    el('a', { href: '#/p/' + e.project, text: e.project }), ': ' + (words ? words(e) : e.kind)
+  ]);
+}
+
+function watchdogLine() {
+  if (!activity.lastRound) return el('p', { class: 'sub error', text: t('noWatchdog') });
+  const stale = Date.now() - Date.parse(activity.lastRound) > Math.max(15, 3 * (activity.every || 5)) * 60000;
+  return el('p', { class: 'sub' + (stale ? ' error' : '') }, [stale ? t('staleWatchdog') + ' ' : '', t('watchdog')(ago(activity.lastRound))]);
+}
+
 function kindLabel(project) {
   return project.kind === 'episode' ? t('kindEpisode')(project.series, project.episode) : t('kindVideo');
 }
@@ -93,12 +150,14 @@ function projectCard(project) {
     el('div', { class: 'meta' }, [kindLabel(project), project.releaseDate ? ' · ' + t('release') + ' ' + project.releaseDate : null]),
     stageStrip(project.stages),
     current ? el('div', { class: 'meta' }, [el('b', { text: current.label }), running && current.startedAt ? ' · ' + t('since') + ' ' + ago(current.startedAt) : null, current.lastError && current.status === 'failed' ? el('div', { class: 'error', text: current.lastError }) : null]) : null,
+    stalledNote(project),
     el('div', { class: 'meta' }, [t('budget') + ': ' + usd(project.budget.spentUsd) + ' / ' + usd(project.budget.totalUsd)]),
     budgetBar(project.budget.totalUsd, project.budget.spentUsd),
     project.queue ? el('div', { class: 'meta' }, [t('queue') + ': ' + queueLine(project.queue)]) : null,
-    project.failedReviews ? el('div', { class: 'meta error', text: t('failedReviews')(project.failedReviews) }) : null,
+    project.failedReviews ? el('div', { class: 'meta error', text: t('failedReviews')(project.failedReviews) }) : null
+  ].concat(progressRows(project)).concat([
     nextBox(project.next, project.next.stage && stageLabel(project, project.next.stage), project.slug)
-  ]);
+  ]));
 }
 
 function seriesCard(series) {
@@ -121,7 +180,7 @@ function group(title, cards) {
 function renderOverview(data) {
   const main = document.getElementById('main');
   main.innerHTML = '';
-  main.appendChild(el('div', { class: 'toolbar' }, [el('h2', { text: t('production'), style: 'margin:0;font-size:20px' })]));
+  main.appendChild(el('div', { class: 'toolbar' }, [el('h2', { text: t('production'), style: 'margin:0;font-size:20px' }), watchdogLine()]));
   if (!data.projects.length && !data.series.length) { main.appendChild(el('p', { class: 'empty', text: t('noWork') })); return; }
   const ok = data.projects.filter(function (p) { return !p.error; });
   const order = { failed: 0, setup: 1, ready: 2, done: 3, running: 4 };
@@ -133,6 +192,10 @@ function renderOverview(data) {
     group(t('groupReleased'), ok.filter(function (p) { return p.next.reason === 'released'; }).map(projectCard)),
     group(t('groupBroken'), data.projects.filter(function (p) { return p.error; }).map(projectCard))
   ].forEach(function (node) { if (node) main.appendChild(node); });
+  if (activity.events.length) {
+    main.appendChild(el('h3', { class: 'section-title', text: t('activity') }));
+    main.appendChild(el('ul', { class: 'activity' }, activity.events.slice(0, 15).map(eventLine)));
+  }
 }
 
 function section(title, children) {
@@ -150,6 +213,8 @@ function renderProject(p) {
   ]));
   main.appendChild(viewTabs(p.slug, 'production', p.hasRelease));
   main.appendChild(nextBox(p.next, p.next.stage && stageLabel(p, p.next.stage), p.slug));
+  const stalled = stalledNote(p);
+  if (stalled) main.appendChild(stalled);
   main.appendChild(el('div', { style: 'height:14px' }));
 
   main.appendChild(section(t('stage'), [el('table', { class: 'list' }, [
@@ -174,12 +239,12 @@ function renderProject(p) {
     return el('a', { href: projectFile(p.slug, doc.path), target: '_blank', text: doc.label });
   }))]));
 
-  main.appendChild(section(t('renders'), p.renders.length ? [el('div', { class: 'renders' }, p.renders.map(function (render) {
+  main.appendChild(section(t('renders'), progressRows(p).concat(p.renders.length ? [el('div', { class: 'renders' }, p.renders.map(function (render) {
     return el('div', {}, [
       el('video', { src: projectFile(p.slug, render.path), controls: true, preload: 'metadata' }),
       el('div', { class: 'meta' }, [el('b', { text: render.name }), ' · ' + bytes(render.bytes) + ' · ' + local(render.modified)])
     ]);
-  }))] : [el('p', { class: 'empty', text: t('noRenders') })]));
+  }))] : p.progress.length ? [] : [el('p', { class: 'empty', text: t('noRenders') })])));
 
   if (p.contactSheet) main.appendChild(section(t('contact'), [el('a', { href: projectFile(p.slug, p.contactSheet), target: '_blank' }, [el('img', { class: 'contact', src: projectFile(p.slug, p.contactSheet), alt: t('contact') })])]));
 
@@ -236,8 +301,10 @@ export function showProduction(key, refresh) {
   setLang(null);
   const parts = key.split(':');
   const path = parts[0] === 'overview' ? '/api/production' : '/api/production/' + (parts[0] === 'series' ? 'series/' : 'projects/') + encodeURIComponent(parts[1]);
-  return api(path).then(function (data) {
-    const json = JSON.stringify(data);
+  return Promise.all([api(path), api('/api/activity').catch(function () { return { events: [], stalled: [] }; })]).then(function (both) {
+    const data = both[0];
+    activity = both[1];
+    const json = JSON.stringify(both);
     if (refresh && (view.key !== key || view.json === json || playing())) return data;
     view.key = key; view.json = json;
     if (parts[0] === 'overview') renderOverview(data);

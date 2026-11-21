@@ -220,6 +220,10 @@ _Avoid_: go-live, publish (the **Publish** command uploads privately)
 `release-run`, started by a timer every few minutes: for an approved release it posts each calendar event that a platform API can post, at the event's time, and leaves the rest to the user. A post it cannot be sure about waits for the user instead of going out twice.
 _Avoid_: scheduler, bot, cron job
 
+**Watchdog**:
+The round `watch` runs every few minutes (the board container or `release-timer`): the release autopilot, then the production scan, which records stage, render, queue, and budget events and **stalled** stages (running, but no file changed for an hour) for the board. It reads and records; it never changes a stage or starts Claude Code.
+_Avoid_: monitor, daemon, supervisor
+
 **Autopilot Log**:
 `review/autopilot.json`: one entry per autopilot step on a calendar event (running, posted, uploaded, scheduled, draft, failed) and the user's retry and force marks.
 _Avoid_: publish log (the **Publish Log** records uploads of `publish`)

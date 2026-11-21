@@ -1,4 +1,5 @@
 import { link, mkdir, open, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { hostname } from 'node:os';
 import { dirname } from 'node:path';
 
 // Small cross-process locks on lock files. Two writers of the same files (the
@@ -40,12 +41,15 @@ export async function withFileLock<T>(path: string, fn: () => Promise<T>, option
  * Take a long-held lock that names its holder, atomically: the file appears
  * only with its content (a temp file linked into place), so another process
  * never reads an empty lock. Returns the release function, or undefined when
- * a live holder has it.
+ * a live holder has it. A holder on another host (the board's container and
+ * the computer share the workspace) cannot be checked by pid, so it counts as
+ * alive until the lock is stale.
  */
-export async function acquireHolderLock(path: string, options: { staleMs: number; alive: (pid: number) => boolean }): Promise<(() => Promise<void>) | undefined> {
+export async function acquireHolderLock(path: string, options: { staleMs: number; alive: (pid: number) => boolean; host?: string }): Promise<(() => Promise<void>) | undefined> {
+  const host = options.host ?? hostname();
   await mkdir(dirname(path), { recursive: true });
   const temp = `${path}.${process.pid}.${Date.now()}.tmp`;
-  await writeFile(temp, JSON.stringify({ pid: process.pid, at: new Date().toISOString() }));
+  await writeFile(temp, JSON.stringify({ pid: process.pid, host, at: new Date().toISOString() }));
   try {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
@@ -56,11 +60,12 @@ export async function acquireHolderLock(path: string, options: { staleMs: number
         const info = await stat(path).catch(() => undefined);
         if (!info) continue;
         const holder = await readFile(path, 'utf8')
-          .then((text) => JSON.parse(text) as { pid?: unknown })
+          .then((text) => JSON.parse(text) as { pid?: unknown; host?: unknown })
           .catch(() => undefined);
         const young = Date.now() - info.mtimeMs < options.staleMs;
         // An unreadable lock is held while it is young: only an old one is taken over.
-        if (young && (holder === undefined || (typeof holder.pid === 'number' && options.alive(holder.pid)))) return undefined;
+        const elsewhere = holder !== undefined && typeof holder.host === 'string' && holder.host !== host;
+        if (young && (holder === undefined || elsewhere || (typeof holder.pid === 'number' && options.alive(holder.pid)))) return undefined;
         await rm(path, { force: true });
       }
     }

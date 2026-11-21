@@ -5,6 +5,7 @@ import { extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ValidationError, calendarIcs, loadChannel, repoRoot, type ReleaseCalendar } from '@coreslopper/core';
 import { boardProject, type BoardProject } from './release-board-data.js';
+import { loadEvents, loadSnapshot } from './production-watch.js';
 import { SLUG, productionDetail, productionOverview, productionSeries, projectDirs, seriesDirs } from './board-production.js';
 import { loadCalendar, updateStatus } from './release-calendar.js';
 import { releaseDir } from './release.js';
@@ -197,6 +198,14 @@ export function boardHandler(options: BoardOptions = {}) {
         return file === undefined ? send(res, 404, 'not found', 'text/plain') : send(res, 200, file, MIME[extname(pageMatch[1]!)]);
       }
       if (req.method === 'GET' && path === '/api/production') return json(res, await productionOverview(root));
+      if (req.method === 'GET' && path === '/api/activity') {
+        const snapshot = await loadSnapshot(root);
+        return json(res, {
+          ...(snapshot ? { lastRound: snapshot.at, every: snapshot.every } : {}),
+          stalled: Object.entries(snapshot?.projects ?? {}).filter(([, pulse]) => pulse.stalled).map(([slug]) => slug),
+          events: await loadEvents(root, 50),
+        });
+      }
       const productionMatch = /^\/api\/production\/(projects|series)\/([^/]+)$/.exec(path);
       if (req.method === 'GET' && productionMatch) {
         if (productionMatch[1] === 'series') {

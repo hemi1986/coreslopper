@@ -345,7 +345,7 @@ describe('release timer', () => {
     expect(script.content).toContain(`export PATH='/home/me/.nvm/versions/node/v24/bin':"$PATH"`);
     expect(script.content).toContain('export CORESLOPPER_TIMER_EVERY=10');
     expect(script.content).toContain(`cd '/home/me/it'\\''s my video' || exit 1`);
-    expect(script.content).toContain('npm run --silent cli -- release-run >> .cache/release-run.log 2>&1');
+    expect(script.content).toContain('npm run --silent cli -- watch >> .cache/watch.log 2>&1');
     expect(() => timerPlan({ root: '/w', kind: 'windows-task', env: { WSL_DISTRO_NAME: 'Ubuntu' }, home: `/home/${'x'.repeat(250)}` })).toThrow(/261/);
   });
 

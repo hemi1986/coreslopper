@@ -11,6 +11,7 @@ import {
   type NextAction,
   type ProductionPhase,
   type ProjectKind,
+  type RenderProgress,
   type StageView,
 } from '@coreslopper/core';
 import { loadStatus } from './release-calendar.js';
@@ -53,6 +54,10 @@ export interface ProductionProject {
   releaseDate?: string;
   /** When state.json last changed. */
   updatedAt?: string;
+  /** Renders in progress (`review/progress/`). */
+  progress: RenderProgress[];
+  /** The newest change among the files the pipeline writes. */
+  lastActivity?: string;
 }
 
 export interface ProductionVerdict {
@@ -193,6 +198,45 @@ export async function latestVerdicts(path: string): Promise<ProductionVerdict[]>
   return [...latest.values()];
 }
 
+/** The progress files `render` writes while it runs: `review/progress/<output>.json`. */
+export async function loadRenderProgress(projectDir: string): Promise<RenderProgress[]> {
+  const dir = join(projectDir, 'review', 'progress');
+  const entries = await readdir(dir).catch(() => [] as string[]);
+  const progress: RenderProgress[] = [];
+  for (const name of entries.filter((entry) => entry.endsWith('.json')).sort()) {
+    const raw = await readJsonLoose<Partial<RenderProgress>>(join(dir, name));
+    if (!raw || typeof raw.output !== 'string' || typeof raw.framesTotal !== 'number') continue;
+    progress.push({
+      output: raw.output,
+      framesDone: typeof raw.framesDone === 'number' ? raw.framesDone : 0,
+      framesTotal: raw.framesTotal,
+      startedAt: typeof raw.startedAt === 'string' ? raw.startedAt : '',
+      updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : '',
+      ...(typeof raw.error === 'string' ? { error: raw.error } : {}),
+    });
+  }
+  return progress;
+}
+
+/**
+ * The newest modification among the files a working pipeline touches: the
+ * project's own files, review/, review/progress/, assets/ and its queue,
+ * manifest, and verdicts, and renders/. One level deep, so a scan stays cheap.
+ */
+export async function lastActivity(projectDir: string): Promise<string | undefined> {
+  let newest = 0;
+  for (const dir of ['', 'review', 'review/progress', 'assets', 'assets/review', 'renders']) {
+    const path = join(projectDir, dir);
+    const entries = await readdir(path, { withFileTypes: true }).catch(() => []);
+    for (const entry of entries) {
+      if (!entry.isFile()) continue;
+      const info = await stat(join(path, entry.name)).catch(() => undefined);
+      if (info && info.mtimeMs > newest) newest = info.mtimeMs;
+    }
+  }
+  return newest ? new Date(newest).toISOString() : undefined;
+}
+
 const DOCUMENTS: Array<[string, string]> = [
   ['Brief', 'brief.md'],
   ['Treatment', 'treatment.md'],
@@ -251,6 +295,8 @@ async function collect(projectDir: string, detail: boolean): Promise<ProductionD
     approved,
     ...(config.release?.release_date ? { releaseDate: config.release.release_date } : {}),
     ...(stateInfo ? { updatedAt: stateInfo.mtime.toISOString() } : {}),
+    progress: await loadRenderProgress(projectDir),
+    ...(await lastActivity(projectDir).then((at) => (at ? { lastActivity: at } : {}))),
     documents: [],
     queueItems: [],
     verdicts: [],
