@@ -411,6 +411,21 @@ describe('release folder', () => {
     expect(result.todos.some((todo) => todo.includes('set announcement.image'))).toBe(true);
   });
 
+  it("carries the cover's scrim into the composed images, but not its text offset", async () => {
+    const dir = await fixture();
+    await writeFile(
+      join(dir, 'renders', 'cover-3000x3000.recipe.json'),
+      JSON.stringify({ version: 1, still: 'assets/image/hero.png', format: '1x1', text: 'NEON STATIC|NEON RAIN', focus: '0.5,0.35', scrim: 0.4, textOffset: -40 }),
+    );
+    const deps = fakeDeps();
+    await buildRelease({ projectDir: dir, deps });
+    expect(deps.thumbnails.length).toBeGreaterThan(0);
+    for (const call of deps.thumbnails) {
+      expect(call).toMatchObject({ scrim: 0.4 });
+      expect(call).not.toHaveProperty('textOffset');
+    }
+  });
+
   it('is idempotent: a second run runs no ffmpeg job and rewrites nothing', async () => {
     const dir = await fixture();
     const deps = fakeDeps();

@@ -130,6 +130,10 @@ export interface ThumbnailProps extends Record<string, unknown> {
   /** The point of the still (fractions 0–1) that lands on the face side. */
   focus: { x: number; y: number };
   zoom: number;
+  /** Scrim strength 0–1: scales the fade's opacity and reach; default 1. */
+  scrim?: number;
+  /** Vertical shift of the hook slabs in pixels (positive = down); default 0. */
+  textOffset?: number;
   hookFont: { family: string; weight: number };
   tagFont: { family: string; weight: number };
   colors: {

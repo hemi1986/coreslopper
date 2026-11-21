@@ -373,6 +373,36 @@ export function layoutVertical(
   return { fontSize: size, slabs, tag: tagBox(tag, layout, format) };
 }
 
+/** Allowed range of `--scrim` (1 = the default scrim) and `--text-offset` (pixels). */
+export const SCRIM_RANGE = [0, 1] as const;
+export const TEXT_OFFSET_MAX = 300;
+
+/**
+ * The scrim towards the text side, a linear gradient of the background
+ * colour. `strength` (0–1, default 1) scales both the opacity and the reach
+ * of every stop, so a lower value gives a shorter, fainter fade; 1 is the
+ * original scrim.
+ */
+export function scrimGradient(
+  background: string,
+  layout: ThumbnailLayout,
+  format: ThumbnailFormat = '16x9',
+  strength = 1,
+): string {
+  const [direction, stops]: [string, Array<[number, number]>] =
+    format === '9x16' || format === '3x4' || format === '4x5' || format === '1x1'
+      ? ['top', [[0xf0, 0], [0xc0, 22], [0x00, 58]]]
+      : layout === 'bottom'
+      ? ['top', [[0xe6, 0], [0xb3, 18], [0x00, 46]]]
+      : [layout === 'left' ? 'right' : 'left', [[0xe0, 11], [0x00, 50]]];
+  const s = Math.min(1, Math.max(0, strength));
+  const parts = stops.map(([alpha, at]) => {
+    const hex = Math.round(alpha * s).toString(16).padStart(2, '0');
+    return `${background}${hex} ${Number((at * s).toFixed(2))}%`;
+  });
+  return `linear-gradient(to ${direction}, ${parts.join(', ')})`;
+}
+
 /** Cover margins and the largest type, as fractions of the 3000 px side. */
 const SQUARE_MARGIN = 0.07;
 const SQUARE_MAX_SIZE = 0.15;
