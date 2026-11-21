@@ -79,6 +79,18 @@
   .pf-youtube, .pf-shorts { background: #c4302b; } .pf-tiktok { background: #111; } .pf-instagram { background: #b03a8a; }
   .pf-spotify, .pf-distributor { background: #1d9a52; } .pf-x { background: #333; } .pf-linkedin { background: #0a66c2; } .pf-microsite { background: #6b5bd6; }
   .flash { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .pilot { border: 1px solid var(--line); border-left: 4px solid var(--accent); background: var(--panel); border-radius: 0 12px 12px 0; padding: 12px 16px; margin: 14px 0; }
+  .pilot.on { border-left-color: var(--ok); }
+  .pilot h3 { margin: 0 0 6px; font-size: 15px; }
+  .pilot p { margin: 4px 0; }
+  .pilot ul { margin: 6px 0 0 18px; padding: 0; font-size: 13px; }
+  button.primary { background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 8px 14px; font: inherit; font-weight: 600; cursor: pointer; }
+  button.primary:disabled { opacity: .45; cursor: not-allowed; }
+  .auto { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; font-size: 13px; }
+  .auto .badge { border-radius: 999px; padding: 1px 9px; font-size: 12px; font-weight: 600; background: var(--chip); color: var(--muted); }
+  .auto .badge.go { background: #dfeee4; color: var(--ok); } .auto .badge.you { background: #f7ead2; color: var(--warn); } .auto .badge.bad { background: #f6dcdc; color: var(--bad); }
+  @media (prefers-color-scheme: dark) { .auto .badge.go { background: #1f3527; } .auto .badge.you { background: #3a2f1a; } .auto .badge.bad { background: #3b2020; } }
+  .auto ul { flex-basis: 100%; margin: 2px 0 0 18px; padding: 0; color: var(--muted); }
   .error { color: var(--bad); }
   .motto { position: fixed; top: 14px; right: 22px; max-width: 230px; text-align: right; font-style: italic; font-weight: 600; color: var(--accent); font-size: 14px; pointer-events: none; }
   .motto:empty { display: none; }
@@ -104,13 +116,29 @@
       calendar: 'Kalender (alle Projekte)', open: 'nur offene', ics: 'Kalender als .ics', release: 'Release', proposed: 'vorgeschlagen',
       done: 'erledigt', posted: 'Gepostet', finished: 'Erledigt', url: 'Live-URL', copy: 'Kopieren', copied: 'Kopiert', chars: 'Zeichen', bytes: 'Bytes',
       todos: 'Offene TODOs', none: 'Hier gibt es nichts zu posten.', profile: 'Profil', points: 'Verweist auf', noProjects: 'Kein Projekt mit Release-Paket oder Kalender gefunden.',
-      week: 'Woche ab', save: 'Speichern', progress: 'erledigt', noEvents: 'Keine Termine.', open_file: 'öffnen', failed: 'Fehler'
+      week: 'Woche ab', save: 'Speichern', progress: 'erledigt', noEvents: 'Keine Termine.', open_file: 'öffnen', failed: 'Fehler',
+      pilot: 'Autopilot', approve: 'Release freigeben', approveDate: function (d, p) { return 'Release am ' + d + ' freigeben' + (p ? ' (Datum wird festgelegt)' : ''); },
+      approved: function (at) { return 'Freigegeben am ' + at + ': die API-Posts gehen zu ihren Kalenderzeiten raus.'; }, revoke: 'Freigabe zurückziehen',
+      summary: function (a, m) { return a + ' Posts gehen per API raus, ' + m + ' bleiben bei dir.'; }, missingAccess: 'Ohne Zugang (bleiben von Hand, bis du publish-auth ausführst):',
+      lastRun: function (at) { return 'Letzter Lauf von release-run: ' + at; }, noRun: 'release-run ist noch nie gelaufen: npm run cli -- release-timer install', staleRun: 'release-run lief seit über 30 Minuten nicht: läuft der Timer?',
+      attention: 'Braucht dich:', confirmApprove: 'Release freigeben? Ab jetzt postet der Autopilot zu den Kalenderzeiten auf den Plattformen mit Zugang.',
+      states: { manual: 'von Hand', done: 'erledigt', unapproved: 'nach Freigabe automatisch', waiting: 'automatisch', due: 'ist dran', blocked: 'wartet', running: 'läuft …', pending: 'hochgeladen', failed: 'fehlgeschlagen', stuck: 'unklar, ob online', missed: 'verpasst' },
+      blocks: { credentials: 'Zugang fehlt: npm run cli -- publish-auth ', youtube: 'wartet, bis das Hauptvideo öffentlich ist', spotify: 'wartet auf den Spotify-Link (Spotify-Tab, „Song“)' },
+      byPilot: 'vom Autopiloten', takeOver: 'Selbst machen', giveBack: 'Dem Autopiloten geben', retry: 'Erneut versuchen', force: 'Jetzt posten', isLive: 'Ist online', at: 'um', upload: 'Upload', retryAt: 'nächster Versuch'
     },
     en: {
       calendar: 'Calendar (all projects)', open: 'open only', ics: 'Calendar as .ics', release: 'Release', proposed: 'proposed',
       done: 'done', posted: 'Posted', finished: 'Done', url: 'Live URL', copy: 'Copy', copied: 'Copied', chars: 'characters', bytes: 'bytes',
       todos: 'Open TODOs', none: 'Nothing to post here.', profile: 'Profile', points: 'Points to', noProjects: 'No project with a release package or calendar.',
-      week: 'Week of', save: 'Save', progress: 'done', noEvents: 'No events.', open_file: 'open', failed: 'Error'
+      week: 'Week of', save: 'Save', progress: 'done', noEvents: 'No events.', open_file: 'open', failed: 'Error',
+      pilot: 'Autopilot', approve: 'Approve release', approveDate: function (d, p) { return 'Approve the release on ' + d + (p ? ' (fixes the date)' : ''); },
+      approved: function (at) { return 'Approved on ' + at + ': the API posts go out at their calendar times.'; }, revoke: 'Withdraw approval',
+      summary: function (a, m) { return a + ' posts go out by API, ' + m + ' stay with you.'; }, missingAccess: 'No access (they stay manual until you run publish-auth):',
+      lastRun: function (at) { return 'Last release-run: ' + at; }, noRun: 'release-run has never run: npm run cli -- release-timer install', staleRun: 'release-run has not run for over 30 minutes: is the timer on?',
+      attention: 'Needs you:', confirmApprove: 'Approve the release? From now on the autopilot posts at the calendar times on every platform it has access to.',
+      states: { manual: 'manual', done: 'done', unapproved: 'automatic after approval', waiting: 'automatic', due: 'due', blocked: 'waiting', running: 'running …', pending: 'uploaded', failed: 'failed', stuck: 'not sure it is live', missed: 'missed' },
+      blocks: { credentials: 'no access: npm run cli -- publish-auth ', youtube: 'waits until the main video is public', spotify: 'waits for the Spotify link (Spotify tab, "Song")' },
+      byPilot: 'by the autopilot', takeOver: 'Do it myself', giveBack: 'Give it to the autopilot', retry: 'Try again', force: 'Post now', isLive: 'It is live', at: 'at', upload: 'Upload', retryAt: 'next attempt'
     }
   };
   var lang = (navigator.language || 'en').toLowerCase().indexOf('de') === 0 ? 'de' : 'en';
@@ -186,6 +214,63 @@
     }).catch(showError);
   }
 
+  function local(iso) {
+    if (!iso) return '';
+    return new Intl.DateTimeFormat(lang, { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+  }
+  function pilotCall(path, payload) {
+    return api('/api/projects/' + encodeURIComponent(state.project) + path, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload || {})
+    }).then(function () { openProject(state.project, state.tab); return api('/api/projects').then(function (projects) { state.projects = projects; renderNav(); }); }).catch(showError);
+  }
+
+  function renderPilot() {
+    var pilot = state.data.autopilot;
+    if (!pilot) return null;
+    var box = el('section', { class: 'pilot' + (pilot.approval ? ' on' : '') }, [el('h3', { text: t('pilot') })]);
+    var missing = Object.keys(pilot.ready).filter(function (p) { return !pilot.ready[p] && p !== 'microsite'; });
+    if (pilot.approval) {
+      box.appendChild(el('p', { text: t('approved')(local(pilot.approval.at)) }));
+      var attention = state.data.calendar.filter(function (e) { var a = pilot.events[e.id]; return a && a.needsUser; });
+      if (attention.length) box.appendChild(el('div', {}, [el('strong', { text: t('attention') }), el('ul', {}, attention.map(function (e) {
+        return el('li', {}, [el('a', { href: '#', onclick: function (ev) { ev.preventDefault(); openProject(state.project, tabOf(e), e.id); }, text: e.label }), ' — ' + t('states')[pilot.events[e.id].state]]);
+      }))]));
+      box.appendChild(el('p', {}, [el('button', { class: 'small', text: t('revoke'), onclick: function () { pilotCall('/revoke'); } })]));
+    } else {
+      var button = el('button', { class: 'primary', text: state.data.releaseDate ? t('approveDate')(state.data.releaseDate, state.data.proposed) : t('approve'), disabled: pilot.blockers.length ? true : undefined });
+      button.onclick = function () { if (confirm(t('confirmApprove'))) pilotCall('/approve', { release_date: state.data.releaseDate }); };
+      box.appendChild(el('p', { text: t('summary')(pilot.automatic, pilot.manual) }));
+      if (pilot.blockers.length) box.appendChild(el('ul', {}, pilot.blockers.map(function (b) { return el('li', { class: 'error', text: b }); })));
+      box.appendChild(el('p', {}, [button]));
+    }
+    if (missing.length) box.appendChild(el('p', { text: t('missingAccess') + ' ' + missing.join(', ') }));
+    if (pilot.notes.length) box.appendChild(el('ul', {}, pilot.notes.map(function (n) { return el('li', { text: n }); })));
+    var stale = pilot.lastRun && Date.now() - Date.parse(pilot.lastRun) > 30 * 60000;
+    box.appendChild(el('p', { class: 'sub' + (stale || !pilot.lastRun ? ' error' : ''), text: pilot.lastRun ? (stale ? t('staleRun') + ' ' : '') + t('lastRun')(local(pilot.lastRun)) : t('noRun') }));
+    return box;
+  }
+
+  function renderAuto(post) {
+    var pilot = state.data.autopilot, a = pilot && pilot.events[post.id];
+    if (!a || (a.state === 'manual' && !a.platform)) return null;
+    var cls = a.state === 'failed' || a.state === 'stuck' || a.state === 'missed' ? 'bad' : a.needsUser ? 'you' : a.state === 'done' || a.state === 'manual' ? '' : 'go';
+    var label = t('states')[a.state];
+    if (a.state === 'done' && a.byAutopilot) label += ' · ' + t('byPilot');
+    if ((a.state === 'waiting' || a.state === 'unapproved') && a.dueAt) label += ' ' + (a.platform === 'youtube' && post.id.indexOf('links') < 0 ? t('upload') + ' ' : '') + local(a.dueAt);
+    if (a.retryAt) label += ' · ' + t('retryAt') + ' ' + local(a.retryAt);
+    if (a.state === 'blocked' && a.block) label += ': ' + t('blocks')[a.block] + (a.block === 'credentials' ? a.platform : '');
+    var row = el('div', { class: 'auto' }, [el('span', { class: 'badge ' + cls, text: t('pilot') + ': ' + label })]);
+    var button = function (text, action) { return el('button', { class: 'small', text: text, onclick: function () { pilotCall('/autopilot', { id: post.id, action: action }); } }); };
+    if (a.state === 'manual') row.appendChild(button(t('giveBack'), 'auto'));
+    else if (a.state === 'failed') { row.appendChild(button(t('retry'), 'retry')); row.appendChild(button(t('takeOver'), 'manual')); }
+    else if (a.state === 'stuck') { row.appendChild(el('button', { class: 'small', text: t('isLive'), onclick: function () { setStatus(post.id, { done: true }).then(function () { openProject(state.project, state.tab); }); } })); row.appendChild(button(t('retry'), 'retry')); }
+    else if (a.state === 'missed') { row.appendChild(button(t('force'), 'force')); row.appendChild(button(t('takeOver'), 'manual')); }
+    else if (a.state !== 'done' && a.state !== 'running' && a.state !== 'pending') row.appendChild(button(t('takeOver'), 'manual'));
+    if (a.error) row.appendChild(el('span', { class: 'error', text: a.error }));
+    if (a.manualSteps.length && a.state !== 'done') row.appendChild(el('ul', {}, a.manualSteps.map(function (step) { return el('li', { text: step }); })));
+    return row;
+  }
+
   function renderField(field) {
     var value = field.value;
     var n = count(value, field);
@@ -233,6 +318,7 @@
     var pointer = post.pointer ? el('div', { class: 'pointer' }, [t('points') + ': ', /^https?:/.test(post.pointer) ? el('a', { href: post.pointer, target: '_blank', text: post.pointer }) : post.pointer]) : null;
     var card = el('section', { class: 'card' + (status.done ? ' done' : ''), id: 'post-' + post.id }, [
       el('div', { class: 'card-head' }, [el('h3', { text: post.heading }), post.at ? el('span', { class: 'when', text: when(post.at) }) : null, posted]),
+      renderAuto(post),
       post.files.length ? el('div', { class: 'files' }, post.files.map(renderFile)) : null,
     ].concat(post.fields.map(renderField)).concat([checklist, pointer]));
     return card;
@@ -247,6 +333,8 @@
       data.releaseDate ? el('span', { class: 'chip', text: t('release') + ' ' + data.releaseDate + (data.proposed ? ' (' + t('proposed') + ')' : '') }) : null,
       el('span', { class: 'chip', text: done + '/' + total + ' ' + t('progress') })
     ]));
+    var pilotBox = renderPilot();
+    if (pilotBox) main.appendChild(pilotBox);
     if (data.todos.length) {
       main.appendChild(el('details', { class: 'todos' }, [el('summary', { text: t('todos') + ' (' + data.todos.length + ')' }), el('ul', {}, data.todos.map(function (todo) { return el('li', { text: todo }); }))]));
     }

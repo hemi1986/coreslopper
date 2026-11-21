@@ -135,6 +135,8 @@ describe('autopilot plan', () => {
     expect(plan('2026-12-11T20:30:00Z', approved, running).get(id)!).toMatchObject({ state: 'stuck', needsUser: true });
     // The Reel was due Friday 20:00; the computer comes back Saturday noon.
     expect(plan('2026-12-12T11:00:00Z').get(id)!).toMatchObject({ state: 'missed', needsUser: true });
+    const unsure: AutopilotLog = { version: 1, entries: [entry(id, 'failed', '2026-12-11T19:00:00Z', { error: 'HTTP 502', uncertain: true })] };
+    expect(plan('2026-12-11T19:20:00Z', approved, unsure).get(id)!).toMatchObject({ state: 'stuck', needsUser: true });
     const forced: AutopilotLog = { version: 1, entries: [entry(id, 'force', '2026-12-12T11:05:00Z')] };
     expect(plan('2026-12-12T11:06:00Z', approved, forced).get(id)!.state).toBe('due');
   });

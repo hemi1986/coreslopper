@@ -1,7 +1,7 @@
 import { stat } from 'node:fs/promises';
 import { ConfigError } from '@coreslopper/core';
 import { delay, mimeForPath, type FetchLike } from '../http.js';
-import { fetchWithRetry, httpError, PublishError, readChunk, readJson, redactSecrets } from './http.js';
+import { fetchWithRetry, httpError, PublishError, readChunk, readJson, redactSecrets, markUncertain } from './http.js';
 import type { PublishLogger } from './types.js';
 import type { SaveSecret, SocialAdapter, SocialAdapterOptions, SocialPostRequest, SocialPostResult } from './social.js';
 
@@ -232,8 +232,13 @@ export class LinkedInPublisher implements SocialAdapter {
       isReshareDisabledByAuthor: false,
     };
     this.log(`linkedin: posting ${request.event}`);
-    const response = await this.rest(token, 'posts', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }, 60_000, 1);
-    if (response.status !== 201 && !response.ok) throw httpError('LinkedIn posts', response.status, await readJson(response), this.secrets);
+    const response = await this.rest(token, 'posts', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }, 60_000, 1).catch((error: unknown) => {
+      throw markUncertain(error);
+    });
+    if (response.status !== 201 && !response.ok) {
+      const error = httpError('LinkedIn posts', response.status, await readJson(response), this.secrets);
+      throw response.status >= 500 ? markUncertain(error) : error;
+    }
     const urn = response.headers.get('x-restli-id') ?? response.headers.get('x-linkedin-id');
     await response.body?.cancel().catch(() => undefined);
     if (!urn) throw new PublishError(`LinkedIn accepted ${request.event} but returned no post ID.`);

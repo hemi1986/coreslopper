@@ -14,6 +14,9 @@ export function redactSecrets(message: string, secrets: (string | undefined)[] =
 
 /** An error whose message has been cleaned of secrets. */
 export class PublishError extends Error {
+  /** The call may have gone through (a lost answer, a 5xx on the post itself): the post may be live, so it is never retried by itself. */
+  uncertain = false;
+
   constructor(
     message: string,
     readonly status?: number,
@@ -66,6 +69,13 @@ export async function fetchWithRetry(
   }
   const message = lastError instanceof Error ? lastError.message : String(lastError);
   throw new PublishError(redactSecrets(`${new URL(url).host}: ${message}`, options.secrets));
+}
+
+/** Mark an error of a call that may have gone through anyway; the release autopilot then asks the user instead of retrying. */
+export function markUncertain(error: unknown): unknown {
+  if (error instanceof PublishError) error.uncertain = true;
+  else if (error instanceof Error && !(error.name === 'ConfigError')) return Object.assign(new PublishError(error.message), { uncertain: true });
+  return error;
 }
 
 /** Parse a JSON body; a non-JSON body becomes `{ raw }`. */

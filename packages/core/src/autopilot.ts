@@ -150,10 +150,10 @@ function planEvent(event: CalendarEvent, context: AutopilotContext): AutopilotEv
   const last = entries.at(-1) ?? log.entries.filter((entry) => entry.event === event.id).at(-1);
   const attempts = entries.filter((entry) => entry.status === 'failed').length;
   const base = { id: event.id, event, attempts, last, needsUser: false };
-  if (item?.done) return { ...base, state: 'done' };
   const action = autopilotAction(event, settings);
-  if (!action) return { ...base, state: 'manual' };
-  const platform = actionPlatform(action);
+  const platform = action ? actionPlatform(action) : undefined;
+  if (item?.done) return { ...base, ...(action ? { action, platform } : {}), state: 'done' };
+  if (!action || !platform) return { ...base, state: 'manual' };
   const plan = { ...base, action, platform };
   if (item?.manual || !settings.platforms.includes(platform)) return { ...plan, state: 'manual' };
 
@@ -176,6 +176,8 @@ function planEvent(event: CalendarEvent, context: AutopilotContext): AutopilotEv
     return { ...withDue, state: 'pending', needsUser: waitsForUser };
   }
   if (latest?.status === 'posted') return { ...withDue, state: 'done' };
+  if (latest?.status === 'failed' && latest.uncertain) return { ...withDue, state: 'stuck', needsUser: true };
+  if (latest?.status === 'failed' && latest.fatal) return { ...withDue, state: 'failed', needsUser: true };
   if (attempts >= settings.retries) return { ...withDue, state: 'failed', needsUser: true };
 
   if (now.getTime() < due) return { ...withDue, state: 'waiting' };

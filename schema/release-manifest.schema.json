@@ -40,7 +40,10 @@
               "text",
               "readme",
               "calendar",
-              "microsite"
+              "microsite",
+              "announcement",
+              "story",
+              "feed-image"
             ]
           },
           "bytes": {

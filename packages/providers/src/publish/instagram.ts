@@ -1,7 +1,7 @@
 import { extname } from 'node:path';
 import { ConfigError } from '@coreslopper/core';
 import { delay, IMAGE_EXTENSIONS, type FetchLike } from '../http.js';
-import { fetchWithRetry, httpError, PublishError, readJson, redactSecrets } from './http.js';
+import { fetchWithRetry, httpError, PublishError, readJson, redactSecrets, markUncertain } from './http.js';
 import type { PublishLogger } from './types.js';
 import type { SaveSecret, SocialAdapter, SocialAdapterOptions, SocialPostRequest, SocialPostResult } from './social.js';
 
@@ -301,14 +301,16 @@ export class InstagramPublisher implements SocialAdapter {
     } catch (error) {
       if (error instanceof ConfigError) throw error;
       const status = await this.get(containerId, { fields: 'status_code' }, 'Instagram container status').catch(() => undefined);
-      if (status?.status_code !== 'PUBLISHED') throw error;
+      // Without a readable container status nobody knows whether it went out.
+      if (status === undefined) throw markUncertain(error);
+      if (status.status_code !== 'PUBLISHED') throw error;
       warnings.push('Instagram published the post but its answer was lost; the newest post of the account is reported.');
       const latest = await this.get(`${user}/media`, { fields: 'id,permalink', limit: '1' }, 'Instagram media list');
       const first = Array.isArray(latest.data) ? (latest.data[0] as { id?: string; permalink?: string } | undefined) : undefined;
-      if (!first?.id) throw new PublishError(`Instagram published ${request.event}, but the post could not be found; check the profile.`);
+      if (!first?.id) throw markUncertain(new PublishError(`Instagram published ${request.event}, but the post could not be found; check the profile.`));
       return { remoteId: first.id, url: first.permalink, warnings, manualSteps };
     }
-    if (!mediaId) throw new PublishError(`Instagram published ${request.event} but returned no media ID; check the profile.`);
+    if (!mediaId) throw markUncertain(new PublishError(`Instagram published ${request.event} but returned no media ID; check the profile.`));
 
     const details = await this.get(mediaId, { fields: 'permalink' }, 'Instagram media').catch((error: Error) => {
       warnings.push(redactSecrets(`Could not read the post's permalink: ${error.message}`, this.secrets));

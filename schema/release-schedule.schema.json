@@ -235,6 +235,76 @@
           "label"
         ]
       }
+    },
+    "autopilot": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "platforms": {
+          "default": [
+            "youtube",
+            "tiktok",
+            "instagram",
+            "x",
+            "linkedin",
+            "microsite"
+          ],
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "youtube",
+              "tiktok",
+              "instagram",
+              "x",
+              "linkedin",
+              "microsite"
+            ]
+          }
+        },
+        "youtube_ahead_hours": {
+          "default": 24,
+          "type": "number",
+          "minimum": 0,
+          "maximum": 336
+        },
+        "youtube_audited": {
+          "default": false,
+          "type": "boolean"
+        },
+        "tiktok_direct": {
+          "default": false,
+          "type": "boolean"
+        },
+        "late_hours": {
+          "default": 12,
+          "type": "number",
+          "minimum": 0,
+          "maximum": 168
+        },
+        "retries": {
+          "default": 3,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        },
+        "microsite": {
+          "type": "object",
+          "properties": {
+            "dir": {
+              "type": "string",
+              "minLength": 1
+            },
+            "command": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "dir"
+          ]
+        }
+      }
     }
   },
   "required": [

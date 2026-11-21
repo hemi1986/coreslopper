@@ -2,7 +2,7 @@ import { stat } from 'node:fs/promises';
 import { basename } from 'node:path';
 import { ConfigError } from '@coreslopper/core';
 import { delay, mimeForPath, type FetchLike } from '../http.js';
-import { fetchWithRetry, httpError, PublishError, readChunk, readJson, redactSecrets } from './http.js';
+import { fetchWithRetry, httpError, PublishError, readChunk, readJson, redactSecrets, markUncertain } from './http.js';
 import { RefreshingToken } from './oauth.js';
 import type { PublishLogger } from './types.js';
 import type { SaveSecret, SocialAdapter, SocialAdapterOptions, SocialPostRequest, SocialPostResult } from './social.js';
@@ -359,11 +359,14 @@ export class XPublisher implements SocialAdapter {
           { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify(body) },
           { attempts: 1, secrets: this.secrets, sleep: this.sleep, timeoutMs: 60_000 },
         ),
-      );
+      ).catch((error: unknown) => {
+        // A network error after sending: the post may exist.
+        throw markUncertain(error);
+      });
       const json = await readJson(response);
       if (response.ok) {
         const id = stringAt(json, 'data', 'id');
-        if (!id) throw new PublishError('X accepted the post but returned no ID; check the profile before posting again.');
+        if (!id) throw markUncertain(new PublishError('X accepted the post but returned no ID; check the profile before posting again.'));
         return id;
       }
       if (response.status === 429) {
@@ -381,10 +384,10 @@ export class XPublisher implements SocialAdapter {
         throw new ConfigError('X refused the post for billing: add credits to the app in the X developer console (pay-per-use).');
       }
       if (response.status === 403 && /duplicate/i.test(JSON.stringify(json))) {
-        throw new PublishError('X refused the post as a duplicate: it is probably live already; check the profile.', 403, json);
+        throw markUncertain(new PublishError('X refused the post as a duplicate: it is probably live already; check the profile.', 403, json));
       }
       if (response.status >= 500) {
-        throw new PublishError(`X answered HTTP ${response.status}; the post may exist anyway. Check the profile before trying again.`, response.status, json);
+        throw markUncertain(new PublishError(`X answered HTTP ${response.status}; the post may exist anyway. Check the profile before trying again.`, response.status, json));
       }
       throw httpError('X create post', response.status, json, this.secrets);
     }

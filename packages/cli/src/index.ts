@@ -341,6 +341,56 @@ program
   );
 
 program
+  .command('release-run')
+  .description(
+    'The release autopilot: post what is due of every release you approved on the release board, by API, at its calendar time. ' +
+      'Run by the timer (release-timer install); never by a pipeline stage.',
+  )
+  .option('--project <slug>', 'Only this project')
+  .option('--dry-run', 'Print what is due; post and write nothing')
+  .option('--plan', 'Print every approved release event with its state and stop')
+  .action((options: { project?: string; dryRun?: boolean; plan?: boolean }) =>
+    run(async () => {
+      const { autopilotOverview, runAutopilot } = await import('./release-autopilot.js');
+      if (options.plan) return autopilotOverview(repoRoot());
+      const stamp = new Date().toISOString();
+      const result = await runAutopilot({ root: repoRoot(), project: options.project, dryRun: options.dryRun });
+      const acted = result.projects.reduce((sum, project) => sum + project.acted.length, 0);
+      const attention = result.projects.reduce((sum, project) => sum + project.attention.length, 0);
+      console.log(`${stamp} release-run: ${acted} action(s), ${attention} item(s) need you${result.locked ? ' (another run was active)' : ''}`);
+    }),
+  );
+
+program
+  .command('release-approve <project>')
+  .description('Approve a release for the autopilot (the board\'s "Approve release" button); a proposed release day becomes release.release_date. A user command.')
+  .option('--revoke', 'Withdraw the approval: nothing more goes out by itself')
+  .action((project: string, options: { revoke?: boolean }) =>
+    run(async () => {
+      const { approveRelease, revokeApproval } = await import('./release-autopilot.js');
+      const dir = projectDirFromArg(project);
+      if (options.revoke) {
+        await revokeApproval(dir);
+        console.log('Approval withdrawn: the autopilot leaves this release alone.');
+        return;
+      }
+      const status = await approveRelease(dir, { root: repoRoot(), now: new Date() });
+      console.log(`Approved: the release of ${status.approval!.release_date} goes out at its calendar times (release-run).`);
+    }),
+  );
+
+program
+  .command('release-timer [action]')
+  .description('The timer that runs release-run: show (default) | install | remove | status. WSL: Windows Task Scheduler; Linux: systemd user timer; macOS: launchd.')
+  .option('--every <minutes>', 'Minutes between runs', (value) => Number(value), 5)
+  .action((action: string | undefined, options: { every: number }) =>
+    run(async () => {
+      const { releaseTimer } = await import('./release-timer.js');
+      await releaseTimer(validateChoice(action ?? 'show', ['show', 'install', 'remove', 'status'] as const, 'action'), { root: repoRoot(), everyMinutes: options.every });
+    }),
+  );
+
+program
   .command('publish [project]')
   .description(
     'Upload the release package from review/upload.yaml: YouTube as private (or scheduled) videos, TikTok as inbox drafts. ' +
@@ -374,11 +424,13 @@ program
 
 program
   .command('publish-auth <platform>')
-  .description('One-time OAuth consent for publish: youtube | tiktok. Stores the refresh token in .env.')
+  .description('One-time consent: youtube | tiktok (publish and the autopilot), x | linkedin | instagram (the autopilot). Stores the tokens in .env.')
   .option('--redirect-uri <uri>', 'Loopback redirect URI (TikTok: the one registered in the developer portal)')
   .action((platform: string, options: { redirectUri?: string }) =>
     run(async () => {
-      await publishAuth(validateChoice(platform, ['youtube', 'tiktok'] as const, 'platform'), { redirectUri: options.redirectUri });
+      const choice = validateChoice(platform, ['youtube', 'tiktok', 'x', 'linkedin', 'instagram'] as const, 'platform');
+      if (choice === 'youtube' || choice === 'tiktok') await publishAuth(choice, { redirectUri: options.redirectUri });
+      else await (await import('./social-auth.js')).socialAuth(choice);
     }),
   );
 

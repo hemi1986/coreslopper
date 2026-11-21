@@ -10,8 +10,11 @@ import {
   loadReleaseSchedule,
   platformLimits,
   plainLyrics,
+  planAutopilot,
   readJsonFile,
   releaseIdentity,
+  type AutopilotEventPlan,
+  type AutopilotPlatform,
   type CalendarEvent,
   type ReleaseCalendar,
   type ReleaseManifest,
@@ -37,6 +40,7 @@ import {
 import { loadUploadData, uploadPaths } from './upload-text.js';
 import { releaseDir, songJson } from './release.js';
 import { DERIVED_PATHS } from './release-images.js';
+import { autopilotReadiness, lastRun, loadAutopilotLog } from './autopilot-state.js';
 
 // The release board's view of one project: per platform the posts to make,
 // each with its files (paths inside renders/release/), the texts to paste
@@ -87,6 +91,38 @@ export interface BoardPlatform {
   posts: BoardPost[];
 }
 
+/** Where one calendar event stands with the autopilot. */
+export interface BoardAutopilotEvent {
+  state: AutopilotEventPlan['state'];
+  block?: AutopilotEventPlan['block'];
+  /** The platform of the API action, when there is one. */
+  platform?: AutopilotEventPlan['platform'];
+  dueAt?: string;
+  retryAt?: string;
+  needsUser: boolean;
+  attempts: number;
+  error?: string;
+  /** What the user still does by hand after the API step. */
+  manualSteps: string[];
+  /** The autopilot posted it. */
+  byAutopilot: boolean;
+}
+
+export interface BoardAutopilot {
+  approval?: { at: string; release_date: string };
+  /** Why the release cannot be approved yet. */
+  blockers: string[];
+  ready: Record<AutopilotPlatform, boolean>;
+  /** Tokens that expire soon and other setup notes. */
+  notes: string[];
+  /** When release-run last finished a round. */
+  lastRun?: string;
+  /** Events the autopilot posts, and events that stay manual. */
+  automatic: number;
+  manual: number;
+  events: Record<string, BoardAutopilotEvent>;
+}
+
 export interface BoardProject {
   slug: string;
   title: string;
@@ -101,6 +137,7 @@ export interface BoardProject {
   calendar: (CalendarEvent & { label: string })[];
   status: ReleaseStatus;
   microsite?: MicrositeSong;
+  autopilot: BoardAutopilot;
 }
 
 const NOTES = {
@@ -386,7 +423,7 @@ export async function projectReleaseContext(projectRoot: string, root: string) {
 }
 
 /** Build the board view of one project. */
-export async function boardProject(projectRoot: string, root: string): Promise<BoardProject> {
+export async function boardProject(projectRoot: string, root: string, options: { now?: Date } = {}): Promise<BoardProject> {
   const { project, music, channel, limits, identity, data, language, l, manifest, files, calendar, status, schedule, input } = await projectReleaseContext(projectRoot, root);
   const de = language.toLowerCase().startsWith('de');
   const b = de ? BOARD.de : BOARD.en;
@@ -640,7 +677,9 @@ export async function boardProject(projectRoot: string, root: string): Promise<B
     },
     { id: 'microsite', label: 'Microsite', notes: notes.microsite, posts: micrositePosts },
   ];
+  const autopilot = await boardAutopilot({ root, projectRoot: project.paths.root, calendar, status, schedule, manifest: Boolean(manifest), data: Boolean(data), now: options.now });
   return {
+    autopilot,
     slug: project.config.slug,
     title: identity.title,
     artist: identity.artist,
@@ -654,5 +693,58 @@ export async function boardProject(projectRoot: string, root: string): Promise<B
     calendar: (calendar?.events ?? []).map((event) => ({ ...event, label: calendarEventLabel(event, l, schedule.release.premiere) })),
     status,
     microsite,
+  };
+}
+
+/** The autopilot's view of a project for the board: the approval, the credentials, and each event's state. */
+export async function boardAutopilot(options: {
+  root: string;
+  projectRoot: string;
+  calendar?: ReleaseCalendar;
+  status: ReleaseStatus;
+  schedule: Awaited<ReturnType<typeof loadReleaseSchedule>>;
+  manifest: boolean;
+  data: boolean;
+  now?: Date;
+  env?: NodeJS.ProcessEnv;
+}): Promise<BoardAutopilot> {
+  const now = options.now ?? new Date();
+  const settings = options.schedule.autopilot;
+  const { ready, notes } = autopilotReadiness(settings, options.env, now);
+  const blockers: string[] = [];
+  if (!options.manifest) blockers.push('no release package yet: run release');
+  if (!options.data) blockers.push('review/upload.yaml is missing');
+  if (!options.calendar) blockers.push('no release calendar yet: run release');
+  const log = await loadAutopilotLog(options.projectRoot);
+  const plans = options.calendar
+    ? planAutopilot({ calendar: options.calendar, status: options.status, log, settings, now, ready, premiere: options.schedule.release.premiere })
+    : [];
+  const events: Record<string, BoardAutopilotEvent> = {};
+  for (const plan of plans) {
+    const failed = plan.last?.status === 'failed' ? plan.last.error : undefined;
+    const steps = [...log.entries].reverse().find((entry) => entry.event === plan.id && entry.manual_steps.length)?.manual_steps ?? [];
+    events[plan.id] = {
+      state: plan.state,
+      ...(plan.block ? { block: plan.block } : {}),
+      ...(plan.platform ? { platform: plan.platform } : {}),
+      ...(plan.dueAt ? { dueAt: plan.dueAt } : {}),
+      ...(plan.retryAt ? { retryAt: plan.retryAt } : {}),
+      needsUser: plan.needsUser,
+      attempts: plan.attempts,
+      ...(failed ? { error: failed } : {}),
+      manualSteps: steps,
+      byAutopilot: options.status.items[plan.id]?.by === 'autopilot',
+    };
+  }
+  const automatic = plans.filter((plan) => plan.action && plan.state !== 'manual').length;
+  return {
+    ...(options.status.approval ? { approval: options.status.approval } : {}),
+    blockers,
+    ready,
+    notes,
+    lastRun: await lastRun(options.root),
+    automatic,
+    manual: plans.length - automatic,
+    events,
   };
 }

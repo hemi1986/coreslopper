@@ -1107,6 +1107,10 @@ export const AutopilotEntrySchema = z.object({
   /** YouTube: the scheduled publication time. */
   publish_at: z.string().optional(),
   error: z.string().optional(),
+  /** A failure after which the post may be live anyway: never retried by itself, the user checks the platform. */
+  uncertain: z.boolean().optional(),
+  /** A failure no retry fixes (credentials, billing, a broken text): the post waits for the user at once. */
+  fatal: z.boolean().optional(),
   warnings: z.array(z.string()).default([]),
   /** What the user still does by hand on the platform. */
   manual_steps: z.array(z.string()).default([]),

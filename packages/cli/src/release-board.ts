@@ -12,8 +12,9 @@ import { releaseDir } from './release.js';
 // Per platform it shows which file goes where, the texts to paste with their
 // limits, the settings to check, and the calendar; the user ticks off what is
 // posted and enters the live URL, which lands in review/release-status.json.
-// Bound to 127.0.0.1 only; it reads the release folders and writes nothing
-// but the status files.
+// Bound to 127.0.0.1 only; it reads the release folders and writes the
+// status files, the approval, and the autopilot's retry and takeover marks
+// (and, on approval of a proposed date, release.release_date in project.yaml).
 
 export interface BoardOptions {
   /** The workspace (or repository) root; projects live in its projects/. */
@@ -21,6 +22,14 @@ export interface BoardOptions {
   port?: number;
   host?: string;
   now?: () => Date;
+  /** Lay out the texts and the microsite data again after a status change (default: release without rendering). */
+  refresh?: (projectDir: string) => Promise<void>;
+}
+
+/** The quick refresh after a live URL arrives: texts and microsite data, no renders, no new stills. */
+async function quickRelease(projectDir: string): Promise<void> {
+  const { buildRelease } = await import('./release.js');
+  await buildRelease({ projectDir, render: false, stills: false, deps: { log: () => undefined } });
 }
 
 const MIME: Record<string, string> = {
@@ -97,6 +106,17 @@ async function serveMedia(req: IncomingMessage, res: ServerResponse, base: strin
 export function boardHandler(options: BoardOptions = {}) {
   const root = options.root ?? repoRoot();
   const now = options.now ?? (() => new Date());
+  const refresh = options.refresh ?? quickRelease;
+  // One refresh per project at a time; a change during a refresh queues one more.
+  const refreshing = new Map<string, Promise<void>>();
+  const scheduleRefresh = (dir: string) => {
+    const previous = refreshing.get(dir) ?? Promise.resolve();
+    const next = previous
+      .then(() => refresh(dir))
+      .catch((error: Error) => console.error(`release-board: refreshing ${dir} failed: ${error.message}`));
+    refreshing.set(dir, next);
+    return next;
+  };
   const projectDir = async (slug: string) => {
     if (!SLUG.test(slug)) throw new ValidationError(`unknown project ${slug}`);
     const dir = join(root, 'projects', slug);
@@ -107,7 +127,7 @@ export function boardHandler(options: BoardOptions = {}) {
     const projects = [];
     for (const dir of await boardProjectDirs(root)) {
       try {
-        projects.push(await boardProject(dir, root));
+        projects.push(await boardProject(dir, root, { now: now() }));
       } catch (error) {
         projects.push({ slug: dir.split(sep).at(-1)!, error: (error as Error).message });
       }
@@ -148,7 +168,7 @@ export function boardHandler(options: BoardOptions = {}) {
         );
       }
       const projectMatch = /^\/api\/projects\/([^/]+)$/.exec(path);
-      if (req.method === 'GET' && projectMatch) return json(res, await boardProject(await projectDir(projectMatch[1]!), root));
+      if (req.method === 'GET' && projectMatch) return json(res, await boardProject(await projectDir(projectMatch[1]!), root, { now: now() }));
       const statusMatch = /^\/api\/projects\/([^/]+)\/status$/.exec(path);
       if (req.method === 'POST' && statusMatch) {
         const dir = await projectDir(statusMatch[1]!);
@@ -159,7 +179,35 @@ export function boardHandler(options: BoardOptions = {}) {
           throw new ValidationError('url must start with http:// or https://');
         }
         const status = await updateStatus(dir, change.id, { done: change.done as boolean | undefined, url: change.url as string | null | undefined }, now());
+        await writeBy(dir, change.id, change.done as boolean | undefined);
+        // A live URL changes the X and LinkedIn texts and the microsite data: lay them out again in the background.
+        if (change.url !== undefined) void scheduleRefresh(dir);
         return json(res, status);
+      }
+      const approveMatch = /^\/api\/projects\/([^/]+)\/(approve|revoke)$/.exec(path);
+      if (req.method === 'POST' && approveMatch) {
+        const dir = await projectDir(approveMatch[1]!);
+        const { approveRelease, revokeApproval } = await import('./release-autopilot.js');
+        if (approveMatch[2] === 'revoke') return json(res, await revokeApproval(dir));
+        const change = (await body(req)) as { release_date?: unknown };
+        if (change.release_date !== undefined && (typeof change.release_date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(change.release_date))) {
+          throw new ValidationError('release_date must be YYYY-MM-DD');
+        }
+        const status = await approveRelease(dir, { root, now: now(), releaseDate: change.release_date as string | undefined });
+        void scheduleRefresh(dir);
+        return json(res, status);
+      }
+      const autopilotMatch = /^\/api\/projects\/([^/]+)\/autopilot$/.exec(path);
+      if (req.method === 'POST' && autopilotMatch) {
+        const dir = await projectDir(autopilotMatch[1]!);
+        const change = (await body(req)) as { id?: unknown; action?: unknown };
+        if (typeof change.id !== 'string' || !change.id || change.id.length > 200) throw new ValidationError('autopilot needs an id');
+        const action = change.action;
+        if (action !== 'manual' && action !== 'auto' && action !== 'retry' && action !== 'force') throw new ValidationError('action must be manual, auto, retry, or force');
+        const { retryEvent, setEventManual } = await import('./release-autopilot.js');
+        if (action === 'manual' || action === 'auto') await setEventManual(dir, change.id, action === 'manual');
+        else await retryEvent(dir, change.id, now(), action === 'force');
+        return json(res, await boardProject(dir, root, { now: now() }));
       }
       if (req.method === 'GET' && path === '/api/calendar') {
         const projects = (await allProjects()).filter((project): project is BoardProject => !('error' in project));
@@ -194,6 +242,19 @@ export function boardHandler(options: BoardOptions = {}) {
       return json(res, { error: (error as Error).message }, status);
     }
   };
+}
+
+/** Record who ticked an item: the user on the board. */
+async function writeBy(dir: string, id: string, done: boolean | undefined): Promise<void> {
+  if (done === undefined) return;
+  const { loadStatus, statusPath } = await import('./release-calendar.js');
+  const { writeJsonAtomic } = await import('@coreslopper/core');
+  const status = await loadStatus(dir);
+  const item = status.items[id];
+  if (!item) return;
+  if (done) item.by = 'user';
+  else delete item.by;
+  await writeJsonAtomic(statusPath(dir), status);
 }
 
 /** Start the board; resolves once it listens. */
