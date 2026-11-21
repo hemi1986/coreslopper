@@ -26,6 +26,7 @@ export interface NextAction {
     | 'interactive'
     | 'pipeline'
     | 'retry'
+    | 'review'
     | 'running'
     | 'release'
     | 'released'
@@ -76,6 +77,8 @@ export interface ProductionFacts {
   hasRelease: boolean;
   /** The release is approved on the board (`review/release-status.json`). */
   approved?: boolean;
+  /** Review rounds the user sent and the agent has not answered. */
+  openRounds?: number;
 }
 
 export function productionPhase(stages: StageView[]): ProductionPhase {
@@ -88,14 +91,16 @@ export function productionPhase(stages: StageView[]): ProductionPhase {
 
 /**
  * The next step of a project. Interactive stages come first (they block
- * `/video-next`); a running stage means waiting; a failed or pending
- * autonomous stage is `/video-next`; a finished project goes to the release.
+ * `/video-next`); a running stage means waiting; an open review round and a
+ * failed or pending autonomous stage are `/video-next`, which answers the
+ * round first; a finished project goes to the release.
  */
 export function projectNextAction(facts: ProductionFacts): NextAction {
   const running = facts.stages.find((stage) => stage.status === 'running');
   if (running) return { where: 'none', reason: 'running', stage: running.id };
   const open = facts.stages.find((stage) => stage.status === 'pending' || stage.status === 'failed');
   if (open?.interactive) return { where: 'claude', command: `/${setupSkill(facts.kind)} ${facts.slug}`, reason: 'interactive', stage: open.id };
+  if (facts.openRounds) return { where: 'claude', command: `/video-next ${facts.slug}`, reason: 'review' };
   if (open) return { where: 'claude', command: `/video-next ${facts.slug}`, reason: open.status === 'failed' ? 'retry' : 'pipeline', stage: open.id };
   if (!facts.hasRelease) return { where: 'claude', command: `/video-next ${facts.slug}`, reason: 'pipeline', stage: 'qa-export' };
   return facts.approved ? { where: 'none', reason: 'released' } : { where: 'board', reason: 'release' };

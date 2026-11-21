@@ -355,8 +355,12 @@ The final step that produces all format renders, the review report, and the rele
 _Avoid_: render
 
 **Review Note**:
-A user's free-text remark on one frame of a render, saved by the review player in `review/notes/<video-stem>.json` with its frame and time.
+A user's free-text remark on one frame or a range of frames of a render, saved by the board's review view or the desktop review player in `review/notes/<video-stem>.json` with its frame and time. A note without a round is a draft.
 _Avoid_: annotation, comment, feedback
+
+**Review Round**:
+The draft notes of one render that the user sent to the agent in one click, frozen in `review/rounds/<NNN>.json` with each note's shots and section. The agent answers every note in `<NNN>.replies.json` (`fixed`, `partly`, `not-fixed`, `question`); until then the round is open and `/video-next` works on it first.
+_Avoid_: ticket, feedback batch, review pass
 
 ## Series and episodes
 

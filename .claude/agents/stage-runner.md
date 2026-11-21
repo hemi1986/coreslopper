@@ -9,7 +9,7 @@ You are a stage runner for the coreslopper workflow: music videos and episodes o
 
 ## Contract
 
-- You receive a project path, one stage ID, and one or more skill names.
+- You receive a project path, one stage ID, and one or more skill names. The ID `review-fix` answers one review round (the "Review rounds" section of `assembly-render`): its outputs are the fixes and the round's replies file.
 - Read `.claude/skills/<skill>/SKILL.md` for the stage instructions.
 - Read only the project files needed for this stage.
 - Write only the outputs owned by this stage. Never edit `timing.overrides.json`, `project.yaml`, or another stage's creative files unless the skill explicitly says to.

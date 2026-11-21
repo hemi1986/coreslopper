@@ -79,7 +79,9 @@ try {
 
 const file = payload?.tool_input?.file_path ?? payload?.tool_input?.path;
 if (!file) process.exit(0);
-if (!TRACKED.has(basename(file))) process.exit(0);
+// The agent's answer to a review round: review/rounds/<NNN>.replies.json.
+const isReplies = /^\d{3,}\.replies\.json$/.test(basename(file)) && basename(dirname(resolve(file))) === 'rounds';
+if (!TRACKED.has(basename(file)) && !isReplies) process.exit(0);
 
 // config/channel.yaml and config/release-schedule.yaml belong to the workspace, not to a project or series.
 const isChannel = ['channel.yaml', 'release-schedule.yaml'].includes(basename(file)) && basename(dirname(resolve(file))) === 'config';

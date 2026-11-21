@@ -1,10 +1,12 @@
 // The board's shell: navigation, routes, and the refresh of the production pages.
 //   #/               production overview      #/calendar               release calendar
 //   #/p/<slug>       a project's production   #/p/<slug>/release[/<platform>[/<event>]]
+//   #/p/<slug>/review[/<render>]             the review player
 //   #/s/<slug>       a series
 import { addStrings, api, el, go, showError, t } from './lib.js';
 import { currentProductionKey, forgetProduction, showProduction } from './production.js';
 import { onReleaseChange, showCalendar, showRelease } from './release.js';
+import { showReview } from './review.js';
 
 addStrings({
   de: { board: 'Board', navProduction: 'Produktion', navCalendar: 'Release-Kalender' },
@@ -34,7 +36,7 @@ function renderNav() {
     const release = releases[project.slug];
     const current = project.stages.filter(function (s) { return s.id === project.current; })[0];
     const sub = release && release.total && project.phase === 'done' ? (release.releaseDate || '—') + ' · ' + release.done + '/' + release.total : current ? current.label : t('phases')[project.phase];
-    nav.appendChild(navButton(project.title, sub, active === 'project:' + project.slug || active === 'release:' + project.slug, '#/p/' + project.slug, project.phase));
+    nav.appendChild(navButton(project.title, sub, active === 'project:' + project.slug || active === 'release:' + project.slug || active === 'review:' + project.slug, '#/p/' + project.slug, project.phase));
   });
   if (overview.series.length) nav.appendChild(el('h2', { text: t('series') }));
   overview.series.forEach(function (series) {
@@ -55,6 +57,7 @@ function route() {
   let match;
   if (hash === '#/calendar') { active = 'calendar'; forgetProduction(); showCalendar(); }
   else if ((match = /^#\/p\/([a-z0-9-]+)\/release(?:\/([a-z]+))?(?:\/(.+))?$/.exec(hash))) { active = 'release:' + match[1]; forgetProduction(); showRelease(match[1], match[2], match[3]); }
+  else if ((match = /^#\/p\/([a-z0-9-]+)\/review(?:\/(.+))?$/.exec(hash))) { active = 'review:' + match[1]; forgetProduction(); showReview(match[1], match[2]); }
   else if ((match = /^#\/p\/([a-z0-9-]+)\/([a-z]+)$/.exec(hash))) { go('#/p/' + match[1] + '/release/' + match[2]); return; } // the release board's old links
   else if ((match = /^#\/p\/([a-z0-9-]+)\/?$/.exec(hash))) { active = 'project:' + match[1]; showProduction(active); }
   else if ((match = /^#\/s\/([a-z0-9-]+)\/?$/.exec(hash))) { active = 'series:' + match[1]; showProduction(active); }

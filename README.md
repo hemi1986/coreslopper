@@ -69,7 +69,9 @@ It analyzes the song, builds the style and character bibles, writes and validate
 
 ## 3. Review and fix
 
-Watch the result in the review player and leave notes on exact frames:
+Watch the result in the board's **Review** tab (`npm run cli -- board`): step frame by frame along a timeline of sections and shots, write notes on a frame or a range, and send them to the agent with one click. `/video-next <slug>` then works through them, re-renders the preview, and answers every note on the board ([docs/board.md](docs/board.md#review)).
+
+The desktop player writes the same notes:
 
 ```bash
 npm run cli -- review <slug>                  # newer of preview and master render

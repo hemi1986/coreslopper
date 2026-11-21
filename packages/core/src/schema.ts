@@ -1338,6 +1338,84 @@ export type Character = z.infer<typeof CharacterSchema>;
 export type CharacterState = z.infer<typeof CharacterStateSchema>;
 export type CharacterBible = z.infer<typeof CharacterBibleSchema>;
 export type BrandKit = z.infer<typeof BrandKitSchema>;
+/** One note on a render: a frame, or a range from `frame` to `end_frame`. Written by the review player and the board. */
+export const ReviewNoteSchema = z
+  .object({
+    /** Set by the board; notes of the desktop player have none until the board submits them. */
+    id: z.string().min(1).optional(),
+    frame: z.number().int().nonnegative(),
+    seconds: z.number().nonnegative(),
+    /** `mm:ss.mmm`. */
+    time: z.string(),
+    end_frame: z.number().int().nonnegative().optional(),
+    end_seconds: z.number().nonnegative().optional(),
+    end_time: z.string().optional(),
+    text: z.string().min(1),
+    /** The review round that sent this note to the agent; a note without one is a draft. */
+    round: z.number().int().positive().optional(),
+    created: z.string().optional(),
+  })
+  .passthrough();
+
+/** `review/notes/<video-stem>.json`: the user's notes on one render. */
+export const ReviewNotesSchema = z
+  .object({
+    video: z.string().min(1),
+    fps: z.number().positive(),
+    notes: z.array(ReviewNoteSchema).default([]),
+  })
+  .passthrough();
+
+/** `review/rounds/<NNN>.json`: notes the user sent to the agent, frozen when sent. */
+export const ReviewRoundSchema = z.object({
+  version: z.literal(1),
+  round: z.number().int().positive(),
+  /** The render the notes refer to, in renders/. Frames and seconds are that file's. */
+  video: z.string().min(1),
+  fps: z.number().positive(),
+  submitted_at: z.string().min(1),
+  notes: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        frame: z.number().int().nonnegative(),
+        seconds: z.number().nonnegative(),
+        time: z.string(),
+        end_frame: z.number().int().nonnegative().optional(),
+        end_seconds: z.number().nonnegative().optional(),
+        end_time: z.string().optional(),
+        /** Storyboard shots on screen during the note, from the effective timing. */
+        shots: z.array(z.string()).default([]),
+        section: z.string().optional(),
+        text: z.string().min(1),
+      }),
+    )
+    .min(1),
+});
+
+export const ReviewReplyStatusSchema = z.enum(['fixed', 'partly', 'not-fixed', 'question']);
+
+/** `review/rounds/<NNN>.replies.json`: the agent's answer to a round, one reply per note. Its existence closes the round. */
+export const ReviewRepliesSchema = z.object({
+  version: z.literal(1),
+  round: z.number().int().positive(),
+  answered_at: z.string().min(1),
+  /** The render that shows the fixes, in renders/. */
+  render: z.string().optional(),
+  notes: z.array(
+    z.object({
+      id: z.string().min(1),
+      status: ReviewReplyStatusSchema,
+      /** One or two sentences: what changed, or why not. */
+      reply: z.string().min(1),
+    }),
+  ),
+});
+
+export type ReviewNote = z.infer<typeof ReviewNoteSchema>;
+export type ReviewNotes = z.infer<typeof ReviewNotesSchema>;
+export type ReviewRound = z.infer<typeof ReviewRoundSchema>;
+export type ReviewReplies = z.infer<typeof ReviewRepliesSchema>;
 export type ModelPricing = z.infer<typeof ModelPricingSchema>;
 export type ModelRoleVariant = z.infer<typeof ModelRoleVariantSchema>;
 export type ModelRole = z.infer<typeof ModelRoleSchema>;

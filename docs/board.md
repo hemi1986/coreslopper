@@ -40,6 +40,24 @@ A project page lists every stage with its attempts, times, and errors, the budge
 
 The next step follows the stages: an open interactive stage is `/new-video <slug>` or `/new-episode <slug>`; an open or failed stage after that is `/video-next <slug>`; a finished project goes to its release view. A series asks for `/new-series <slug>` until every on-screen character and set has a reference and every speaking character a reference voice, then for `/new-episode`.
 
+## Review
+
+The **Review** tab of a project plays its renders (newest first) frame by frame:
+
+| Key | Action |
+|---|---|
+| Space | play / pause |
+| ← / → | one frame back / forward |
+| Shift + ← / → | one second |
+| `[` / `]` | previous / next shot |
+| `,` / `.` | previous / next note |
+| `I` / `O` | start / end of a range |
+| `N` | write a note |
+
+Below the player, the timeline shows the song's sections, the storyboard's shots, and the notes; click it to jump. Write a note and press Enter: it sits on the current frame, or on the range you marked with `I` and `O`. Drafts can be changed or deleted.
+
+**Send to the agent** freezes the render's drafts as a review round in `review/rounds/<NNN>.json`, with the shots and section of each note. Then run `/video-next <slug>` in Claude Code: it works through the round before anything else, re-renders the preview, and answers each note (fixed, partly, not fixed, or a question), which appears under the note. Notes from the desktop player (`npm run cli -- review`) show up here too and go out with the next round.
+
 ## The watchdog
 
 One round (`npm run cli -- watch`) runs the release autopilot (`release-run`, see [publishing.md](publishing.md#release-autopilot)) and then the production scan. The scan reads every project as the board does and writes `.cache/watch/snapshot.json` and `.cache/watch/events.jsonl`; it never changes `state.json` and never starts a stage. The board shows the events under **Activity**:

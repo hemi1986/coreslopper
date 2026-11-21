@@ -126,16 +126,18 @@ npm run cli -- render projects/my-video --format 1x1
 
 Completion: preview plays with the song; master is 1080p30 H.264; derivatives use designed layouts; no clipping.
 
-### Review notes
+### Review notes and rounds
 
-The user can watch any render in the review player and leave notes on exact frames ([ADR 0022](adr/0022-review-player.md), [scripts/review-player](../scripts/review-player/README.md)):
+The user watches renders in the board's review view (`npm run cli -- board`, tab **Review**), leaves notes on exact frames or ranges, and sends them to the agent as a **review round** ([ADR 0032](adr/0032-web-review-rounds.md), [board.md](board.md#review)). The round is frozen in `review/rounds/<NNN>.json` with each note's shots and section; `status` prints a `Review:` line while it is open, and `/video-next` answers it before any stage: a `review-fix` runner follows `assembly-render`, re-renders the preview, and writes one reply per note to `review/rounds/<NNN>.replies.json`, which the board shows beside the notes.
+
+The desktop player writes the same notes ([ADR 0022](adr/0022-review-player.md), [scripts/review-player](../scripts/review-player/README.md)):
 
 ```bash
 npm run cli -- review projects/my-video                 # newer of preview and master
 npm run cli -- review projects/my-video --format 9x16
 ```
 
-Notes land in `review/notes/<video-stem>.json`. No stage waits for them; on a fix pass, `assembly-render` maps each note to its shot and works through them.
+Notes land in `review/notes/<video-stem>.json`. No stage waits for them; the board sends them in a round, or the user asks for a fix pass in chat.
 
 ## 9. QA & export
 

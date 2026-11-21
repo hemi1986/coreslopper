@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { ValidationError, calendarIcs, loadChannel, repoRoot, type ReleaseCalendar } from '@coreslopper/core';
 import { boardProject, type BoardProject } from './release-board-data.js';
 import { loadEvents, loadSnapshot } from './production-watch.js';
+import { editNote, reviewData, submitRound } from './board-review.js';
 import { SLUG, productionDetail, productionOverview, productionSeries, projectDirs, seriesDirs } from './board-production.js';
 import { loadCalendar, updateStatus } from './release-calendar.js';
 import { releaseDir } from './release.js';
@@ -213,6 +214,27 @@ export function boardHandler(options: BoardOptions = {}) {
           return 'error' in detail ? json(res, detail, 500) : json(res, detail);
         }
         return json(res, await productionDetail(await workspaceDir(projectDirs, productionMatch[2]!, 'project')));
+      }
+      const reviewMatch = /^\/api\/review\/([^/]+)(?:\/(notes|submit))?$/.exec(path);
+      if (reviewMatch) {
+        const dir = await workspaceDir(projectDirs, reviewMatch[1]!, 'project');
+        if (req.method === 'GET' && !reviewMatch[2]) return json(res, await reviewData(dir));
+        if (req.method === 'POST' && reviewMatch[2] === 'notes') {
+          const change = (await body(req)) as Record<string, unknown>;
+          const action = change.action;
+          if (action !== 'add' && action !== 'update' && action !== 'delete') throw new ValidationError('action must be add, update, or delete');
+          return json(res, await editNote(dir, change.video, {
+            action,
+            id: typeof change.id === 'string' ? change.id : undefined,
+            seconds: change.seconds as number | undefined,
+            end_seconds: change.end_seconds as number | null | undefined,
+            text: change.text as string | undefined,
+          }, now()));
+        }
+        if (req.method === 'POST' && reviewMatch[2] === 'submit') {
+          const change = (await body(req)) as { video?: unknown };
+          return json(res, await submitRound(dir, change.video, now()));
+        }
       }
       const fileMatch = /^\/(files|series-files)\/([^/]+)\/(.+)$/.exec(path);
       if (req.method === 'GET' && fileMatch) {

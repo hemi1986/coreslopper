@@ -146,7 +146,7 @@ npm run schema
 | `npm run cli -- render <project> [--format <id>]` | Render with Remotion in segments; the default is the master format. `--frames <a>-<b>` renders a test range; `--subtitles en` burns in episode subtitles. |
 | `npm run cli -- thumbnail <project> --still <file> --text "<a\|b>" --out <file>` | Compose a 1280x720 JPEG thumbnail with the brand fonts and palette; `--format 9x16` for a 1080x1920 Short thumbnail, `--format 1x1` for the 3000x3000 streaming cover (artist and title only); `--tag`, `--layout left\|right\|bottom`, `--accent <role>`, `--focus x,y`. |
 | `npm run cli -- short <project> --from <anchor\|s> --to <anchor\|s> --name <stem>` | Cut a Short (at most 60 s) from `renders/9x16.mp4` into `renders/shorts/<stem>-9x16.mp4`; anchors like `section:chorus_1:end-0.5`. |
-| `npm run cli -- review <project> [--format <id>] [--video <file>]` | Open a render in the review player (play, step frames, type notes); notes go to `review/notes/<video>.json`. |
+| `npm run cli -- review <project> [--format <id>] [--video <file>]` | The desktop review player (play, step frames, type notes); notes go to `review/notes/<video>.json`. The board's review view writes the same notes and sends them to the agent as review rounds (`review/rounds/`). |
 | `npm run cli -- media-link <project> [--move]` | Move `assets/` and `renders/` to `CORESLOPPER_MEDIA_DIR` and symlink them. |
 | `npm run cli -- new <slug> --budget <usd>` | Create a project from the template. |
 | `npm run cli -- new <slug> --kind episode --series <s> --episode <n> --budget <usd>` | Create an episode of a series. |

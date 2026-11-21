@@ -16,10 +16,12 @@ addStrings({
       interactive: function (s) { return 'In Claude Code weitermachen (' + s + '):'; },
       pipeline: function (s) { return 'Pipeline weiterlaufen lassen (' + s + '):'; },
       retry: function (s) { return s + ' ist fehlgeschlagen. Erneut starten:'; },
+      review: 'Review-Runde an den Agenten gesendet. Abarbeiten lassen:',
       running: function (s) { return s + ' läuft gerade. Nichts zu tun.'; },
       release: 'Fertig. Weiter im Release-Tab.', released: 'Release freigegeben: der Autopilot postet.',
       canon: 'Canon fertigstellen:', episode: 'Nächste geplante Episode anlegen:', 'series-done': 'Alle geplanten Episoden sind angelegt.'
     },
+    drafts: function (n) { return n + ' Notiz(en) noch nicht an den Agenten gesendet'; },
     canon: 'Canon', characters: 'Figuren', sets: 'Sets', episodes: 'Episoden', notCreated: 'nicht angelegt', gaps: 'Lücken im Canon', format: 'Format',
     uncommitted: 'frei', canonSpent: 'Canon', episodeBudgets: 'Episoden-Budgets', updated: 'aktualisiert vor',
     activity: 'Aktivität', watchdog: function (at) { return 'Watchdog: letzte Runde vor ' + at; },
@@ -48,10 +50,12 @@ addStrings({
       interactive: function (s) { return 'Continue in Claude Code (' + s + '):'; },
       pipeline: function (s) { return 'Let the pipeline continue (' + s + '):'; },
       retry: function (s) { return s + ' failed. Run it again:'; },
+      review: 'A review round is waiting for the agent. Let it work through it:',
       running: function (s) { return s + ' is running. Nothing to do.'; },
       release: 'Done. Continue in the release tab.', released: 'Release approved: the autopilot posts.',
       canon: 'Finish the canon:', episode: 'Create the next planned episode:', 'series-done': 'Every planned episode exists.'
     },
+    drafts: function (n) { return n + ' note(s) not sent to the agent yet'; },
     canon: 'Canon', characters: 'Characters', sets: 'Sets', episodes: 'Episodes', notCreated: 'not created', gaps: 'Gaps in the canon', format: 'Format',
     uncommitted: 'uncommitted', canonSpent: 'canon', episodeBudgets: 'episode budgets', updated: 'updated',
     activity: 'Activity', watchdog: function (at) { return 'Watchdog: last round ' + at + ' ago'; },
@@ -154,7 +158,8 @@ function projectCard(project) {
     el('div', { class: 'meta' }, [t('budget') + ': ' + usd(project.budget.spentUsd) + ' / ' + usd(project.budget.totalUsd)]),
     budgetBar(project.budget.totalUsd, project.budget.spentUsd),
     project.queue ? el('div', { class: 'meta' }, [t('queue') + ': ' + queueLine(project.queue)]) : null,
-    project.failedReviews ? el('div', { class: 'meta error', text: t('failedReviews')(project.failedReviews) }) : null
+    project.failedReviews ? el('div', { class: 'meta error', text: t('failedReviews')(project.failedReviews) }) : null,
+    project.review && project.review.drafts ? el('div', { class: 'meta', text: t('drafts')(project.review.drafts) }) : null
   ].concat(progressRows(project)).concat([
     nextBox(project.next, project.next.stage && stageLabel(project, project.next.stage), project.slug)
   ]));
@@ -242,7 +247,7 @@ function renderProject(p) {
   main.appendChild(section(t('renders'), progressRows(p).concat(p.renders.length ? [el('div', { class: 'renders' }, p.renders.map(function (render) {
     return el('div', {}, [
       el('video', { src: projectFile(p.slug, render.path), controls: true, preload: 'metadata' }),
-      el('div', { class: 'meta' }, [el('b', { text: render.name }), ' · ' + bytes(render.bytes) + ' · ' + local(render.modified)])
+      el('div', { class: 'meta' }, [el('b', { text: render.name }), ' · ' + bytes(render.bytes) + ' · ' + local(render.modified) + ' · ', el('a', { href: '#/p/' + p.slug + '/review/' + encodeURIComponent(render.name), text: t('tabReview') + ' →' })])
     ]);
   }))] : p.progress.length ? [] : [el('p', { class: 'empty', text: t('noRenders') })])));
 

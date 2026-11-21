@@ -14,6 +14,7 @@ import {
   type RenderProgress,
   type StageView,
 } from '@coreslopper/core';
+import { reviewCounts } from './board-review.js';
 import { loadStatus } from './release-calendar.js';
 import { collectSeriesStatus, type SeriesStatus } from './series.js';
 
@@ -58,6 +59,8 @@ export interface ProductionProject {
   progress: RenderProgress[];
   /** The newest change among the files the pipeline writes. */
   lastActivity?: string;
+  /** Review rounds waiting for the agent, and notes not sent yet. */
+  review: { open: number; drafts: number };
 }
 
 export interface ProductionVerdict {
@@ -276,6 +279,7 @@ async function collect(projectDir: string, detail: boolean): Promise<ProductionD
   const running = stages.find((stage) => stage.status === 'running');
   const open = stages.find((stage) => stage.status === 'pending' || stage.status === 'failed');
   const stateInfo = await stat(paths.state).catch(() => undefined);
+  const review = await reviewCounts(projectDir);
   const summary: ProductionDetail = {
     slug: config.slug,
     kind: config.kind,
@@ -287,7 +291,7 @@ async function collect(projectDir: string, detail: boolean): Promise<ProductionD
     stages,
     ...((running ?? open) ? { current: (running ?? open)!.id } : {}),
     budget: { ...state.budget },
-    next: projectNextAction({ slug: config.slug, kind: config.kind, stages, hasRelease, approved }),
+    next: projectNextAction({ slug: config.slug, kind: config.kind, stages, hasRelease, approved, openRounds: review.open }),
     renders: await listRenders(projectDir),
     ...(hasQueue ? { queue: queueCounts(queueItems) } : {}),
     failedReviews: verdicts.filter((verdict) => verdict.verdict === 'fail').length,
@@ -296,6 +300,7 @@ async function collect(projectDir: string, detail: boolean): Promise<ProductionD
     ...(config.release?.release_date ? { releaseDate: config.release.release_date } : {}),
     ...(stateInfo ? { updatedAt: stateInfo.mtime.toISOString() } : {}),
     progress: await loadRenderProgress(projectDir),
+    review,
     ...(await lastActivity(projectDir).then((at) => (at ? { lastActivity: at } : {}))),
     documents: [],
     queueItems: [],

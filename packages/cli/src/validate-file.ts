@@ -12,6 +12,8 @@ import {
   ChannelConfigSchema,
   ReleaseCalendarSchema,
   ReleaseScheduleSchema,
+  ReviewRepliesSchema,
+  ReviewRoundSchema,
   ValidationError,
   loadProject,
   loadDefaults,
@@ -175,6 +177,14 @@ export async function validateChangedFile(file: string): Promise<string | undefi
     await readYamlFile(join(projectDir, 'review', 'calendar.yaml'), ReleaseCalendarSchema);
     return 'release calendar';
   }
+  if (/^\d{3,}\.replies\.json$/.test(name) && basename(dirname(resolve(file))) === 'rounds') {
+    await validateReplies(projectDir, resolve(file));
+    return 'review replies';
+  }
+  if (/^\d{3,}\.json$/.test(name) && basename(dirname(resolve(file))) === 'rounds') {
+    await readJsonFile(resolve(file), ReviewRoundSchema);
+    return 'review round';
+  }
   if (name === 'publish.json' && basename(dirname(resolve(file))) === 'review') {
     await readJsonFile(join(projectDir, 'review', 'publish.json'), PublishLogSchema);
     return 'publish log';
@@ -189,4 +199,20 @@ export async function validateChangedFile(file: string): Promise<string | undefi
     return 'sets';
   }
   return undefined;
+}
+
+/** The agent's replies answer every note of their round, and only those. */
+async function validateReplies(projectDir: string, path: string): Promise<void> {
+  const replies = await readJsonFile(path, ReviewRepliesSchema);
+  const number = Number(basename(path).split('.')[0]);
+  if (replies.round !== number) throw new ValidationError(`${basename(path)} answers round ${replies.round}; its file name says round ${number}.`);
+  const roundPath = join(projectDir, 'review', 'rounds', `${basename(path).split('.')[0]}.json`);
+  if (!existsSync(roundPath)) throw new ValidationError(`round ${number} does not exist (${roundPath}).`);
+  const round = await readJsonFile(roundPath, ReviewRoundSchema);
+  const asked = new Set(round.notes.map((note) => note.id));
+  const answered = new Set(replies.notes.map((note) => note.id));
+  const unknown = [...answered].filter((id) => !asked.has(id));
+  const missing = [...asked].filter((id) => !answered.has(id));
+  if (unknown.length) throw new ValidationError(`replies to notes that round ${number} does not have: ${unknown.join(', ')}`);
+  if (missing.length) throw new ValidationError(`round ${number} has notes without a reply: ${missing.join(', ')}. Answer every note, with status not-fixed or question where needed.`);
 }
