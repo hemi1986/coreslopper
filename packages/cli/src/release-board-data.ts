@@ -13,6 +13,7 @@ import {
   planAutopilot,
   readJsonFile,
   releaseIdentity,
+  withReleaseDefaults,
   type AutopilotEventPlan,
   type AutopilotPlatform,
   type CalendarEvent,
@@ -410,7 +411,7 @@ export async function projectReleaseContext(projectRoot: string, root: string) {
     artist: identity.artist,
     title: identity.title,
     data,
-    release: project.config.release,
+    release: withReleaseDefaults(project.config.release, channel),
     channel,
     limits,
     chapters: data?.main.chapters ?? (timing ? chaptersFromSections(timing) : []),
@@ -597,7 +598,7 @@ export async function boardProject(projectRoot: string, root: string, options: {
   if (music) {
     spotify.push({
       id: 'distributor',
-      heading: heading('distributor', l.sp.form(project.config.release?.distributor === 'distrokid' ? 'DistroKid' : 'Distributor')),
+      heading: heading('distributor', l.sp.form(input.release?.distributor === 'distrokid' ? 'DistroKid' : 'Distributor')),
       at: at('distributor'),
       files: [...file(b.audio, files.audio), ...file(b.cover, files.cover), ...file(b.lyrics, files.lyricsTxt), ...file(b.lrc, files.lyricsLrc)],
       fields: distributorRows(input, l).map(([label, value]) => ({ label, value: value.replace(/`/g, '') })),

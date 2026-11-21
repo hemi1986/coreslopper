@@ -30,6 +30,7 @@ import {
   readYamlFile,
   releaseTodos,
   unmarkedPlaceholders,
+  withReleaseDefaults,
   type Timing,
 } from '../packages/core/src/index.ts';
 import { buildRelease, type ReleaseDeps } from '../packages/cli/src/release.ts';
@@ -150,6 +151,20 @@ describe('TODO detection and text limits', () => {
     );
     expect(todos.join()).not.toContain('release.artist');
     expect(releaseTodos(ReleaseMetadataSchema.parse(RELEASE))).toEqual([]);
+  });
+
+  it('fills release facts from the channel defaults, and the project wins', () => {
+    const channel = ChannelConfigSchema.parse({
+      version: 1,
+      name: 'x',
+      language: 'de',
+      release_defaults: { distributor: 'distrokid', songwriters: ['Erika Mustermann'], explicit: false, ai_credits: { lyrics: 'none', music: 'full', vocals: 'full', instrumental: 'full' }, ai_tool: 'Suno', license_note: 'Suno Pro plan', primary_genre: 'Electronic' },
+    });
+    const merged = withReleaseDefaults(ReleaseMetadataSchema.parse({ explicit: true, ai_credits: { lyrics: 'partial' }, release_date: '2026-12-11' }), channel)!;
+    expect(merged).toMatchObject({ distributor: 'distrokid', songwriters: ['Erika Mustermann'], explicit: true, ai_tool: 'Suno', ai_credits: { lyrics: 'partial', music: 'full' } });
+    expect(releaseTodos(merged, channel, { artist: 'Neon Static', title: 'Neon Rain' })).toEqual(['release.language is not set']);
+    // Without defaults nothing changes.
+    expect(withReleaseDefaults(undefined, undefined)).toBeUndefined();
   });
 
   it('finds <ID> placeholders and unmarked ones', () => {

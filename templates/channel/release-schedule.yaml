@@ -39,3 +39,17 @@ posts:
 booked: []
 #  - { date: 2027-01-04, kind: short, label: A1 }
 #  - { date: 2027-01-08, kind: release, label: Another song }
+
+# The release autopilot (docs/publishing.md, "Release autopilot"): once you
+# approve a release on the board, `release-run` (run by `release-timer install`)
+# posts by API at the times above. Platforms without credentials stay manual.
+autopilot:
+  platforms: [youtube, tiktok, instagram, x, linkedin, microsite]
+  youtube_ahead_hours: 24   # YouTube uploads go up this long before their time
+  youtube_audited: false    # true once Google audited the API project: scheduled uploads go public by themselves
+  tiktok_direct: false      # true once TikTok audited the app (TIKTOK_DIRECT_POST=1): posts instead of inbox drafts
+  late_hours: 12            # a post missed by more (computer off) waits for you
+  retries: 3
+  # microsite:              # copy microsite/<slug>.json and its images, then deploy
+  #   dir: ../artist-site/content/songs
+  #   command: git add -A && git commit -m "new song" && git push

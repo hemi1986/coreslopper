@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "number",
+      "const": 1
+    },
+    "entries": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "event": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "running",
+              "posted",
+              "uploaded",
+              "scheduled",
+              "draft",
+              "failed",
+              "retry",
+              "force"
+            ]
+          },
+          "at": {
+            "type": "string",
+            "minLength": 1
+          },
+          "remote_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "publish_at": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          },
+          "uncertain": {
+            "type": "boolean"
+          },
+          "fatal": {
+            "type": "boolean"
+          },
+          "warnings": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "manual_steps": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cost_usd": {
+            "type": "number",
+            "minimum": 0
+          },
+          "mock": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "event",
+          "status",
+          "at"
+        ]
+      }
+    }
+  },
+  "required": [
+    "version"
+  ]
+}

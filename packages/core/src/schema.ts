@@ -1230,6 +1230,33 @@ export const ChannelConfigSchema = z.object({
       distributor_ai_credits: z.boolean().default(true),
     })
     .prefault({}),
+  /**
+   * Release facts that are the same for every song of the channel: `release`
+   * and the board use them where a project's `release:` block leaves a field
+   * out. The project always wins. Only facts the user gave go here.
+   */
+  release_defaults: z
+    .object({
+      distributor: z.enum(['distrokid', 'manual']).optional(),
+      artist: z.string().min(1).optional(),
+      primary_genre: z.string().min(1).optional(),
+      secondary_genre: z.string().min(1).optional(),
+      explicit: z.boolean().optional(),
+      songwriters: z.array(z.string().min(1)).optional(),
+      producer: z.string().min(1).optional(),
+      label: z.string().min(1).optional(),
+      ai_credits: z
+        .object({
+          lyrics: AiShareSchema.optional(),
+          music: AiShareSchema.optional(),
+          vocals: AiShareSchema.optional(),
+          instrumental: AiShareSchema.optional(),
+        })
+        .optional(),
+      ai_tool: z.string().min(1).optional(),
+      license_note: z.string().min(1).optional(),
+    })
+    .optional(),
 });
 
 export const ReleaseFileKindSchema = z.enum([

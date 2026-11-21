@@ -631,8 +631,22 @@ describe('doctor', () => {
     expect(checks.map((check) => [check.id, check.ok, check.required])).toEqual([
       ['youtube-publish', false, false],
       ['tiktok-publish', true, false],
+      ['x-autopilot', false, false],
+      ['linkedin-autopilot', false, false],
+      ['instagram-autopilot', false, false],
     ]);
     expect(checks[0]!.detail).toContain('publish-auth youtube');
     expect(JSON.stringify(checks)).not.toMatch(/"r"|"s"/);
+  });
+
+  it('warns before the LinkedIn token runs out and asks for FAL_KEY beside Instagram', async () => {
+    const { autopilotChecks } = await import('../packages/cli/src/doctor.ts');
+    const checks = autopilotChecks(
+      { LINKEDIN_ACCESS_TOKEN: 't', LINKEDIN_TOKEN_EXPIRES_AT: '2026-12-01T00:00:00Z', INSTAGRAM_ACCESS_TOKEN: 'i' },
+      new Date('2026-11-25T00:00:00Z'),
+    );
+    const byId = Object.fromEntries(checks.map((check) => [check.id, check]));
+    expect(byId['linkedin-autopilot']).toMatchObject({ ok: false, detail: expect.stringContaining('expires in 6 days') });
+    expect(byId['instagram-autopilot']).toMatchObject({ ok: false, detail: expect.stringContaining('FAL_KEY') });
   });
 });

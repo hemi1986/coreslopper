@@ -28,6 +28,7 @@ import {
   resolveAnchor,
   safeFileName,
   sha256,
+  withReleaseDefaults,
   writeJsonAtomic,
   writeTextAtomic,
   type Chapter,
@@ -227,7 +228,8 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
   else todos.push('review/upload.yaml is missing: write the platform texts (video-qa release.md)');
   const language = project.config.release?.language ?? (typeof song.language === 'string' ? song.language : undefined) ?? data?.language ?? channel?.language ?? 'en';
 
-  if (music) todos.push(...releaseTodos(project.config.release, channel, identity));
+  const releaseFacts = withReleaseDefaults(project.config.release, channel);
+  if (music) todos.push(...releaseTodos(releaseFacts, channel, identity));
   todos.push(...channelTodos(channel));
   await mkdir(dir, { recursive: true });
 
@@ -384,7 +386,7 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
     artist: identity.artist,
     title: identity.title,
     data,
-    release: project.config.release,
+    release: releaseFacts,
     channel,
     limits,
     chapters,
