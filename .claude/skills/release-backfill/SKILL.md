@@ -1,6 +1,6 @@
 ---
 name: release-backfill
-description: Backfill an existing project into the release board and calendar — a project finished before the release calendar existed, or a song that is already partly or fully published. Records what is out, writes the missing release texts, plans the open slots, and marks the past done.
+description: Backfill a project into the release board and calendar — a project finished before the release calendar existed, or a song that is already partly or fully published.
 license: MIT
 ---
 

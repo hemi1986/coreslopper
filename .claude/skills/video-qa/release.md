@@ -132,18 +132,18 @@ shorts:
     platforms: [youtube, tiktok]
     # x: { post: "<the Short's line for X>", hashtags: ['#topic'] }   # optional: the Short also goes to X
 instagram_post:                    # the main video in the feed format (4:5 or 1:1 render) on the release day
-  caption: "<the hook in the first 125 characters, then one line of context; no link>"
+  caption: "<the hook in the first 125 characters, then one line of context>"
   hashtags: ['#topic']             # at most 5, counting those in the caption
 spotify:
   artist_pick: "<one line pinned on the artist profile>"
   pitch: "<at most 500 characters: mood, genre, instruments, story>"
 announcement:                      # a week before: Instagram story with the cover, YouTube post, X
-  text: "<the release day and one line that makes people curious; no link>"
+  text: "<the release day and one line that makes people curious>"
   hashtags: ['#topic']             # at most 5
 x:
-  post: "<at most 280 characters with the hashtags; no link: it goes in the reply>"
+  post: "<at most 280 characters with the hashtags>"
   hashtags: ['#topic']             # one or two
-  reply: "<'Full video:' in the project's language; release appends the YouTube link>"
+  reply: "<'Full video:' in the project's language>"
   media: Z1-intro                  # the Short uploaded with the post
 linkedin:
   decision: post                   # post | skip
@@ -166,10 +166,10 @@ microsite:
 - Every Short in `renders/shorts/` gets an entry; `related: main` becomes a checklist item, since YouTube sets the related video only by hand.
 - `made_for_kids` and `synthetic_media` follow the brief; `config/channel.yaml` sets the disclosure defaults of the other platforms.
 - Episodes have no `spotify` block.
-- **LinkedIn is a decision.** Post when the song has a political, work, business, tech, or AI angle that a professional audience discusses (war profits, data sovereignty, AI and jobs, how an AI pipeline makes a video); skip a love song, a party song, or plain satire without that angle. Write the reason in either case. A post reads as a person's story, not as an ad.
-- **X and LinkedIn carry no link in the text you write:** `release` adds the YouTube link (the live one once the user enters it on the release board) to the X reply and the end of the LinkedIn post.
+- **LinkedIn is a decision.** Post when the song has a political, work, business, tech, or AI angle that a professional audience discusses (war profits, data sovereignty, AI and jobs, how an AI pipeline makes a video); skip a love song, a party song, or plain satire without that angle. Write the reason in either case. A post reads as a person's story told in the first person.
+- **Links are `release`'s job:** write the texts as plain words; `release` appends the YouTube link to the X reply and the end of the LinkedIn post (the live link once the user enters it on the release board), and the other platforms link through stickers, bios, and the related video.
 - **The microsite** text is the song's own page: what the song is about and how it was made, in the voice of the brief; facts follow the same rules as the YouTube description.
-- What each platform takes (limits, clickable links, AI labels) is in `docs/release-platforms.md`.
+- When a limit, a clickable link, or an AI label of a platform is unclear, read `docs/release-platforms.md`.
 
 ## 8. Build the release folder
 
@@ -178,7 +178,7 @@ npm run cli -- release projects/<slug>
 npm run cli -- upload-text projects/<slug>
 ```
 
-`release` plans the release calendar first (`review/calendar.yaml`, the next free slots under `config/release-schedule.yaml`; it keeps times already planned and never touches `project.yaml`), then renders only formats that are missing or stale, copies (hardlinks) everything else, converts the song to a deliverable WAV only when needed, cuts the Spotify canvas, writes the lyrics files, lays out `texts/` and `README.md`, and records `manifest.json`. A `✖` line is a broken limit: fix `upload.yaml` and run it again. When it reports that the canvas window shows lyrics, run it again with `--canvas-from <seconds or anchor>` on a part without lyrics (an instrumental or the drop) and check a frame of `streaming/canvas-9x16.mp4` with the art director: no text, no logos. `upload-text` keeps `review/upload.md` as a pointer to the folder. The release folder also gets `texts/x.md`, `texts/linkedin.md` (with a LinkedIn post), `texts/release-plan.md` with the calendar's dates and times, `calendar.ics`, and `microsite/<slug>.json`. The user works from `npm run cli -- release-board`; you do not start it.
+`release` plans the release calendar first (`review/calendar.yaml`, the next free slots under `config/release-schedule.yaml`, keeping times already planned), then renders only formats that are missing or stale, copies (hardlinks) everything else, converts the song to a deliverable WAV only when needed, cuts the Spotify canvas, writes the lyrics files, lays out `texts/` and `README.md`, and records `manifest.json`. A `✖` line is a broken limit: fix `upload.yaml` and run it again. When it reports that the canvas window shows lyrics, run it again with `--canvas-from <seconds or anchor>` on a part without lyrics (an instrumental or the drop) and check a frame of `streaming/canvas-9x16.mp4` with the art director: no text, no logos. `upload-text` keeps `review/upload.md` as a pointer to the folder. A proposed release date (no `release.release_date` yet) stays a TODO for the user: the date in `project.yaml` is theirs. The user publishes from `npm run cli -- release-board`, a server they start themselves.
 
 `npm run cli -- publish projects/<slug> --dry-run` also checks the YouTube and TikTok limits; uploading stays the user's command.
 
