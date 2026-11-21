@@ -168,9 +168,10 @@ The adapter talks to `COMFYUI_URL` (default `http://127.0.0.1:8188`). Under WSL,
 | `COMFYUI_URL` | `http://127.0.0.1:8188` | ComfyUI server |
 | `COMFYUI_TIMEOUT_MS` | `3600000` | Maximum wait for one generation |
 | `COMFYUI_WORKFLOWS_DIR` | `comfyui/workflows` | Alternative workflow folder |
+| `COMFYUI_RESTART_COMMAND` | none | Shell command that restarts the server (see "Stuck queue") |
 
 Images and audio are uploaded to ComfyUI's `input/coreslopper/` folder. Results are downloaded into the generation cache like cloud results. The cache key includes the workflow file's content, so editing a workflow regenerates.
 
 ## Stuck queue
 
-When jobs stay in `queue_pending` and `queue_running` is empty, the server's prompt worker has died while HTTP still answers; restart the server. `POST /free` releases VRAM between heavy phases, but only while the queue is idle and the last job ended cleanly; after it, confirm that a submitted job reaches `queue_running`. A machine-specific restart script belongs in the workspace's gitignored `.local/` folder (for example `.local/comfyui-restart.sh`); stage runners call it when it exists. `Fault failed: 2` (`VRAM Allocation failed (non OOM)`) on a single job is VRAM pressure from a large edit; it passes on retry, and fewer references per edit avoid it.
+When jobs stay in `queue_pending` and `queue_running` is empty, the server's prompt worker has died while HTTP still answers; restart the server. `POST /free` releases VRAM between heavy phases, but only while the queue is idle and the last job ended cleanly; after it, confirm that a submitted job reaches `queue_running`. `npm run cli -- comfy status` shows the server, both queue counts, VRAM, and the outcome of the last prompts. How the server is restarted differs per machine, so the command comes from `.env`: `COMFYUI_RESTART_COMMAND=.local/comfyui-restart.sh` (a script in the workspace's gitignored `.local/` folder that stops the server, starts it, and returns once it answers). `npm run cli -- comfy restart` runs it, and `queue run` runs it by itself when a generation fails or hangs past `--timeout`. `Fault failed: 2` (`VRAM Allocation failed (non OOM)`) on a single job is VRAM pressure from a large edit; it passes on retry, and fewer references per edit avoid it.

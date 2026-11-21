@@ -274,6 +274,18 @@ _Avoid_: log
 A JSON or YAML array of one or more generation requests executed with budget, cache, and manifest checks.
 _Avoid_: job
 
+**Generation Queue**:
+The list of a project's open generations in `assets/queue.json`, worked by `queue run`: each item is generated, reviewed, and filed at its `out` path once approved; an item waits for the items it derives from.
+_Avoid_: worker, job list
+
+**Attempt**:
+One generated version of a queue item, kept as `attempts/<name>-a<n>` next to its `out` path with its verdict. Only an approved attempt is filed.
+_Avoid_: retry, version
+
+**Region Patch**:
+An edit of one box of an image that is pasted back with a soft edge (`patch`), so everything outside the box stays unchanged.
+_Avoid_: inpaint, crop fix
+
 **Provider Adapter**:
 The small implementation behind `generateImage`, `editImage`, `textToVideo`, `imageToVideo`, `firstLastFrameToVideo`, and `lipSync`; fal.ai, Higgsfield, and Topview are the cloud adapters (all three lip-sync), ComfyUI is the local video adapter, and mock is the deterministic test adapter.
 _Avoid_: client, SDK
