@@ -209,7 +209,11 @@ describe('9:16 thumbnail layout', () => {
     await expect(buildThumbnailProps({ projectDir: demoDir, still, text: 'A', format: '9x16', layout: 'left', out: 'x.jpg' })).rejects.toThrow(
       /fixed vertical layout/,
     );
-    await expect(buildThumbnailProps({ projectDir: demoDir, still, text: 'A', format: '4x5', out: 'x.jpg' })).rejects.toThrow(/format/);
+    await expect(buildThumbnailProps({ projectDir: demoDir, still, text: 'A', format: '5x4', out: 'x.jpg' })).rejects.toThrow(/format/);
+    // The Instagram feed image: 4:5 with the vertical stack.
+    const feed = await buildThumbnailProps({ projectDir: demoDir, still, text: 'Neon|Rain', format: '4x5', out: 'x.jpg' });
+    expect(feed.props.format).toBe('4x5');
+    expect(feed.props.layout).toBe('bottom');
   });
 
   it('checks the JPEG size per format', async () => {

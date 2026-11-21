@@ -5,6 +5,7 @@ import { readYamlFile } from './project.js';
 import {
   ChannelConfigSchema,
   PLATFORM_LIMITS,
+  ReleaseMetadataSchema,
   type ChannelConfig,
   type ProjectConfig,
   type ReleaseMetadata,
@@ -177,6 +178,36 @@ export function platformLimits(channel?: ChannelConfig) {
   };
 }
 export type PlatformLimits = ReturnType<typeof platformLimits>;
+
+/**
+ * The project's release facts over the channel's `release_defaults`: a field
+ * the project sets always wins; songwriters and AI credits come from the
+ * channel only when the project gives none.
+ */
+export function withReleaseDefaults(release: ReleaseMetadata | undefined, channel?: Pick<ChannelConfig, 'release_defaults'>): ReleaseMetadata | undefined {
+  const defaults = channel?.release_defaults;
+  if (!defaults) return release;
+  const base = release ?? ReleaseMetadataSchema.parse({});
+  const pick = <K extends keyof ReleaseMetadata>(key: K) => base[key] ?? (defaults as Partial<ReleaseMetadata>)[key];
+  return ReleaseMetadataSchema.parse({
+    ...base,
+    distributor: pick('distributor'),
+    artist: pick('artist'),
+    primary_genre: pick('primary_genre'),
+    secondary_genre: pick('secondary_genre'),
+    explicit: pick('explicit'),
+    songwriters: base.songwriters.length ? base.songwriters : (defaults.songwriters ?? []),
+    producer: pick('producer'),
+    label: pick('label'),
+    ai_credits: base.ai_credits || defaults.ai_credits ? { ...defaults.ai_credits, ...stripUndefined(base.ai_credits ?? {}) } : undefined,
+    ai_tool: pick('ai_tool'),
+    license_note: pick('license_note'),
+  });
+}
+
+function stripUndefined<T extends object>(value: T): Partial<T> {
+  return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined)) as Partial<T>;
+}
 
 /** Artist and title of the release: `release:` first, then song.json, then the project. */
 export function releaseIdentity(

@@ -206,6 +206,93 @@
           "type": "boolean"
         }
       }
+    },
+    "release_defaults": {
+      "type": "object",
+      "properties": {
+        "distributor": {
+          "type": "string",
+          "enum": [
+            "distrokid",
+            "manual"
+          ]
+        },
+        "artist": {
+          "type": "string",
+          "minLength": 1
+        },
+        "primary_genre": {
+          "type": "string",
+          "minLength": 1
+        },
+        "secondary_genre": {
+          "type": "string",
+          "minLength": 1
+        },
+        "explicit": {
+          "type": "boolean"
+        },
+        "songwriters": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "producer": {
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ai_credits": {
+          "type": "object",
+          "properties": {
+            "lyrics": {
+              "type": "string",
+              "enum": [
+                "none",
+                "partial",
+                "full"
+              ]
+            },
+            "music": {
+              "type": "string",
+              "enum": [
+                "none",
+                "partial",
+                "full"
+              ]
+            },
+            "vocals": {
+              "type": "string",
+              "enum": [
+                "none",
+                "partial",
+                "full"
+              ]
+            },
+            "instrumental": {
+              "type": "string",
+              "enum": [
+                "none",
+                "partial",
+                "full"
+              ]
+            }
+          }
+        },
+        "ai_tool": {
+          "type": "string",
+          "minLength": 1
+        },
+        "license_note": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
     }
   },
   "required": [

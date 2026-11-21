@@ -6,6 +6,8 @@ import { RefreshingToken } from './oauth.js';
 import type { PublishAdapter, PublishItem, PublishLogger, PublishRequest, PublishResult } from './types.js';
 
 export const TIKTOK_SCOPE = 'video.upload';
+/** Direct Post: publishes the video with its caption. Needs an audited app for public posts. */
+export const TIKTOK_DIRECT_SCOPE = 'video.publish';
 export const TIKTOK_DEFAULT_REDIRECT_URI = 'http://localhost:8765/callback/';
 const AUTH_URL = 'https://www.tiktok.com/v2/auth/authorize/';
 const API = 'https://open.tiktokapis.com/v2';
@@ -39,6 +41,16 @@ export function resolveTikTokCredentials(env: NodeJS.ProcessEnv = process.env): 
   };
 }
 
+/** `TIKTOK_DIRECT_POST=1`: the app passed TikTok's audit, so the autopilot posts directly instead of sending drafts. */
+export function tiktokDirectPost(env: NodeJS.ProcessEnv = process.env): boolean {
+  return /^(1|true|yes)$/i.test(env.TIKTOK_DIRECT_POST?.trim() ?? '');
+}
+
+/** The scopes to request: `video.upload` for drafts, plus `video.publish` with `TIKTOK_DIRECT_POST=1`. */
+export function tiktokScopes(env: NodeJS.ProcessEnv = process.env): string[] {
+  return tiktokDirectPost(env) ? [TIKTOK_SCOPE, TIKTOK_DIRECT_SCOPE] : [TIKTOK_SCOPE];
+}
+
 /** The redirect URI registered in the TikTok developer portal; `TIKTOK_REDIRECT_URI` overrides the default. */
 export function tiktokRedirectUri(env: NodeJS.ProcessEnv = process.env): string {
   return env.TIKTOK_REDIRECT_URI?.trim() || TIKTOK_DEFAULT_REDIRECT_URI;
@@ -64,11 +76,11 @@ export function tiktokChunks(size: number): { chunkSize: number; count: number }
 }
 
 /** The consent URL of the desktop flow; TikTok expects the PKCE challenge as a hex SHA-256. */
-export function tiktokAuthUrl(options: { clientKey: string; redirectUri: string; state: string; challenge: string }): string {
+export function tiktokAuthUrl(options: { clientKey: string; redirectUri: string; state: string; challenge: string; scopes?: string[] }): string {
   const url = new URL(AUTH_URL);
   url.search = new URLSearchParams({
     client_key: options.clientKey,
-    scope: TIKTOK_SCOPE,
+    scope: (options.scopes ?? [TIKTOK_SCOPE]).join(','),
     response_type: 'code',
     redirect_uri: options.redirectUri,
     state: options.state,
@@ -175,12 +187,30 @@ export interface TikTokPublisherOptions extends TikTokCredentials {
   pollTimeoutMs?: number;
   log?: PublishLogger;
   now?: () => number;
+  /**
+   * `inbox` (default): a draft in the user's TikTok inbox (`video.upload`).
+   * `direct`: Direct Post with caption and AI label (`video.publish`); public
+   * only for an app that passed TikTok's audit, private otherwise.
+   */
+  mode?: 'inbox' | 'direct';
+}
+
+/** What `creator_info/query` says the account allows. */
+interface CreatorInfo {
+  username?: string;
+  privacyOptions: string[];
+  commentDisabled: boolean;
+  duetDisabled: boolean;
+  stitchDisabled: boolean;
+  maxSeconds?: number;
 }
 
 /**
- * Content Posting API, inbox path (`video.upload`): init a FILE_UPLOAD, send
- * the chunks, poll the status. The video lands in the user's TikTok inbox as
- * a draft; the user adds sound and text there and posts it.
+ * Content Posting API. Inbox path (`video.upload`, default): init a
+ * FILE_UPLOAD, send the chunks, poll the status; the video lands in the
+ * user's TikTok inbox as a draft, and the user posts it there. Direct path
+ * (`video.publish`, `mode: 'direct'`): the same upload as a post with its
+ * caption and AI label, for an app that passed TikTok's audit.
  */
 export class TikTokPublisher implements PublishAdapter {
   readonly platform = 'tiktok' as const;
@@ -193,6 +223,7 @@ export class TikTokPublisher implements PublishAdapter {
   private readonly pollIntervalMs: number;
   private readonly pollTimeoutMs: number;
   private readonly now: () => number;
+  readonly mode: 'inbox' | 'direct';
 
   constructor(options: TikTokPublisherOptions = {}) {
     const env = resolveTikTokCredentials();
@@ -209,6 +240,7 @@ export class TikTokPublisher implements PublishAdapter {
     this.pollIntervalMs = options.pollIntervalMs ?? 5_000;
     this.pollTimeoutMs = options.pollTimeoutMs ?? 600_000;
     this.now = options.now ?? Date.now;
+    this.mode = options.mode ?? 'inbox';
     this.secrets = [clientSecret, refreshToken];
     this.token = new RefreshingToken(async () => {
       const result = await tokenRequest(
@@ -228,7 +260,10 @@ export class TikTokPublisher implements PublishAdapter {
   }
 
   async publish(request: PublishRequest): Promise<PublishResult> {
-    const { item } = request;
+    return this.mode === 'direct' ? this.directPost(request.item) : this.inboxUpload(request.item);
+  }
+
+  private async inboxUpload(item: PublishItem): Promise<PublishResult> {
     const size = (await stat(item.file)).size;
     const { chunkSize, count } = tiktokChunks(size);
     this.log(`tiktok: uploading ${item.name} (${(size / 1e6).toFixed(1)} MB, ${count} chunk${count === 1 ? '' : 's'})`);
@@ -236,31 +271,7 @@ export class TikTokPublisher implements PublishAdapter {
     const init = await this.api('post/publish/inbox/video/init/', {
       source_info: { source: 'FILE_UPLOAD', video_size: size, chunk_size: chunkSize, total_chunk_count: count },
     });
-    const publishId = typeof init.publish_id === 'string' ? init.publish_id : undefined;
-    const uploadUrl = typeof init.upload_url === 'string' ? init.upload_url : undefined;
-    if (!publishId || !uploadUrl) throw new PublishError('TikTok returned no publish_id or upload_url.');
-
-    for (let index = 0; index < count; index += 1) {
-      const start = index * chunkSize;
-      const end = index === count - 1 ? size : start + chunkSize;
-      const chunk = await readChunk(item.file, start, end - start);
-      const response = await fetchWithRetry(
-        this.fetchImpl,
-        uploadUrl,
-        {
-          method: 'PUT',
-          headers: {
-            'content-type': mimeForPath(item.file),
-            'content-length': String(chunk.length),
-            'content-range': `bytes ${start}-${end - 1}/${size}`,
-          },
-          body: chunk,
-        },
-        { secrets: [...this.secrets, uploadUrl], sleep: this.sleep, timeoutMs: 600_000 },
-      );
-      if (!response.ok) throw httpError(`TikTok chunk ${index + 1}/${count}`, response.status, await readJson(response), [...this.secrets, uploadUrl]);
-      await response.body?.cancel().catch(() => undefined);
-    }
+    const publishId = await this.uploadTo(init, item.file, size);
 
     const status = await this.waitForInbox(publishId);
     const caption = tiktokCaption(item);
@@ -276,8 +287,102 @@ export class TikTokPublisher implements PublishAdapter {
     };
   }
 
+  /**
+   * Direct Post (`video.publish`): read what the account allows, init the post
+   * with caption, privacy, and the AI-generated label, send the chunks, and
+   * wait for PUBLISH_COMPLETE. TikTok's content sharing guidelines want the
+   * creator info queried before every post.
+   */
+  private async directPost(item: PublishItem): Promise<PublishResult> {
+    const creator = await this.creatorInfo();
+    if (!creator.privacyOptions.includes('PUBLIC_TO_EVERYONE')) {
+      throw new PublishError(
+        `TikTok does not offer public posting for this account (options: ${creator.privacyOptions.join(', ') || 'none'}). ` +
+          'An app that has not passed TikTok\'s audit may post only privately: unset TIKTOK_DIRECT_POST to send drafts instead (docs/publishing.md).',
+      );
+    }
+    const size = (await stat(item.file)).size;
+    const { chunkSize, count } = tiktokChunks(size);
+    this.log(`tiktok: posting ${item.name} (${(size / 1e6).toFixed(1)} MB, ${count} chunk${count === 1 ? '' : 's'})`);
+    const caption = tiktokCaption(item);
+    const init = await this.api('post/publish/video/init/', {
+      post_info: {
+        title: caption,
+        privacy_level: 'PUBLIC_TO_EVERYONE',
+        disable_comment: creator.commentDisabled,
+        disable_duet: creator.duetDisabled,
+        disable_stitch: creator.stitchDisabled,
+        // The AI-generated content label (Content Posting API, post_info.is_aigc).
+        is_aigc: item.syntheticMedia,
+        brand_content_toggle: false,
+        brand_organic_toggle: false,
+      },
+      source_info: { source: 'FILE_UPLOAD', video_size: size, chunk_size: chunkSize, total_chunk_count: count },
+    });
+    const publishId = await this.uploadTo(init, item.file, size);
+    const { status, postId } = await this.waitForPost(publishId);
+    const profile = creator.username ? `https://www.tiktok.com/@${creator.username}` : undefined;
+    const url = postId && creator.username ? `${profile}/video/${postId}` : profile;
+    return {
+      remoteId: postId ?? publishId,
+      ...(url ? { url } : {}),
+      status,
+      thumbnail: 'none',
+      warnings: status === 'processing' ? ['TikTok was still processing the post; it goes live once done.'] : [],
+      manualSteps: [],
+    };
+  }
+
+  private async creatorInfo(): Promise<CreatorInfo> {
+    const data = await this.api('post/publish/creator_info/query/', {});
+    const options = Array.isArray(data.privacy_level_options) ? data.privacy_level_options.map(String) : [];
+    return {
+      ...(typeof data.creator_username === 'string' ? { username: data.creator_username } : {}),
+      privacyOptions: options,
+      commentDisabled: data.comment_disabled === true,
+      duetDisabled: data.duet_disabled === true,
+      stitchDisabled: data.stitch_disabled === true,
+      ...(typeof data.max_video_post_duration_sec === 'number' ? { maxSeconds: data.max_video_post_duration_sec } : {}),
+    };
+  }
+
+  /** Send the file in the chunks the init announced; returns the publish ID. */
+  private async uploadTo(init: Record<string, unknown>, file: string, size: number): Promise<string> {
+    const publishId = typeof init.publish_id === 'string' ? init.publish_id : undefined;
+    const uploadUrl = typeof init.upload_url === 'string' ? init.upload_url : undefined;
+    if (!publishId || !uploadUrl) throw new PublishError('TikTok returned no publish_id or upload_url.');
+    const { chunkSize, count } = tiktokChunks(size);
+    for (let index = 0; index < count; index += 1) {
+      const start = index * chunkSize;
+      const end = index === count - 1 ? size : start + chunkSize;
+      const chunk = await readChunk(file, start, end - start);
+      const response = await fetchWithRetry(
+        this.fetchImpl,
+        uploadUrl,
+        {
+          method: 'PUT',
+          headers: {
+            'content-type': mimeForPath(file),
+            'content-length': String(chunk.length),
+            'content-range': `bytes ${start}-${end - 1}/${size}`,
+          },
+          body: chunk,
+        },
+        { secrets: [...this.secrets, uploadUrl], sleep: this.sleep, timeoutMs: 600_000 },
+      );
+      if (!response.ok) throw httpError(`TikTok chunk ${index + 1}/${count}`, response.status, await readJson(response), [...this.secrets, uploadUrl]);
+      await response.body?.cancel().catch(() => undefined);
+    }
+    return publishId;
+  }
+
   /** POST to the Content Posting API; refresh the token once on access_token_invalid. */
-  private async api(path: string, body: unknown, retried = false): Promise<Record<string, unknown>> {
+  private async api(path: string, body: unknown): Promise<Record<string, unknown>> {
+    return (await this.apiRaw(path, body)).data;
+  }
+
+  /** `api` with the raw response text, for int64 IDs that JSON.parse would round. */
+  private async apiRaw(path: string, body: unknown, retried = false): Promise<{ data: Record<string, unknown>; raw: string }> {
     const token = await this.token.get();
     const response = await fetchWithRetry(
       this.fetchImpl,
@@ -289,12 +394,19 @@ export class TikTokPublisher implements PublishAdapter {
       },
       { secrets: this.secrets, sleep: this.sleep, timeoutMs: 60_000 },
     );
-    const json = await readJson(response);
+    const raw = await response.text();
+    let json: Record<string, unknown> = {};
+    try {
+      const parsed = raw ? (JSON.parse(raw) as unknown) : {};
+      if (parsed && typeof parsed === 'object') json = parsed as Record<string, unknown>;
+    } catch {
+      json = { raw: raw.slice(0, 500) };
+    }
     const error = (json.error ?? {}) as { code?: string; message?: string };
-    if (response.ok && (!error.code || error.code === 'ok')) return (json.data ?? {}) as Record<string, unknown>;
+    if (response.ok && (!error.code || error.code === 'ok')) return { data: (json.data ?? {}) as Record<string, unknown>, raw };
     if (!retried && (response.status === 401 || error.code === 'access_token_invalid')) {
       this.token.invalidate();
-      return this.api(path, body, true);
+      return this.apiRaw(path, body, true);
     }
     if (error.code === 'spam_risk_too_many_pending_share') {
       throw new PublishError(
@@ -303,7 +415,16 @@ export class TikTokPublisher implements PublishAdapter {
       );
     }
     if (error.code === 'scope_not_authorized') {
-      throw new ConfigError('The TikTok token lacks the video.upload scope. Run "npm run cli -- publish-auth tiktok" again.');
+      const scope = path.startsWith('post/publish/inbox') ? TIKTOK_SCOPE : TIKTOK_DIRECT_SCOPE;
+      throw new ConfigError(
+        `The TikTok token lacks the ${scope} scope. ${scope === TIKTOK_DIRECT_SCOPE ? 'Set TIKTOK_DIRECT_POST=1 in .env, then run' : 'Run'} "npm run cli -- publish-auth tiktok" again.`,
+      );
+    }
+    if (error.code === 'unaudited_client_can_only_post_to_private_accounts' || error.code === 'privacy_level_option_mismatch') {
+      throw new PublishError(
+        `TikTok refused the public post (${error.code}): the app has not passed TikTok's audit. Unset TIKTOK_DIRECT_POST to send drafts instead.`,
+        response.status,
+      );
     }
     throw httpError(`TikTok ${path}`, response.status, json, this.secrets);
   }
@@ -319,4 +440,22 @@ export class TikTokPublisher implements PublishAdapter {
       await this.sleep(this.pollIntervalMs);
     }
   }
+  /** Poll a Direct Post until it is live; returns the post ID once TikTok publishes one. */
+  private async waitForPost(publishId: string): Promise<{ status: 'uploaded' | 'processing'; postId?: string }> {
+    const deadline = this.now() + this.pollTimeoutMs;
+    while (true) {
+      const { data, raw } = await this.apiRaw('post/publish/status/fetch/', { publish_id: publishId });
+      const status = String(data.status ?? '');
+      if (status === 'PUBLISH_COMPLETE') {
+        // TikTok spells the field "publicaly_available_post_id" and sends int64 numbers that
+        // JSON.parse rounds, so the ID is read from the raw text; the correct spelling counts too.
+        const postId = /"publica?ly_available_post_id"\s*:\s*\[\s*"?(\d+)/.exec(raw)?.[1];
+        return { status: 'uploaded', ...(postId ? { postId } : {}) };
+      }
+      if (status === 'FAILED') throw new PublishError(`TikTok could not publish the post: ${String(data.fail_reason ?? 'unknown reason')}.`);
+      if (this.now() >= deadline) return { status: 'processing' };
+      await this.sleep(this.pollIntervalMs);
+    }
+  }
 }
+

@@ -8,11 +8,12 @@
 export const THUMBNAIL_WIDTH = 1280;
 export const THUMBNAIL_HEIGHT = 720;
 
-/** Thumbnail sizes: 16:9 for the main video, 9:16 for a Short, 3:4 for a TikTok cover, 1:1 for the streaming cover. */
+/** Thumbnail sizes: 16:9 for the main video, 9:16 for a Short, 3:4 for a TikTok cover, 4:5 for an Instagram feed post, 1:1 for the streaming cover. */
 export const THUMBNAIL_FORMATS = {
   '16x9': { width: THUMBNAIL_WIDTH, height: THUMBNAIL_HEIGHT },
   '9x16': { width: 1080, height: 1920 },
   '3x4': { width: 1080, height: 1440 },
+  '4x5': { width: 1080, height: 1350 },
   '1x1': { width: 3000, height: 3000 },
 } as const;
 export type ThumbnailFormat = keyof typeof THUMBNAIL_FORMATS;
@@ -40,6 +41,12 @@ export const VERTICAL_TEXT_TOP = 0.5;
  * 9:16 upload to its middle 3:4); the view count covers the bottom 12 %.
  */
 export const TIKTOK_GRID_UI_TOP = 0.88;
+/** An Instagram feed post has no UI over the image; the text keeps a margin to the bottom edge. */
+export const FEED_TEXT_BOTTOM = 0.94;
+
+/** The formats with the vertical text stack: hook below, face above. */
+export type VerticalFormat = '9x16' | '3x4' | '4x5';
+export const isVerticalFormat = (format: ThumbnailFormat): format is VerticalFormat => format === '9x16' || format === '3x4' || format === '4x5';
 
 /** The central square of a vertical frame, which grid views show. */
 export function centralSquare(frame: FrameSize): { top: number; bottom: number } {
@@ -54,6 +61,7 @@ export const THUMBNAIL_FORMAT_MAX_BYTES: Record<ThumbnailFormat, number> = {
   '16x9': THUMBNAIL_MAX_BYTES,
   '9x16': THUMBNAIL_MAX_BYTES,
   '3x4': THUMBNAIL_MAX_BYTES,
+  '4x5': THUMBNAIL_MAX_BYTES,
   '1x1': 10 * 1024 * 1024,
 };
 
@@ -186,7 +194,7 @@ export function faceAnchor(layout: ThumbnailLayout, format: ThumbnailFormat = '1
     const frame = thumbnailSize(format);
     return { x: frame.width * 0.5, y: frame.height * 0.32 };
   }
-  if (format === '3x4') {
+  if (format === '3x4' || format === '4x5') {
     const frame = thumbnailSize(format);
     return { x: frame.width * 0.5, y: frame.height * 0.28 };
   }
@@ -255,9 +263,9 @@ function tagBox(metrics: LineMetrics | undefined, layout: ThumbnailLayout, forma
   const height = (metrics.ascent + metrics.descent) * k + 2 * TAG_PAD_Y;
   const frame = thumbnailSize(format);
   // The tag sits in a top corner on the face side, away from the hook; on 9:16 below the top UI.
-  const vertical = format === '9x16' || format === '3x4';
+  const vertical = isVerticalFormat(format);
   const x = format === '16x9' && layout === 'right' ? TAG_MARGIN : frame.width - (vertical ? VERTICAL_MARGIN : TAG_MARGIN) - width;
-  const y = format === '9x16' ? Math.round(frame.height * 0.09) : format === '3x4' ? VERTICAL_MARGIN : TAG_MARGIN;
+  const y = format === '9x16' ? Math.round(frame.height * 0.09) : vertical ? VERTICAL_MARGIN : TAG_MARGIN;
   return { x, y, width, height, textX: x + TAG_PAD_X + metrics.left * k, textY: y + TAG_PAD_Y + metrics.ascent * k, fontSize: TAG_SIZE };
 }
 
@@ -269,7 +277,7 @@ function tagBox(metrics: LineMetrics | undefined, layout: ThumbnailLayout, forma
  *   slabs tilt 2° and step in a little on every other row.
  * - `bottom`: the lines sit side by side along the bottom edge, untilted,
  *   centred, with a slight vertical stagger.
- * - 9:16 and 3:4 (any layout): see `layoutVertical`.
+ * - 9:16, 3:4, and 4:5 (any layout): see `layoutVertical`.
  */
 export function layoutThumbnail(
   lines: LineMetrics[],
@@ -278,7 +286,7 @@ export function layoutThumbnail(
   format: ThumbnailFormat = '16x9',
 ): ThumbnailLayoutResult {
   if (lines.length === 0) return { fontSize: 0, slabs: [], tag: tagBox(tag, layout, format) };
-  if (format === '9x16' || format === '3x4') return layoutVertical(lines, layout, tag, format);
+  if (isVerticalFormat(format)) return layoutVertical(lines, layout, tag, format);
   if (format === '1x1') return layoutSquare(lines);
 
   if (layout === 'bottom') {
@@ -329,17 +337,19 @@ export function layoutThumbnail(
  *
  * The 3:4 TikTok cover uses the same stack, above the view count of the
  * profile grid instead of the Shorts UI; TikTok shows the whole tile, so the
- * stack is not lifted into a central square.
+ * stack is not lifted into a central square. The 4:5 Instagram feed image
+ * has no UI over it; the stack keeps a margin to the bottom edge.
  */
 export function layoutVertical(
   lines: LineMetrics[],
   layout: ThumbnailLayout,
   tag?: LineMetrics,
-  format: '9x16' | '3x4' = '9x16',
+  format: VerticalFormat = '9x16',
 ): ThumbnailLayoutResult {
   const frame = thumbnailSize(format);
   const zoneTop = frame.height * VERTICAL_TEXT_TOP;
-  const zoneBottom = frame.height * (format === '3x4' ? TIKTOK_GRID_UI_TOP : SHORT_UI_TOP) - VERTICAL_UI_GAP;
+  const uiTop = format === '3x4' ? TIKTOK_GRID_UI_TOP : format === '4x5' ? FEED_TEXT_BOTTOM : SHORT_UI_TOP;
+  const zoneBottom = frame.height * uiTop - VERTICAL_UI_GAP;
   const maxWidth = frame.width - 2 * VERTICAL_MARGIN - VERTICAL_STEP;
   const stackHeight = (size: number) =>
     lines.reduce((sum, metrics) => sum + slabSize(metrics, size).height, 0) - ROW_OVERLAP * (lines.length - 1);

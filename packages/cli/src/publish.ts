@@ -67,6 +67,8 @@ export interface PublishOptions {
   probe?: (path: string) => VideoProbe;
   /** Adapters to use instead of the configured ones (tests). */
   adapters?: Partial<Record<PublishPlatform, PublishAdapter>>;
+  /** TikTok: `inbox` (default) sends drafts; `direct` posts publicly, for an app that passed TikTok's audit. */
+  tiktokMode?: 'inbox' | 'direct';
   /** Called when TikTok rotates its refresh token. */
   onTikTokRefreshToken?: (token: string) => Promise<void> | void;
   log?: (line: string) => void;
@@ -257,7 +259,7 @@ function scheduleProblems(schedule: string | undefined, now: Date, platforms: Pu
   if (platforms.includes('youtube')) {
     warnings.push('youtube: a scheduled video only goes public if the API project passed Google\'s audit; otherwise it stays private (docs/publishing.md)');
   }
-  if (platforms.includes('tiktok')) warnings.push('tiktok: --schedule does not apply to drafts; post them from the inbox');
+  if (platforms.includes('tiktok')) warnings.push('tiktok: --schedule does not apply to TikTok; drafts are posted from the inbox, direct posts go live at once');
   return { errors, warnings };
 }
 
@@ -377,9 +379,9 @@ function createAdapters(platforms: PublishPlatform[], options: PublishOptions): 
   for (const platform of platforms) {
     const given = options.adapters?.[platform];
     if (given) adapters[platform] = given;
-    else if (options.mock) adapters[platform] = new MockPublisher(platform);
+    else if (options.mock) adapters[platform] = new MockPublisher(platform, options.tiktokMode);
     else if (platform === 'youtube') adapters[platform] = new YouTubePublisher({ log: options.log });
-    else adapters[platform] = new TikTokPublisher({ log: options.log, onRefreshToken: options.onTikTokRefreshToken });
+    else adapters[platform] = new TikTokPublisher({ log: options.log, onRefreshToken: options.onTikTokRefreshToken, mode: options.tiktokMode });
   }
   return adapters;
 }
@@ -466,6 +468,9 @@ export async function publishProject(options: PublishOptions): Promise<PublishSu
     }
   }
   printManualSteps(print, manualSteps);
-  print('Nothing was made public. Review each video on its platform and publish it yourself.');
+  // A direct post that TikTok is still processing goes live by itself, like a finished one.
+  const posted = entries.filter((entry) => entry.platform === 'tiktok' && (entry.status === 'uploaded' || (options.tiktokMode === 'direct' && entry.status === 'processing')));
+  if (posted.length) print(`Posted ${posted.length} video(s) on TikTok directly; everything else is private or a draft.`);
+  else print('Nothing was made public. Review each video on its platform and publish it yourself.');
   return { plan, entries, manualSteps };
 }

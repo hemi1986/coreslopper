@@ -16,6 +16,7 @@ import {
   unmarkedPlaceholders,
   type LoadedProject,
   type ReleaseManifest,
+  withReleaseDefaults,
 } from '@coreslopper/core';
 import { shortProblems } from './release-files.js';
 import { canvasProblems, probeMedia, videoFacts, videoProblems, wavProblems, type Prober } from './release-media.js';
@@ -221,7 +222,9 @@ export async function releaseChecks(projectDir: string, probe: Prober = probeMed
 
   if (music) {
     const meta = await song(project);
-    const todos = releaseTodos(project.config.release, await loadChannel(repoRoot()), releaseIdentity(project.config, meta));
+    const channel = await loadChannel(repoRoot());
+    const facts = withReleaseDefaults(project.config.release, channel);
+    const todos = releaseTodos(facts, channel, releaseIdentity({ ...project.config, release: facts }, meta));
     checks.push(todos.length ? check('Release metadata', 'TODO', todos.join('; ')) : check('Release metadata', 'PASS', 'release: block complete'));
   }
   return checks;

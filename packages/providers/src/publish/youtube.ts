@@ -6,13 +6,31 @@ import { RefreshingToken } from './oauth.js';
 import type { PublishAdapter, PublishLogger, PublishRequest, PublishResult } from './types.js';
 
 export const YOUTUBE_SCOPE = 'https://www.googleapis.com/auth/youtube.upload';
+/** `youtube.force-ssl` lets the autopilot read a video's status, edit its description, and post a comment. */
+export const YOUTUBE_FORCE_SSL_SCOPE = 'https://www.googleapis.com/auth/youtube.force-ssl';
+export const YOUTUBE_SCOPES = [YOUTUBE_SCOPE, YOUTUBE_FORCE_SSL_SCOPE] as const;
 const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const UPLOAD_URL = 'https://www.googleapis.com/upload/youtube/v3/videos';
 const THUMBNAIL_URL = 'https://www.googleapis.com/upload/youtube/v3/thumbnails/set';
+const API_URL = 'https://www.googleapis.com/youtube/v3';
 
-/** YouTube Data API quota: the default daily allowance and the cost of the calls `publish` makes. */
-export const YOUTUBE_QUOTA = { dailyUnits: 10_000, insert: 1_600, thumbnail: 50 } as const;
+/**
+ * YouTube Data API quota: the default daily allowance and the cost of the calls
+ * `publish` and the autopilot make (developers.google.com/youtube/v3/determine_quota_cost:
+ * videos.list 1, videos.update 50, commentThreads.insert 50).
+ */
+export const YOUTUBE_QUOTA = { dailyUnits: 10_000, insert: 1_600, thumbnail: 50, list: 1, update: 50, comment: 50 } as const;
+
+/** YouTube's description limit in bytes. */
+export const YOUTUBE_DESCRIPTION_BYTES = 5000;
+
+export interface YouTubeVideoStatus {
+  privacyStatus: 'private' | 'unlisted' | 'public' | string;
+  /** ISO time of a scheduled publication. */
+  publishAt?: string;
+  uploadStatus: 'uploaded' | 'processed' | 'failed' | 'rejected' | 'deleted' | string;
+}
 
 /** The daily quota, raised by `YOUTUBE_DAILY_QUOTA` after Google granted an extension. */
 export function youtubeDailyQuota(env: NodeJS.ProcessEnv = process.env): number {
@@ -42,7 +60,7 @@ export function youtubeAuthUrl(options: { clientId: string; redirectUri: string;
     client_id: options.clientId,
     redirect_uri: options.redirectUri,
     response_type: 'code',
-    scope: YOUTUBE_SCOPE,
+    scope: YOUTUBE_SCOPES.join(' '),
     access_type: 'offline',
     prompt: 'consent',
     state: options.state,
@@ -239,6 +257,91 @@ export class YouTubePublisher implements PublishAdapter {
       ],
       quotaUnits,
     };
+  }
+
+  /** The privacy and upload status of a video (videos.list part=status, 1 unit). */
+  async videoStatus(videoId: string): Promise<YouTubeVideoStatus> {
+    const video = await this.getVideo(videoId, 'status');
+    const status = (video.status ?? {}) as Record<string, unknown>;
+    return {
+      privacyStatus: String(status.privacyStatus ?? 'private'),
+      ...(typeof status.publishAt === 'string' ? { publishAt: status.publishAt } : {}),
+      uploadStatus: String(status.uploadStatus ?? 'uploaded'),
+    };
+  }
+
+  /**
+   * Append a block to a video's description (videos.list + videos.update
+   * part=snippet, 51 units). The snippet is sent back whole, so title, tags,
+   * and category stay. Idempotent: a description that already holds the text
+   * is not touched.
+   */
+  async appendToDescription(videoId: string, text: string): Promise<{ changed: boolean }> {
+    const block = text.trim();
+    if (!block) return { changed: false };
+    const video = await this.getVideo(videoId, 'snippet');
+    const snippet = { ...((video.snippet ?? {}) as Record<string, unknown>) };
+    const current = typeof snippet.description === 'string' ? snippet.description : '';
+    if (current.includes(block)) return { changed: false };
+    const description = current.trim() ? `${current.trimEnd()}\n\n${block}` : block;
+    const bytes = Buffer.byteLength(description, 'utf8');
+    if (bytes > YOUTUBE_DESCRIPTION_BYTES) {
+      throw new PublishError(`The description of ${videoId} would have ${bytes} bytes, limit ${YOUTUBE_DESCRIPTION_BYTES}; shorten it in YouTube Studio.`);
+    }
+    // videos.update rejects read-only snippet fields; send what it accepts.
+    const writable = ['title', 'description', 'tags', 'categoryId', 'defaultLanguage'];
+    const body = {
+      id: videoId,
+      snippet: Object.fromEntries(Object.entries({ ...snippet, description }).filter(([key, value]) => writable.includes(key) && value !== undefined)),
+    };
+    await this.apiJson('PUT', `${API_URL}/videos?part=snippet`, body, 'YouTube videos.update');
+    return { changed: true };
+  }
+
+  /** Post a top-level comment under a video (commentThreads.insert, 50 units). The API cannot pin it. */
+  async postComment(videoId: string, text: string): Promise<{ commentId: string }> {
+    const body = { snippet: { videoId, topLevelComment: { snippet: { textOriginal: text } } } };
+    const thread = await this.apiJson('POST', `${API_URL}/commentThreads?part=snippet`, body, 'YouTube commentThreads.insert');
+    const id = typeof thread.id === 'string' ? thread.id : undefined;
+    if (!id) throw new PublishError('YouTube accepted the comment but returned no ID.');
+    return { commentId: id };
+  }
+
+  private async getVideo(videoId: string, part: 'status' | 'snippet'): Promise<Record<string, unknown>> {
+    const body = await this.apiJson('GET', `${API_URL}/videos?part=${part}&id=${encodeURIComponent(videoId)}`, undefined, 'YouTube videos.list');
+    const video = Array.isArray(body.items) ? (body.items[0] as Record<string, unknown> | undefined) : undefined;
+    if (!video) throw new PublishError(`YouTube has no video ${videoId} on this channel (deleted, or uploaded by another account).`, 404);
+    return video;
+  }
+
+  /** A Data API call with the access token; 403 insufficientPermissions means the token predates the force-ssl scope. */
+  private async apiJson(method: 'GET' | 'POST' | 'PUT', url: string, body: unknown, label: string): Promise<Record<string, unknown>> {
+    const response = await this.authorized((token) =>
+      fetchWithRetry(
+        this.fetchImpl,
+        url,
+        {
+          method,
+          headers: { authorization: `Bearer ${token}`, ...(body === undefined ? {} : { 'content-type': 'application/json; charset=UTF-8' }) },
+          ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+        },
+        // A POST is not retried: a comment that reached YouTube before a timeout would appear twice.
+        { secrets: this.secrets, sleep: this.sleep, timeoutMs: 60_000, ...(method === 'POST' ? { attempts: 1 } : {}) },
+      ),
+    );
+    const json = await readJson(response);
+    if (response.ok) return json;
+    const text = JSON.stringify(json);
+    if (response.status === 403 && /insufficientPermissions|ACCESS_TOKEN_SCOPE_INSUFFICIENT|insufficient authentication scopes/i.test(text)) {
+      throw new ConfigError(
+        'The YouTube token lacks the youtube.force-ssl scope the autopilot needs (status, description, comments). ' +
+          'Run "npm run cli -- publish-auth youtube" again to grant the new scope.',
+      );
+    }
+    if (response.status === 403 && text.includes('quotaExceeded')) {
+      throw new PublishError('YouTube API quota exceeded for today. It resets at midnight Pacific Time.', 403, json);
+    }
+    throw httpError(label, response.status, json, this.secrets);
   }
 
   private async authorized(send: (token: string) => Promise<Response>): Promise<Response> {

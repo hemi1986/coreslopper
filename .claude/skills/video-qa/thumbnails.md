@@ -41,7 +41,7 @@ npm run cli -- thumbnail projects/<slug> \
 - `--layout` is the text side; the face goes on the opposite side (`bottom` puts the face above the text).
 - `--focus x,y` is the face's position in the still as fractions (0–1); the command moves it to the face side as far as the frame allows. `--zoom` (1–4) crops tighter.
 - `--font` picks another `style.yaml` typography key for the hook (default `display`). The hook needs a heavy, condensed, all-caps face; the tag always uses `mono`.
-- Name the files `thumb-<n>-<subject>.jpg` in `renders/thumbnails/`. The command writes 1280x720 sRGB JPEG under 2 MB and fails otherwise.
+- Name the files `thumb-<n>-<subject>.jpg` in `renders/thumbnails/`. The command writes 1280x720 sRGB JPEG under 2 MB and fails otherwise, and records its **recipe** (still, focus, options) beside it as `<name>.recipe.json`.
 
 ## 4. Review
 
@@ -60,6 +60,7 @@ The 3000x3000 cover goes to Spotify, Apple Music, and every other store, and is 
 - `--text "<ARTIST>|<TITLE>"`: artist and title only. URLs, handles, prices, platform names and logos, and the tag are refused by the command and by the stores.
 - The layout is fixed: the image above, artist and title centred below, untilted. The command writes an RGB JPEG of exactly 3000x3000.
 - The art director checks it like a thumbnail and also at 64x64: the image still reads, the text may blur, nothing looks like a logo.
+- `release` composes the announcement images (with the release date), the release-day story, and the 4:5 feed image from the cover's recipe, so the cover's still carries the whole campaign: pick it for that too.
 
 ## Completion
 

@@ -173,7 +173,7 @@ _Avoid_: deliverables, export bundle
 _Avoid_: export folder, output
 
 **Release Metadata**:
-The `release:` block of a project: the facts a distributor asks for, such as artist, genres, songwriters, release date, and AI credits. Only the user supplies them; a missing one is a TODO.
+The `release:` block of a project: the facts a distributor asks for, such as artist, genres, songwriters, release date, and AI credits. Only the user supplies them, per project or once as the channel's release defaults; a missing one is a TODO.
 _Avoid_: tags, song info
 
 **AI Credits**:
@@ -189,7 +189,7 @@ The silent 3–8 s vertical loop Spotify plays behind a song, cut from the 9:16 
 _Avoid_: loop, visualizer
 
 **Channel Config**:
-`config/channel.yaml`: the workspace's channel with its handles, links, footer lines, hashtag sets, limit overrides, and AI disclosure defaults. Optional.
+`config/channel.yaml`: the workspace's channel with its handles, links, footer lines, hashtag sets, limit overrides, AI disclosure defaults, and the release defaults (release metadata shared by every song). Optional.
 _Avoid_: brand kit (a **Brand Kit** is visual), profile
 
 **Distributor**:
@@ -208,6 +208,26 @@ _Avoid_: release plan (the plan is the calendar's table in the release folder), 
 The local page `release-board` serves over all release folders: per platform the posts with files, texts, limits, and settings, the calendar of all projects, and the user's done state and live URLs in `review/release-status.json`.
 _Avoid_: dashboard, CMS
 
+**Release Approval**:
+The user's one click on the release board that hands a release to the release autopilot. Before it nothing goes out by itself; withdrawing it stops what has not gone out.
+_Avoid_: go-live, publish (the **Publish** command uploads privately)
+
+**Release Autopilot**:
+`release-run`, started by a timer every few minutes: for an approved release it posts each calendar event that a platform API can post, at the event's time, and leaves the rest to the user. A post it cannot be sure about waits for the user instead of going out twice.
+_Avoid_: scheduler, bot, cron job
+
+**Autopilot Log**:
+`review/autopilot.json`: one entry per autopilot step on a calendar event (running, posted, uploaded, scheduled, draft, failed) and the user's retry and force marks.
+_Avoid_: publish log (the **Publish Log** records uploads of `publish`)
+
+**Announcement**:
+The release's posts a week before: a story and a post image with the release date on them, the teaser, and the announcement text. `release` composes the images from the cover's still again whenever the date moves.
+_Avoid_: teaser post, pre-save
+
+**Thumbnail Recipe**:
+`<image>.recipe.json` beside a composed thumbnail: the still, focus, and options it was made from, so `release` can compose further images from the same still.
+_Avoid_: preset, template (a **Template** seeds a project)
+
 **Microsite**:
 The artist's own website. A song's page is built from `renders/release/microsite/<slug>.json`.
 _Avoid_: landing page, link-in-bio
@@ -223,11 +243,11 @@ The user's explicit act of uploading a release package to platforms, as private 
 _Avoid_: release, post, deploy
 
 **Platform**:
-A service a video is published on: YouTube or TikTok.
+A service a release is published on: YouTube, TikTok, Instagram, X, LinkedIn, Spotify, or the microsite.
 _Avoid_: channel, network, provider (a **Provider Adapter** generates media)
 
 **Publish Adapter**:
-The small implementation that uploads one item of upload data to one platform; YouTube and TikTok are the real adapters, mock the test adapter.
+The small implementation that uploads one item of upload data to one platform (YouTube, TikTok) or posts one post (Instagram, X, LinkedIn); mock is the test adapter.
 _Avoid_: uploader, integration
 
 **Publish Log**:

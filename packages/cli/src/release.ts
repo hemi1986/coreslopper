@@ -28,6 +28,7 @@ import {
   resolveAnchor,
   safeFileName,
   sha256,
+  withReleaseDefaults,
   writeJsonAtomic,
   writeTextAtomic,
   type Chapter,
@@ -35,6 +36,7 @@ import {
   type ReleaseFile,
   type ReleaseFileKind,
   type ReleaseManifest,
+  type ReleaseCalendar,
   type UploadData,
 } from '@coreslopper/core';
 import { listShorts, shortName, shortPaths } from './release-files.js';
@@ -55,6 +57,10 @@ import { readmeText, releaseLabels, releaseTexts, youtubeDescriptionText, calend
 import { calendarInput, loadStatus, planCalendar } from './release-calendar.js';
 import { micrositeSong } from './release-microsite.js';
 import { listThumbnails } from './thumbnail-files.js';
+import { readRecipe, recipePath } from './thumbnail-recipe.js';
+import { DERIVED_PATHS, derivedImages, teaserWindow } from './release-images.js';
+import { shortFfmpegArgs } from './short.js';
+import type { ThumbnailOptions } from './thumbnail.js';
 import { loadUploadData, uploadPaths } from './upload-text.js';
 import { parseTimePoint } from './short.js';
 
@@ -73,6 +79,8 @@ export interface ReleaseDeps {
   render: (projectDir: string, format: string) => Promise<string>;
   /** The current inputs hash of a format's render; undefined when it cannot be computed. */
   inputsHash: (projectDir: string, format: string) => Promise<string | undefined>;
+  /** Compose one thumbnail (the Remotion still); returns the file. */
+  thumbnail: (options: ThumbnailOptions) => Promise<string>;
   now: () => Date;
   log: (line: string) => void;
 }
@@ -86,6 +94,8 @@ export interface ReleaseOptions {
   canvasSeconds?: number;
   /** Plan the release calendar again instead of keeping the times it holds. */
   replan?: boolean;
+  /** Compose the announcement, story, and feed images (default). `false` keeps the ones already in the folder: the board's quick refresh. */
+  stills?: boolean;
   deps?: Partial<ReleaseDeps>;
 }
 
@@ -112,6 +122,7 @@ async function defaultDeps(): Promise<ReleaseDeps> {
         return undefined;
       }
     },
+    thumbnail: async (thumbnailOptions) => (await import('./thumbnail.js')).renderThumbnail(thumbnailOptions),
     now: () => new Date(),
     log: (line) => console.log(line),
   };
@@ -205,7 +216,9 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
   const channel = await loadChannel(root);
   const limits = platformLimits(channel);
   const song = await songJson(project);
-  const identity = releaseIdentity(project.config, song);
+  // The channel's release defaults fill what the project leaves out, also the artist.
+  const releaseFacts = withReleaseDefaults(project.config.release, channel);
+  const identity = releaseIdentity({ ...project.config, release: releaseFacts }, song);
   const slug = project.config.slug;
   const todos: string[] = [];
   const errors: string[] = [];
@@ -217,7 +230,7 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
   else todos.push('review/upload.yaml is missing: write the platform texts (video-qa release.md)');
   const language = project.config.release?.language ?? (typeof song.language === 'string' ? song.language : undefined) ?? data?.language ?? channel?.language ?? 'en';
 
-  if (music) todos.push(...releaseTodos(project.config.release, channel, identity));
+  if (music) todos.push(...releaseTodos(releaseFacts, channel, identity));
   todos.push(...channelTodos(channel));
   await mkdir(dir, { recursive: true });
 
@@ -374,7 +387,7 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
     artist: identity.artist,
     title: identity.title,
     data,
-    release: project.config.release,
+    release: releaseFacts,
     channel,
     limits,
     chapters,
@@ -396,6 +409,7 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
     }),
     { root, now: deps.now(), replan: options.replan, schedule },
   );
+  await deriveReleaseMedia({ project, dir, writer, files, data, calendar: input.calendar, language, title: identity.title, deps, todos, stills: options.stills !== false });
   const labels = releaseLabels(language);
   const ics = calendarIcs([input.calendar], (calendar, event) => `${calendar.title}: ${calendarEventLabel(event, labels, schedule.release.premiere)}`);
   await writer.text('calendar.ics', ics, 'calendar', { events: input.calendar.events.length, release_date: input.calendar.release_date });
@@ -430,6 +444,105 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
   };
   await writeJsonAtomic(manifestPath, ReleaseManifestSchema.parse(manifest));
   return { dir, manifest, todos: manifest.todos, errors, warnings };
+}
+
+/**
+ * The announcement images and teaser, the release-day story image, and the feed
+ * image without a feed-format render: composed from the announcement still or
+ * the cover's recipe, again only when the text (the release date) or the still
+ * changed. The teaser is cut from the 9:16 render.
+ */
+async function deriveReleaseMedia(context: {
+  project: LoadedProject;
+  dir: string;
+  writer: ReleaseWriter;
+  files: ReleaseTextInput['files'];
+  data?: UploadData;
+  calendar: ReleaseCalendar;
+  language: string;
+  title: string;
+  deps: ReleaseDeps;
+  todos: string[];
+  stills: boolean;
+}): Promise<void> {
+  const { project, dir, writer, files, data, calendar, deps, todos } = context;
+  const releaseAt = calendar.events.find((event) => event.id === 'youtube')?.at;
+  const images = derivedImages({
+    title: context.title,
+    language: context.language,
+    releaseAt,
+    announcement: Boolean(data?.announcement),
+    story: Boolean(data),
+    feedVideo: Boolean(files.videos?.['4x5'] ?? files.videos?.['1x1']),
+    feedPost: Boolean(data?.instagram_post),
+  });
+  if (images.length) {
+    const recipe = data?.announcement?.image
+      ? { still: data.announcement.image.still, focus: data.announcement.image.focus }
+      : ((await readRecipe(join(project.paths.root, COVER_SOURCE))) ?? (data?.main.thumbnail ? await readRecipe(resolve(project.paths.root, data.main.thumbnail)) : undefined));
+    const stillPath = recipe ? [resolve(project.paths.root, recipe.still), resolve(recipe.still)].find((path) => existsSync(path)) : undefined;
+    if (!recipe || !stillPath) {
+      todos.push(
+        recipe
+          ? `the still of the announcement images is missing: ${recipe.still}`
+          : 'the announcement, story, and feed images need a still: set announcement.image in review/upload.yaml, or compose the cover again with thumbnail (it records its recipe)',
+      );
+    } else {
+      const stillHash = await hashFileStream(stillPath);
+      for (const image of images) {
+        const spec = { format: image.format, text: image.text, tag: image.tag, still: recipe.still, stillSha256: stillHash, focus: recipe.focus ?? null };
+        const key = sha256(JSON.stringify(spec));
+        const same = await writer.unchanged(image.path, (entry) => entry.spec.key === key);
+        if (!same && !context.stills) {
+          // An image whose date or title no longer matches is dropped, never posted: the post falls back to the cover until a full release composes it again.
+          todos.push(`${image.path} is not composed for the current date and title yet: run release`);
+          continue;
+        }
+        if (!same) {
+          deps.log(`Composing ${image.path} (${image.text.replace(/\|/g, ' / ')})...`);
+          await mkdir(dirname(join(dir, image.path)), { recursive: true });
+          await deps.thumbnail({
+            projectDir: project.paths.root,
+            still: stillPath,
+            text: image.text,
+            tag: image.tag,
+            format: image.format,
+            ...(image.layout ? { layout: image.layout } : {}),
+            ...(recipe.focus ? { focus: recipe.focus } : {}),
+            ...('accent' in recipe && recipe.accent ? { accent: recipe.accent } : {}),
+            ...('font' in recipe && recipe.font ? { font: recipe.font } : {}),
+            out: join(dir, image.path),
+          });
+          await rm(recipePath(join(dir, image.path)), { force: true });
+        }
+        await writer.generated(image.path, image.kind, { ...spec, key }, recipe.still);
+      }
+    }
+  }
+  for (const image of images) {
+    if (!writer.files.some((file) => file.path === image.path)) continue;
+    if (image.path === DERIVED_PATHS.announceStory) files.announceStory = image.path;
+    if (image.path === DERIVED_PATHS.announcePost) files.announcePost = image.path;
+    if (image.path === DERIVED_PATHS.story) files.story = image.path;
+    if (image.path === DERIVED_PATHS.feedImage) files.feedImage = image.path;
+  }
+
+  // The teaser: ten seconds from the first chorus of the 9:16 render, with sound, for the announcement.
+  const timing = project.effectiveTiming ?? project.timing;
+  const vertical = join(project.paths.root, 'renders', '9x16.mp4');
+  if (data?.announcement && timing && existsSync(vertical)) {
+    const window = teaserWindow(timing);
+    const sourceHash = await hashFileStream(vertical);
+    const spec = { start: Number(window.start.toFixed(3)), seconds: Number(window.duration.toFixed(3)), audio: true, sourceSha256: sourceHash };
+    const same = await writer.unchanged(DERIVED_PATHS.teaser, (entry) => entry.spec.sourceSha256 === sourceHash && entry.spec.start === spec.start && entry.spec.seconds === spec.seconds);
+    if (!same) {
+      deps.log(`Cutting the teaser: ${spec.seconds} s from ${spec.start.toFixed(2)} s...`);
+      await mkdir(join(dir, 'announce'), { recursive: true });
+      await deps.ffmpeg(shortFfmpegArgs(vertical, join(dir, DERIVED_PATHS.teaser), window, project.config.formats.master.fps));
+    }
+    await writer.generated(DERIVED_PATHS.teaser, 'announcement', spec, 'renders/9x16.mp4');
+    files.teaser = DERIVED_PATHS.teaser;
+  }
 }
 
 function loadedArtifact(project: LoadedProject, key: string): string | undefined {

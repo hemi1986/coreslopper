@@ -43,3 +43,15 @@ disclosure:
   tiktok_ai_label: true        # TikTok "AI-generated content"
   instagram_ai_label: true     # Instagram "AI info"
   distributor_ai_credits: true # AI credits in the distributor form
+
+# Release facts that are the same for every song (optional). `release` and the
+# board use them where a project's `release:` block leaves a field out; the
+# project always wins. Only facts you give: legal names, never guesses.
+# release_defaults:
+#   distributor: distrokid
+#   artist: "<artist name>"
+#   songwriters: ["<legal name>"]
+#   explicit: false
+#   ai_credits: { lyrics: none, music: full, vocals: full, instrumental: full }
+#   ai_tool: "<the tool that made the AI parts>"
+#   license_note: "<the plan the songs are made with>"

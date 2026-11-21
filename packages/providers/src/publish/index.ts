@@ -4,3 +4,7 @@ export * from './oauth.js';
 export * from './youtube.js';
 export * from './tiktok.js';
 export * from './mock.js';
+export * from './social.js';
+export * from './x.js';
+export * from './linkedin.js';
+export * from './instagram.js';

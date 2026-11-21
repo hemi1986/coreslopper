@@ -10,8 +10,12 @@ import {
   loadReleaseSchedule,
   platformLimits,
   plainLyrics,
+  planAutopilot,
   readJsonFile,
   releaseIdentity,
+  withReleaseDefaults,
+  type AutopilotEventPlan,
+  type AutopilotPlatform,
   type CalendarEvent,
   type ReleaseCalendar,
   type ReleaseManifest,
@@ -36,6 +40,8 @@ import {
 } from './release-texts.js';
 import { loadUploadData, uploadPaths } from './upload-text.js';
 import { releaseDir, songJson } from './release.js';
+import { DERIVED_PATHS } from './release-images.js';
+import { autopilotReadiness, lastRun, loadAutopilotLog } from './autopilot-state.js';
 
 // The release board's view of one project: per platform the posts to make,
 // each with its files (paths inside renders/release/), the texts to paste
@@ -86,6 +92,42 @@ export interface BoardPlatform {
   posts: BoardPost[];
 }
 
+/** Where one calendar event stands with the autopilot. */
+export interface BoardAutopilotEvent {
+  state: AutopilotEventPlan['state'];
+  block?: AutopilotEventPlan['block'];
+  /** The platform of the API action, when there is one. */
+  platform?: AutopilotEventPlan['platform'];
+  dueAt?: string;
+  retryAt?: string;
+  needsUser: boolean;
+  attempts: number;
+  error?: string;
+  /** What the user still does by hand after the API step. */
+  manualSteps: string[];
+  /** The autopilot posted it. */
+  byAutopilot: boolean;
+}
+
+export interface BoardAutopilot {
+  approval?: { at: string; release_date: string };
+  /** The release day moved since the approval: nothing goes out until the user approves the new day. */
+  approvalStale: boolean;
+  /** Why the release cannot be approved yet. */
+  blockers: string[];
+  ready: Record<AutopilotPlatform, boolean>;
+  /** Tokens that expire soon and other setup notes. */
+  notes: string[];
+  /** When release-run last finished a round. */
+  lastRun?: string;
+  /** Minutes between the timer's rounds, when a timer ran it. */
+  lastRunEvery?: number;
+  /** Events the autopilot posts, and events that stay manual. */
+  automatic: number;
+  manual: number;
+  events: Record<string, BoardAutopilotEvent>;
+}
+
 export interface BoardProject {
   slug: string;
   title: string;
@@ -100,6 +142,7 @@ export interface BoardProject {
   calendar: (CalendarEvent & { label: string })[];
   status: ReleaseStatus;
   microsite?: MicrositeSong;
+  autopilot: BoardAutopilot;
 }
 
 const NOTES = {
@@ -167,6 +210,12 @@ const NOTES = {
 
 const BOARD = {
   de: {
+    announceStory: 'Story-Bild mit Termin',
+    announcePost: 'Post-Bild mit Termin',
+    teaserFile: 'Teaser (10 s)',
+    storyImage: 'Story-Bild',
+    feedImageFile: 'Feed-Bild (4:5)',
+    feedImageCheck: 'Feed-Bild als Beitrag',
     master: 'Hauptvideo',
     upload: 'Thumbnail (Upload)',
     alt: (n: number) => `Thumbnail ${n} (Testen und vergleichen)`,
@@ -230,6 +279,12 @@ const BOARD = {
     noLinkedin: 'Noch keine Entscheidung: linkedin in review/upload.yaml',
   },
   en: {
+    announceStory: 'Story image with the date',
+    announcePost: 'Post image with the date',
+    teaserFile: 'Teaser (10 s)',
+    storyImage: 'Story image',
+    feedImageFile: 'Feed image (4:5)',
+    feedImageCheck: 'The feed image as the post',
     master: 'Main video',
     upload: 'Thumbnail (upload)',
     alt: (n: number) => `Thumbnail ${n} (Test & compare)`,
@@ -318,6 +373,11 @@ export function filesFromManifest(manifest: ReleaseManifest | undefined, masterF
     else if (file.kind === 'canvas') files.canvas = file.path;
     else if (file.kind === 'lyrics' && file.path.endsWith('.txt')) files.lyricsTxt = file.path;
     else if (file.kind === 'lyrics' && file.path.endsWith('.lrc')) files.lyricsLrc = file.path;
+    else if (file.path === DERIVED_PATHS.announceStory) files.announceStory = file.path;
+    else if (file.path === DERIVED_PATHS.announcePost) files.announcePost = file.path;
+    else if (file.path === DERIVED_PATHS.teaser) files.teaser = file.path;
+    else if (file.path === DERIVED_PATHS.story) files.story = file.path;
+    else if (file.path === DERIVED_PATHS.feedImage) files.feedImage = file.path;
   }
   files.thumbnails.sort();
   files.shorts.sort((a, b) => a.name.localeCompare(b.name));
@@ -329,19 +389,17 @@ const kindOf = (path: string): BoardFile['kind'] =>
 const file = (label: string, path: string | undefined): BoardFile[] => (path ? [{ label, path, kind: kindOf(path) }] : []);
 const field = (label: string, value: string | undefined, extra: Partial<BoardField> = {}): BoardField[] => (value?.trim() ? [{ label, value, ...extra }] : []);
 
-/** Build the board view of one project. */
-export async function boardProject(projectRoot: string, root: string): Promise<BoardProject> {
+/** Everything the release texts of a project are made from: the board and the autopilot read the same. */
+export async function projectReleaseContext(projectRoot: string, root: string) {
   const project = await loadProject(projectRoot);
   const music = project.config.kind !== 'episode';
   const channel = await loadChannel(root);
   const limits = platformLimits(channel);
   const song = await songJson(project);
-  const identity = releaseIdentity(project.config, song);
+  const releaseFacts = withReleaseDefaults(project.config.release, channel);
+  const identity = releaseIdentity({ ...project.config, release: releaseFacts }, song);
   const data: UploadData | undefined = existsSync(uploadPaths(project.paths.root).data) ? await loadUploadData(project.paths.root).catch(() => undefined) : undefined;
   const language = project.config.release?.language ?? (typeof song.language === 'string' ? song.language : undefined) ?? data?.language ?? channel?.language ?? 'en';
-  const de = language.toLowerCase().startsWith('de');
-  const b = de ? BOARD.de : BOARD.en;
-  const notes = de ? NOTES.de : NOTES.en;
   const l = releaseLabels(language);
   const dir = releaseDir(project.paths.root);
   const manifestPath = join(dir, 'manifest.json');
@@ -358,7 +416,7 @@ export async function boardProject(projectRoot: string, root: string): Promise<B
     artist: identity.artist,
     title: identity.title,
     data,
-    release: project.config.release,
+    release: releaseFacts,
     channel,
     limits,
     chapters: data?.main.chapters ?? (timing ? chaptersFromSections(timing) : []),
@@ -367,6 +425,15 @@ export async function boardProject(projectRoot: string, root: string): Promise<B
     premiere: schedule.release.premiere,
     durationSeconds: timing?.audio.duration,
   };
+  return { project, music, channel, limits, identity, data, language, l, dir, manifest, files, calendar, status, schedule, input };
+}
+
+/** Build the board view of one project. */
+export async function boardProject(projectRoot: string, root: string, options: { now?: Date } = {}): Promise<BoardProject> {
+  const { project, music, channel, limits, identity, data, language, l, manifest, files, calendar, status, schedule, input } = await projectReleaseContext(projectRoot, root);
+  const de = language.toLowerCase().startsWith('de');
+  const b = de ? BOARD.de : BOARD.en;
+  const notes = de ? NOTES.de : NOTES.en;
   const at = (id: string) => calendar?.events.find((event) => event.id === id)?.at;
   const heading = (id: string, fallback: string) => {
     const event = calendar?.events.find((entry) => entry.id === id);
@@ -382,7 +449,7 @@ export async function boardProject(projectRoot: string, root: string): Promise<B
   // YouTube
   const youtube: BoardPost[] = [];
   if (announcement) {
-    youtube.push({ id: 'announce:youtube', heading: heading('announce:youtube', l.announce.heading), at: at('announce:youtube'), files: file(b.cover, files.cover), fields: field(b.text, announcement), checklist: [], url: true });
+    youtube.push({ id: 'announce:youtube', heading: heading('announce:youtube', l.announce.heading), at: at('announce:youtube'), files: files.announcePost ? file(b.announcePost, files.announcePost) : file(b.cover, files.cover), fields: field(b.text, announcement), checklist: [], url: true });
   }
   const description = youtubeDescriptionText(input, l);
   youtube.push({
@@ -419,14 +486,22 @@ export async function boardProject(projectRoot: string, root: string): Promise<B
   const instagramPosts: BoardPost[] = [];
   const xPosts: BoardPost[] = [];
   if (announcement) {
-    instagramPosts.push({ id: 'announce:instagram', heading: heading('announce:instagram', l.announce.heading), at: at('announce:instagram'), files: file(b.cover, files.cover), fields: field(b.story, announcement), checklist: [], url: false });
+    instagramPosts.push({
+      id: 'announce:instagram',
+      heading: heading('announce:instagram', l.announce.heading),
+      at: at('announce:instagram'),
+      files: files.announceStory ? [...file(b.announceStory, files.announceStory), ...file(b.teaserFile, files.teaser)] : file(b.cover, files.cover),
+      fields: field(b.story, announcement),
+      checklist: [],
+      url: false,
+    });
   }
   const firstStory = data?.shorts.find((short) => short.instagram?.story)?.instagram?.story;
   instagramPosts.push({
     id: 'story',
     heading: heading('story', l.ig.story),
     at: at('story'),
-    files: [...file(b.thumb, files.shorts[0]?.thumbnail), ...file(b.video, files.shorts[0]?.video)],
+    files: [...(files.story ? file(b.storyImage, files.story) : file(b.thumb, files.shorts[0]?.thumbnail)), ...file(b.video, files.shorts[0]?.video)],
     fields: field(b.story, firstStory),
     checklist: [b.sticker],
     pointer: videoUrl,
@@ -437,14 +512,18 @@ export async function boardProject(projectRoot: string, root: string): Promise<B
       id: 'instagram-post',
       heading: heading('instagram-post', l.ig.post),
       at: at('instagram-post'),
-      files: feedVideo(input) ? [...file(b.feedVideo, feedVideo(input)), ...file(b.cover, files.cover)] : file(b.cover, files.cover),
+      files: feedVideo(input)
+        ? [...file(b.feedVideo, feedVideo(input)), ...file(b.cover, files.cover)]
+        : files.feedImage
+          ? file(b.feedImageFile, files.feedImage)
+          : file(b.cover, files.cover),
       fields: field(b.caption, caption, { limit: limits.instagram.caption, unit: 'chars', note: `${hashtagCount(data.instagram_post.caption, data.instagram_post.hashtags)}/${limits.instagram.hashtags} Hashtags` }),
-      checklist: [feedVideo(input) ? b.feedVideoCheck : b.feedImage, b.igAi, ...((input.durationSeconds ?? 0) > 180 ? [b.longReel] : [])],
+      checklist: [feedVideo(input) ? b.feedVideoCheck : files.feedImage ? b.feedImageCheck : b.feedImage, b.igAi, ...((input.durationSeconds ?? 0) > 180 ? [b.longReel] : [])],
       url: true,
     });
   }
   if (announcement && data?.x) {
-    xPosts.push({ id: 'announce:x', heading: heading('announce:x', l.announce.heading), at: at('announce:x'), files: file(b.cover, files.cover), fields: field(b.post, announcement, { limit: limits.x.post, unit: 'chars', counting: 'x' }), checklist: [], url: true });
+    xPosts.push({ id: 'announce:x', heading: heading('announce:x', l.announce.heading), at: at('announce:x'), files: files.teaser ? file(b.teaserFile, files.teaser) : files.announcePost ? file(b.announcePost, files.announcePost) : file(b.cover, files.cover), fields: field(b.post, announcement, { limit: limits.x.post, unit: 'chars', counting: 'x' }), checklist: [], url: true });
   }
   if (data?.x) {
     const texts = xTexts(data.x, videoUrl);
@@ -524,7 +603,7 @@ export async function boardProject(projectRoot: string, root: string): Promise<B
   if (music) {
     spotify.push({
       id: 'distributor',
-      heading: heading('distributor', l.sp.form(project.config.release?.distributor === 'distrokid' ? 'DistroKid' : 'Distributor')),
+      heading: heading('distributor', l.sp.form(input.release?.distributor === 'distrokid' ? 'DistroKid' : 'Distributor')),
       at: at('distributor'),
       files: [...file(b.audio, files.audio), ...file(b.cover, files.cover), ...file(b.lyrics, files.lyricsTxt), ...file(b.lrc, files.lyricsLrc)],
       fields: distributorRows(input, l).map(([label, value]) => ({ label, value: value.replace(/`/g, '') })),
@@ -604,7 +683,9 @@ export async function boardProject(projectRoot: string, root: string): Promise<B
     },
     { id: 'microsite', label: 'Microsite', notes: notes.microsite, posts: micrositePosts },
   ];
+  const autopilot = await boardAutopilot({ root, projectRoot: project.paths.root, calendar, status, schedule, manifest: Boolean(manifest), data: Boolean(data), now: options.now });
   return {
+    autopilot,
     slug: project.config.slug,
     title: identity.title,
     artist: identity.artist,
@@ -618,5 +699,59 @@ export async function boardProject(projectRoot: string, root: string): Promise<B
     calendar: (calendar?.events ?? []).map((event) => ({ ...event, label: calendarEventLabel(event, l, schedule.release.premiere) })),
     status,
     microsite,
+  };
+}
+
+/** The autopilot's view of a project for the board: the approval, the credentials, and each event's state. */
+export async function boardAutopilot(options: {
+  root: string;
+  projectRoot: string;
+  calendar?: ReleaseCalendar;
+  status: ReleaseStatus;
+  schedule: Awaited<ReturnType<typeof loadReleaseSchedule>>;
+  manifest: boolean;
+  data: boolean;
+  now?: Date;
+  env?: NodeJS.ProcessEnv;
+}): Promise<BoardAutopilot> {
+  const now = options.now ?? new Date();
+  const settings = options.schedule.autopilot;
+  const { ready, notes } = autopilotReadiness(settings, options.env, now);
+  const blockers: string[] = [];
+  if (!options.manifest) blockers.push('no release package yet: run release');
+  if (!options.data) blockers.push('review/upload.yaml is missing');
+  if (!options.calendar) blockers.push('no release calendar yet: run release');
+  const log = await loadAutopilotLog(options.projectRoot);
+  const plans = options.calendar
+    ? planAutopilot({ calendar: options.calendar, status: options.status, log, settings, now, ready, premiere: options.schedule.release.premiere })
+    : [];
+  const events: Record<string, BoardAutopilotEvent> = {};
+  for (const plan of plans) {
+    const failed = plan.last?.status === 'failed' ? plan.last.error : undefined;
+    const steps = [...log.entries].reverse().find((entry) => entry.event === plan.id && entry.manual_steps.length)?.manual_steps ?? [];
+    events[plan.id] = {
+      state: plan.state,
+      ...(plan.block ? { block: plan.block } : {}),
+      ...(plan.platform ? { platform: plan.platform } : {}),
+      ...(plan.dueAt ? { dueAt: plan.dueAt } : {}),
+      ...(plan.retryAt ? { retryAt: plan.retryAt } : {}),
+      needsUser: plan.needsUser,
+      attempts: plan.attempts,
+      ...(failed ? { error: failed } : {}),
+      manualSteps: steps,
+      byAutopilot: options.status.items[plan.id]?.by === 'autopilot',
+    };
+  }
+  const automatic = plans.filter((plan) => plan.action && plan.state !== 'manual').length;
+  return {
+    ...(options.status.approval ? { approval: options.status.approval } : {}),
+    approvalStale: Boolean(options.status.approval && options.calendar && options.status.approval.release_date !== options.calendar.release_date),
+    blockers,
+    ready,
+    notes,
+    ...(await lastRun(options.root).then((run) => (run ? { lastRun: run.at, ...(run.every ? { lastRunEvery: run.every } : {}) } : {}))),
+    automatic,
+    manual: plans.length - automatic,
+    events,
   };
 }

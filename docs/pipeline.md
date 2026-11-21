@@ -165,6 +165,8 @@ The release calendar `review/calendar.yaml` takes the next free release day and 
 
 `npm run cli -- release-board` serves a local page over every release folder: per platform the posts with their files, the texts to copy with counters, the settings to check, and the links; the calendar of all projects with an `.ics` export. The user ticks off what is posted and enters live URLs (`review/release-status.json`); the live YouTube URL fills the link in the X and LinkedIn texts and the microsite data. A project finished before the calendar existed, or a song that is already out, joins through the `release-backfill` skill: it records what is published, writes the missing texts, plans the open slots, and marks the past done (`calendar --done-until`).
 
+**Approve release** on the board hands the release to the release autopilot ([ADR 0029](adr/0029-release-autopilot.md), [publishing.md](publishing.md#release-autopilot)): `release-run`, on the timer `release-timer install` sets up, posts each event a platform API can post at its calendar time and leaves the rest on the board. Nothing in the pipeline approves a release or runs the autopilot.
+
 `release` renders a format only when it is missing or stale (its inputs hash in `state.json` changed), hardlinks or copies every other file, converts the song only when it is not already a deliverable WAV, cuts the canvas from a lyric-free window near the first chorus with a crossfaded seam, and rewrites only its own files. Missing release facts (songwriters, genres, AI credits, release date) and `<ID>` links from `config/channel.yaml` become TODOs in `README.md` and in the texts; they never fail the stage. `review/upload.md` stays as a pointer to the folder.
 
 ```bash

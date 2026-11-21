@@ -8,6 +8,11 @@ import {
   resolveTopviewApiKey,
   resolveTopviewAvatarCredentials,
   resolveYouTubeCredentials,
+  resolveXCredentials,
+  resolveLinkedInCredentials,
+  resolveInstagramCredentials,
+  linkedinTokenDaysLeft,
+  instagramTokenDaysLeft,
 } from '@coreslopper/providers';
 import { detectTools, type ToolCheck } from './tools.js';
 import { isWorkspace, loadWorkspaceEnv } from './workspace.js';
@@ -127,6 +132,49 @@ export function publishChecks(env: NodeJS.ProcessEnv = process.env): DoctorCheck
       name: 'TikTok publishing',
       ok: tiktokClient && Boolean(tiktok.refreshToken),
       detail: detail(tiktokClient, Boolean(tiktok.refreshToken), 'tiktok'),
+      required: false,
+      group: 'credentials',
+    },
+    ...autopilotChecks(env),
+  ];
+}
+
+/** The release autopilot's social platforms: optional; a missing one stays manual on the board. */
+export function autopilotChecks(env: NodeJS.ProcessEnv = process.env, now = new Date()): DoctorCheck[] {
+  const x = resolveXCredentials(env);
+  const linkedin = resolveLinkedInCredentials(env);
+  const instagram = resolveInstagramCredentials(env);
+  const optional = '(only needed for the release autopilot; see docs/publishing.md)';
+  const linkedinDays = linkedinTokenDaysLeft(linkedin, now);
+  const instagramDays = instagramTokenDaysLeft(instagram, now);
+  const days = (left: number | undefined, platform: string) =>
+    left === undefined ? '' : left < 0 ? `; the token expired, run "npm run cli -- publish-auth ${platform}"` : left < 10 ? `; the token expires in ${Math.floor(left)} days, run "npm run cli -- publish-auth ${platform}"` : '';
+  return [
+    {
+      id: 'x-autopilot',
+      name: 'X posting',
+      ok: Boolean(x.clientId && x.clientSecret && x.refreshToken),
+      detail: !x.clientId ? `not set ${optional}` : x.refreshToken ? 'client and refresh token set; posts are billed per call (pay-per-use)' : 'client set; run "npm run cli -- publish-auth x"',
+      required: false,
+      group: 'credentials',
+    },
+    {
+      id: 'linkedin-autopilot',
+      name: 'LinkedIn posting',
+      ok: Boolean(linkedin.accessToken) && (linkedinDays === undefined || linkedinDays >= 10),
+      detail: !linkedin.clientId && !linkedin.accessToken ? `not set ${optional}` : linkedin.accessToken ? `token set${days(linkedinDays, 'linkedin')}` : 'client set; run "npm run cli -- publish-auth linkedin"',
+      required: false,
+      group: 'credentials',
+    },
+    {
+      id: 'instagram-autopilot',
+      name: 'Instagram posting',
+      ok: Boolean(instagram.accessToken && env.FAL_KEY) && (instagramDays === undefined || instagramDays >= 0),
+      detail: !instagram.accessToken
+        ? `not set ${optional}`
+        : !env.FAL_KEY
+          ? 'token set; FAL_KEY is also needed (Instagram fetches each file from a public URL in your fal.ai storage)'
+          : `token set; refreshed by the autopilot${days(instagramDays, 'instagram')}`,
       required: false,
       group: 'credentials',
     },

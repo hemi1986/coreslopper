@@ -13,6 +13,7 @@ import {
   startLoopback,
   tiktokAuthUrl,
   tiktokRedirectUri,
+  tiktokScopes,
   youtubeAuthUrl,
   type FetchLike,
 } from '@coreslopper/providers';
@@ -61,7 +62,7 @@ export async function publishAuth(platform: PublishPlatform, options: PublishAut
     try {
       const pkce = pkcePair('base64url');
       const url = youtubeAuthUrl({ clientId, redirectUri: loopback.redirectUri, state, challenge: pkce.challenge });
-      print('Open this URL to let coreslopper upload to your YouTube channel (opening the browser):');
+      print('Open this URL to let coreslopper upload to your YouTube channel and manage its videos and comments (opening the browser):');
       print(url);
       open(url);
       const code = await loopback.waitForCode(state, options.timeoutMs);
@@ -88,8 +89,16 @@ export async function publishAuth(platform: PublishPlatform, options: PublishAut
   const loopback = await startLoopback(options.redirectUri ?? tiktokRedirectUri());
   try {
     const pkce = pkcePair('hex');
-    const url = tiktokAuthUrl({ clientKey, redirectUri: loopback.redirectUri, state, challenge: pkce.challenge });
-    print('Open this URL to let coreslopper send drafts to your TikTok inbox (opening the browser):');
+    // Direct posting (an audited app) needs video.publish: asked for when .env or the release schedule turns it on.
+    const { loadReleaseSchedule } = await import('@coreslopper/core');
+    const schedule = await loadReleaseSchedule(findWorkspaceRoot() ?? repoRoot()).catch(() => undefined);
+    const scopes = schedule?.autopilot.tiktok_direct ? tiktokScopes({ ...process.env, TIKTOK_DIRECT_POST: '1' }) : tiktokScopes();
+    const url = tiktokAuthUrl({ clientKey, redirectUri: loopback.redirectUri, state, challenge: pkce.challenge, scopes });
+    print(
+      scopes.includes('video.publish')
+        ? 'Open this URL to let coreslopper post videos on your TikTok account (opening the browser):'
+        : 'Open this URL to let coreslopper send drafts to your TikTok inbox (opening the browser):',
+    );
     print(url);
     open(url);
     const code = await loopback.waitForCode(state, options.timeoutMs);

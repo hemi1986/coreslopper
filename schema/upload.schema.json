@@ -371,6 +371,22 @@
             "type": "string",
             "pattern": "^#[\\p{L}\\p{N}_]+$"
           }
+        },
+        "image": {
+          "type": "object",
+          "properties": {
+            "still": {
+              "type": "string",
+              "minLength": 1
+            },
+            "focus": {
+              "type": "string",
+              "pattern": "^\\d*\\.?\\d+,\\d*\\.?\\d+$"
+            }
+          },
+          "required": [
+            "still"
+          ]
         }
       },
       "required": [
