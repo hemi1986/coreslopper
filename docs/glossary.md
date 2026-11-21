@@ -12,6 +12,18 @@ _Avoid_: repo, checkout
 The versioned copy of the workflow files that `npx coreslopper init` writes into a workspace. It is not a git clone and is updated with `npx coreslopper@latest update`, which merges against the **Baseline**.
 _Avoid_: install, template
 
+**Workspace Payload**:
+The part of the upstream repository that every workspace gets: the product code and docs at their own paths, and `workspace/`, which becomes the workspace root. The runtime snapshot is built from it.
+_Avoid_: template, runtime source
+
+**Engineering Layer**:
+The agent instructions, tooling, and documents for working on the upstream repository itself: the root `AGENTS.md`, `CLAUDE.md`, and `.claude/`. It never reaches a workspace.
+_Avoid_: dev workflow, dev config
+
+**Sandbox Workspace**:
+A workspace created from a local checkout of the upstream repository with `npm run dev:workspace`, outside the repository, to try the workflow the way a user gets it.
+_Avoid_: test workspace, playground
+
 **Baseline**:
 The SHA-256 of every runtime file as last installed, stored in `coreslopper.workspace.json`. `coreslopper update` compares it with the workspace to tell local edits from untouched workflow files.
 _Avoid_: lockfile, manifest

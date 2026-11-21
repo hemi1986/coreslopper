@@ -2,48 +2,20 @@
 /**
  * Build the `runtime/` directory that ships inside the npm package.
  *
- * The runtime is a self-contained copy of this repository (only tracked files).
- * `npx coreslopper init` copies it into a new workspace. Keeping it as a copy
- * means the generated workspace behaves exactly like a git clone, without
- * requiring the user to have git or network access to GitHub.
+ * The runtime is the workspace payload of this repository (tracked files only,
+ * classified by `runtime-files.mjs`): the engineering layer stays behind and
+ * `workspace/` becomes the workspace root. `npx coreslopper init` copies it
+ * into a new workspace. Keeping it as a copy means the generated workspace
+ * needs neither git nor network access to GitHub.
  */
 import { execFileSync } from 'node:child_process';
 import { chmod, cp, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { planRuntime } from './runtime-files.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const destination = join(root, 'runtime');
-
-const SKIPPED_FILES = new Set([
-  'scripts/build-runtime.mjs',
-  'tsup.config.ts',
-  '.env',
-  // Upstream release automation: in a workspace it would open release PRs and
-  // try to publish the coreslopper package from the user's repository.
-  '.github/workflows/release.yml',
-  'release-please-config.json',
-  '.release-please-manifest.json',
-  // A workspace's own channel; init and update never create or replace it.
-  'config/channel.yaml',
-]);
-
-const SKIPPED_DIRECTORIES = new Set([
-  '.git',
-  '.cache',
-  '.tools',
-  '.vitest',
-  'node_modules',
-  'dist',
-  'runtime',
-  'tmp',
-]);
-
-function isSkipped(path) {
-  if (SKIPPED_FILES.has(path)) return true;
-  if (path === '.env' || path.startsWith('.env.')) return path !== '.env.example';
-  return [...SKIPPED_DIRECTORIES].some((directory) => path === directory || path.startsWith(`${directory}/`));
-}
 
 async function main() {
   let tracked;
@@ -70,15 +42,15 @@ async function main() {
     throw new Error(`Could not list tracked files with git. Run this from a git checkout.\n${error}`);
   }
 
+  const plan = planRuntime(tracked);
   const packageJson = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'));
 
   await rm(destination, { recursive: true, force: true });
   await mkdir(destination, { recursive: true });
 
   let copied = 0;
-  for (const file of tracked) {
-    if (isSkipped(file)) continue;
-    const source = join(root, file);
+  for (const [file, from] of plan) {
+    const source = join(root, from);
     const target = join(destination, file);
     await mkdir(dirname(target), { recursive: true });
     await cp(source, target);
@@ -94,7 +66,7 @@ async function main() {
   delete runtimePackage.bin;
   delete runtimePackage.files;
   delete runtimePackage.publishConfig;
-  for (const script of ['build:runtime', 'build:cli', 'build', 'pack:check', 'prepack', 'prepublishOnly']) {
+  for (const script of ['build:runtime', 'build:cli', 'build', 'pack:check', 'prepack', 'prepublishOnly', 'dev:workspace']) {
     delete runtimePackage.scripts[script];
   }
 
