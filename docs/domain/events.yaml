@@ -13,7 +13,8 @@
 # Glossary: docs/glossary.md (ships to every workspace). CONTEXT.md points there.
 #
 # Slices adopted 2026-11-21: project and stage pipeline (confirmed); human review (confirmed); art-director verdicts and the
-# generation queue (decided by recommendation, not reviewed by the user – see the adoption report).
+# generation queue (decided by recommendation, not reviewed by the user – see the adoption report); song timing and lyrics
+# (decided by recommendation, four answers from the user).
 # See docs/domain/adoption-report.md.
 
 version: 1
@@ -44,6 +45,9 @@ external_systems:
   - id: EXT-ComfyUI
     name: ComfyUI server
     description: The local generation server; the queue run restarts it through COMFYUI_RESTART_COMMAND when a generation fails or hangs
+  - id: EXT-AudioModels
+    name: Local audio models
+    description: Demucs (vocal separation), WhisperX (speech recognition and word alignment), librosa (beats, onsets, energy) and the MelBand-Roformer karaoke model (lead stem), run locally by the song analysis (ADR 0008, 0026)
 
 bounded_contexts:
   - id: BC-Pipeline
@@ -55,6 +59,9 @@ bounded_contexts:
   - id: BC-GenerationQueue
     name: Generation queue
     purpose: Gets every generated image and clip of a project approved before anything derives from it – generate an attempt, give it a verdict, requeue it with the fix prompt, or file it
+  - id: BC-Timing
+    name: Timing
+    purpose: Turns the user's song and lyrics into a measured timing, merges the user's timing overrides into the effective timing, and resolves symbolic anchors to seconds for every later stage
 
 aggregates:
   - id: AGG-Project
@@ -108,6 +115,33 @@ aggregates:
       - A user's accept is final; no automatic step undoes it (decided 2026-11-21, HS-42; a verdict that lands after an accept overwrites it today – gap register)
       - An item that is generating or reviewing is not accepted, requeued, replaced or dropped (decided 2026-11-21, HS-38; accept has no check – gap register)
       - No writer of queue.json loses another writer's change (decided 2026-11-21, HS-41; no lock around read-modify-write – gap register)
+  - id: AGG-ProjectTiming
+    name: Project timing
+    context: BC-Timing
+    status: as-is
+    evidence:
+      - timing.json and timing.overrides.json per project are parsed and merged into one effective timing on every project load, and the merge ends in one check of the whole timing (packages/core/src/project.ts:237-241; packages/core/src/timing.ts:61-94)
+      - assertTiming checks sections, lines, words, beats and energy of the merged timing together, so one bad override fails the whole timing (timing.ts:96-165)
+      - the analysis writes timing.json whole and never writes the overrides (scripts/audio-analysis/analyze.py:430-432, README.md:10)
+    invariants:
+      - Sections cover the audio from 0 to its duration without gaps or overlaps, within 0.05 s (the code does this, timing.ts:100-127)
+      - Every line names an existing section and lies inside the audio; the words of a line are in order (the code does this, timing.ts:129-145)
+      - Every line lies inside its section and every word inside its line (decided 2026-11-21, HS-53; not checked after a timing override – gap register)
+      - A timing override changes only times – bpm, beats, downbeats, and the start and end of a section, line or word – and always wins over the measured timing (the code does this, timing.ts:61-90)
+      - Every timing override refers to a section, line or word the measured timing has; one that does not is reported by name, and commands that do not read timing still work (decided 2026-11-21, HS-54; today every project load throws – gap register)
+      - No tool replaces or regenerates timing.overrides.json; overrides are written only at the user's request (user and decided 2026-11-21, HS-66; the code only seeds an empty file, packages/cli/src/new-project.ts:157-162)
+      - Word text and order come from the lyrics; speech recognition supplies only times (ADR 0008; the code does this, scripts/audio-analysis/timing_core.py:310-645)
+      - Words in parentheses are backing vocals and are timed like any other word (user, 2026-11-21, HS-50; the analysis turns them into untimed cues or drops them – gap register)
+      - The timing's audio duration matches the song it was measured from (decided 2026-11-21, HS-59; not checked – gap register)
+  - id: AGG-Lyrics
+    name: Lyrics
+    context: BC-Timing
+    status: as-is
+    evidence:
+      - writeLyrics checks the whole text for section tags and writes lyrics.txt atomically (packages/cli/src/board-wizard.ts:271-278), used by the lyrics command and the board wizard (packages/cli/src/index.ts:588-608; packages/cli/src/release-board.ts:206)
+    invariants:
+      - Every sung line sits under a section tag, and at least one tag has lines (the code does this for writeLyrics, board-wizard.ts:274-276; a hand edit of lyrics.txt bypasses it)
+      - The lyrics are the authoritative word text and spelling; tags and lines keep the user's order (glossary; ADR 0008)
 
 events:
   - id: EVT-ProjectCreated
@@ -218,6 +252,36 @@ events:
     name: Queue run stopped
     aggregate: AGG-GenerationQueue
     data: [Reason, Items needing a fix]
+  - id: EVT-SongImported
+    name: Song imported
+    context: BC-Timing
+    description: "audio/song.wav and audio/stems/vocals.wav registered in song.json, other formats converted to 48 kHz WAV; a stem whose length differs from the mix by more than 0.5 s only warns (packages/cli/src/media.ts:252-312)"
+    data: [Song file, Vocal stem, Duration, Source files]
+  - id: EVT-SongLoudnessNormalized
+    name: Song loudness normalized
+    context: BC-Timing
+    description: "normalize-audio writes audio/song.wav at -14 LUFS / -1 dBTP; song.json is not updated (media.ts:169-194)"
+    data: [Song file, Source file]
+  - id: EVT-LyricsWritten
+    name: Lyrics written
+    aggregate: AGG-Lyrics
+    data: [Lyrics text, Sections]
+  - id: EVT-SongAnalyzed
+    name: Song analyzed
+    aggregate: AGG-ProjectTiming
+    pivotal: true
+    description: "timing.json and timing.report.md written by analyze.py; the stage runner then completes the audio-analysis stage"
+    data: [Audio, Duration, BPM, Beats, Downbeats, Onsets, Energy, Sections, Lines, Words, Section confidence, Line confidence, Echo spans, Speech recognition used, Vocals source]
+  - id: EVT-LeadStemSeparated
+    name: Lead stem separated
+    context: BC-Timing
+    description: "separate_lead.py writes audio/stems/lead.wav and backing.wav from the vocal stem (ADR 0026)"
+    data: [Lead stem, Backing stem]
+  - id: EVT-TimingOverridden
+    name: Timing overridden
+    aggregate: AGG-ProjectTiming
+    description: "An entry of timing.overrides.json added or changed by hand; no command writes it (HS-66)"
+    data: [Section, Line, Word index, Start, End, BPM, Beats, Downbeats]
 
 commands:
   - id: CMD-CreateProject
@@ -385,6 +449,55 @@ commands:
     rules:
       - Crops the box, runs it as an image edit through generate (cache, manifest, budget), pastes it back with a soft edge; pixels outside the box do not change
       - The patched image is the next attempt of the image's queue item (HS-40; the code numbers it from verdicts.jsonl and leaves queue.json alone – gap register)
+  - id: CMD-ImportSong
+    name: Import song
+    actor: ACT-SetupSkill
+    produces: [EVT-SongImported]
+    description: "import-song, run by the setup skill or by the board wizard's upload"
+    rules:
+      - One source per name, case-insensitive; a WAV already in place is kept as it is
+      - A missing vocal stem only warns; the analysis then separates the vocals from the mix
+  - id: CMD-NormalizeSongLoudness
+    name: Normalize song loudness
+    actor: ACT-SetupSkill
+    produces: [EVT-SongLoudnessNormalized]
+    rules:
+      - Before the song analysis; a song changed after it makes the timing stale (HS-59)
+  - id: CMD-WriteLyrics
+    name: Write lyrics
+    actor: ACT-User
+    aggregate: AGG-Lyrics
+    produces: [EVT-LyricsWritten]
+    description: "lyrics --file or the board wizard; lyrics --propose and the wizard's preview propose section tags and write nothing (a block that repeats becomes [Chorus], the others numbered verses)"
+    rules:
+      - Not empty and at most 100,000 characters; line endings become LF
+  - id: CMD-AnalyzeSong
+    name: Analyze song
+    actor: ACT-StageRunner
+    aggregate: AGG-ProjectTiming
+    produces: [EVT-SongAnalyzed]
+    description: "analyze.py in the audio-analysis stage, run by the stage runner through the audio-analysis skill; no CLI command runs it"
+    rules:
+      - Analyzes the imported vocal stem from song.json; separates the vocals from the mix only when none was imported and never overwrites an imported stem (HS-56; without --vocals Demucs overwrites it today – gap register)
+      - A missing separation or speech recognition model stops the analysis; it falls back to the mix or to energy-based sections only when asked to, and the report says which (HS-57; a missing Demucs and zero recognized words fall back silently today – gap register)
+      - Validates timing.json against the generated schema before writing it (HS-58; skipped when run from scripts/audio-analysis – gap register)
+      - Section ids follow the tag text – [Verse 2] is verse_2, a repeated unnumbered tag is numbered in order, a repeated numbered tag is refused; line ids are positional (HS-55; ids drift today – gap register)
+      - Lists low-confidence boundaries (below 0.7), low-confidence lines (below 0.6), lines placed without a recognized word, and echo spans in the timing report
+  - id: CMD-SeparateLeadStem
+    name: Separate lead stem
+    actor: ACT-StageRunner
+    produces: [EVT-LeadStemSeparated]
+    rules:
+      - Optional; lip-sync segments of a music video are cut from the lead stem when it exists
+  - id: CMD-OverrideTiming
+    name: Override timing
+    actor: ACT-User
+    aggregate: AGG-ProjectTiming
+    produces: [EVT-TimingOverridden]
+    description: "The user tells the agent what sits wrong and the agent enters the override in timing.overrides.json (user, 2026-11-21, HS-66)"
+    rules:
+      - An entry is added or changed; the file is never replaced and no entry the user asked for is dropped
+      - To change the sections themselves, change the lyrics and analyze again; an override moves times only
 
 policies:
   - id: POL-RunNextStage
@@ -396,7 +509,7 @@ policies:
     name: A hard stop fails the stage and halts the pipeline
     when: [EVT-StageStarted]
     then: [CMD-FailStage]
-    description: "Hard stop: the budget or batch cap would be exceeded; a real provider's credentials are missing; validation or QA fails after the stage's bounded retries; a user-owned file would be overwritten (timing.overrides.json, project.yaml, an imported take, the series canon)"
+    description: "Hard stop: the budget or batch cap would be exceeded; a real provider's credentials are missing; validation or QA fails after the stage's bounded retries; a user-owned file would be overwritten (timing.overrides.json, project.yaml, an imported take, an imported vocal stem (HS-56), the series canon)"
   - id: POL-AnswerOpenRounds
     name: Open review rounds are answered before the next autonomous stage
     when: [EVT-ReviewRoundSent]
@@ -457,6 +570,24 @@ read_models:
     used_by: [ACT-Orchestrator, ACT-StageRunner, ACT-User]
     fields: [Subject, Verdict, Score, Attempt number, Image or clip, Blocking issues]
     description: "verdicts [--failed] and the board's failed verdicts: the last verdict per subject, a clip apart from its keyframe; an accepted subject shows as accepted, not failed (HS-37; missing – gap register). Read twice today (verdicts.ts, board-production.ts)"
+  - id: RM-EffectiveTiming
+    name: Effective timing
+    fed_by: [EVT-SongAnalyzed, EVT-TimingOverridden]
+    used_by: [ACT-StageRunner, ACT-Orchestrator, ACT-User]
+    fields: [Audio, Duration, BPM, Beats, Downbeats, Onsets, Energy, Sections, Lines, Words]
+    description: "The merge of timing.json and timing.overrides.json, made on every project load; the renderer, storyboard, review, queue, Shorts and release read it (HS-49). validate writes a snapshot, timing.effective.json, for agents and scripts; release falls back to the measured timing – gap register"
+  - id: RM-TimingReport
+    name: Timing report
+    fed_by: [EVT-SongAnalyzed]
+    used_by: [ACT-StageRunner, ACT-User]
+    fields: [Duration, BPM, Speech recognition used, Vocals source, Overrides present, Sections, Low-confidence boundaries, Low-confidence lines, Lines placed without a match, Echo spans]
+    description: timing.report.md; the stage runner reads it to propose timing overrides
+  - id: RM-EchoSpans
+    name: Echo spans
+    fed_by: [EVT-SongAnalyzed, EVT-LeadStemSeparated]
+    used_by: [ACT-StageRunner]
+    fields: [Start, End, Nearest line, Source]
+    description: "The unwritten echoes found in the vocal stem (the report, echo_scan.py) and the backing words in parentheses (from the timing); audio-segment silences them in a lip-sync segment"
 
 hotspots:
   - id: HS-1
@@ -689,6 +820,116 @@ hotspots:
     refs: [AGG-GenerationQueue]
     status: resolved
     resolution: "The whole queue of a project stays the aggregate as recovered (as-is) (recommendation; the user agreed without reviewing it – delegated, 2026-11-21)"
+  - id: HS-47
+    question: "Song import, lyrics, the analysis, overrides, the effective timing and anchor resolution sit in core, cli, Python and the setup skills. One context, and where do song metadata (title, artist, rights) belong?"
+    refs: [BC-Timing]
+    status: resolved
+    resolution: "One context, Timing: lyrics, the song's audio files as analysis input, the analysis, overrides, the effective timing and anchor resolution. Song metadata belongs to setup and release, not here (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-48
+    question: "The consistency boundary in code is the merged timing: timing.json and timing.overrides.json are merged and checked as one on every load. Keep it as the aggregate (as-is)?"
+    refs: [AGG-ProjectTiming]
+    status: resolved
+    resolution: "Yes, the project timing (measured timing plus overrides) is the aggregate as recovered (as-is); lyrics are a second, small one (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-49
+    question: "'Effective timing' means the in-memory merge (render, every command) and the file timing.effective.json, which only validate writes and which agents, echo_scan and skills read. Which is the term?"
+    refs: [RM-EffectiveTiming]
+    status: resolved
+    resolution: "The merge is the effective timing; timing.effective.json is a snapshot of it for agents and scripts. Release falling back to the measured timing is a gap (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-50
+    question: "Lyrics words in parentheses: Suno backing vocals (sung, timed, muted in lip-sync segments; glossary Echo Span, ADR 0026) or stage directions? The analysis makes a line in parentheses an untimed cue and drops a leading (…) as a direction."
+    refs: [AGG-ProjectTiming, CMD-AnalyzeSong]
+    status: resolved
+    resolution: "Words in parentheses are backing vocals: sung, timed like any word, muted in lip-sync segments (user, 2026-11-21). A leading (Spoken) still marks a spoken line (recommendation, not reviewed by the user – delegated). The analysis contradicts it – gap"
+  - id: HS-51
+    question: "Echo Span, 'unwritten vocals', 'backing words', backingSpans and after_line name the same things in code, report and CLI help. One term?"
+    refs: [RM-EchoSpans]
+    status: resolved
+    resolution: "Echo Span, with two sources: backing words (in parentheses) and unwritten echoes (found in the vocal stem); 'unwritten vocals' and 'backing span' are avoided (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-52
+    question: "A section's confidence is the lower confidence of its two boundaries; a line's confidence measures its alignment and lives untyped in meta. What are the terms?"
+    refs: [RM-TimingReport]
+    status: resolved
+    resolution: "A section carries the confidence of its boundaries, a lyric line an alignment confidence; both are explained in the glossary term Timing Report. The 0.8 lip-sync threshold stays guidance in the skill (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-53
+    question: "The skill's completion criteria say lines and words lie inside their sections; the analysis clamps them, but assertTiming does not check it, so an override can break it. Invariant?"
+    refs: [AGG-ProjectTiming]
+    status: resolved
+    resolution: "Invariant: every line lies inside its section and every word inside its line, checked on the merged timing. Not checked today – gap (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-54
+    question: "An override of an unknown section, line or word throws inside loadProject, so every command that loads the project fails, also import-song and normalize-audio. Block or report?"
+    refs: [AGG-ProjectTiming]
+    status: resolved
+    resolution: "validate and every command that reads timing report the override by name and stop; commands that do not read timing still work – gap (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-55
+    question: "Section ids come only from the Python parser and drift from the tag text ([Verse 1][Chorus][Verse 1][Verse 2] gives verse_3 for 'Verse 2'); line ids are positional, so a lyrics edit retargets overrides and anchors. Rule?"
+    refs: [CMD-AnalyzeSong]
+    status: resolved
+    resolution: "Section ids follow the tag text; a repeated unnumbered tag is numbered in order and a repeated numbered tag is refused. Line ids stay positional – the user never changes the lyrics after the analysis (user, 2026-11-21). The drift is a low gap (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-56
+    question: "Without --vocals the analysis runs Demucs and writes audio/stems/vocals.wav over the stem import-song registered; it ignores song.json's vocals. Is an imported stem user-owned?"
+    refs: [CMD-AnalyzeSong]
+    status: resolved
+    resolution: "Yes: the analysis analyzes the imported stem and separates vocals only when none was imported; overwriting an imported stem is a hard stop (a user-owned file). High gap – the user imports a vocal stem for most songs (user, 2026-11-21) (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-57
+    question: "The skill says stop when Demucs or WhisperX is missing; the code continues on the mix when Demucs is missing, and falls back to energy sections when speech recognition finds no word, while the report still names WhisperX. Rule?"
+    refs: [CMD-AnalyzeSong]
+    status: resolved
+    resolution: "A missing model stops the analysis; a fallback (the mix, energy-based sections) happens only when asked for and the report says so – gap (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-58
+    question: "ADR 0004 has Python validate against the generated JSON Schema, but the default path is relative to the working directory and the documented call skips the check silently. Rule?"
+    refs: [CMD-AnalyzeSong]
+    status: resolved
+    resolution: "The analysis always validates against the repository's schema/timing.schema.json and fails when it is missing – gap (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-59
+    question: "import-song and normalize-audio can replace audio/song.wav after the analysis; nothing marks timing.json stale, and normalize-audio leaves song.json's duration alone. Invariant?"
+    refs: [AGG-ProjectTiming]
+    status: resolved
+    resolution: "Invariant: the timing's audio duration matches the song. Low gap – the user never changes the song after the analysis (user, 2026-11-21) (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-60
+    question: "Remotion has its own sectionAt, beatAt and energyAt (no tolerance, beat 0 before the first beat); core's (0.05 s tolerance, -1) are used by the board review, and beatIndexAt by nobody. Decision or accident?"
+    refs: [RM-EffectiveTiming]
+    status: resolved
+    resolution: "Accident: one set of lookups in core (exported through @coreslopper/core/browser), used by Remotion and the board – gap (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-61
+    question: "A string grammar for anchors (section:<id>[:start|end], word:<line>:<i>, seconds) lives in cli short.ts and is reused by release. Domain language?"
+    refs: [BC-Timing]
+    status: resolved
+    resolution: "Yes; it belongs in core beside AnchorSchema – low gap (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-62
+    question: "The glossary and ADR 0005 say only section and line anchors carry an edge; the schema and the resolver give word anchors an edge too. Which is right?"
+    refs: [BC-Timing]
+    status: resolved
+    resolution: "The code is right: section, line and word anchors carry an edge, beat and downbeat are points. Glossary corrected; ADR 0039 amends ADR 0005 (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-63
+    question: "The audio-analysis skill runs validate to write timing.effective.json, and the hook validates every override edit, but validate needs storyboard.yaml, which only exists two stages later. Rule?"
+    refs: [AGG-ProjectTiming]
+    status: resolved
+    resolution: "validate checks the timing alone when no storyboard exists yet and writes the snapshot – gap (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-64
+    question: "song.json has no schema; the wizard, import-song and the new-video skill write it, and the analysis, the wizard and release read it. Domain artifact with a schema?"
+    refs: [BC-Timing]
+    status: resolved
+    resolution: "Yes, a schema in schema.ts (ADR 0004); the language, the song file, the duration and the stems are this context's part – gap (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-65
+    question: "Line kind (sung or spoken), line confidence, directions and cues live in timing.meta without a schema; the two analysis paths write cues in two shapes. Schema fields?"
+    refs: [AGG-ProjectTiming]
+    status: resolved
+    resolution: "Line kind and line confidence become schema fields, since lip-sync and the report use them; cues may stay in meta with one shape – low gap (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-66
+    question: "timing.overrides.json is user-owned and a hard stop protects it, yet the skill tells the stage runner to edit it. Who writes overrides?"
+    refs: [AGG-ProjectTiming, CMD-OverrideTiming]
+    status: resolved
+    resolution: "The user says what sits wrong and the agent enters it (user, 2026-11-21). No tool replaces or regenerates the file, and no entry is dropped; to change the sections, change the lyrics and analyze again (recommendation, not reviewed by the user – delegated)"
+  - id: HS-67
+    question: "Decisions without an ADR: the merge on every load, the 0.05 s tolerance, overrides that move times only, the models and checkpoints, the 4/4 assumption, the confidence thresholds, uv. Record them?"
+    refs: [BC-Timing]
+    status: resolved
+    resolution: "One ADR, 0039 (Proposed), amends ADR 0005 and 0008; the alignment constants stay in code (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-68
+    question: "The lyrics rules live twice: core lyrics.ts (tags, writeLyrics rejects lines before the first tag) and the Python parser (section ids, an 'unlabeled' section for lines before the first tag, parentheses). Decision or accident?"
+    refs: [AGG-Lyrics]
+    status: resolved
+    resolution: "The analysis stays in Python (ADR 0008); the lyrics rules are defined once and the Python follows them, pinned by one shared fixture – low gap (recommendation, not reviewed by the user – delegated, 2026-11-21)"
 
 flows:
   - id: FLOW-AutonomousStage
@@ -700,3 +941,6 @@ flows:
   - id: FLOW-QueueItem
     name: From a queue item to a filed attempt
     sequence: [ACT-StageRunner, CMD-AddQueueItem, EVT-QueueItemAdded, CMD-RunQueue, EVT-AttemptGenerated, POL-JudgeEveryAttempt, CMD-GiveVerdict, EVT-VerdictGiven, POL-ApplyVerdict, CMD-ApplyVerdict, EVT-AttemptFiled]
+  - id: FLOW-SongTiming
+    name: From the song to the effective timing
+    sequence: [ACT-User, CMD-WriteLyrics, EVT-LyricsWritten, ACT-SetupSkill, CMD-ImportSong, EVT-SongImported, ACT-StageRunner, CMD-AnalyzeSong, EVT-SongAnalyzed, RM-TimingReport, CMD-OverrideTiming, EVT-TimingOverridden, RM-EffectiveTiming]

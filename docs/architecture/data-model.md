@@ -153,6 +153,53 @@ replace or drop while `generating` or `reviewing`; no requeue of a `passed` item
 returns every passed item after it to `pending`); at most three local attempts and one cloud attempt since the
 last replace; a user's accept is final; no lost write and one run per project.
 
+### AGG-ProjectTiming – Project timing (as-is)
+
+Two files per project merged into one effective timing on every load: the measured timing `timing.json`
+(`TimingSchema`, written whole by the analysis) and the user's `timing.overrides.json`
+(`TimingOverridesSchema`). The merge ends in one check of the whole result (`packages/core/src/timing.ts:61-165`).
+Times are seconds in the song, checked with a tolerance of 0.05 s.
+
+**Timing (root)**
+
+| Attribute | Type | Required | Source |
+|---|---|---|---|
+| Audio | path, Duration (seconds), sample rate (always 48 kHz from the analysis) | yes | EVT-SongAnalyzed |
+| BPM | positive number; an episode has none | no | EVT-SongAnalyzed, EVT-TimingOverridden |
+| Beats, Downbeats, Onsets | lists of Seconds inside the audio | default empty | EVT-SongAnalyzed (beats and downbeats also EVT-TimingOverridden) |
+| Energy | frame rate, hop, values normalized to the peak | yes | EVT-SongAnalyzed |
+| Sections | at least one Section | yes | EVT-SongAnalyzed |
+| Lines | list of Line | default empty | EVT-SongAnalyzed |
+| Meta | untyped: device, models, speech recognition used, downbeat phase, line kinds, line directions, line confidence, cues (HS-65) | default empty | EVT-SongAnalyzed |
+
+**Section** – Id (SectionId, from the tag text, e.g. `verse_1`, `chorus_2`, `intro`), Label (the tag text),
+Start, End, Confidence (0–1, the lower of its two boundaries), Sources. Source: EVT-SongAnalyzed; Start and End
+also EVT-TimingOverridden.
+
+**Line** – Id (LineId, positional `l1…ln`), Section (SectionId), Start, End, Text (from the lyrics), Words.
+**Word** – Text, Start, End; addressed by line and index. Source: EVT-SongAnalyzed; times also
+EVT-TimingOverridden.
+
+**Timing override** – BPM, Beats, Downbeats (replace the whole value); per section and per line by id: Start,
+End; per word by line and index: Start, End. Source: EVT-TimingOverridden.
+
+**Not in the aggregate** – the snapshot `timing.effective.json` (RM-EffectiveTiming), the timing report
+`timing.report.md` (RM-TimingReport), the song files and `song.json` (no schema, HS-64), the lead and backing
+stems.
+
+Decided 2026-11-21 by recommendation, ahead of the code: every line inside its section and every word inside its
+line (HS-53); an override that misses its target is reported by name, without blocking commands that do not read
+timing (HS-54); words in parentheses are timed as backing vocals (user, HS-50); the timing's duration matches the
+song (HS-59).
+
+### AGG-Lyrics – Lyrics (as-is)
+
+`lyrics.txt`, plain text: section tags on their own line (`[Verse 1]`, `[Chorus]`), each followed by its sung
+lines; words in parentheses are backing vocals. Written whole and atomically by `writeLyrics`
+(`packages/cli/src/board-wizard.ts:271-278`), which refuses lines before the first tag and lyrics without a sung
+line. Source: EVT-LyricsWritten (Lyrics text, Sections). A hand edit bypasses the check; the analysis then puts
+lines before the first tag into a section `unlabeled` (HS-68).
+
 ## Lifecycle
 
 Stage state as the code allows it today. Every transition is accepted from every status (HS-11); the diagram
@@ -196,4 +243,14 @@ erDiagram
   QUEUE_ITEM }o--o{ QUEUE_ITEM : "after, chain from"
   QUEUE_ITEM ||--o{ ATTEMPT : "numbered attempts"
   ATTEMPT ||--o{ VERDICT : "judged in verdicts.jsonl"
+  PROJECT ||--|| LYRICS : "lyrics.txt"
+  PROJECT ||--o| TIMING : "timing.json"
+  PROJECT ||--o| TIMING_OVERRIDES : "timing.overrides.json"
+  TIMING ||--|{ SECTION : "covers the audio"
+  SECTION ||--o{ LINE : "contains"
+  LINE ||--o{ WORD : "contains"
+  TIMING_OVERRIDES }o--o{ SECTION : "moves by id"
+  TIMING_OVERRIDES }o--o{ LINE : "moves by id"
+  TIMING_OVERRIDES }o--o{ WORD : "moves by line and index"
+  LYRICS ||--o{ SECTION : "section tags name"
 ```

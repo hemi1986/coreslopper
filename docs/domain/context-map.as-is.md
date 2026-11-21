@@ -3,7 +3,7 @@
 > Recovered from code by `/adopt` on 2026-11-21 at b195086. This is **not a target**.
 > Target: [context-map.md](context-map.md) · Gap register: [gap-register.md](gap-register.md).
 
-Adopted slices: project and stage pipeline; human review; art-director verdicts and the generation queue (decided by recommendation). Other areas – release, series canon,
+Adopted slices: project and stage pipeline; human review; art-director verdicts and the generation queue (decided by recommendation); song timing and lyrics (decided by recommendation, four answers from the user). Other areas – release, series canon,
 character library, model bench, providers – appear only as neighbours until their own slice is adopted.
 
 ```mermaid
@@ -16,6 +16,12 @@ flowchart LR
   BC-GenerationQueue -->|every attempt through generate: budget, cache, manifest, spend| Generation[Generation and providers - not adopted]
   BC-GenerationQueue -->|items built from storyboard shots and their references| Storyboard
   BC-GenerationQueue -->|needs-fix count, failed verdicts| BC-Pipeline
+  BC-Pipeline -->|audio-analysis stage runs the song analysis| BC-Timing
+  BC-Timing -->|effective timing, anchors resolved to seconds| Storyboard
+  BC-Timing -->|effective timing as render props| Render[Render - not adopted]
+  BC-Review -->|sections and beats on the review timeline| BC-Timing
+  BC-Timing -->|echo spans, lead stem for lip-sync segments| Lipsync[Lip-sync audio - not adopted]
+  BC-Timing -->|lyrics, effective timing for canvas, Shorts, texts| Release
 ```
 
 ## Contexts
@@ -83,3 +89,36 @@ Boundaries:
   stage state is written here.
 - The model bench has its own scores (`pass/weak/fail`, `packages/core/src/bench.ts:183`), not verdicts.
 
+### BC-Timing – Timing
+Purpose (as recovered, decided by recommendation HS-47): turns the user's finished song and section-tagged
+lyrics into a measured timing, merges the user's timing overrides into the effective timing, and resolves
+symbolic anchors to seconds for every later stage. Measured for a music video; an episode's timing is
+constructed by the episode track (series slice, not adopted) and passes the same merge and check.
+Core terms: Lyrics, section tag, Song Import, Stem, Lead Stem, Echo Span, Timing, Section, Line, Word, Beat,
+Downbeat, Onset, Energy, Timing Override, Effective Timing, Timing Report, Anchor.
+Evidence:
+- the measured timing `projects/<slug>/timing.json`, schema `TimingSchema` (`packages/core/src/schema.ts:170-215`),
+  written whole by the Python analysis (`scripts/audio-analysis/analyze.py:430-432`) in the `audio-analysis`
+  stage (`packages/core/src/state.ts:43-50`), run by the stage runner through
+  `workspace/.claude/skills/audio-analysis/SKILL.md`; no CLI command runs it
+- the overrides `timing.overrides.json`, schema `TimingOverridesSchema` (`schema.ts:218-239`), seeded empty by
+  `new` (`packages/cli/src/new-project.ts:157-162`) and otherwise edited by hand
+- the merge and check on every project load (`packages/core/src/project.ts:237-241`;
+  `packages/core/src/timing.ts:61-165`); the snapshot `timing.effective.json` written by `validate`
+  (`packages/cli/src/validate.ts:104-119`); the anchor resolver `resolveAnchor` (`timing.ts:167-217`)
+- the lyrics `lyrics.txt`, checked and written by `writeLyrics` (`packages/cli/src/board-wizard.ts:271-278`),
+  tag rules in `packages/core/src/lyrics.ts`; section ids derived only by the Python parser
+  (`scripts/audio-analysis/timing_core.py:13-55`)
+- the song files `audio/song.wav`, `audio/stems/vocals.wav` and `song.json` (no schema), written by
+  `import-song` and `normalize-audio` (`packages/cli/src/media.ts:169-312`); the lead stem by
+  `separate_lead.py`; the timing report `timing.report.md` and the echo scan (`echo_scan.py`)
+Boundaries:
+- Writers of `timing.json`: the analysis for a music video, the episode track for an episode
+  (`packages/cli/src/episode-track.ts:247`). Writer of the overrides: the agent at the user's request (HS-66).
+- Readers of the effective timing, all through `loadProject`: render (as Remotion props,
+  `packages/cli/src/render.ts:173`), the storyboard resolver, the board review (`board-review.ts:251`), the
+  queue (`queue.ts:293`), Shorts and release (`short.ts:99`, `release.ts:557`), lip-sync segments
+  (`media.ts:136`). Remotion re-implements the lookups (`packages/remotion/src/lib/timing.ts`, HS-60).
+- The Python analysis and TypeScript share only the generated JSON Schema `schema/timing.schema.json`
+  (ADR 0004); `timing.meta` is untyped (HS-65).
+- Song metadata in `song.json` (title, artist, rights) belongs to setup and release, not here (HS-47).

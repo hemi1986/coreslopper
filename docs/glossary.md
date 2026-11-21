@@ -25,7 +25,7 @@ The visual and dramatic interpretation of the brief: core idea, imagery, dramatu
 _Avoid_: outline, script (a **Script** belongs to an episode)
 
 **Lyrics**:
-The authoritative lyric text with section tags, supplied by the user. Word text and spelling come from here, never from speech recognition.
+The authoritative lyric text with section tags, supplied by the user. Word text and spelling come from here, never from speech recognition. Every sung line sits under a section tag; words in parentheses are backing vocals, sung and timed like any other word.
 _Avoid_: transcript
 
 **Song Import**:
@@ -46,30 +46,34 @@ _Avoid_: lead track, dry vocal
 
 **Echo Span**:
 A time range of backing vocals that the lead singer does not sing: parenthesized lyric words (Suno backing markup) or an unwritten echo found in the vocal stem. `audio-segment` silences echo spans so a lip-sync face does not mouth them.
-_Avoid_: ad-lib (when the lead sings it), backing track
+_Avoid_: ad-lib (when the lead sings it), backing track, unwritten vocals, backing span
 
 **Timing**:
 The relationship between a project's audio and time: sections, lines, words, and energy, plus BPM, beats, downbeats, and onsets for a song. Measured for a music video, constructed for an episode.
 _Avoid_: sync data
 
 **Effective Timing**:
-The result of merging `timing.json` with `timing.overrides.json`; the only timing the renderer reads.
-_Avoid_: final timing
+The result of merging `timing.json` with `timing.overrides.json`, made whenever a project is loaded; the only timing the renderer and every later stage read. `timing.effective.json` is a snapshot of it for agents and scripts.
+_Avoid_: final timing, merged timing
 
 **Timing Override**:
-A user-authored correction to timing that always wins and is never overwritten.
+A user-authored correction to timing that always wins and is never overwritten. It moves times only (BPM, beats, downbeats, and the start and end of a section, line, or word); the user says what sits wrong and the agent enters it in `timing.overrides.json`. Changing the sections themselves means changing the lyrics and analyzing again.
 _Avoid_: fix, patch
 
+**Timing Report**:
+The report the song analysis writes beside `timing.json` (`timing.report.md`): the sections with the confidence of their boundaries, lyric lines with a low alignment confidence or placed without a recognized word, and the echo spans. The agent reads it to propose timing overrides.
+_Avoid_: analysis log, confidence report
+
 **Section**:
-A labeled span of the audio with a start, end, and confidence: a song part such as intro, verse, or chorus, or one **Scene** of an episode.
+A labeled span of the audio with a start, end, and the confidence of its boundaries: a song part such as intro, verse, or chorus, named by its section tag in the lyrics, or one **Scene** of an episode.
 _Avoid_: part, segment
 
 **Line**:
-One lyric line or one **Script Line**, with a start, end, and optional words.
-_Avoid_: phrase
+One lyric line or one **Script Line**, with a start, end, and optional words. It lies inside its section.
+_Avoid_: phrase, entry
 
 **Word**:
-One lyric word with a start and end; the unit for word pops and highlight words.
+One lyric word with a start and end, inside its line; the unit for word pops and highlight words.
 _Avoid_: token
 
 **Beat**:
@@ -89,7 +93,7 @@ A frame-level measure of musical intensity, used to drive visual intensity.
 _Avoid_: loudness, volume
 
 **Anchor**:
-A symbolic reference from a shot boundary to timing: section, line, word, beat, downbeat, or an explicit time escape hatch. Section and line anchors also name the edge (`start` or `end`).
+A symbolic reference from a shot boundary to timing: section, line, word, beat, downbeat, or an explicit time escape hatch. Section, line, and word anchors also name the edge (`start` or `end`); every anchor but `time` takes an offset in seconds.
 _Avoid_: timestamp
 
 **Shot**:

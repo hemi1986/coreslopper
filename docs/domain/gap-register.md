@@ -10,6 +10,8 @@
 | GAP-AGG-Project | as-is boundary | [AGG-Project](events.yaml) | [BC-Pipeline](context-map.as-is.md#bc-pipeline--pipeline) | – | state.json per project, loaded and saved as one document (packages/core/src/project.ts:171-184,233-236)<br>stage transitions mutate one State (packages/core/src/state.ts:250-324)<br>budget ledger inside the same State (packages/core/src/state.ts:326-341) | Decide the target boundary |
 | GAP-AGG-ProjectReview | as-is boundary | [AGG-ProjectReview](events.yaml) | [BC-Review](context-map.as-is.md#bc-review--review) | – | one lock per project review folder, review/.notes.lock, around every note change and every send (packages/cli/src/board-review.ts:38,202,238)<br>round numbers from all rounds of the project (packages/core/src/review.ts:37; board-review.ts:242)<br>notes per render in review/notes/<video-stem>.json, rounds in review/rounds/<NNN>.json (board-review.ts:50,62-78) | Decide the target boundary |
 | GAP-AGG-GenerationQueue | as-is boundary | [AGG-GenerationQueue](events.yaml) | [BC-GenerationQueue](context-map.as-is.md#bc-generationqueue--generation-queue) | – | assets/queue.json per project, read, changed and written whole on every change (packages/cli/src/queue.ts:101-119)<br>an item waits for the items in its after list across the whole queue (queue.ts:524-529); order numbers are taken from the whole queue (queue.ts:127)<br>one queue run per project, pid lock assets/queue.lock (queue.ts:562-578,671-674) | Decide the target boundary |
+| GAP-AGG-ProjectTiming | as-is boundary | [AGG-ProjectTiming](events.yaml) | [BC-Timing](context-map.as-is.md#bc-timing--timing) | – | timing.json and timing.overrides.json per project are parsed and merged into one effective timing on every project load, and the merge ends in one check of the whole timing (packages/core/src/project.ts:237-241; packages/core/src/timing.ts:61-94)<br>assertTiming checks sections, lines, words, beats and energy of the merged timing together, so one bad override fails the whole timing (timing.ts:96-165)<br>the analysis writes timing.json whole and never writes the overrides (scripts/audio-analysis/analyze.py:430-432, README.md:10) | Decide the target boundary |
+| GAP-AGG-Lyrics | as-is boundary | [AGG-Lyrics](events.yaml) | [BC-Timing](context-map.as-is.md#bc-timing--timing) | – | writeLyrics checks the whole text for section tags and writes lyrics.txt atomically (packages/cli/src/board-wizard.ts:271-278), used by the lyrics command and the board wizard (packages/cli/src/index.ts:588-608; packages/cli/src/release-board.ts:206) | Decide the target boundary |
 <!-- kataster:gap-register:end -->
 
 ## Gaps found by the adoption of the project and stage pipeline (2026-11-21)
@@ -96,6 +98,46 @@ Decisions (by recommendation, not reviewed by the user):
   failed clip waits for the stage runner; the one-attempt cloud fallback; the ComfyUI restart; `drop` keeps the
   files; the append-only verdict log that skips torn lines; the series canon judged by hand (HS-43). ADR 0038
   (proposed) records them.
+
+## Gaps found by the adoption of timing (2026-11-21)
+
+Candidates only – no stories until the user asks. Decided by recommendation; the user answered four questions
+about how they work (parentheses are backing vocals, a vocal stem comes with most songs, the song never changes
+after the analysis, the agent enters corrections). Priority is a suggestion.
+
+| # | Class | Gap | Evidence | Source | Priority |
+|---|---|---|---|---|---|
+| G-49 | Exists but contradicts | A lyric line in parentheses becomes an untimed cue and a leading `(…)` is dropped as a direction, so backing vocals get no timing and a lip-sync segment cannot silence them | `scripts/audio-analysis/timing_core.py:265-301`; `packages/cli/src/lipsync-audio.ts:18-41` | HS-50 | high |
+| G-50 | Exists but contradicts | Without `--vocals` the analysis runs Demucs and overwrites the imported `audio/stems/vocals.wav`; it ignores `song.json`'s `vocals` | `analyze.py:41-50,344-351` | HS-56 | high |
+| G-51 | Exists but contradicts | A missing Demucs falls back to the mix with exit 0; zero recognized words fall back to energy sections while the report names WhisperX | `analyze.py:121-135,371,388-400` | HS-57 | medium |
+| G-52 | Exists but contradicts | The schema check's default path is relative to the working directory; the documented call from `scripts/audio-analysis` skips it silently | `analyze.py:425-428`; `audio-analysis/SKILL.md` step 2 | HS-58 | medium |
+| G-53 | Exists but contradicts | `validate` needs `storyboard.yaml`, so the skill's step 5 and the hook on every override edit fail during `audio-analysis` | `packages/cli/src/validate.ts:80-83`; `validate-file.ts:128-133` | HS-63 | medium |
+| G-54 | Exists but contradicts | An override of an unknown section, line or word throws in `loadProject`, so every command fails, also `import-song` and `normalize-audio` | `packages/core/src/timing.ts:45-59,83-86`; `project.ts:237-241` | HS-54 | medium |
+| G-55 | Missing | `assertTiming` checks neither lines inside their section nor words inside their line (or the audio); an override can break both | `timing.ts:96-165` | HS-53 | medium |
+| G-56 | Exists but contradicts | Section ids drift from the tag text: `[Verse 1][Chorus][Verse 1][Verse 2]` gives `verse_3` for "Verse 2"; `[Chorus 2]` then `[Chorus]` gives `chorus_2, chorus_1` | `timing_core.py:13-55` | HS-55 | low |
+| G-57 | Exists but contradicts | Lines before the first tag: Python makes a section `unlabeled`, core refuses them (`writeLyrics`) or proposes `[Intro]`; the lyrics rules live twice | `timing_core.py:51-53`; `board-wizard.ts:274-276`; `lyrics.ts:42-45` | HS-68 | low |
+| G-58 | Missing | `song.json` has no schema; the wizard, `import-song` and the new-video skill write it, the analysis, the wizard and release read it, the hook does not watch it | `media.ts:285-304`; `board-wizard.ts:260-266`; `analyze.py:41-50` | HS-64 | medium |
+| G-59 | Exists but contradicts | Remotion re-implements `sectionAt`, `beatAt`, `energyAt` without the tolerance (beat 0 before the first beat); core's `beatIndexAt` has no caller | `packages/remotion/src/lib/timing.ts:12-35`; `timing.ts:566-585` | HS-60 | low |
+| G-60 | Exists but contradicts | The anchor string grammar (`section:<id>[:start\|end]`, `word:<line>:<i>`) lives in cli `short.ts` and is reused by release | `packages/cli/src/short.ts:26-99`; `release.ts:555-560` | HS-61 | low |
+| G-61 | Missing | A replaced `audio/song.wav` (`import-song`, `normalize-audio`) does not mark the timing stale; `normalize-audio` leaves `song.json`'s duration alone | `media.ts:169-194` | HS-59 | low |
+| G-62 | Exists but contradicts | Line kind, line confidence, directions and cues live untyped in `timing.meta`; cues have two shapes | `timing_core.py:396-400,624-644`; `schema.ts:215` | HS-65 | low |
+| G-63 | Exists but contradicts | Release falls back to the measured timing when there is no effective timing | `packages/cli/src/release.ts:226,534` | HS-49 | low |
+| G-64 | Exists but contradicts | Code, report and CLI help say "unwritten vocals", "backing words", `backingSpans`, `after_line` for echo spans | `analyze.py:291-299`; `index.ts:1029`; `lipsync-audio.ts:18` | HS-51 | low |
+| G-65 | Exists but contradicts | The analysis writes `timing.json` and the report with a plain write, not atomically | `analyze.py:318,430-432` | analyst | low |
+| G-66 | Exists but contradicts | Without speech recognition, downbeats are every fourth beat; with it, the phase is picked by energy | `analyze.py:219`; `timing_core.py:500` | analyst | low |
+| G-67 | Dead | `StoryboardSchema.timing` (default `timing.effective.json`) is read by no code | `schema.ts:367` | analyst | low |
+| G-68 | Missing | No test pins the resolver's errors, most `assertTiming` rules, the lookups, or the analysis' parentheses and stem handling (partly covered now by `tests/timing-characterization.test.ts`) | `tests/timing.test.ts`; `scripts/audio-analysis/tests/` | analyst | low |
+
+Decisions (by recommendation, not reviewed by the user):
+
+- GAP-AGG-ProjectTiming, GAP-AGG-Lyrics: the boundaries stay as recovered (`as-is`).
+- Exists and is intended: the merge on every load; overrides that move times only and always win; the lyrics
+  text winning over speech recognition; symbolic anchors with edges and offsets and a warned `time` anchor; the
+  0.05 s tolerance; the Python analysis behind the generated schema (ADR 0004, 0008); the confidence thresholds
+  in the report; the 0.8 lip-sync threshold as guidance in the skill; `transcribe.py` serving the bench, not the
+  timing. ADR 0039 (proposed) records them.
+- The song events (`EVT-SongImported`, `EVT-SongLoudnessNormalized`, `EVT-LeadStemSeparated`) belong to the
+  context without an aggregate until `song.json` has a schema (G-58).
 
 ## Decisions
 

@@ -60,6 +60,20 @@ flowchart LR
         EVT_QueueRunStopped["Queue run stopped"]:::evt
     end
     CMD_GiveVerdict["Give a verdict"]:::cmd
+    CMD_ImportSong["Import song"]:::cmd
+    CMD_NormalizeSongLoudness["Normalize song loudness"]:::cmd
+    CMD_SeparateLeadStem["Separate lead stem"]:::cmd
+    subgraph BC_Timing["Timing"]
+        CMD_WriteLyrics["Write lyrics"]:::cmd
+        CMD_AnalyzeSong["Analyze song"]:::cmd
+        CMD_OverrideTiming["Override timing"]:::cmd
+        EVT_SongImported["Song imported"]:::evt
+        EVT_SongLoudnessNormalized["Song loudness normalized"]:::evt
+        EVT_LyricsWritten["Lyrics written"]:::evt
+        EVT_SongAnalyzed["⭐ Song analyzed"]:::evt
+        EVT_LeadStemSeparated["Lead stem separated"]:::evt
+        EVT_TimingOverridden["Timing overridden"]:::evt
+    end
     ACT_User(["User"]):::act
     ACT_Orchestrator(["Orchestrator"]):::act
     ACT_SetupSkill(["Setup skill"]):::act
@@ -69,6 +83,7 @@ flowchart LR
     ACT_QueueRun(["Queue run"]):::act
     EXT_Provider[["Generation provider"]]:::ext
     EXT_ComfyUI[["ComfyUI server"]]:::ext
+    EXT_AudioModels[["Local audio models"]]:::ext
     POL_RunNextStage{{"Run the next autonomous stage"}}:::pol
     POL_HardStop{{"A hard stop fails the stage and halts the pipeline"}}:::pol
     POL_AnswerOpenRounds{{"Open review rounds are answered before the next autonomous stage"}}:::pol
@@ -82,6 +97,9 @@ flowchart LR
     RM_OpenReviewRounds[("Open review rounds")]:::rm
     RM_QueueStatus[("Queue status")]:::rm
     RM_LatestVerdicts[("Latest verdicts")]:::rm
+    RM_EffectiveTiming[("Effective timing")]:::rm
+    RM_TimingReport[("Timing report")]:::rm
+    RM_EchoSpans[("Echo spans")]:::rm
     ACT_SetupSkill --> CMD_CreateProject
     CMD_CreateProject --> EVT_ProjectCreated
     ACT_Orchestrator --> CMD_StartStage
@@ -132,6 +150,18 @@ flowchart LR
     CMD_DropQueueItem --> EVT_QueueItemDropped
     ACT_StageRunner --> CMD_PatchRegion
     CMD_PatchRegion --> EVT_RegionPatched
+    ACT_SetupSkill --> CMD_ImportSong
+    CMD_ImportSong --> EVT_SongImported
+    ACT_SetupSkill --> CMD_NormalizeSongLoudness
+    CMD_NormalizeSongLoudness --> EVT_SongLoudnessNormalized
+    ACT_User --> CMD_WriteLyrics
+    CMD_WriteLyrics --> EVT_LyricsWritten
+    ACT_StageRunner --> CMD_AnalyzeSong
+    CMD_AnalyzeSong --> EVT_SongAnalyzed
+    ACT_StageRunner --> CMD_SeparateLeadStem
+    CMD_SeparateLeadStem --> EVT_LeadStemSeparated
+    ACT_User --> CMD_OverrideTiming
+    CMD_OverrideTiming --> EVT_TimingOverridden
     EVT_StageCompleted --> POL_RunNextStage
     EVT_StageSkipped --> POL_RunNextStage
     POL_RunNextStage --> CMD_StartStage
@@ -193,6 +223,17 @@ flowchart LR
     RM_LatestVerdicts -.-> ACT_Orchestrator
     RM_LatestVerdicts -.-> ACT_StageRunner
     RM_LatestVerdicts -.-> ACT_User
+    EVT_SongAnalyzed -.-> RM_EffectiveTiming
+    EVT_TimingOverridden -.-> RM_EffectiveTiming
+    RM_EffectiveTiming -.-> ACT_StageRunner
+    RM_EffectiveTiming -.-> ACT_Orchestrator
+    RM_EffectiveTiming -.-> ACT_User
+    EVT_SongAnalyzed -.-> RM_TimingReport
+    RM_TimingReport -.-> ACT_StageRunner
+    RM_TimingReport -.-> ACT_User
+    EVT_SongAnalyzed -.-> RM_EchoSpans
+    EVT_LeadStemSeparated -.-> RM_EchoSpans
+    RM_EchoSpans -.-> ACT_StageRunner
     classDef evt fill:#a3391f,stroke:#e65100,color:#fff
     classDef cmd fill:#64b5f6,stroke:#0d47a1,color:#000
     classDef pol fill:#ce93d8,stroke:#4a148c,color:#000
@@ -298,6 +339,45 @@ flowchart LR
     classDef hs fill:#e57373,stroke:#b71c1c,color:#fff
 ```
 
+### From the song to the effective timing
+
+```mermaid
+flowchart LR
+    ACT_User(["User"]):::act
+    CMD_WriteLyrics["Write lyrics"]:::cmd
+    EVT_LyricsWritten["Lyrics written"]:::evt
+    ACT_SetupSkill(["Setup skill"]):::act
+    CMD_ImportSong["Import song"]:::cmd
+    EVT_SongImported["Song imported"]:::evt
+    ACT_StageRunner(["Stage runner"]):::act
+    CMD_AnalyzeSong["Analyze song"]:::cmd
+    EVT_SongAnalyzed["⭐ Song analyzed"]:::evt
+    RM_TimingReport[("Timing report")]:::rm
+    CMD_OverrideTiming["Override timing"]:::cmd
+    EVT_TimingOverridden["Timing overridden"]:::evt
+    RM_EffectiveTiming[("Effective timing")]:::rm
+    ACT_User --> CMD_WriteLyrics
+    CMD_WriteLyrics --> EVT_LyricsWritten
+    EVT_LyricsWritten --> ACT_SetupSkill
+    ACT_SetupSkill --> CMD_ImportSong
+    CMD_ImportSong --> EVT_SongImported
+    EVT_SongImported --> ACT_StageRunner
+    ACT_StageRunner --> CMD_AnalyzeSong
+    CMD_AnalyzeSong --> EVT_SongAnalyzed
+    EVT_SongAnalyzed --> RM_TimingReport
+    RM_TimingReport --> CMD_OverrideTiming
+    CMD_OverrideTiming --> EVT_TimingOverridden
+    EVT_TimingOverridden --> RM_EffectiveTiming
+    classDef evt fill:#a3391f,stroke:#e65100,color:#fff
+    classDef cmd fill:#64b5f6,stroke:#0d47a1,color:#000
+    classDef pol fill:#ce93d8,stroke:#4a148c,color:#000
+    classDef rm fill:#81c784,stroke:#1b5e20,color:#000
+    classDef act fill:#a3751f,stroke:#f57f17,color:#000
+    classDef ext fill:#f48fb1,stroke:#880e4f,color:#000
+    classDef agg fill:#ffe082,stroke:#ff6f00,color:#000
+    classDef hs fill:#e57373,stroke:#b71c1c,color:#fff
+```
+
 ## Bounded Contexts & Aggregates
 
 | Context | Purpose | Aggregates | Events |
@@ -305,6 +385,7 @@ flowchart LR
 | Pipeline (`BC-Pipeline`) | Drives one project from setup to qa-export through the stages of its project kind and keeps its budget | Project | Project created, Stage started, Stage completed, Stage failed, Stage skipped, Stage reset, Spend recorded, Project completed |
 | Review (`BC-Review`) | The user's frame-accurate notes on renders, sent to the agent in rounds and answered note by note | Project review | Review note added, Review note changed, Review note deleted, Review round sent, Review round answered |
 | Generation queue (`BC-GenerationQueue`) | Gets every generated image and clip of a project approved before anything derives from it – generate an attempt, give it a verdict, requeue it with the fix prompt, or file it | Generation queue | Queue item added, Queue item replaced, Attempt generated, Attempt generation failed, Verdict given, Attempt filed, Queue item requeued, Queue item needs a fix, Attempt accepted, Queue item dropped, Region patched, Queue run stopped |
+| Timing (`BC-Timing`) | Turns the user's song and lyrics into a measured timing, merges the user's timing overrides into the effective timing, and resolves symbolic anchors to seconds for every later stage | Project timing, Lyrics | Song imported, Song loudness normalized, Lyrics written, Song analyzed, Lead stem separated, Timing overridden |
 
 ## Aggregates
 
@@ -313,3 +394,5 @@ flowchart LR
 | Project (`AGG-Project`) | Pipeline | as-is | state.json per project, loaded and saved as one document (packages/core/src/project.ts:171-184,233-236)<br>stage transitions mutate one State (packages/core/src/state.ts:250-324)<br>budget ledger inside the same State (packages/core/src/state.ts:326-341) |
 | Project review (`AGG-ProjectReview`) | Review | as-is | one lock per project review folder, review/.notes.lock, around every note change and every send (packages/cli/src/board-review.ts:38,202,238)<br>round numbers from all rounds of the project (packages/core/src/review.ts:37; board-review.ts:242)<br>notes per render in review/notes/<video-stem>.json, rounds in review/rounds/<NNN>.json (board-review.ts:50,62-78) |
 | Generation queue (`AGG-GenerationQueue`) | Generation queue | as-is | assets/queue.json per project, read, changed and written whole on every change (packages/cli/src/queue.ts:101-119)<br>an item waits for the items in its after list across the whole queue (queue.ts:524-529); order numbers are taken from the whole queue (queue.ts:127)<br>one queue run per project, pid lock assets/queue.lock (queue.ts:562-578,671-674) |
+| Project timing (`AGG-ProjectTiming`) | Timing | as-is | timing.json and timing.overrides.json per project are parsed and merged into one effective timing on every project load, and the merge ends in one check of the whole timing (packages/core/src/project.ts:237-241; packages/core/src/timing.ts:61-94)<br>assertTiming checks sections, lines, words, beats and energy of the merged timing together, so one bad override fails the whole timing (timing.ts:96-165)<br>the analysis writes timing.json whole and never writes the overrides (scripts/audio-analysis/analyze.py:430-432, README.md:10) |
+| Lyrics (`AGG-Lyrics`) | Timing | as-is | writeLyrics checks the whole text for section tags and writes lyrics.txt atomically (packages/cli/src/board-wizard.ts:271-278), used by the lyrics command and the board wizard (packages/cli/src/index.ts:588-608; packages/cli/src/release-board.ts:206) |

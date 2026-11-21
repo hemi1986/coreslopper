@@ -415,3 +415,159 @@ None. HS-29 to HS-46 are resolved by recommendation.
 | HS-39 | 3 local + 1 cloud attempt since the last replace | recommendation | invariant, glossary, G-34 |
 | HS-40 | A region patch is an attempt of its item | recommendation | invariant, glossary, G-35, G-36 |
 | HS-42 | The user accepts anything, final; the runner only after the cloud attempt | recommendation | `CMD-AcceptAttempt` |
+
+# Adoption – timing
+Date: 2026-11-21 · Commit: 5e06927 · Slice: song analysis, timing resolver, overrides, anchors, lyrics, song import (concept `timing`) · Analysts: 3 lenses
+
+## Scope
+
+- **Slice:** the lyrics (`lyrics.txt`, `lyrics.ts`, `writeLyrics`, `lyrics [--propose]`), the song import as the
+  analysis' input (`import-song`, `normalize-audio`, `song.json`, stems), the Python song analysis
+  (`scripts/audio-analysis/`), the timing and its overrides (`TimingSchema`, `TimingOverridesSchema`, the merge
+  and check in `timing.ts` and `project.ts`), anchor resolution (`resolveAnchor`), the timing lookups in core and
+  Remotion, and the `audio-analysis` skill. No shared library.
+- **Out of scope:** the storyboard's coverage and validation rules (slice `storyboard`), the episode's
+  constructed timing (slice `series`), cutting lip-sync segments, release.
+- **Intent:** domain model, as for the earlier slices. **Language:** artifacts `en`, UI `en`.
+- **Since the last slice:** no code change (same day).
+
+| Layer | Files |
+|---|---|
+| core (domain) | `packages/core/src/timing.ts` (merge, check, anchors, lookups), `lyrics.ts`, the timing parts of `schema.ts`, `project.ts` (load and merge), `state.ts` (stage outputs) |
+| scripts (analysis) | `scripts/audio-analysis/analyze.py`, `timing_core.py`, `echo_scan.py`, `separate_lead.py`, `README.md`, tests; `transcribe.py` serves the bench |
+| cli (application) | `index.ts` (`lyrics`, `import-song`, `normalize-audio`, `validate`), `media.ts`, `board-wizard.ts` `writeLyrics`, `new-project.ts`, `validate.ts`, `validate-file.ts` |
+| remotion (consumer) | `packages/remotion/src/lib/timing.ts`, `hooks/useTiming.ts` |
+| workspace | `workspace/.claude/skills/audio-analysis/SKILL.md`, `hooks/validate-artifacts.mjs` (timing parts) |
+| tests | `tests/timing.test.ts`, `lyric-display.test.ts`, `import-song.test.ts`, `scripts/audio-analysis/tests/` |
+
+## How this slice was decided
+
+As in the verdict slice: no code-level questions. Every technical hotspot was decided by the recommendation and
+is marked "not reviewed by the user – delegated". The user answered four questions about how they work:
+1. Words in parentheses in the lyrics are backing vocals (Suno style), not directions.
+2. A vocal stem comes with most songs.
+3. The song and lyrics never change after the analysis.
+4. When a line or section sits wrong, the user tells the agent and the agent enters the correction.
+Answers 2 and 3 set the priority of G-50 (high) and G-61 (low). ADR 0039 stays `Proposed`.
+
+## What the repository is (facts)
+
+- The analysis is Python, run by the stage runner through the skill (`uv run python analyze.py`); no CLI command
+  runs it. It writes `timing.json` and `timing.report.md`, never the overrides. Lyrics text and order win, and
+  speech recognition supplies only times (Needleman–Wunsch alignment, optional forced alignment). Sections are
+  snapped to downbeats, and a section's confidence is that of its weaker boundary.
+- `loadProject` merges `timing.json` with `timing.overrides.json` and checks the result on every load. The
+  renderer gets this merge as props. `timing.effective.json` is a snapshot only `validate` (and the episode
+  track) writes.
+- Overrides move times only, by section or line id or by line and word index. An unknown target throws and
+  breaks every command.
+- Section ids come only from the Python parser; line ids are positional. `song.json` has no schema.
+- Python and TypeScript share only the generated JSON Schema; `timing.meta` is untyped. Remotion keeps its own
+  lookups. 19 commits touch the slice; the largest (`ac35d0d`, "align lyrics first") left the energy-only path as
+  the `--skip-asr` fallback. There are no TODOs and no reverts.
+
+## Domain model (decided by recommendation)
+
+- **Context:** `BC-Timing` – Timing. Run by the pipeline's `audio-analysis` stage. It feeds the storyboard
+  (anchors), render (props), the board review (sections, beats), lip-sync segments (echo spans, lead stem), the
+  queue, Shorts, and release.
+- **Aggregates:** `AGG-ProjectTiming` (`as-is`: the merge and the one check on every load) with invariants:
+  sections cover the audio; lines inside their section and words inside their line; overrides move times only,
+  always win, and name an existing target; no tool replaces the overrides; the lyrics text wins; words in
+  parentheses are timed; the duration matches the song. `AGG-Lyrics` (`as-is`: `writeLyrics`) with every sung
+  line under a tag.
+- **Commands:** import song, normalize song loudness, write lyrics, analyze song, separate lead stem, override
+  timing. **Read models:** effective timing, timing report, echo spans. **Flow:** `FLOW-SongTiming`.
+- **Glossary:** new **Timing Report**; sharpened **Lyrics** (tags, parentheses), **Effective Timing** (made on
+  load, the file is a snapshot), **Timing Override** (times only, entered by the agent), **Section** (boundary
+  confidence, tag), **Line**, **Word** (inside their container), **Anchor** (word anchors carry an edge),
+  **Echo Span** (avoid "unwritten vocals", "backing span").
+- **ADR:** 0039 (Proposed), which amends 0005 and 0008.
+
+## Package documentation written
+
+- `.claude/rules/timing.md` – path-scoped slice doc; nothing left `[OPEN]`.
+- `docs/engineering/conventions.md` – Python behind the generated schema, the merge on load, user-owned files,
+  timing seams.
+- `docs/architecture/data-model.md`, `docs/domain/context-map.as-is.md` – `AGG-ProjectTiming`, `AGG-Lyrics`,
+  `BC-Timing`.
+
+## Contradictions found and how they were resolved
+
+| Contradiction | Resolution |
+|---|---|
+| Parentheses: backing vocals (glossary, ADR 0026, lip-sync muting) vs cues and directions (analysis) | backing vocals (user; G-49) |
+| "Never overwrite" user files vs Demucs writing over the imported stem | the stem is user-owned, a hard stop (G-50) |
+| Skill "stop when Demucs is missing" vs the silent fallback | stop; fallback only when asked (G-51) |
+| ADR 0004 producer check vs the cwd-relative schema path | always check against the repository schema (G-52) |
+| Skill step 5 and the hook vs `validate` needing a storyboard | validate the timing alone (G-53) |
+| "Timing Override always wins" vs an unknown override breaking every load | reported by name, other commands work (G-54) |
+| Skill "lines and words inside their sections" vs `assertTiming` | invariant (G-55) |
+| Glossary and ADR 0005 "word anchors are points" vs schema and resolver | the code is right; glossary fixed, ADR 0039 |
+| "Effective timing" for the merge and for the file | the merge; the file is a snapshot (G-63 for release) |
+| `[Verse 2]` vs id `verse_3` | ids follow the tag text (G-56) |
+| Lines before the first tag: `unlabeled` vs refused / `[Intro]` | rules once, Python follows (G-57) |
+| Overrides user-owned vs the skill telling the agent to edit them | the agent enters them at the user's request (user) |
+| Two sets of lookups (core, Remotion) | one in core (G-59) |
+
+## Rules and checks
+
+| Rule | Enforcement | State |
+|---|---|---|
+| Overrides replace beats whole and move sections, lines and words by id or index; text and labels stay; a line override leaves its words | `tests/timing-characterization.test.ts` | green |
+| Unknown override targets throw; the 0.05 s tolerance at the audio's edges; beats inside the audio | `tests/timing-characterization.test.ts` | green |
+| Anchor offsets, edges, clamping, missing beats; tag proposal (`[Chorus]`, `[Verse n]`, `[Intro]`) | `tests/timing-characterization.test.ts` | green |
+| Lyrics text wins, sections cover the song, in-order chorus alignment, echo spans | existing `scripts/audio-analysis/tests/` | green |
+| Backing vocals timed, stem never replaced, stop on a missing model, schema check, lines inside sections, override reported | documentation until stories build them (G-49–G-55) | – |
+| The slice stays inside the packages' allowed imports | slice 1 boundary rule and test | green |
+
+## Gap register (candidates – stories only with --stories)
+
+20 candidates G-49 to G-68 in `docs/domain/gap-register.md`: 15 *exists but contradicts* (highest: G-49
+parentheses, G-50 the overwritten stem), 4 *missing*, and 1 *dead* (G-67 `StoryboardSchema.timing`).
+
+## Deliberately left alone
+
+- Production code, the audio-analysis skill, `scripts/audio-analysis/README.md`, and ADR 0005 and 0008 (accepted;
+  ADR 0039 amends them).
+- The episode's constructed timing and `assertTimingMatchesScript` (series slice), `audio-segment` (lip-sync).
+- `tools.ts` installing the analysis without the `asr` and `stems` extras (workspace slice).
+- The alignment constants; they are tuning, not decisions.
+- `EVT-SongImported`, `EVT-SongLoudnessNormalized`, and `EVT-LeadStemSeparated` belong to no aggregate on
+  purpose (the validator warns).
+
+## Open hotspots
+
+None. HS-47 to HS-68 are resolved, four of them partly by the user's answers.
+
+## Next slice
+
+`storyboard` (shots, shot sources, coverage, validation, contact sheet), per the adoption plan. It owns
+`resolveStoryboard`'s coverage rules next to this slice's anchors.
+
+## Decision log
+
+| # | Decision | How | Written to |
+|---|---|---|---|
+| HS-50 | Words in parentheses are backing vocals, timed | user (2026-11-21); `(Spoken)` by recommendation | glossary (Lyrics), invariant, G-49 |
+| HS-56 | An imported vocal stem is analyzed, never replaced | recommendation; priority from the user | `CMD-AnalyzeSong`, hard stop, G-50 |
+| HS-59 | The duration matches the song | recommendation; low because the song never changes (user) | invariant, G-61 |
+| HS-66 | The agent enters overrides at the user's request; no tool replaces the file | user and recommendation | glossary, invariant, `CMD-OverrideTiming` |
+| HS-55 | Section ids from the tag text; positional line ids | recommendation; lyrics never change (user) | `CMD-AnalyzeSong`, G-56 |
+| HS-47 | One context, Timing; song metadata elsewhere | recommendation | `BC-Timing` |
+| HS-48 | Project timing and lyrics as the aggregates (as-is) | recommendation | `AGG-ProjectTiming`, `AGG-Lyrics` |
+| HS-49 | Effective timing is the merge; the file a snapshot | recommendation | glossary, `RM-EffectiveTiming`, G-63 |
+| HS-51 | Echo Span; avoid "unwritten vocals", "backing span" | recommendation | glossary, G-64 |
+| HS-52 | Boundary confidence, alignment confidence; Timing Report | recommendation | glossary |
+| HS-53 | Lines inside sections, words inside lines | recommendation | invariant, G-55 |
+| HS-54 | A missed override is reported by name | recommendation | invariant, G-54 |
+| HS-57 | A missing model stops the analysis | recommendation | `CMD-AnalyzeSong`, G-51 |
+| HS-58 | The analysis always checks the repository schema | recommendation | `CMD-AnalyzeSong`, G-52 |
+| HS-60 | One set of lookups in core | recommendation | G-59 |
+| HS-61 | The anchor string grammar belongs in core | recommendation | G-60 |
+| HS-62 | Word anchors carry an edge | recommendation | glossary, ADR 0039 |
+| HS-63 | `validate` checks the timing without a storyboard | recommendation | G-53 |
+| HS-64 | `song.json` gets a schema | recommendation | G-58 |
+| HS-65 | Line kind and confidence as schema fields | recommendation | G-62 |
+| HS-67 | ADR 0039 | recommendation | `docs/adr/0039-song-timing.md` |
+| HS-68 | Lyrics rules once; Python follows | recommendation | G-57 |

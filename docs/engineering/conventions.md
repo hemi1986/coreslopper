@@ -1,6 +1,6 @@
 # Engineering conventions – coreslopper
 
-> How the code is built here, recovered by `/adopt` (slices: project and stage pipeline; human review; generation queue and verdicts – 2026-11-21). The ADRs
+> How the code is built here, recovered by `/adopt` (slices: project and stage pipeline; human review; generation queue and verdicts; timing – 2026-11-21). The ADRs
 > decide WHAT; this file says HOW. Sections other slices own are marked as such. When code and this file
 > disagree, raise it – don't silently follow either.
 
@@ -58,12 +58,24 @@ state in memory), one core transition (`setStageRunning`, `setStageDone`, `setSt
 - Agent judgement inside a command runs headless: `claude -p --agent <name> --json-schema <schema>`
   (`review-image.ts` `claudeRunner`), binary and timeout from `CORESLOPPER_CLAUDE_BIN` and
   `CORESLOPPER_REVIEW_TIMEOUT_MS`.
+- Measurement that needs heavy models runs in Python, not in a CLI command: the stage runner calls
+  `scripts/audio-analysis/analyze.py` through `uv run` (ADR 0008). The contract between Python and TypeScript is
+  the JSON Schema generated from Zod (`npm run schema`, `schema/timing.schema.json`); the Python side writes the
+  file, the TypeScript side merges and checks it. Python writes `timing.json` with a plain write, not atomically.
+- `loadProject` merges `timing.json` with `timing.overrides.json` and checks the result on every load
+  (`project.ts:237-241`), so every command sees the effective timing and a broken timing breaks every command
+  (gap G-54). `validate` writes the snapshot `timing.effective.json` for agents and scripts.
+- User-owned files (`timing.overrides.json`, `lyrics.txt`, imported stems, `project.yaml`) are never replaced by
+  a tool; a command that would do so is a hard stop.
 
 ## Read models
 
 Pure functions over loaded files: `stageViews`, `productionPhase`, `projectNextAction`, `seriesNextAction`
 (`packages/core/src/production.ts`); `status` (`packages/cli/src/status.ts`); the board's production view
 (`packages/cli/src/board-production.ts`), which reads files and never writes. The board polls every 10 s.
+
+Timing lookups (`sectionAt`, `energyAt`, `beatIndexAt`) and anchor resolution (`resolveAnchor`) are pure
+functions over the effective timing in `packages/core/src/timing.ts`; Remotion has its own copies today (G-59).
 
 ## Time-based rules
 
@@ -91,5 +103,7 @@ directory. `tests/helpers/release-fixture.ts` builds release projects.
 | Page, form, flow | the board's HTTP API | integration | `tests/board-review.test.ts` |
 | Queue run | `runQueue(dir, { deps })` with injected `generate`, `review`, `restart`, `log` (`QueueDeps`) | integration | `tests/queue.test.ts` |
 | Headless agent | `reviewImage(dir, { runner })` with a fake runner returning the JSON | unit | `tests/review-image.test.ts` |
-| Python helper | the helper's functions | unit (pytest, `npm run python:test`) | `scripts/review-player/tests/test_review_notes.py` |
+| Python helper | the helper's functions | unit (pytest, `npm run python:test`) | `scripts/review-player/tests/test_review_notes.py`, `scripts/audio-analysis/tests/test_timing_core.py` |
+| Song analysis | `analyze.py --no-separate --skip-asr --schema …` on a fixture project; no model loads | integration (pytest) | `scripts/audio-analysis/tests/test_analyze_integration.py` |
+| Timing rule | `mergeTiming`, `assertTiming`, `resolveAnchor` on an inline `Timing` | unit | `tests/timing.test.ts`, `tests/timing-characterization.test.ts` |
 | Agent instruction | not testable deterministically | – | `workspace/.claude/commands/video-next.md` |

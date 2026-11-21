@@ -258,7 +258,9 @@
         "4 layers: core, remotion, scripts, tests",
         "4 packages",
         "5 files"
-      ]
+      ],
+      "adopted": true,
+      "adoptedAt": "2026-11-21"
     },
     {
       "name": "episode",
@@ -693,6 +695,33 @@
       ]
     },
     {
+      "name": "queue",
+      "terms": [
+        "characterization",
+        "queue"
+      ],
+      "tables": [],
+      "files": [
+        "packages/cli/src/queue.ts",
+        "tests/queue-characterization.test.ts",
+        "tests/queue.test.ts"
+      ],
+      "packages": [
+        "?",
+        "packages/cli"
+      ],
+      "layers": [
+        "cli",
+        "tests"
+      ],
+      "score": 11,
+      "reasons": [
+        "2 layers: cli, tests",
+        "2 packages",
+        "3 files"
+      ]
+    },
+    {
       "name": "state",
       "terms": [
         "characterization",
@@ -793,32 +822,6 @@
       "score": 10,
       "reasons": [
         "2 layers: providers, tests",
-        "2 packages",
-        "2 files"
-      ]
-    },
-    {
-      "name": "contact",
-      "terms": [
-        "contact",
-        "sheet"
-      ],
-      "tables": [],
-      "files": [
-        "packages/cli/src/contact-sheet.ts",
-        "tests/contact-sheet.test.ts"
-      ],
-      "packages": [
-        "?",
-        "packages/cli"
-      ],
-      "layers": [
-        "cli",
-        "tests"
-      ],
-      "score": 10,
-      "reasons": [
-        "2 layers: cli, tests",
         "2 packages",
         "2 files"
       ]
