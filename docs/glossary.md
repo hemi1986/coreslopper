@@ -97,19 +97,39 @@ A symbolic reference from a shot boundary to timing: section, line, word, beat, 
 _Avoid_: timestamp
 
 **Shot**:
-The smallest unit of visual direction: one continuous visual idea with a source, timing, description, camera, text, and references.
-_Avoid_: clip, scene (a **Scene** is a part of a script)
+The smallest unit of visual direction: one continuous visual idea in a section, from a start anchor to an end anchor, with a shot source, a description, a camera direction, optional on-screen text with highlights, a transition, continuity references, and what its source needs (a motion component, keyframe and video prompts, an asset, or layers). Ids run `shot-001`, `shot-002`, … in playing order.
+_Avoid_: clip, scene (a **Scene** is a part of a script), cut (a **cut** is a transition)
 
 **Storyboard**:
-The ordered, validated list of shots that covers the whole song or episode track.
+The ordered, validated list of shots that covers the whole song or episode track: `storyboard.yaml`, one model for both project kinds. The agent writes it in the storyboard stage and changes it when the user asks, in the chat or in a review round; the user does not edit it by hand.
 _Avoid_: shot list
 
 **Shot Source**:
-The provenance of a shot's imagery: motion, AI clip, footage, or mixed.
-_Avoid_: type, medium
+The provenance of a shot's imagery: motion, AI clip, footage, or mixed (two or more layers).
+_Avoid_: type, medium, source (alone: a lip-sync shot's audio source is a stem, not a shot source)
+
+**Layer**:
+One part of a mixed shot: a motion component, an AI clip, or footage, stacked by its order. A layer has a layer type, never a shot source of its own.
+_Avoid_: track, overlay
+
+**Continuity Reference**:
+What a shot pins down from the bibles so its keyframe cannot re-imagine it: style tokens, characters, sets, a plate, prop references, and character states. Every one must exist, and a character state belongs to a character on screen in the shot.
+_Avoid_: refs, reference (a **User Reference** is the user's material)
+
+**Lip-Sync Shot**:
+An AI-clip shot whose frontal face keyframe is animated by the vocal segment between the shot's start and end: the vocal stem of a music video, the speaker stem of an episode. Its character shows a face, and the shot fits the lip-sync model's maximum length and, in an episode, the series' creative limit.
+_Avoid_: talking shot, singing shot
+
+**Highlight**:
+A word of a shot's on-screen text that the renderer emphasises.
+_Avoid_: accent, emphasis
+
+**Focus Point**:
+The point of a shot's media, as fractions of its width and height, that a narrower format's crop keeps in view. The default is the centre.
+_Avoid_: crop point, anchor (an **Anchor** points into the timing)
 
 **Coverage**:
-The property that shots start at zero, end at the audio duration, and leave no gaps or overlaps.
+The property that shots start at zero, end at the duration of the song or episode track, and leave no gaps or overlaps, each within one frame.
 _Avoid_: completeness
 
 **Keyframe**:
@@ -153,8 +173,8 @@ A reusable package of logo, colors, fonts, tokens, and style guide, stored under
 _Avoid_: theme
 
 **Contact Sheet**:
-A grid of stills sampled from the storyboard for fast visual review.
-_Avoid_: thumbnail sheet
+A grid of the storyboard's shots for a fast visual review on the board: per shot its id, source, section, times, description, text, and its keyframe once one exists.
+_Avoid_: thumbnail sheet, shot overview
 
 **Thumbnail**:
 The still that represents a finished video on a platform such as YouTube: a generated still with the hook on solid slabs. The main video gets three 1280x720 thumbnails of different subjects; each Short gets one at 1080x1920.

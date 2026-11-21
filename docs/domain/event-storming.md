@@ -74,6 +74,16 @@ flowchart LR
         EVT_LeadStemSeparated["Lead stem separated"]:::evt
         EVT_TimingOverridden["Timing overridden"]:::evt
     end
+    subgraph BC_Storyboard["Storyboard"]
+        CMD_WriteStoryboard["Write storyboard"]:::cmd
+        CMD_ReviseStoryboard["Revise storyboard"]:::cmd
+        CMD_ValidateStoryboard["Validate storyboard"]:::cmd
+        CMD_WriteContactSheet["Write contact sheet"]:::cmd
+        EVT_StoryboardWritten["⭐ Storyboard written"]:::evt
+        EVT_StoryboardRevised["Storyboard revised"]:::evt
+        EVT_StoryboardValidated["Storyboard validated"]:::evt
+        EVT_ContactSheetWritten["Contact sheet written"]:::evt
+    end
     ACT_User(["User"]):::act
     ACT_Orchestrator(["Orchestrator"]):::act
     ACT_SetupSkill(["Setup skill"]):::act
@@ -90,6 +100,7 @@ flowchart LR
     POL_RebuildQaAfterFixes{{"Fixes that change the picture reset qa-export"}}:::pol
     POL_JudgeEveryAttempt{{"Every attempt with a verdict target is judged"}}:::pol
     POL_ApplyVerdict{{"The queue run applies every verdict"}}:::pol
+    POL_ValidateEveryStoryboardEdit{{"Every storyboard edit is validated"}}:::pol
     RM_Status[("Status")]:::rm
     RM_NextAction[("Next action")]:::rm
     RM_ProductionView[("Production view")]:::rm
@@ -100,6 +111,9 @@ flowchart LR
     RM_EffectiveTiming[("Effective timing")]:::rm
     RM_TimingReport[("Timing report")]:::rm
     RM_EchoSpans[("Echo spans")]:::rm
+    RM_ResolvedStoryboard[("Resolved storyboard")]:::rm
+    RM_StoryboardTable[("Storyboard table")]:::rm
+    RM_ContactSheet[("Contact sheet")]:::rm
     ACT_SetupSkill --> CMD_CreateProject
     CMD_CreateProject --> EVT_ProjectCreated
     ACT_Orchestrator --> CMD_StartStage
@@ -162,6 +176,14 @@ flowchart LR
     CMD_SeparateLeadStem --> EVT_LeadStemSeparated
     ACT_User --> CMD_OverrideTiming
     CMD_OverrideTiming --> EVT_TimingOverridden
+    ACT_StageRunner --> CMD_WriteStoryboard
+    CMD_WriteStoryboard --> EVT_StoryboardWritten
+    ACT_Orchestrator --> CMD_ReviseStoryboard
+    CMD_ReviseStoryboard --> EVT_StoryboardRevised
+    ACT_StageRunner --> CMD_ValidateStoryboard
+    CMD_ValidateStoryboard --> EVT_StoryboardValidated
+    ACT_StageRunner --> CMD_WriteContactSheet
+    CMD_WriteContactSheet --> EVT_ContactSheetWritten
     EVT_StageCompleted --> POL_RunNextStage
     EVT_StageSkipped --> POL_RunNextStage
     POL_RunNextStage --> CMD_StartStage
@@ -175,6 +197,9 @@ flowchart LR
     POL_JudgeEveryAttempt --> CMD_GiveVerdict
     EVT_VerdictGiven --> POL_ApplyVerdict
     POL_ApplyVerdict --> CMD_ApplyVerdict
+    EVT_StoryboardWritten --> POL_ValidateEveryStoryboardEdit
+    EVT_StoryboardRevised --> POL_ValidateEveryStoryboardEdit
+    POL_ValidateEveryStoryboardEdit --> CMD_ValidateStoryboard
     EVT_StageStarted -.-> RM_Status
     EVT_StageCompleted -.-> RM_Status
     EVT_StageFailed -.-> RM_Status
@@ -234,6 +259,20 @@ flowchart LR
     EVT_SongAnalyzed -.-> RM_EchoSpans
     EVT_LeadStemSeparated -.-> RM_EchoSpans
     RM_EchoSpans -.-> ACT_StageRunner
+    EVT_StoryboardValidated -.-> RM_ResolvedStoryboard
+    EVT_StoryboardWritten -.-> RM_ResolvedStoryboard
+    EVT_StoryboardRevised -.-> RM_ResolvedStoryboard
+    EVT_TimingOverridden -.-> RM_ResolvedStoryboard
+    RM_ResolvedStoryboard -.-> ACT_StageRunner
+    RM_ResolvedStoryboard -.-> ACT_Orchestrator
+    RM_ResolvedStoryboard -.-> ACT_QueueRun
+    RM_ResolvedStoryboard -.-> ACT_User
+    EVT_StoryboardWritten -.-> RM_StoryboardTable
+    EVT_StoryboardRevised -.-> RM_StoryboardTable
+    RM_StoryboardTable -.-> ACT_User
+    RM_StoryboardTable -.-> ACT_StageRunner
+    EVT_ContactSheetWritten -.-> RM_ContactSheet
+    RM_ContactSheet -.-> ACT_User
     classDef evt fill:#a3391f,stroke:#e65100,color:#fff
     classDef cmd fill:#64b5f6,stroke:#0d47a1,color:#000
     classDef pol fill:#ce93d8,stroke:#4a148c,color:#000
@@ -378,6 +417,39 @@ flowchart LR
     classDef hs fill:#e57373,stroke:#b71c1c,color:#fff
 ```
 
+### From the treatment to the resolved storyboard
+
+```mermaid
+flowchart LR
+    ACT_StageRunner(["Stage runner"]):::act
+    CMD_WriteStoryboard["Write storyboard"]:::cmd
+    EVT_StoryboardWritten["⭐ Storyboard written"]:::evt
+    POL_ValidateEveryStoryboardEdit{{"Every storyboard edit is validated"}}:::pol
+    CMD_ValidateStoryboard["Validate storyboard"]:::cmd
+    EVT_StoryboardValidated["Storyboard validated"]:::evt
+    RM_ResolvedStoryboard[("Resolved storyboard")]:::rm
+    CMD_WriteContactSheet["Write contact sheet"]:::cmd
+    EVT_ContactSheetWritten["Contact sheet written"]:::evt
+    RM_ContactSheet[("Contact sheet")]:::rm
+    ACT_StageRunner --> CMD_WriteStoryboard
+    CMD_WriteStoryboard --> EVT_StoryboardWritten
+    EVT_StoryboardWritten --> POL_ValidateEveryStoryboardEdit
+    POL_ValidateEveryStoryboardEdit --> CMD_ValidateStoryboard
+    CMD_ValidateStoryboard --> EVT_StoryboardValidated
+    EVT_StoryboardValidated --> RM_ResolvedStoryboard
+    RM_ResolvedStoryboard --> CMD_WriteContactSheet
+    CMD_WriteContactSheet --> EVT_ContactSheetWritten
+    EVT_ContactSheetWritten --> RM_ContactSheet
+    classDef evt fill:#a3391f,stroke:#e65100,color:#fff
+    classDef cmd fill:#64b5f6,stroke:#0d47a1,color:#000
+    classDef pol fill:#ce93d8,stroke:#4a148c,color:#000
+    classDef rm fill:#81c784,stroke:#1b5e20,color:#000
+    classDef act fill:#a3751f,stroke:#f57f17,color:#000
+    classDef ext fill:#f48fb1,stroke:#880e4f,color:#000
+    classDef agg fill:#ffe082,stroke:#ff6f00,color:#000
+    classDef hs fill:#e57373,stroke:#b71c1c,color:#fff
+```
+
 ## Bounded Contexts & Aggregates
 
 | Context | Purpose | Aggregates | Events |
@@ -386,6 +458,7 @@ flowchart LR
 | Review (`BC-Review`) | The user's frame-accurate notes on renders, sent to the agent in rounds and answered note by note | Project review | Review note added, Review note changed, Review note deleted, Review round sent, Review round answered |
 | Generation queue (`BC-GenerationQueue`) | Gets every generated image and clip of a project approved before anything derives from it – generate an attempt, give it a verdict, requeue it with the fix prompt, or file it | Generation queue | Queue item added, Queue item replaced, Attempt generated, Attempt generation failed, Verdict given, Attempt filed, Queue item requeued, Queue item needs a fix, Attempt accepted, Queue item dropped, Region patched, Queue run stopped |
 | Timing (`BC-Timing`) | Turns the user's song and lyrics into a measured timing, merges the user's timing overrides into the effective timing, and resolves symbolic anchors to seconds for every later stage | Project timing, Lyrics | Song imported, Song loudness normalized, Lyrics written, Song analyzed, Lead stem separated, Timing overridden |
+| Storyboard (`BC-Storyboard`) | Turns the treatment or script, the effective timing and the bibles into an ordered list of shots that covers the song or episode track, checks every shot's source, continuity references and limits, and hands resolved shots to the queue, render, QA and review | Storyboard | Storyboard written, Storyboard revised, Storyboard validated, Contact sheet written |
 
 ## Aggregates
 
@@ -396,3 +469,4 @@ flowchart LR
 | Generation queue (`AGG-GenerationQueue`) | Generation queue | as-is | assets/queue.json per project, read, changed and written whole on every change (packages/cli/src/queue.ts:101-119)<br>an item waits for the items in its after list across the whole queue (queue.ts:524-529); order numbers are taken from the whole queue (queue.ts:127)<br>one queue run per project, pid lock assets/queue.lock (queue.ts:562-578,671-674) |
 | Project timing (`AGG-ProjectTiming`) | Timing | as-is | timing.json and timing.overrides.json per project are parsed and merged into one effective timing on every project load, and the merge ends in one check of the whole timing (packages/core/src/project.ts:237-241; packages/core/src/timing.ts:61-94)<br>assertTiming checks sections, lines, words, beats and energy of the merged timing together, so one bad override fails the whole timing (timing.ts:96-165)<br>the analysis writes timing.json whole and never writes the overrides (scripts/audio-analysis/analyze.py:430-432, README.md:10) |
 | Lyrics (`AGG-Lyrics`) | Timing | as-is | writeLyrics checks the whole text for section tags and writes lyrics.txt atomically (packages/cli/src/board-wizard.ts:271-278), used by the lyrics command and the board wizard (packages/cli/src/index.ts:588-608; packages/cli/src/release-board.ts:206) |
+| Storyboard (`AGG-Storyboard`) | Storyboard | as-is | storyboard.yaml per project is parsed whole with StoryboardSchema, only by loadProject (packages/core/src/project.ts:242-243)<br>resolveStoryboard checks all shots together – unique ids, order, coverage, chaining – against the effective timing and the bibles, in one call whose only caller is validateProject (packages/core/src/timing.ts:455-577; packages/cli/src/validate.ts:106)<br>the hook validates the whole project on every edit of storyboard.yaml and blocks a failing edit (workspace/.claude/hooks/validate-artifacts.mjs:13-15; packages/cli/src/validate-file.ts:124-127) |

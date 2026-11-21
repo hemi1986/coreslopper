@@ -12,6 +12,7 @@
 | GAP-AGG-GenerationQueue | as-is boundary | [AGG-GenerationQueue](events.yaml) | [BC-GenerationQueue](context-map.as-is.md#bc-generationqueue--generation-queue) | – | assets/queue.json per project, read, changed and written whole on every change (packages/cli/src/queue.ts:101-119)<br>an item waits for the items in its after list across the whole queue (queue.ts:524-529); order numbers are taken from the whole queue (queue.ts:127)<br>one queue run per project, pid lock assets/queue.lock (queue.ts:562-578,671-674) | Decide the target boundary |
 | GAP-AGG-ProjectTiming | as-is boundary | [AGG-ProjectTiming](events.yaml) | [BC-Timing](context-map.as-is.md#bc-timing--timing) | – | timing.json and timing.overrides.json per project are parsed and merged into one effective timing on every project load, and the merge ends in one check of the whole timing (packages/core/src/project.ts:237-241; packages/core/src/timing.ts:61-94)<br>assertTiming checks sections, lines, words, beats and energy of the merged timing together, so one bad override fails the whole timing (timing.ts:96-165)<br>the analysis writes timing.json whole and never writes the overrides (scripts/audio-analysis/analyze.py:430-432, README.md:10) | Decide the target boundary |
 | GAP-AGG-Lyrics | as-is boundary | [AGG-Lyrics](events.yaml) | [BC-Timing](context-map.as-is.md#bc-timing--timing) | – | writeLyrics checks the whole text for section tags and writes lyrics.txt atomically (packages/cli/src/board-wizard.ts:271-278), used by the lyrics command and the board wizard (packages/cli/src/index.ts:588-608; packages/cli/src/release-board.ts:206) | Decide the target boundary |
+| GAP-AGG-Storyboard | as-is boundary | [AGG-Storyboard](events.yaml) | [BC-Storyboard](context-map.as-is.md#bc-storyboard--storyboard) | – | storyboard.yaml per project is parsed whole with StoryboardSchema, only by loadProject (packages/core/src/project.ts:242-243)<br>resolveStoryboard checks all shots together – unique ids, order, coverage, chaining – against the effective timing and the bibles, in one call whose only caller is validateProject (packages/core/src/timing.ts:455-577; packages/cli/src/validate.ts:106)<br>the hook validates the whole project on every edit of storyboard.yaml and blocks a failing edit (workspace/.claude/hooks/validate-artifacts.mjs:13-15; packages/cli/src/validate-file.ts:124-127) | Decide the target boundary |
 <!-- kataster:gap-register:end -->
 
 ## Gaps found by the adoption of the project and stage pipeline (2026-11-21)
@@ -138,6 +139,44 @@ Decisions (by recommendation, not reviewed by the user):
   timing. ADR 0039 (proposed) records them.
 - The song events (`EVT-SongImported`, `EVT-SongLoudnessNormalized`, `EVT-LeadStemSeparated`) belong to the
   context without an aggregate until `song.json` has a schema (G-58).
+
+## Gaps found by the adoption of the storyboard (2026-11-21)
+
+Candidates only – no stories until the user asks (`/adopt <scope> --stories`). Priority is a suggestion; the
+user's four answers (they use lip-sync shots in music videos regularly, AI clips, motion and mixed shots but no
+footage, change the storyboard only by telling the agent, and want the contact sheet on the board with images)
+set G-69 high and G-70, G-73 medium.
+
+| # | Class | Gap | Evidence | Source | Priority |
+|---|---|---|---|---|---|
+| G-69 | Exists but contradicts | A music-video lip-sync shot is not checked at all: no character, face, or length check, and no `source: ai-clip` rule; the skill says "≤ 30 s" instead of the provider's maximum | `packages/core/src/timing.ts:268-269`; `workspace/.claude/skills/storyboard/SKILL.md:31` | HS-72 | high |
+| G-70 | Missing | The contact sheet is an SVG of text cards with no keyframes, written once in the storyboard stage and stale after a revision; the board's production view embeds it, and the user has never noticed it there | `packages/cli/src/contact-sheet.ts:72-99`; `board-production.ts:314` | HS-71 | medium |
+| G-71 | Exists but contradicts | An AI clip must set both prompts: a lip-sync shot carries a video prompt nobody uses, a chained shot a keyframe prompt nobody uses | `timing.ts:407-410`; `queue.ts:364-367`; `workspace/.claude/skills/ai-clips/SKILL.md:91` | HS-73 | medium |
+| G-72 | Exists but contradicts | `queue add --kind` (`buildShotItems`) and QA's continuity checks read the unvalidated storyboard; items can be built from an invalid one | `queue.ts:326-386`; `qa.ts:48-102,299` | HS-79 | medium |
+| G-73 | Exists but contradicts | A mixed shot's AI-clip layer passes with only `prompts.video` and renders empty; a ChatWindow layer's lines are read from the shot's `motion.props` | `timing.ts:376-379,433`; `packages/remotion/src/components/ShotRenderer.tsx:114-124` | HS-82 | medium |
+| G-74 | Exists but contradicts | The storyboard skill says "shot list", files the lyric-text rule under Episodes, asks a "storyboard critic" that does not exist, and gives the 30 s lip-sync limit | `SKILL.md:3,26,31,38,51` | HS-86 | low |
+| G-75 | Exists but contradicts | The motion components are listed twice (core `MOTION_COMPONENTS`, the Remotion switch); Remotion falls back silently to `TitleCard` or `Grid` | `timing.ts:18-27`; `ShotRenderer.tsx:53-70,84,100`; `packages/remotion/README.md:30` | HS-80 | low |
+| G-76 | Exists but contradicts | A shot's continuity references are resolved three times (validation, queue, QA) | `timing.ts:297-366`; `queue.ts:247-287`; `qa.ts:75-102,293-303` | HS-80 | low |
+| G-77 | Exists but contradicts | Validation accepts any substring as a highlight; the renderer highlights single normalized words, so a multi-word highlight never shows | `timing.ts:442-452`; `packages/remotion/src/components/TextOverlay.tsx:29-35` | HS-81 | low |
+| G-78 | Dead | `StoryboardSchema.timing`, `.style` and `.characters` are read by nothing, for either kind (extends G-67); `project.ts` and ADR 0016 say "for an episode" only | `schema.ts:365-371`; `project.ts:101-107,225-228` | HS-74 | low |
+| G-79 | Dead | `layer.blend` is read by nothing | `schema.ts:288` | HS-75 | low |
+| G-80 | Exists but contradicts | `fade`, `dissolve` and `wipe` render as the same opacity fade inside one shot | `packages/remotion/src/components/Transition.tsx:11-36` | HS-76 | low |
+| G-81 | Exists but contradicts | `storyboard.md` is written by hand and checked by nothing; it can drift from the YAML | skill step 6; `board-production.ts:243-262` | HS-78 | low |
+| G-82 | Exists but contradicts | The queue reads `clipSeconds` and `keyframeWorkflow`, and ChatWindow reads `lines`, from the untyped `motion.props` | `queue.ts:289-295,352`; `ChatWindow.tsx:35` | HS-83 | low |
+| G-83 | Exists but contradicts | A section id containing `intro` or `outro` switches the renderer to a title look | `ShotRenderer.tsx:76-77` | HS-84 | low |
+| G-84 | Exists but contradicts | `validate` is defined twice, in the workspace CLI and in the npx CLI, with different output | `packages/cli/src/index.ts:86-103`; `npx.ts:182-195` | analyst | low |
+| G-85 | Missing | No test pinned coverage errors, order, ids, the source rules, highlights or chaining (covered now by `tests/storyboard-characterization.test.ts`); still none for the hook's storyboard path or ChatWindow layers | `tests/timing.test.ts`; `tests/contact-sheet.test.ts` | analyst | low |
+
+Decisions (by recommendation, not reviewed by the user):
+
+- GAP-AGG-Storyboard: the boundary stays as recovered (`as-is`).
+- Exists and is intended: one storyboard model for both kinds with episode checks as branches (ADR 0016);
+  coverage within one frame; symbolic anchors with a warned `time` anchor (ADR 0005); the source rules for motion,
+  footage and mixed shots; continuity references checked against the bibles and the canon (ADR 0025); the hook
+  blocking a failing storyboard edit; render taking the resolved shots as props; `camera` as written direction;
+  the composition rules, the 3–6 s clip length and the three-revision cap as agent guidance in the skills;
+  character sheets checked by the queue before generation, not by `validate`. ADR 0040 (proposed) records them.
+- Footage shots are kept but get low priority: the user does not bring footage.
 
 ## Decisions
 

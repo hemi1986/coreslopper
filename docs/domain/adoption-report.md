@@ -571,3 +571,170 @@ None. HS-47 to HS-68 are resolved, four of them partly by the user's answers.
 | HS-65 | Line kind and confidence as schema fields | recommendation | G-62 |
 | HS-67 | ADR 0039 | recommendation | `docs/adr/0039-song-timing.md` |
 | HS-68 | Lyrics rules once; Python follows | recommendation | G-57 |
+
+# Adoption – storyboard
+Date: 2026-11-21 · Commit: 2ba1480 · Slice: shots, shot sources, coverage, validation, contact sheet (concept `storyboard`) · Analysts: 3 lenses
+
+## Scope
+
+- **Slice:** the storyboard schemas (`ShotSchema`, `StoryboardSchema`, layers, transitions), the storyboard
+  checks in `resolveStoryboard` with their episode branches, `validate` and `validateProject`, the hook's
+  storyboard path, the contact sheet, `storyboard.md`, and the storyboard skill. No shared library.
+- **Out of scope:** anchors and their resolution (timing slice), the generation queue (verdict slice), keyframe
+  and clip generation (generation), the definitions of sets, plates, props and character states (character), the
+  script and scenes (series), the Remotion compositions (render). Consumers were read for coupling only.
+- **Intent:** domain model, as for the earlier slices. **Language:** artifacts `en`, UI `en`.
+- **Since the last slice:** no code change (same day).
+
+| Layer | Files |
+|---|---|
+| core (domain) | the storyboard parts of `packages/core/src/schema.ts`, `timing.ts` (`resolveStoryboard`, `EpisodeContext`, `MOTION_COMPONENTS`), `project.ts` (load), `state.ts` (stage) |
+| cli (application) | `validate.ts`, `validate-file.ts`, `contact-sheet.ts`, `index.ts` (`validate`, `contact-sheet`), `npx.ts` (`validate`) |
+| consumers | `queue.ts` (`buildShotItems`), `render.ts`, `qa.ts`, `subtitles.ts`, `board-review.ts`, `board-production.ts`, `packages/remotion/src/components/ShotRenderer.tsx`, `Transition.tsx`, `TextOverlay.tsx` |
+| workspace | `workspace/.claude/skills/storyboard/SKILL.md`, `hooks/validate-artifacts.mjs` |
+| tests | `tests/continuity.test.ts`, `timing.test.ts`, `schema.test.ts`, `contact-sheet.test.ts`, `episode*.test.ts` (storyboard parts) |
+
+## How this slice was decided
+
+As in the verdict and timing slices: no code-level questions. Every technical hotspot was decided by the
+recommendation and is marked "not reviewed by the user – delegated". The user answered four questions about how
+they work:
+1. They have never looked at the contact sheet. If it stays, it belongs in the board's view of an active
+   project, with images if possible.
+2. When something in the storyboard is wrong, they tell the agent; they do not edit it.
+3. They use lip-sync shots in music videos regularly.
+4. Their videos use AI clips, motion graphics and mixed shots, but no footage.
+Answer 3 makes G-69 high; answers 1 and 4 set G-70 and G-73 to medium and footage to low. ADR 0040 stays
+`Proposed`.
+
+## What the repository is (facts)
+
+- `storyboard.yaml` is written by the agent (skill step 3), parsed only by `loadProject`, and checked as a whole
+  by `resolveStoryboard`, whose only caller is `validateProject`. Render, contact sheet, QA, subtitles and the board
+  review go through it; the queue's `buildShotItems` and QA's continuity checks read the raw storyboard.
+- The checks: unique `shot-NNN` ids, start order, at least one frame per shot, a known section, coverage from 0
+  to the audio duration within one frame, the source rules, continuity references, highlights inside the text,
+  and chaining from an earlier shot. A `time` anchor only warns.
+- One model for both kinds: an episode adds scene sets and plates, ChatWindow chat lines, and lip-sync face and
+  length checks through `EpisodeContext`. A music video gets no lip-sync check at all.
+- The contact sheet is a hand-built SVG of text cards with no images; the board embeds it. `storyboard.md` is
+  written by hand. The hook validates every storyboard edit, which also rewrites `timing.effective.json`.
+- Dead fields: `storyboard.timing`, `.style`, `.characters` and `layer.blend`. `camera` is read by no code. Undeclared
+  keys in `motion.props` are read by the queue and ChatWindow. `fade`, `dissolve` and `wipe` render alike.
+- `ShotSchema` changed in six commits (lip-sync, focus, episodes, lip-sync limits, plates, props and states).
+  `layers`, `mixed`, `chaining`, `highlights` and `transition` date from the first commit. No demo uses mixed shots.
+  There are no TODOs and no reverts.
+
+## Domain model (decided by recommendation)
+
+- **Context:** `BC-Storyboard` – Storyboard. It is run by the pipeline's `storyboard` stage, which both kinds
+  share. It reads the effective timing (BC-Timing) and refers to the bibles and the canon. It feeds the queue,
+  render, QA, subtitles and the board review.
+- **Aggregate:** `AGG-Storyboard` (`as-is`: parsed whole, checked as one, validated on every edit). Its
+  invariants:
+  - coverage within one frame;
+  - order and ids;
+  - each source has what it needs (lip-sync shots need no video prompt, chained shots no keyframe prompt);
+  - every layer can be rendered;
+  - continuity references exist;
+  - the episode scene rules;
+  - lip-sync checks in both kinds;
+  - a highlight is one word;
+  - chaining from an earlier shot;
+  - the agent is the only writer.
+- **Commands:** write storyboard, revise storyboard, validate storyboard, write contact sheet. **Policy:** every
+  storyboard edit is validated (the hook). **Read models:** resolved storyboard, storyboard table, contact sheet.
+  **Flow:** `FLOW-Storyboard`.
+- **Glossary:**
+  - New: **Layer**, **Continuity Reference**, **Lip-Sync Shot**, **Highlight**, **Focus Point**.
+  - Sharpened: **Shot** (all its parts, ids, avoid "cut"), **Storyboard** (one model, the agent writes it at the
+    user's request), **Shot Source** (avoid "source" alone), **Coverage** (song or episode track, within one
+    frame), **Contact Sheet** (on the board, with keyframes).
+- **ADR:** 0040 (Proposed), which amends 0005 and 0016.
+
+## Package documentation written
+
+- `.claude/rules/storyboard.md` – path-scoped slice doc; nothing left `[OPEN]`.
+- `docs/engineering/conventions.md` – an agent-written artifact checked whole by one core function, consumers
+  through `validateProject`, derived documents going stale, the storyboard seam.
+- `docs/architecture/data-model.md`, `docs/domain/context-map.as-is.md` – `AGG-Storyboard`, `BC-Storyboard`.
+
+## Contradictions found and how they were resolved
+
+| Contradiction | Resolution |
+|---|---|
+| Glossary "grid of stills" vs text cards in an SVG | on the board, with keyframes (user; G-70) |
+| Lip-sync checks for episodes only vs regular music-video lip-sync; skill "≤ 30 s" | both kinds, the provider's maximum (user and recommendation; G-69) |
+| An AI clip needs both prompts vs unused video prompts of lip-sync shots and keyframe prompts of chained shots | each needs only the prompt it uses (G-71) |
+| "One validated storyboard" (render, board) vs the queue and QA reading the raw one | everything reads the validated one (G-72) |
+| A mixed AI-clip layer validates with only a video prompt vs renders empty | every layer renderable (G-73) |
+| Highlight: substring (validation) vs word (renderer) | one word (G-77) |
+| `project.ts` and ADR 0016 "path fields unused for an episode" vs unused for both kinds | remove them (G-78) |
+| Skill: `storyboard.md` "derived" vs written by hand | generated (G-81) |
+| Skill "shot list", "storyboard critic", lyric rule under Episodes | glossary terms; skill fix (G-74) |
+| Glossary "character sheet required for every character shot" vs `validate` not checking it | the queue's check before generation is intended |
+| Motion components and continuity references kept in two and three places | one place each (G-75, G-76) |
+
+## Rules and checks
+
+| Rule | Enforcement | State |
+|---|---|---|
+| Coverage within one frame, start at 0, end at the duration; order, unique ids, the id format, a known section, at least one frame; the `time` anchor warning | `tests/storyboard-characterization.test.ts` | green |
+| Source rules: motion component, both prompts of an ordinary AI clip, footage asset, two layers and valid layers of a mixed shot | `tests/storyboard-characterization.test.ts` | green |
+| Highlights inside the text, ignoring case; chaining from an existing earlier shot | `tests/storyboard-characterization.test.ts` | green |
+| Continuity references, plates, props, states, the episode set rule | existing `tests/continuity.test.ts`, `tests/episode.test.ts` | green |
+| Music-video lip-sync checks, single prompts, renderable layers, validated input for every consumer, one-word highlights | documentation until stories build them (G-69–G-73, G-77) | – |
+| The slice stays inside the packages' allowed imports | slice 1 boundary rule and test | green |
+
+## Gap register (candidates – stories only with --stories)
+
+17 candidates, G-69 to G-85, in `docs/domain/gap-register.md`:
+- 13 *exist but contradict*. The highest are G-69 (music-video lip-sync), G-71 (prompts), G-72 (unvalidated
+  input) and G-73 (empty layers).
+- 2 are *missing*: G-70 (the contact sheet with keyframes) and G-85 (tests).
+- 2 are *dead*: G-78 (path fields) and G-79 (`blend`).
+
+## Deliberately left alone
+
+- Production code, the storyboard and ai-clips skills, and ADRs 0005, 0016 and 0025, which are accepted. ADR 0040
+  amends 0005 and 0016.
+- The definitions of sets, plates, props and character states, and the canon append rule (character slice).
+  ChatWindow typing and the script's scenes (series slice).
+- The Remotion compositions, transitions and text overlay as code (render slice). G-75, G-77, G-80 and G-83 are
+  recorded here because the storyboard's terms are at stake.
+- The composition rules for AI shots and the 3–6 s clip length. They are agent guidance, not checks.
+- The glossary term **Animatic**, which no code or skill uses (render slice).
+- The hook rewriting `timing.effective.json` on every storyboard edit. It is harmless, because the snapshot is
+  the same merge (timing slice, HS-49).
+
+## Open hotspots
+
+None. HS-69 to HS-86 are resolved, four of them partly by the user's answers.
+
+## Next slice
+
+`generation` per the adoption plan: `generate`, the cache and manifest, provider adapters, models and roles, and
+ComfyUI. It owns how keyframes and clips are made from this slice's shots and prompts.
+
+## Decision log
+
+| # | Decision | How | Written to |
+|---|---|---|---|
+| HS-71 | The contact sheet on the board, with keyframes | user (2026-11-21) | glossary, `RM-ContactSheet`, G-70 |
+| HS-72 | Lip-sync checks in both kinds; provider maximum | user (regular use) and recommendation | invariant, ADR 0040, G-69 |
+| HS-77 | The agent is the only writer, at the user's request | user (2026-11-21) | glossary (Storyboard), invariant, `CMD-ReviseStoryboard` |
+| HS-82 | Every layer renderable; at most one ChatWindow per mixed shot | recommendation; medium because the user uses mixed shots | invariant, G-73 |
+| HS-69 | One context, Storyboard; one model for both kinds | recommendation | `BC-Storyboard` |
+| HS-70 | The whole storyboard as the aggregate (as-is) | recommendation | `AGG-Storyboard` |
+| HS-73 | Lip-sync shots need no video prompt, chained shots no keyframe prompt | recommendation | invariant, G-71 |
+| HS-74 | Remove the storyboard path fields | recommendation | G-78 |
+| HS-75 | Keep `camera` as direction; remove `blend` | recommendation | glossary (Shot), G-79 |
+| HS-76 | Keep five transition values; render them apart | recommendation | G-80 |
+| HS-78 | `storyboard.md` generated from the YAML | recommendation | `RM-StoryboardTable`, G-81 |
+| HS-79 | Every consumer reads the validated storyboard | recommendation | `CMD-ValidateStoryboard`, G-72 |
+| HS-80 | One continuity resolution, one motion component registry | recommendation | G-75, G-76 |
+| HS-81 | A highlight is one word | recommendation | glossary, invariant, G-77 |
+| HS-83 | Typed fields for clip length and keyframe workflow | recommendation | G-82 |
+| HS-84 | The look comes from the storyboard, not a section's name | recommendation | G-83 |
+| HS-85 | ADR 0040 | recommendation | `docs/adr/0040-storyboard.md` |
+| HS-86 | Shot Source, Layer, Continuity Reference, Lip-Sync Shot; avoid "refs", "shot list" and "cut" | recommendation | glossary, G-74 |

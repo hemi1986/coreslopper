@@ -200,6 +200,52 @@ lines; words in parentheses are backing vocals. Written whole and atomically by 
 line. Source: EVT-LyricsWritten (Lyrics text, Sections). A hand edit bypasses the check; the analysis then puts
 lines before the first tag into a section `unlabeled` (HS-68).
 
+### AGG-Storyboard – Storyboard (as-is)
+
+One file per project, `storyboard.yaml` (`StoryboardSchema`, `packages/core/src/schema.ts:277-371`), parsed whole
+by `loadProject` and resolved and checked as one by `resolveStoryboard` against the effective timing, the bibles,
+and in an episode the script (`packages/core/src/timing.ts:455-577`). One model for both project kinds.
+
+**Storyboard (root)**
+
+| Attribute | Type | Required | Source |
+|---|---|---|---|
+| Version | always 1 | yes | EVT-StoryboardWritten |
+| Shots | at least one Shot, in start order | yes | EVT-StoryboardWritten, EVT-StoryboardRevised |
+| Timing, Style, Characters | paths with defaults, read by nothing (HS-74, to be removed) | default | – |
+
+**Shot** – the attributes all come from EVT-StoryboardWritten and EVT-StoryboardRevised.
+
+| Attribute | Type | Required |
+|---|---|---|
+| Id | ShotId `shot-NNN`, unique | yes |
+| Section | SectionId of the effective timing (a scene id in an episode) | yes |
+| Start, End | Anchor (BC-Timing); End after Start, at least one frame | yes |
+| Source | Shot Source: motion, ai-clip, footage, mixed | yes |
+| Description | text | yes |
+| Camera | text, default `static`; direction for the prompts, read by no code (HS-75) | default |
+| Text, Highlights | on-screen text; highlights are words of it (HS-81) | no, default empty |
+| Transition | type cut, fade, dissolve, wipe, glitch (default cut) and duration in seconds (default 0) | default |
+| Continuity references | style tokens (paths into the style bible), characters, sets, plate (`<set>/<plate>`), props, character state per character | default empty |
+| Motion | component (one of the motion components) and untyped props (HS-83) | for motion |
+| Prompts | keyframe, video | for an AI clip (HS-73) |
+| Asset | path of the footage or clip | for footage |
+| Lip-sync | character, optional audio source (default the vocal stem, or the speaker stem in an episode) | no |
+| Layers | at least two Layers | for mixed |
+| Focus point | x and y in 0–1, default centre | no |
+| Chaining | enabled, from (ShotId of an earlier shot) | no |
+
+**Layer** – Layer type (motion, ai-clip, footage), Asset, Component, Blend (read by nothing, HS-75), Order
+(z-index, default 0). Motion layers share the shot's motion props (HS-82).
+
+**Not in the aggregate** – the resolved storyboard (RM-ResolvedStoryboard: seconds and frames per shot, made on
+demand), the storyboard table `storyboard.md` (RM-StoryboardTable), the contact sheet `review/contact-sheet.svg`
+(RM-ContactSheet), and the sets, plates, props and character states the references point to (bibles and canon).
+
+Decided 2026-11-21, ahead of the code: lip-sync checks for both project kinds (user and recommendation, HS-72); a
+lip-sync shot needs no video prompt and a chained shot no keyframe prompt (HS-73); every layer renderable
+(HS-82); a highlight is one word (HS-81); the agent is the only writer (user, HS-77).
+
 ## Lifecycle
 
 Stage state as the code allows it today. Every transition is accepted from every status (HS-11); the diagram
@@ -253,4 +299,9 @@ erDiagram
   TIMING_OVERRIDES }o--o{ LINE : "moves by id"
   TIMING_OVERRIDES }o--o{ WORD : "moves by line and index"
   LYRICS ||--o{ SECTION : "section tags name"
+  PROJECT ||--o| STORYBOARD : "storyboard.yaml"
+  STORYBOARD ||--|{ SHOT : "covers the audio in order"
+  SHOT }o--|| SECTION : "in"
+  SHOT ||--o{ LAYER : "mixed shot"
+  SHOT }o--o| SHOT : "chains from"
 ```

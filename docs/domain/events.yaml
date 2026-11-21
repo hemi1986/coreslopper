@@ -62,6 +62,9 @@ bounded_contexts:
   - id: BC-Timing
     name: Timing
     purpose: Turns the user's song and lyrics into a measured timing, merges the user's timing overrides into the effective timing, and resolves symbolic anchors to seconds for every later stage
+  - id: BC-Storyboard
+    name: Storyboard
+    purpose: Turns the treatment or script, the effective timing and the bibles into an ordered list of shots that covers the song or episode track, checks every shot's source, continuity references and limits, and hands resolved shots to the queue, render, QA and review
 
 aggregates:
   - id: AGG-Project
@@ -142,6 +145,25 @@ aggregates:
     invariants:
       - Every sung line sits under a section tag, and at least one tag has lines (the code does this for writeLyrics, board-wizard.ts:274-276; a hand edit of lyrics.txt bypasses it)
       - The lyrics are the authoritative word text and spelling; tags and lines keep the user's order (glossary; ADR 0008)
+  - id: AGG-Storyboard
+    name: Storyboard
+    context: BC-Storyboard
+    status: as-is
+    evidence:
+      - storyboard.yaml per project is parsed whole with StoryboardSchema, only by loadProject (packages/core/src/project.ts:242-243)
+      - resolveStoryboard checks all shots together – unique ids, order, coverage, chaining – against the effective timing and the bibles, in one call whose only caller is validateProject (packages/core/src/timing.ts:455-577; packages/cli/src/validate.ts:106)
+      - the hook validates the whole project on every edit of storyboard.yaml and blocks a failing edit (workspace/.claude/hooks/validate-artifacts.mjs:13-15; packages/cli/src/validate-file.ts:124-127)
+    invariants:
+      - Shots cover the song or episode track from frame 0 to its duration with no gap or overlap, each within one frame (the code does this, timing.ts:519-554)
+      - Shots are in start order with unique ids shot-NNN, each at least one frame long, and each names a section of the effective timing (the code does this, timing.ts:471-502,515-517; schema.ts:293)
+      - Every shot has what its source needs – a known motion component; a keyframe and a video prompt for an AI clip; an asset for footage; two or more renderable layers for a mixed shot (the code does this, timing.ts:396-439); a lip-sync shot needs no video prompt and a chained shot no keyframe prompt (decided 2026-11-21, HS-73; the code requires both prompts – gap register)
+      - Every layer of a mixed shot can be rendered – an AI-clip layer has an asset (decided 2026-11-21, HS-82; a video prompt alone passes and renders empty – gap register)
+      - Every continuity reference exists – style token, character, set, plate, prop, character state – a plate belongs to one of the shot's sets, and a character state belongs to a character on screen in the shot (the code does this, timing.ts:226-366)
+      - In an episode a shot's set and plate are the set of its scene, and a ChatWindow shows chat lines of the shot's own scene (the code does this, timing.ts:296-321,374-393)
+      - A lip-sync shot is an AI clip of an existing character who shows a face, no longer than the lip-sync model's maximum and, in an episode, the series' limit – in a music video as in an episode (user and decided 2026-11-21, HS-72; the code checks episodes only – gap register)
+      - A highlight is a word of the shot's text (decided 2026-11-21, HS-81; the code accepts any substring the renderer never shows – gap register)
+      - A chained shot chains from an existing shot that ends before it starts (the code does this, timing.ts:556-569)
+      - Only the agent writes storyboard.yaml, in the storyboard stage and when the user asks for a change (user, 2026-11-21, HS-77)
 
 events:
   - id: EVT-ProjectCreated
@@ -282,6 +304,27 @@ events:
     aggregate: AGG-ProjectTiming
     description: "An entry of timing.overrides.json added or changed by hand; no command writes it (HS-66)"
     data: [Section, Line, Word index, Start, End, BPM, Beats, Downbeats]
+  - id: EVT-StoryboardWritten
+    name: Storyboard written
+    aggregate: AGG-Storyboard
+    pivotal: true
+    description: "storyboard.yaml and storyboard.md written by the agent in the storyboard stage (workspace/.claude/skills/storyboard/SKILL.md steps 3 and 6); no command or template writes either"
+    data: [Shots, Sections, Anchors, Shot sources, Continuity references, Prompts, Layers, Transitions, Texts, Highlights, Focus points, Lip-sync characters, Chaining]
+  - id: EVT-StoryboardRevised
+    name: Storyboard revised
+    aggregate: AGG-Storyboard
+    description: "Shots added, removed, re-timed or rewritten by the agent at the user's request, in the chat or in a fix pass (user, 2026-11-21, HS-77)"
+    data: [Changed shots, Removed shots, Reason]
+  - id: EVT-StoryboardValidated
+    name: Storyboard validated
+    aggregate: AGG-Storyboard
+    description: "validateProject resolved every shot to seconds and frames and found no violation; a failure throws and records nothing. Unless --no-write it also writes the timing snapshot timing.effective.json (packages/cli/src/validate.ts:117-119)"
+    data: [Shot count, Duration, Duration in frames, Frame rate, Warnings]
+  - id: EVT-ContactSheetWritten
+    name: Contact sheet written
+    aggregate: AGG-Storyboard
+    description: "contact-sheet writes review/contact-sheet.svg from the validated storyboard: text cards, no images (packages/cli/src/contact-sheet.ts; HS-71)"
+    data: [Shots, Duration, BPM]
 
 commands:
   - id: CMD-CreateProject
@@ -498,6 +541,43 @@ commands:
     rules:
       - An entry is added or changed; the file is never replaced and no entry the user asked for is dropped
       - To change the sections themselves, change the lyrics and analyze again; an override moves times only
+  - id: CMD-WriteStoryboard
+    name: Write storyboard
+    actor: ACT-StageRunner
+    aggregate: AGG-Storyboard
+    produces: [EVT-StoryboardWritten]
+    description: "The storyboard stage through the storyboard skill, from the treatment (music video) or the script (episode), the effective timing, the style, character and set bibles, and the user references of kind storyboard and footage"
+    rules:
+      - Anchors are symbolic; a time anchor is the escape hatch and only warns (ADR 0005)
+      - Shots the user drew or filmed (user references) keep their framing and timing unless the treatment changed them
+      - Missing plates, props or character states are added to the bibles first; an episode only appends them to the canon (ADR 0025)
+      - The storyboard table storyboard.md lists exactly the shots of storyboard.yaml (HS-78; written by hand today – gap register)
+  - id: CMD-ReviseStoryboard
+    name: Revise storyboard
+    actor: ACT-Orchestrator
+    aggregate: AGG-Storyboard
+    produces: [EVT-StoryboardRevised]
+    description: "The agent changes shots because the user asked in the chat or in a review note; the fix pass maps notes to shots (user, 2026-11-21, HS-77)"
+    rules:
+      - A revised shot's keyframe and clip are generated again; the generation cache keeps unchanged shots cheap
+  - id: CMD-ValidateStoryboard
+    name: Validate storyboard
+    actor: ACT-StageRunner
+    aggregate: AGG-Storyboard
+    produces: [EVT-StoryboardValidated]
+    description: "validate, the hook's validate-file, and every render, contact-sheet, qa, subtitles and board-review run validateProject first"
+    rules:
+      - Needs the effective timing, the style and character bibles, and in an episode the script and the series canon; the project kind, slug and budget must match state.json
+      - The lip-sync maximum comes from video.lipsync of the project's provider (config/models.yaml)
+      - Every consumer that builds from shots – queue items, QA, render, review – reads the validated storyboard (HS-79; the queue and QA read it unvalidated – gap register)
+  - id: CMD-WriteContactSheet
+    name: Write contact sheet
+    actor: ACT-StageRunner
+    aggregate: AGG-Storyboard
+    produces: [EVT-ContactSheetWritten]
+    description: "contact-sheet in the storyboard stage (skill step 5); validates first"
+    rules:
+      - The contact sheet belongs in the board's project view and shows each shot's keyframe once it exists (user, 2026-11-21, HS-71; today an SVG of text cards nobody opens – gap register)
 
 policies:
   - id: POL-RunNextStage
@@ -530,6 +610,11 @@ policies:
     when: [EVT-VerdictGiven]
     then: [CMD-ApplyVerdict]
     description: A verdict on a queue attempt files it, requeues it, or leaves the item waiting for a fix
+  - id: POL-ValidateEveryStoryboardEdit
+    name: Every storyboard edit is validated
+    when: [EVT-StoryboardWritten, EVT-StoryboardRevised]
+    then: [CMD-ValidateStoryboard]
+    description: "The workspace hook runs validate-file on every edit of storyboard.yaml under projects/ and blocks a failing edit (exit 2)"
 
 read_models:
   - id: RM-Status
@@ -588,6 +673,24 @@ read_models:
     used_by: [ACT-StageRunner]
     fields: [Start, End, Nearest line, Source]
     description: "The unwritten echoes found in the vocal stem (the report, echo_scan.py) and the backing words in parentheses (from the timing); audio-segment silences them in a lip-sync segment"
+  - id: RM-ResolvedStoryboard
+    name: Resolved storyboard
+    fed_by: [EVT-StoryboardValidated, EVT-StoryboardWritten, EVT-StoryboardRevised, EVT-TimingOverridden]
+    used_by: [ACT-StageRunner, ACT-Orchestrator, ACT-QueueRun, ACT-User]
+    fields: [Shots with start and end in seconds and frames, Duration, Duration in frames, Frame rate, Warnings]
+    description: "resolveStoryboard's result, made on demand and never stored; render passes it to Remotion as props, the board review maps it to shot spans (board-review.ts:122-128)"
+  - id: RM-StoryboardTable
+    name: Storyboard table
+    fed_by: [EVT-StoryboardWritten, EVT-StoryboardRevised]
+    used_by: [ACT-User, ACT-StageRunner]
+    fields: [Shot, Section, Start, End, Source, Description, Coverage notes]
+    description: "storyboard.md, derived from storyboard.yaml (skill step 6); the board lists it as a production document"
+  - id: RM-ContactSheet
+    name: Contact sheet
+    fed_by: [EVT-ContactSheetWritten]
+    used_by: [ACT-User]
+    fields: [Shot, Source, Section, Start, End, Description, Text, Keyframe]
+    description: "review/contact-sheet.svg, embedded in the board's production view; the keyframe field is missing today (HS-71)"
 
 hotspots:
   - id: HS-1
@@ -930,6 +1033,96 @@ hotspots:
     refs: [AGG-Lyrics]
     status: resolved
     resolution: "The analysis stays in Python (ADR 0008); the lyrics rules are defined once and the Python follows them, pinned by one shared fixture – low gap (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-69
+    question: "Shots, coverage, sources, continuity references, lip-sync and ChatWindow checks sit in core timing.ts, the CLI's validate and contact-sheet, the hook and the storyboard skill, for both project kinds. One context, and who owns sets, plates, props and character states?"
+    refs: [BC-Storyboard]
+    status: resolved
+    resolution: "One context, Storyboard, with one model for both kinds and episode branches (ADR 0016). It refers to sets, plates, props and character states; their definitions belong to the bibles and the canon (character slice) (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-70
+    question: "The consistency boundary in code is the whole storyboard: parsed whole, resolved and checked as one, validated on every edit. Keep it as the aggregate (as-is)?"
+    refs: [AGG-Storyboard]
+    status: resolved
+    resolution: "Yes, the whole storyboard of a project is the aggregate as recovered (as-is) (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-71
+    question: "The glossary calls the contact sheet 'a grid of stills'; contact-sheet.ts draws text cards with no images into an SVG the board embeds. Which is it?"
+    refs: [RM-ContactSheet, CMD-WriteContactSheet]
+    status: resolved
+    resolution: "The user has never opened it; it belongs in the board's view of an active project, with each shot's keyframe once it exists (user, 2026-11-21). Glossary updated; the text-card SVG is a gap"
+  - id: HS-72
+    question: "Lip-sync checks (character exists, shows a face, provider maximum, series limit) run only for episodes; a music-video lip-sync shot is not checked at all, and the skill says '≤ 30 s'. Rule?"
+    refs: [AGG-Storyboard]
+    status: resolved
+    resolution: "The user uses lip-sync shots in music videos regularly (user, 2026-11-21). The same checks apply to both kinds except the series limit; the provider's maximum replaces the skill's 30 s; a lip-sync shot is an AI clip – gap, high (recommendation, not reviewed by the user – delegated)"
+  - id: HS-73
+    question: "An AI clip must set prompts.keyframe and prompts.video. A lip-sync shot's video prompt is never used (the queue skips lip-sync clips), and a chained shot gets no keyframe (ai-clips skill). Rule?"
+    refs: [AGG-Storyboard]
+    status: resolved
+    resolution: "A lip-sync shot needs only a keyframe prompt; a chained shot needs only a video prompt – gap (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-74
+    question: "StoryboardSchema's timing, style and characters path fields are read by nothing, for either kind (G-67 covers only timing). Keep?"
+    refs: [AGG-Storyboard]
+    status: resolved
+    resolution: "Remove all three; the project layout fixes the paths – gap, extends G-67 (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-75
+    question: "camera (default static) and layer.blend are never read by code. Keep?"
+    refs: [AGG-Storyboard]
+    status: resolved
+    resolution: "camera stays: it is the agent's written direction the prompts are made from (glossary Shot). blend is removed until a renderer uses it – gap (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-76
+    question: "Transitions fade, dissolve and wipe render as the same opacity fade, inside one shot; only glitch differs. Keep the five values?"
+    refs: [AGG-Storyboard]
+    status: resolved
+    resolution: "Keep the values as direction; the renderer making them distinct is a render gap, low (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-77
+    question: "Who changes storyboard.yaml after the storyboard stage – the user by hand or the agent?"
+    refs: [AGG-Storyboard, CMD-ReviseStoryboard]
+    status: resolved
+    resolution: "The user tells the agent, in the chat or as a review note, and the agent changes it (user, 2026-11-21)"
+  - id: HS-78
+    question: "storyboard.md is meant to be derived from the YAML but is written by hand and checked by nothing. Rule?"
+    refs: [RM-StoryboardTable]
+    status: resolved
+    resolution: "It is a read model: generated from storyboard.yaml by a command, never by hand – gap, low (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-79
+    question: "render, qa, contact-sheet and the board review validate first, but queue add --kind and QA's continuity checks read the raw storyboard. Rule?"
+    refs: [CMD-ValidateStoryboard]
+    status: resolved
+    resolution: "Everything that builds from shots reads the validated storyboard; queue items from an invalid storyboard are refused – gap (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-80
+    question: "Continuity references are resolved three times (timing.ts checks, queue.ts shotReferences, qa.ts checkContinuityRefs), and the motion component list twice (core MOTION_COMPONENTS, Remotion's switch, which falls back silently). One place?"
+    refs: [AGG-Storyboard]
+    status: resolved
+    resolution: "One resolution of a shot's continuity references in core, used by validation, the queue and QA; one motion component registry, and an unknown component fails instead of falling back – gaps, low (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-81
+    question: "Validation accepts a highlight that is any substring of the text; the renderer highlights single normalized words, so a multi-word highlight passes and never shows. Rule?"
+    refs: [AGG-Storyboard]
+    status: resolved
+    resolution: "A highlight is one word of the text; validation and renderer match the same way – gap (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-82
+    question: "A mixed shot's AI-clip layer validates with only prompts.video and then renders empty (no asset); a ChatWindow layer reads the shot's motion.props. Layer contract?"
+    refs: [AGG-Storyboard]
+    status: resolved
+    resolution: "Every layer must be renderable: an AI-clip layer needs an asset, since the queue does not build layers. Motion layers share the shot's motion.props, so a mixed shot has at most one ChatWindow – gap, medium (the user uses mixed shots) (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-83
+    question: "motion.props is an untyped record, but the queue reads clipSeconds and keyframeWorkflow from it and ChatWindow reads lines. Typed fields?"
+    refs: [AGG-Storyboard]
+    status: resolved
+    resolution: "Clip length and keyframe workflow become typed shot fields; ChatWindow lines stay a typed prop of that component – gap, low (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-84
+    question: "The renderer picks a title look when a section id contains intro or outro, so the lyrics' tag names change the picture. Rule?"
+    refs: [AGG-Storyboard]
+    status: resolved
+    resolution: "The look is chosen in the storyboard (a motion component or a shot field), never from a section's name – render gap, low (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-85
+    question: "No ADR decides shot sources, mixed shots and layers, frame chaining, highlights, transitions, the contact sheet or the focus point. Record the storyboard's de-facto decisions?"
+    refs: [BC-Storyboard]
+    status: resolved
+    resolution: "ADR 0040, Proposed: one storyboard for both kinds, coverage within one frame, the source rules, one validated storyboard as the input of every consumer, the agent as the only writer, the contact sheet on the board (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-86
+    question: "'source' means a shot source, a layer type and a lip-sync audio file; 'refs' are continuity references beside the user references; the skill says 'shot list'; 'cut' is a transition and a shot boundary. Terms?"
+    refs: [BC-Storyboard]
+    status: resolved
+    resolution: "Shot Source, Layer (with a layer type), Continuity Reference and Lip-Sync Shot in the glossary; 'refs', 'shot list' and 'cut' for a shot avoided; the skill's wording is a gap (recommendation, not reviewed by the user – delegated, 2026-11-21)"
 
 flows:
   - id: FLOW-AutonomousStage
@@ -944,3 +1137,6 @@ flows:
   - id: FLOW-SongTiming
     name: From the song to the effective timing
     sequence: [ACT-User, CMD-WriteLyrics, EVT-LyricsWritten, ACT-SetupSkill, CMD-ImportSong, EVT-SongImported, ACT-StageRunner, CMD-AnalyzeSong, EVT-SongAnalyzed, RM-TimingReport, CMD-OverrideTiming, EVT-TimingOverridden, RM-EffectiveTiming]
+  - id: FLOW-Storyboard
+    name: From the treatment to the resolved storyboard
+    sequence: [ACT-StageRunner, CMD-WriteStoryboard, EVT-StoryboardWritten, POL-ValidateEveryStoryboardEdit, CMD-ValidateStoryboard, EVT-StoryboardValidated, RM-ResolvedStoryboard, CMD-WriteContactSheet, EVT-ContactSheetWritten, RM-ContactSheet]

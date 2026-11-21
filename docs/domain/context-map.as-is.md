@@ -3,21 +3,25 @@
 > Recovered from code by `/adopt` on 2026-11-21 at b195086. This is **not a target**.
 > Target: [context-map.md](context-map.md) · Gap register: [gap-register.md](gap-register.md).
 
-Adopted slices: project and stage pipeline; human review; art-director verdicts and the generation queue (decided by recommendation); song timing and lyrics (decided by recommendation, four answers from the user). Other areas – release, series canon,
+Adopted slices: project and stage pipeline; human review; art-director verdicts and the generation queue (decided by recommendation); song timing and lyrics (decided by recommendation, four answers from the user); the storyboard (decided by recommendation, four answers from the user). Other areas – release, series canon,
 character library, model bench, providers – appear only as neighbours until their own slice is adopted.
 
 ```mermaid
 flowchart LR
   BC-Pipeline -->|reads canon, books canon spend separately| Series[Series canon - not adopted]
   BC-Review -->|open rounds come before the next autonomous stage; fixes reset qa-export| BC-Pipeline
-  BC-Review -->|notes map to storyboard shots and timing sections| Storyboard[Storyboard and timing - not adopted]
+  BC-Review -->|notes map to storyboard shots and timing sections| BC-Storyboard
   BC-Pipeline -->|done project feeds release| Release[Release - not adopted]
   BC-Pipeline -->|style-character done imports characters| Library[Character library - not adopted]
   BC-GenerationQueue -->|every attempt through generate: budget, cache, manifest, spend| Generation[Generation and providers - not adopted]
-  BC-GenerationQueue -->|items built from storyboard shots and their references| Storyboard
+  BC-GenerationQueue -->|items built from storyboard shots and their references| BC-Storyboard
   BC-GenerationQueue -->|needs-fix count, failed verdicts| BC-Pipeline
   BC-Pipeline -->|audio-analysis stage runs the song analysis| BC-Timing
-  BC-Timing -->|effective timing, anchors resolved to seconds| Storyboard
+  BC-Timing -->|effective timing, anchors resolved to seconds| BC-Storyboard
+  BC-Pipeline -->|storyboard stage, shared by both kinds| BC-Storyboard
+  BC-Storyboard -->|refers to sets, plates, props, character states| Canon[Bibles and canon - not adopted]
+  BC-Storyboard -->|resolved shots as render props| Render
+  BC-Storyboard -->|episode: scenes as sections, chat lines| Series
   BC-Timing -->|effective timing as render props| Render[Render - not adopted]
   BC-Review -->|sections and beats on the review timeline| BC-Timing
   BC-Timing -->|echo spans, lead stem for lip-sync segments| Lipsync[Lip-sync audio - not adopted]
@@ -122,3 +126,33 @@ Boundaries:
 - The Python analysis and TypeScript share only the generated JSON Schema `schema/timing.schema.json`
   (ADR 0004); `timing.meta` is untyped (HS-65).
 - Song metadata in `song.json` (title, artist, rights) belongs to setup and release, not here (HS-47).
+
+### BC-Storyboard – Storyboard
+Purpose (as recovered, decided by recommendation HS-69): turns the treatment or script, the effective timing and
+the bibles into an ordered list of shots that covers the song or episode track, checks every shot's source,
+continuity references and limits, and hands resolved shots to the queue, render, QA and review. One model for
+both project kinds; an episode adds checks through `EpisodeContext` (ADR 0016).
+Core terms: Storyboard, Shot, Shot Source, Layer, Continuity Reference, Lip-Sync Shot, Highlight, Focus Point,
+Frame Chaining, Coverage, Contact Sheet, Anchor (from BC-Timing).
+Evidence:
+- `projects/<slug>/storyboard.yaml`, schema `StoryboardSchema` and `ShotSchema`
+  (`packages/core/src/schema.ts:277-371`), parsed only by `loadProject` (`packages/core/src/project.ts:242-243`);
+  written by the agent in the `storyboard` stage (`packages/core/src/state.ts:59-66`,
+  `workspace/.claude/skills/storyboard/SKILL.md`); no command or template writes it
+- `resolveStoryboard` (`packages/core/src/timing.ts:455-577`) with the per-shot checks (`:226-452`); its only
+  caller is `validateProject` (`packages/cli/src/validate.ts:66-121`)
+- `validate`, `contact-sheet` (`packages/cli/src/index.ts:86-103,165-182`), the hook path
+  (`workspace/.claude/hooks/validate-artifacts.mjs:13-15`, `packages/cli/src/validate-file.ts:124-127`)
+- `review/contact-sheet.svg` (`packages/cli/src/contact-sheet.ts`), embedded by the board
+  (`packages/cli/src/board-production.ts:314`); `storyboard.md` written by hand (skill step 6)
+Boundaries:
+- Writer of `storyboard.yaml`: the agent only, in the stage and at the user's request (HS-77).
+- Readers of the resolved storyboard, through `validateProject`: render (Remotion props, `render.ts:98-140`),
+  contact sheet, QA (`qa.ts:334`), subtitles (`subtitles.ts:12`), the board review's shot spans
+  (`board-review.ts:122-128`). Readers of the raw storyboard: the queue's `buildShotItems` (`queue.ts:326-386`)
+  and QA's continuity checks (`qa.ts:48-102`) – HS-79.
+- Continuity references point into the style, character and set bibles (project or series canon); their
+  definitions are not this context's (HS-69). Resolved three times today (HS-80).
+- Episode checks read the script's scenes and chat lines and the series' lip-sync limit; the lip-sync maximum
+  comes from `config/models.yaml` (`validate.ts:53-63`).
+- Remotion keeps its own motion component switch and highlight matching (HS-80, HS-81).

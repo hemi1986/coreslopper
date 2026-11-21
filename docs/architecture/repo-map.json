@@ -853,6 +853,20 @@
       ],
       "adopted": true,
       "adoptedAt": "2026-11-21"
+    },
+    {
+      "name": "storyboard",
+      "terms": [],
+      "tables": [],
+      "files": [],
+      "packages": [],
+      "layers": [],
+      "score": 0,
+      "reasons": [
+        "marked adopted manually"
+      ],
+      "adopted": true,
+      "adoptedAt": "2026-11-21"
     }
   ]
 }

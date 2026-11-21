@@ -57,6 +57,7 @@ Files that share a concept stem or a table across layers. These are suggestions 
 | comfyui | providers, tests | 2 | – | 2 layers: providers, tests; 2 packages; 2 files | – |
 | pipeline | – | 0 | – | marked adopted manually | yes |
 | verdict | – | 0 | – | marked adopted manually | yes |
+| storyboard | – | 0 | – | marked adopted manually | yes |
 
 Adopt a concept slice with:
 

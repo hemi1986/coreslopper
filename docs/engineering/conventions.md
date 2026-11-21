@@ -1,6 +1,6 @@
 # Engineering conventions – coreslopper
 
-> How the code is built here, recovered by `/adopt` (slices: project and stage pipeline; human review; generation queue and verdicts; timing – 2026-11-21). The ADRs
+> How the code is built here, recovered by `/adopt` (slices: project and stage pipeline; human review; generation queue and verdicts; timing; storyboard – 2026-11-21). The ADRs
 > decide WHAT; this file says HOW. Sections other slices own are marked as such. When code and this file
 > disagree, raise it – don't silently follow either.
 
@@ -65,6 +65,11 @@ state in memory), one core transition (`setStageRunning`, `setStageDone`, `setSt
 - `loadProject` merges `timing.json` with `timing.overrides.json` and checks the result on every load
   (`project.ts:237-241`), so every command sees the effective timing and a broken timing breaks every command
   (gap G-54). `validate` writes the snapshot `timing.effective.json` for agents and scripts.
+- A project artifact the agent writes (`storyboard.yaml`) is checked as a whole by one core function
+  (`resolveStoryboard`), reached only through `validateProject` in cli; the hook runs it on every agent edit and
+  blocks a failing one. Consumers that build from shots take the resolved storyboard from `validateProject`;
+  `buildShotItems` and QA's continuity checks still read the raw one (G-72). Kind-specific checks are branches on
+  an optional context (`EpisodeContext`), not a second model.
 - User-owned files (`timing.overrides.json`, `lyrics.txt`, imported stems, `project.yaml`) are never replaced by
   a tool; a command that would do so is a hard stop.
 
@@ -73,6 +78,11 @@ state in memory), one core transition (`setStageRunning`, `setStageDone`, `setSt
 Pure functions over loaded files: `stageViews`, `productionPhase`, `projectNextAction`, `seriesNextAction`
 (`packages/core/src/production.ts`); `status` (`packages/cli/src/status.ts`); the board's production view
 (`packages/cli/src/board-production.ts`), which reads files and never writes. The board polls every 10 s.
+
+The resolved storyboard (shots in seconds and frames) is made on demand and never stored; render passes it to
+Remotion unchanged as props, apart from public asset paths (`render.ts:98-111`). Derived documents of the
+storyboard (`storyboard.md`, `review/contact-sheet.svg`) are written once and go stale when the YAML changes
+(G-70, G-81). Lists that core and Remotion both need (motion components) are kept twice today (G-75).
 
 Timing lookups (`sectionAt`, `energyAt`, `beatIndexAt`) and anchor resolution (`resolveAnchor`) are pure
 functions over the effective timing in `packages/core/src/timing.ts`; Remotion has its own copies today (G-59).
@@ -106,4 +116,5 @@ directory. `tests/helpers/release-fixture.ts` builds release projects.
 | Python helper | the helper's functions | unit (pytest, `npm run python:test`) | `scripts/review-player/tests/test_review_notes.py`, `scripts/audio-analysis/tests/test_timing_core.py` |
 | Song analysis | `analyze.py --no-separate --skip-asr --schema …` on a fixture project; no model loads | integration (pytest) | `scripts/audio-analysis/tests/test_analyze_integration.py` |
 | Timing rule | `mergeTiming`, `assertTiming`, `resolveAnchor` on an inline `Timing` | unit | `tests/timing.test.ts`, `tests/timing-characterization.test.ts` |
+| Storyboard rule | `resolveStoryboard` on an inline `Storyboard`, `Timing`, style and character bible | unit | `tests/storyboard-characterization.test.ts`, `tests/continuity.test.ts` |
 | Agent instruction | not testable deterministically | – | `workspace/.claude/commands/video-next.md` |
