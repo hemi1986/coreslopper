@@ -35,7 +35,7 @@ Files that share a concept stem or a table across layers. These are suggestions 
 
 | Concept | Layers | Files | Tables | Why | Adopted |
 |---|---|---|---|---|---|
-| review | cli, core, scripts, tests | 9 | – | 4 layers: cli, core, scripts, tests; 4 packages; 9 files | – |
+| review | cli, core, scripts, tests | 9 | – | 4 layers: cli, core, scripts, tests; 4 packages; 9 files | yes |
 | timing | core, remotion, scripts, tests | 5 | – | 4 layers: core, remotion, scripts, tests; 4 packages; 5 files | – |
 | episode | cli, core, tests | 6 | – | 3 layers: cli, core, tests; 3 packages; 6 files | – |
 | release | cli, core, tests | 20 | – | 3 layers: cli, core, tests; 3 packages; 20 files | – |
@@ -84,14 +84,14 @@ node .claude/skills/adopt/scripts/repo-map.ts --adopt-slice <name>
 
 ## Suggested first slice
 
-- **Concept:** `review` – cli, core, scripts, tests (9 file(s))
-  Start with `node .claude/skills/adopt/scripts/slice.ts --cluster review`.
+- **Concept:** `timing` – core, remotion, scripts, tests (5 file(s))
+  Start with `node .claude/skills/adopt/scripts/slice.ts --cluster timing`.
 - **Package:** `scripts/audio-analysis` (coreslopper-audio-analysis)
 - **Shared library:** `packages/cli` (@coreslopper/cli)
 
 Adopt one concept or domain plus at most one shared library per session. Then mark it adopted:
 
 ```bash
-node .claude/skills/adopt/scripts/repo-map.ts --adopt-slice review
+node .claude/skills/adopt/scripts/repo-map.ts --adopt-slice timing
 node .claude/skills/adopt/scripts/repo-map.ts --adopt scripts/audio-analysis
 ```

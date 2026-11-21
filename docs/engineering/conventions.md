@@ -1,6 +1,6 @@
 # Engineering conventions – coreslopper
 
-> How the code is built here, recovered by `/adopt` (slice: project and stage pipeline, 2026-11-21). The ADRs
+> How the code is built here, recovered by `/adopt` (slices: project and stage pipeline; human review – 2026-11-21). The ADRs
 > decide WHAT; this file says HOW. Sections other slices own are marked as such. When code and this file
 > disagree, raise it – don't silently follow either.
 
@@ -43,6 +43,8 @@ state in memory), one core transition (`setStageRunning`, `setStageDone`, `setSt
 - There is no write lock on `state.json` (`withFileLock` in `packages/cli/src/file-lock.ts` is used by review
   and release only) and no version check.
 - Errors are typed: `ValidationError`, `BudgetError`, `ConfigError` (`packages/core/src/errors.ts`).
+- File writes outside `state.json` that two writers share take `withFileLock` (review notes and rounds:
+  `review/.notes.lock`; release files). Python helpers write atomically but take no lock.
 - There is no event journal. `state.json` holds current state only; the watchdog derives events (stage started,
   done, failed, stalled) by diffing snapshots into `.cache/watch/`.
 - IDs: project and series slugs (kebab-case folder names), stage IDs from the kind's stage list in `state.ts`.
@@ -79,4 +81,5 @@ directory. `tests/helpers/release-fixture.ts` builds release projects.
 | Command | the CLI command or the function it calls, on a project in a temp directory | integration | `tests/episode.test.ts` |
 | Read model | the read-model function on a project in a temp directory | integration | `tests/board-production.test.ts` |
 | Page, form, flow | the board's HTTP API | integration | `tests/board-review.test.ts` |
+| Python helper | the helper's functions | unit (pytest, `npm run python:test`) | `scripts/review-player/tests/test_review_notes.py` |
 | Agent instruction | not testable deterministically | – | `workspace/.claude/commands/video-next.md` |

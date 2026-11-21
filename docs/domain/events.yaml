@@ -12,7 +12,8 @@
 #
 # Glossary: docs/glossary.md (ships to every workspace). CONTEXT.md points there.
 #
-# Slice adopted 2026-11-21: project and stage pipeline (DRAFT – see docs/domain/adoption-report.md).
+# Slices adopted 2026-11-21: project and stage pipeline (confirmed); human review (DRAFT).
+# See docs/domain/adoption-report.md.
 
 version: 1
 domain: coreslopper
@@ -38,6 +39,9 @@ bounded_contexts:
   - id: BC-Pipeline
     name: Pipeline
     purpose: Drives one project from setup to qa-export through the stages of its project kind and keeps its budget
+  - id: BC-Review
+    name: Review
+    purpose: The user's frame-accurate notes on renders, sent to the agent in rounds and answered note by note
 
 aggregates:
   - id: AGG-Project
@@ -56,6 +60,24 @@ aggregates:
       - A stage is started, done or skipped only when every earlier stage of the kind's list is done or skipped (confirmed 2026-11-21; not enforced in code – gap register)
       - No writer loses another writer's change to the project state, and no recorded spend is lost (confirmed 2026-11-21; not enforced, state.json has no write lock – gap register)
       - The project's error history only grows; the current error of a stage is its last error (the code does this, state.ts:293)
+  - id: AGG-ProjectReview
+    name: Project review
+    context: BC-Review
+    status: as-is
+    evidence:
+      - one lock per project review folder, review/.notes.lock, around every note change and every send (packages/cli/src/board-review.ts:38,202,238)
+      - round numbers from all rounds of the project (packages/core/src/review.ts:37; board-review.ts:242)
+      - notes per render in review/notes/<video-stem>.json, rounds in review/rounds/<NNN>.json (board-review.ts:50,62-78)
+    invariants:
+      - A sent note never changes (the board enforces it, board-review.ts:213; the desktop player does not)
+      - Round numbers are unique and ascending per project (the code takes the highest plus one under the lock)
+      - A round holds every draft of one render at the time it was sent, at least one (board-review.ts:240-241)
+      - A round's replies answer every note of the round and no other (validate-file, validate-file.ts:219-232; not checked when a round counts as answered)
+      - A round is answered exactly once, by one fix pass (confirmed 2026-11-21; the code does not check it)
+      - A note is sent in exactly one round (confirmed 2026-11-21; a crash between the two writes of a send breaks it – gap register)
+      - A round is open until a valid replies file answers every note of it; an unreadable round counts as open, never as nothing open (confirmed 2026-11-21; the code counts any replies file – gap register)
+      - Notes and rounds belong to the user; only the board and the desktop player write them, the agent writes only replies (confirmed 2026-11-21; an instruction only – gap register)
+      - Every writer of notes – the board and the desktop player – keeps sent notes unchanged and loses no other writer's change; a note's frame is floor(seconds × format fps) (confirmed 2026-11-21; the desktop player breaks all three – gap register)
 
 events:
   - id: EVT-ProjectCreated
@@ -92,6 +114,28 @@ events:
     aggregate: AGG-Project
     pivotal: true
     data: [Finished at]
+  - id: EVT-ReviewNoteAdded
+    name: Review note added
+    aggregate: AGG-ProjectReview
+    data: [Render, Frame, End frame, Text, Created at]
+  - id: EVT-ReviewNoteChanged
+    name: Review note changed
+    aggregate: AGG-ProjectReview
+    data: [Note, Frame, End frame, Text]
+  - id: EVT-ReviewNoteDeleted
+    name: Review note deleted
+    aggregate: AGG-ProjectReview
+    data: [Note]
+  - id: EVT-ReviewRoundSent
+    name: Review round sent
+    aggregate: AGG-ProjectReview
+    pivotal: true
+    data: [Round number, Render, Frame rate, Sent at, Notes with shots and section]
+  - id: EVT-ReviewRoundAnswered
+    name: Review round answered
+    aggregate: AGG-ProjectReview
+    pivotal: true
+    data: [Round number, Answered at, Render with the fixes, Reply per note with status]
 
 commands:
   - id: CMD-CreateProject
@@ -158,6 +202,38 @@ commands:
     produces: [EVT-SpendRecorded]
     rules:
       - Before a paid batch, its worst-case estimate fits the remaining budget and the batch cap (30 % of the remaining budget unless batch_cap_usd is set)
+  - id: CMD-AddReviewNote
+    name: Add review note
+    actor: ACT-User
+    aggregate: AGG-ProjectReview
+    produces: [EVT-ReviewNoteAdded]
+    rules:
+      - The render is one of the project's renders; the note sits on a frame or a range of frames of it
+  - id: CMD-ChangeReviewNote
+    name: Change review note
+    actor: ACT-User
+    aggregate: AGG-ProjectReview
+    produces: [EVT-ReviewNoteChanged]
+  - id: CMD-DeleteReviewNote
+    name: Delete review note
+    actor: ACT-User
+    aggregate: AGG-ProjectReview
+    produces: [EVT-ReviewNoteDeleted]
+  - id: CMD-SendReviewRound
+    name: Send review round
+    actor: ACT-User
+    aggregate: AGG-ProjectReview
+    produces: [EVT-ReviewRoundSent]
+    rules:
+      - Each note gets the shots on screen during it (a note on a cut belongs to both shots) and the section at its start
+      - The round records the version of its render, so notes on a since-changed render can be shown as such (confirmed 2026-11-21; missing – gap register)
+  - id: CMD-AnswerReviewRound
+    name: Answer review round
+    actor: ACT-StageRunner
+    aggregate: AGG-ProjectReview
+    produces: [EVT-ReviewRoundAnswered]
+    rules:
+      - Reply status is fixed, partly, not-fixed or question
 
 policies:
   - id: POL-RunNextStage
@@ -170,6 +246,16 @@ policies:
     when: [EVT-StageStarted]
     then: [CMD-FailStage]
     description: "Hard stop: the budget or batch cap would be exceeded; a real provider's credentials are missing; validation or QA fails after the stage's bounded retries; a user-owned file would be overwritten (timing.overrides.json, project.yaml, an imported take, the series canon)"
+  - id: POL-AnswerOpenRounds
+    name: Open review rounds are answered before the next autonomous stage
+    when: [EVT-ReviewRoundSent]
+    then: [CMD-AnswerReviewRound]
+    description: An orchestrator rule (/video-next "Review rounds"); one fix pass per round, oldest first, after a running and an open interactive stage. With review mode final, the final review is done with review rounds before qa-export
+  - id: POL-RebuildQaAfterFixes
+    name: Fixes that change the picture reset qa-export
+    when: [EVT-ReviewRoundAnswered]
+    then: [CMD-ResetStage]
+    description: An orchestrator rule (/video-next "Review rounds" step 4), only when the fix pass changed a render; ADR 0032's unconditional wording is a gap
 
 read_models:
   - id: RM-Status
@@ -188,6 +274,16 @@ read_models:
     fed_by: [EVT-ProjectCreated, EVT-StageStarted, EVT-StageCompleted, EVT-StageFailed, EVT-StageSkipped, EVT-StageReset, EVT-SpendRecorded]
     used_by: [ACT-User]
     fields: [Project, Production phase, Stage status, Stage attempts, Spent total, Remaining budget, Next action]
+  - id: RM-ReviewView
+    name: Review view
+    fed_by: [EVT-ReviewNoteAdded, EVT-ReviewNoteChanged, EVT-ReviewNoteDeleted, EVT-ReviewRoundSent, EVT-ReviewRoundAnswered]
+    used_by: [ACT-User]
+    fields: [Render, Sections, Shots, Notes with draft or sent state, Rounds, Reply per note]
+  - id: RM-OpenReviewRounds
+    name: Open review rounds
+    fed_by: [EVT-ReviewRoundSent, EVT-ReviewRoundAnswered]
+    used_by: [ACT-Orchestrator, ACT-User]
+    fields: [Round number, Render, Note count, Round file, Replies file]
 
 hotspots:
   - id: HS-1
@@ -265,8 +361,76 @@ hotspots:
     refs: [AGG-Project, CMD-RecordSpend]
     status: resolved
     resolution: "Yes: no writer loses another writer's change and no recorded spend is lost (aggregate invariant). The missing lock and the stale state in long batches are a high-priority gap. (user, 2026-11-21)"
+  - id: HS-16
+    question: "The desktop review player deletes sent notes, takes no lock, rewrites the whole notes file from memory, and rounds frames differently than the board. What is its role: a full second writer bound by the same rules, a fallback with fewer rights, or retired?"
+    refs: [AGG-ProjectReview, CMD-DeleteReviewNote]
+    status: resolved
+    resolution: "A fallback writer bound by the same invariants as the board: sent notes stay unchanged, no other writer's change is lost, frame = floor(seconds × format fps). Today's deviations are gap candidates, data loss with high priority. (user, 2026-11-21)"
+  - id: HS-17
+    question: "Desktop-player notes reach the agent with the next round (docs/board.md) or when the user asks in chat (assembly-render). Which is the one way?"
+    refs: [CMD-SendReviewRound]
+    status: resolved
+    resolution: "One way: desktop-player notes become draft notes in the board and go out with the next round. The chat path in assembly-render is a gap. (user, 2026-11-21)"
+  - id: HS-18
+    question: "A round counts as answered once any replies file exists, even an incomplete one; completeness is checked only by the hook after the write. What answers a round?"
+    refs: [EVT-ReviewRoundAnswered, RM-OpenReviewRounds]
+    status: resolved
+    resolution: "A round is answered only by a valid replies file that answers every note of it and no other; an invalid one leaves it open. Board and status count open rounds the same way; an unreadable round is open or an error, never nothing open. Gap register. (user, 2026-11-21)"
+  - id: HS-19
+    question: "After a reply 'question' or 'not-fixed' the round is closed and nothing is left open. Does the user continue only with a new note in a new round?"
+    refs: [EVT-ReviewRoundAnswered]
+    status: resolved
+    resolution: "An answered round stays answered; there is no reopening. The user follows up with a new note in the next round. (user, 2026-11-21)"
+  - id: HS-20
+    question: "ADR 0032 resets qa-export after every fixed round; /video-next only when the fixes changed the picture. Which?"
+    refs: [POL-RebuildQaAfterFixes]
+    status: resolved
+    resolution: "qa-export is reset only when the fix pass changed a render (/video-next's rule). ADR 0032's unconditional wording is a gap; the ADR is not edited. (user, 2026-11-21)"
+  - id: HS-21
+    question: "The UI, glossary and ADR say 'send'; the code says submit (submitRound, /submit, submitted_at). Which is the domain verb?"
+    refs: [CMD-SendReviewRound]
+    status: resolved
+    resolution: "The domain verb is send: a round is sent, a note is sent. 'submit' in code is a gap (low); the glossary avoids 'submission'. (user, 2026-11-21)"
+  - id: HS-22
+    question: "'review' means the user's review of renders, the art director's verdicts (queue state 'reviewing', 'Art-director reviews', assets/review/verdicts.jsonl), and the review/ folder that also holds release and progress files. Which meanings keep the word?"
+    refs: [BC-Review]
+    status: resolved
+    resolution: "'Review' in the domain is only the user's review of renders (BC-Review). The art director gives verdicts; its 'review' words are a gap for the art-director slice. The review/ folder is file layout, not a term; renaming it needs an ADR and is not planned. In BC-Review an unsent note is a draft note, unrelated to the publishing Draft. (user, 2026-11-21)"
+  - id: HS-23
+    question: "The fix work for a round is 'review-fix' (a runner label, no stage in state) and 'fix pass' (assembly-render). Is it a domain concept, and under which name?"
+    refs: [CMD-AnswerReviewRound, POL-AnswerOpenRounds]
+    status: resolved
+    resolution: "Fix Pass: the agent's work on one review round, ending with the replies; review-fix is only the runner's label, not a stage. (user, 2026-11-21)"
+  - id: HS-24
+    question: "The consistency boundary in code is the board's lock over notes and rounds; the agent writes replies without it. Are the replies part of the same aggregate?"
+    refs: [AGG-ProjectReview]
+    status: resolved
+    resolution: "Round, replies and notes are one aggregate (AGG-ProjectReview, as-is). Replies without the lock are fine as long as each round gets exactly one fix pass (invariant). (user, 2026-11-21)"
+  - id: HS-25
+    question: "'The agent never writes notes or rounds' is an instruction only; the hook validates replies and ignores notes and round files. Must it be enforced?"
+    refs: [AGG-ProjectReview]
+    status: resolved
+    resolution: "Notes and rounds belong to the user (invariant); the cheapest enforcement is the workspace hook blocking agent edits to review/notes/ and review/rounds/<NNN>.json – product code, so a gap candidate. (user, 2026-11-21)"
+  - id: HS-26
+    question: "A note knows its render by file name only; a re-render under the same name moves old notes and rounds onto different frames without a trace. Must a note record which render version it was made on?"
+    refs: [EVT-ReviewNoteAdded, EVT-ReviewRoundSent]
+    status: resolved
+    resolution: "Yes: a round records the version of its render at sending, so the board can mark notes on a since-changed render. Missing today – gap register. (user, 2026-11-21)"
+  - id: HS-27
+    question: "Review mode final stops for 'one final human review' before qa-export. Is that review done with review rounds?"
+    refs: [POL-AnswerOpenRounds]
+    status: resolved
+    resolution: "Yes: the final review is the user's review in the board, with or without a round; the user releases qa-export with /video-next <slug> --stage qa-export. The missing release and the repeating stop are a gap. (user, 2026-11-21)"
+  - id: HS-28
+    question: "ADR 0032 speaks of offsetting notes on Shorts, but the board lists only renders/ top-level files, so Shorts can be reviewed only with the desktop player. Are Shorts reviewed?"
+    refs: [CMD-AddReviewNote]
+    status: resolved
+    resolution: "Shorts are not reviewed in the board; the 9:16 render they are cut from is. Intended as is; the desktop player covers special cases. (user, 2026-11-21)"
 
 flows:
   - id: FLOW-AutonomousStage
     name: One autonomous stage
     sequence: [ACT-Orchestrator, CMD-StartStage, EVT-StageStarted, ACT-StageRunner, CMD-CompleteStage, EVT-StageCompleted, POL-RunNextStage]
+  - id: FLOW-ReviewRound
+    name: From a note to its reply
+    sequence: [ACT-User, CMD-AddReviewNote, EVT-ReviewNoteAdded, CMD-SendReviewRound, EVT-ReviewRoundSent, POL-AnswerOpenRounds, CMD-AnswerReviewRound, EVT-ReviewRoundAnswered, POL-RebuildQaAfterFixes]

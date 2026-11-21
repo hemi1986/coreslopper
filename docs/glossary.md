@@ -387,12 +387,16 @@ Material the user hands over for the grilling and the bibles: mood boards, photo
 _Avoid_: moodboard (one kind of it), input files
 
 **Review Note**:
-A user's free-text remark on one frame or a range of frames of a render, saved by the board's review view or the desktop review player in `review/notes/<video-stem>.json` with its frame and time. A note without a round is a draft.
+A user's free-text remark on one frame or a range of frames of a render, saved by the board's review view or the desktop review player in `review/notes/<video-stem>.json` with its frame and time. A note without a round is a draft note (not a publishing **Draft**); a sent note never changes.
 _Avoid_: annotation, comment, feedback
 
 **Review Round**:
-The draft notes of one render that the user sent to the agent in one click, frozen in `review/rounds/<NNN>.json` with each note's shots and section. The agent answers every note in `<NNN>.replies.json` (`fixed`, `partly`, `not-fixed`, `question`); until then the round is open and `/video-next` works on it first.
-_Avoid_: ticket, feedback batch, review pass
+The draft notes of one render that the user sent to the agent in one click, frozen in `review/rounds/<NNN>.json` with each note's shots and section. The agent answers every note in `<NNN>.replies.json` (`fixed`, `partly`, `not-fixed`, `question`); until a valid replies file answers every note, the round is open and `/video-next` works on it first. An answered round stays answered: the user follows up on a `question` or `not-fixed` reply with a new note in the next round.
+_Avoid_: ticket, feedback batch, review pass, submission
+
+**Fix Pass**:
+The agent's work on one review round: map the notes to shots, fix, re-render, and answer every note; it ends with the replies. Each round gets exactly one. `review-fix` is the stage runner's label for it, not a stage.
+_Avoid_: review-fix (as a term), review stage
 
 ## Series and episodes
 

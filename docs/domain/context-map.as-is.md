@@ -3,13 +3,14 @@
 > Recovered from code by `/adopt` on 2026-11-21 at b195086. This is **not a target**.
 > Target: [context-map.md](context-map.md) · Gap register: [gap-register.md](gap-register.md).
 
-Adopted slices: project and stage pipeline (draft). Other areas – review rounds, release, series canon,
+Adopted slices: project and stage pipeline; human review (draft). Other areas – art-director verdicts, release, series canon,
 character library, model bench, providers – appear only as neighbours until their own slice is adopted.
 
 ```mermaid
 flowchart LR
   BC-Pipeline -->|reads canon, books canon spend separately| Series[Series canon - not adopted]
-  BC-Pipeline -->|review rounds reset qa-export| Review[Review rounds - not adopted]
+  BC-Review -->|open rounds come before the next autonomous stage; fixes reset qa-export| BC-Pipeline
+  BC-Review -->|notes map to storyboard shots and timing sections| Storyboard[Storyboard and timing - not adopted]
   BC-Pipeline -->|done project feeds release| Release[Release - not adopted]
   BC-Pipeline -->|style-character done imports characters| Library[Character library - not adopted]
 ```
@@ -34,3 +35,20 @@ Boundaries:
 - Readers only: `status`, the board production view, the watchdog (`packages/cli/src/production-watch.ts`).
 - The orchestrating rules (interactive gate, review-mode stop, hard stops, batch size) live in agent
   instructions (`workspace/.claude/commands/video-next.md`, `workspace/.claude/agents/stage-runner.md`), not in code.
+
+### BC-Review – Review
+Purpose (as recovered): the user's frame-accurate notes on a render, sent to the agent in numbered rounds and
+answered note by note; the human side of quality control, next to the automated critics.
+Core terms: Review Note (draft, sent), Review Round (open, answered), reply and reply status, render.
+Evidence:
+- notes `review/notes/<video-stem>.json`, rounds `review/rounds/<NNN>.json`, replies `<NNN>.replies.json`
+  (`packages/core/src/schema.ts:1349-1421`); pure helpers `packages/core/src/review.ts`
+- writes and the lock `review/.notes.lock` (`packages/cli/src/board-review.ts:200-269`); board routes
+  `/api/review/<slug>[/notes|/submit]` (`packages/cli/src/release-board.ts:373-392`)
+- a second writer of notes: the desktop player (`scripts/review-player/review_notes.py`), without the lock
+- replies validated by `validate-file` and the workspace hook; answered by a `review-fix` runner per
+  `workspace/.claude/commands/video-next.md` and `workspace/.claude/skills/assembly-render/SKILL.md`
+Boundaries:
+- BC-Pipeline reads only the count of open rounds (`projectNextAction`, `status` `Review:` lines); the link
+  back is the orchestrator's `stage-reset … qa-export`, an instruction, not code.
+- The art director's verdicts (`assets/review/verdicts.jsonl`) share the word "review" but not this context.

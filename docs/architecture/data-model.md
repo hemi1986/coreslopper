@@ -1,7 +1,7 @@
 # Logical data model – coreslopper
 
 > **As-is** for the adopted slices, recovered from `packages/core/src/schema.ts` (Zod is the source, ADR 0004).
-> Slice: project and stage pipeline (draft, 2026-11-21). Open points are hotspots in `docs/domain/events.yaml`.
+> Slices: project and stage pipeline (2026-11-21); human review (draft, 2026-11-21). Open points are hotspots in `docs/domain/events.yaml`.
 
 ## Aggregates
 
@@ -58,6 +58,40 @@ mechanical flag (no reader). Music video: `setup`✋ `brief`✋ `treatment`✋ `
 `storyboard` `assets` `assembly` `qa-export`. Episode: `setup`✋ `script`✋ `voice-track` `episode-track`
 `storyboard` `assets` `assembly` `qa-export`. Order is list order; there are no other dependencies.
 
+### AGG-ProjectReview – Project review (as-is, draft)
+
+Files in `projects/<slug>/review/`. The board changes notes and sends rounds under one lock per project
+(`review/.notes.lock`); the desktop player writes notes without it; the agent writes replies.
+
+**Notes file (one per render, `notes/<video-stem>.json`)** – Render (file name), Frame rate, Notes.
+
+| Attribute of a note | Type | Required | Source |
+|---|---|---|---|
+| Note ID | NoteId | no – given by the board on its first write | EVT-ReviewNoteAdded |
+| Frame / Seconds / Time | FrameNumber / Seconds / Timecode | yes | EVT-ReviewNoteAdded, EVT-ReviewNoteChanged |
+| End frame / end seconds / end time | – | no (a range; board only) | EVT-ReviewNoteAdded, EVT-ReviewNoteChanged |
+| Text | Text | yes | EVT-ReviewNoteAdded, EVT-ReviewNoteChanged |
+| Round | RoundNumber | no – absent means draft | EVT-ReviewRoundSent |
+| Created | Timestamp | no | EVT-ReviewNoteAdded |
+
+**Review round (`rounds/<NNN>.json`, frozen)** – Round number, Render, Frame rate, Sent at, and per note its ID,
+frames, range, Shots (list of ShotId), Section (SectionId, from the note's start), Text. Source: EVT-ReviewRoundSent.
+
+**Replies (`rounds/<NNN>.replies.json`)** – Round number, Answered at, Render with the fixes (optional), and per
+note ID a Reply status (`fixed`, `partly`, `not-fixed`, `question`) and a Reply text. Source:
+EVT-ReviewRoundAnswered. Its existence makes the round answered (HS-18).
+
+```mermaid
+stateDiagram-v2
+  [*] --> draft: Review note added
+  draft --> draft: Review note changed
+  draft --> [*]: Review note deleted
+  draft --> sent: Review round sent
+  state "round open" as open
+  sent --> open
+  open --> answered: Review round answered
+```
+
 ## Lifecycle
 
 Stage state as the code allows it today. Every transition is accepted from every status (HS-11); the diagram
@@ -92,4 +126,8 @@ erDiagram
   PROJECT ||--|{ STAGE_STATE : "one per stage of its kind"
   STAGE_STATE }o--|| STAGE_DEFINITION : "defined by"
   PROJECT }o--o| SERIES : "episode of"
+  PROJECT ||--o{ REVIEW_NOTE : "notes per render"
+  PROJECT ||--o{ REVIEW_ROUND : "numbered rounds"
+  REVIEW_ROUND ||--|{ REVIEW_NOTE : "freezes"
+  REVIEW_ROUND ||--o| REPLIES : "answered by"
 ```

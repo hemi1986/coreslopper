@@ -79,8 +79,8 @@ Keep this block short: it is loaded into every session. Put rules into the skill
 - **Tooling:** npm workspaces · **Packages:** 6 · **Adopted:** 0 of 6
 - **Layout:** `packages/` (4), `scripts/` (2)
 - **Detail:** `docs/architecture/repo-map.md` – package list, dependency edges, consumers, adoption ranking.
-- **Concept slices:** `review` (cli, core, scripts, tests), `timing` (core, remotion, scripts, tests), `episode` (cli, core, tests), `release` (cli, core, tests), `thumbnail` (cli, remotion, tests) – candidates for `/adopt`, not confirmed domains.
-- **Adopted slices:** concept `pipeline`. Everything else is **not adopted**: run `/adopt` before inferring domain there.
+- **Concept slices:** `timing` (core, remotion, scripts, tests), `episode` (cli, core, tests), `release` (cli, core, tests), `thumbnail` (cli, remotion, tests), `generate` (cli, scripts, tests) – candidates for `/adopt`, not confirmed domains.
+- **Adopted slices:** concept `review`, concept `pipeline`. Everything else is **not adopted**: run `/adopt` before inferring domain there.
 
 ## Commands
 

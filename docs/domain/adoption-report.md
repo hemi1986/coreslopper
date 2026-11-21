@@ -152,3 +152,126 @@ None. HS-1 to HS-15 are resolved.
 | Q8 | Package import direction is a hard rule. | `boundaries.yaml`, `tests/package-boundaries.test.ts` |
 | Q9 | Clock in core, in-place mutation, in-memory migration are accidents, not decisions. | conventions, G-14 |
 | Q10 | The context is named Pipeline. | `BC-Pipeline` |
+
+---
+
+# Adoption – human-review
+Date: 2026-11-21 · Commit: 5128f52 · Slice: human review (concept `review`, without art-director verdicts) · Analysts: 3 lenses
+
+## Scope
+
+- **Slice:** the user's review of renders – review notes, review rounds and their replies, the desktop review
+  player, the board's review view, and how the orchestrator answers open rounds. No shared library.
+- **Intent:** domain model, as for the pipeline slice. **Language:** artifacts `en`, UI `en`.
+- **Split from the map's `review` cluster:** the art director's verdicts (`review-image`, `verdicts.jsonl`)
+  are a different concept that shares the word; they stay for a later slice.
+- **Since the last slice:** nothing changed in code (same day); slice 1 is committed on `docs/adopt-pipeline`.
+
+| Layer | Files |
+|---|---|
+| core (domain) | `packages/core/src/review.ts`; in `schema.ts` `ReviewNoteSchema`, `ReviewNotesSchema`, `ReviewRoundSchema`, `ReviewReplyStatusSchema`, `ReviewRepliesSchema`; `production.ts` (`openRounds` only) |
+| cli (application) | `packages/cli/src/board-review.ts`, `board/review.js`, `review.ts`, `status.ts` (`Review:` lines), `validate-file.ts` (review parts), `file-lock.ts` (as used by review) |
+| python | `scripts/review-player/review_player.py`, `review_notes.py`, `README.md` |
+| workspace (orchestration) | `workspace/.claude/commands/video-next.md` ("Review rounds"), `workspace/.claude/skills/assembly-render/SKILL.md` ("Review rounds"), `workspace/.claude/hooks/validate-artifacts.mjs` (replies) |
+| tests | `tests/review.test.ts`, `tests/board-review.test.ts`, `scripts/review-player/tests/test_review_notes.py` |
+| docs | ADR 0022, ADR 0032, `docs/board.md` "Review", `docs/pipeline.md` "Review notes and rounds" |
+
+## What the repository is (facts)
+
+- Review data are three file kinds per project under `review/`: notes per render, frozen round files, and
+  reply files; Zod schemas in core, generated JSON Schema that the Python player does not use.
+- The board writes notes and rounds under one lock per project; the desktop player writes notes without the
+  lock; the agent writes replies; only replies are validated.
+- A round counts as answered once a replies file exists; rounds are numbered once per project.
+- Time, frame, and path logic exists three times (core, board page, Python).
+
+## Confirmed domain model
+
+- **Context:** `BC-Review` – Review. It feeds `BC-Pipeline` through the count of open rounds and the
+  orchestrator's `qa-export` reset.
+- **Aggregate:** `AGG-ProjectReview` (`as-is`, evidence the board's lock and project-wide round numbers) with
+  notes, rounds and replies. Invariants: a sent note never changes; round numbers unique and ascending; a round
+  holds every draft note of one render; replies answer every note; a round is answered exactly once; notes and
+  rounds belong to the user; every writer keeps sent notes, loses no write and uses floor(seconds × format fps);
+  a note is sent in exactly one round; a round is open until a valid replies file answers it.
+- **Commands:** add, change, delete review note; send review round; answer review round. **Policies:** answer
+  open rounds before the next autonomous stage; fixes that changed a render reset `qa-export`. **Read models:**
+  review view, open review rounds.
+- **Glossary:** new **Fix Pass**; **Review Note** (draft note vs publishing Draft, a sent note never changes);
+  **Review Round** (answered only by a valid, complete replies file; follow-ups in the next round; avoid
+  "submission").
+
+## Package documentation written
+
+- `.claude/rules/review.md` – path-scoped slice doc; nothing left `[OPEN]`.
+- `docs/engineering/conventions.md` – locks for shared files, the Python seam.
+- `docs/architecture/data-model.md`, `docs/domain/context-map.as-is.md` – `AGG-ProjectReview`, `BC-Review`.
+
+## Contradictions found and how they were resolved
+
+| Contradiction | Resolution |
+|---|---|
+| send (UI, glossary) vs submit (code) | send (G-27) |
+| "review" for the user, the art director, and a folder | only the user's review; the art director gives verdicts (G-28) |
+| `review-fix` runner label vs "fix pass" | Fix Pass; `review-fix` is a label |
+| Desktop player deletes sent notes, writes without the lock | a fallback bound by the same invariants (G-17, G-18, G-23) |
+| Desktop notes via the next round vs via chat | the next round only (G-24) |
+| Any replies file closes a round | only a valid, complete one (G-19, G-20) |
+| `qa-export` reset always (ADR 0032) vs when the picture changed | when a render changed (G-25) |
+| "Rounds before any stage" vs running and interactive stages first | slice 1 decision stands (G-26) |
+
+## Rules and checks
+
+| Rule | Enforcement | State |
+|---|---|---|
+| Rounds numbered once per project; open rounds oldest first; draft note = no round | `tests/review-characterization.test.ts` | green |
+| Drafts editable, sent notes frozen in the board, replies cover every note | existing `tests/board-review.test.ts` | green |
+| Notes and rounds are the user's; every writer obeys the note invariants; a valid reply answers | documentation until stories build them (G-17–G-22) | – |
+| `core/review.ts` stays free of other packages | slice 1 boundary rule and test | green |
+
+## Gap register (candidates – stories only with --stories)
+
+15 candidates G-17 to G-31 in `docs/domain/gap-register.md`: 12 *exists but contradicts* (highest: G-17 lost
+writes from the desktop player, G-18 it deletes sent notes), 3 *missing* (G-29 render version, G-30 the release
+of the final-review stop, G-31 live replies, inferred).
+
+## Deliberately left alone
+
+- Production code, ADR 0022 and 0032, and the shipped docs that contradict the model.
+- The `review/` folder name; the art director's wording (its own slice).
+
+## Open hotspots
+
+None. HS-16 to HS-28 are resolved.
+
+## Next slice
+
+`release` (release package, folder, calendar, board, autopilot), cut down to one concept first – or the
+art director's verdicts, which now share no word with human review.
+
+## Grilling log
+
+### Round 1 (2026-11-21)
+
+| # | Decision | Written to |
+|---|---|---|
+| Q1 | The domain verb is *send*; `submit` in code is a gap. | glossary (Review Round), HS-21 |
+| Q2 | "Review" is only the user's review of renders; the art director gives *verdicts*; `review/` is file layout; an unsent note is a *draft note*. | glossary (Review Note), HS-22 |
+| Q3 | **Fix Pass** is the agent's work on one round; `review-fix` is a runner label, not a stage. | glossary, HS-23 |
+| Q4 | Notes, rounds and replies are one aggregate; a round is answered exactly once. | HS-24, `AGG-ProjectReview` |
+| Q5 | The desktop player stays a fallback writer bound by the same invariants. | HS-16, `AGG-ProjectReview` |
+| Q6 | Notes and rounds belong to the user; enforcement by the hook is a gap. | HS-25, `AGG-ProjectReview` |
+
+### Round 2 (2026-11-21)
+
+| # | Decision | Written to |
+|---|---|---|
+| Q1 | Desktop notes reach the agent only through the board's next round. | HS-17 |
+| Q2 | Only a valid, complete replies file answers a round; board and `status` count alike. | HS-18, invariant |
+| Q3 | No reopening; the user follows up with a new note in the next round. | HS-19, glossary |
+| Q4 | `qa-export` is reset only when the fix pass changed a render. | HS-20, `POL-RebuildQaAfterFixes` |
+| Q5 | A round records its render's version. | HS-26, `CMD-SendReviewRound` |
+| Q6 | The final review of review mode `final` uses the review view; `--stage qa-export` releases it. | HS-27, `POL-AnswerOpenRounds` |
+| Q7 | Shorts are not reviewed in the board. | HS-28 |
+| Q8 | A note is sent in exactly one round. | invariant |
+| Q9 | A range note's section is the one at its start – intended. | `CMD-SendReviewRound` |
