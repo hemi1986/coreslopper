@@ -1,0 +1,41 @@
+# Release schedule (optional). Copy to config/release-schedule.yaml in the workspace:
+#   cp templates/channel/release-schedule.yaml config/release-schedule.yaml
+# `release` and `calendar` plan every project's review/calendar.yaml under these
+# rules, in the next free slots, without colliding with other projects.
+# Without the file the defaults below apply. Schema: schema/release-schedule.schema.json.
+version: 1
+# timezone: Europe/Berlin   # IANA time zone; default: this computer's time zone
+
+release:
+  weekday: fri            # Global Release Day
+  song_time: "00:00"      # the song on the streaming services
+  video_time: "18:00"     # the main video on YouTube
+  premiere: true          # as a YouTube Premiere
+  min_gap_weeks: 1        # at most one release a week
+  lead_days: 21           # earliest release day from today
+  skip: ["12-24", "12-25", "12-26", "12-31", "01-01"]   # no releases or tasks (MM-DD or YYYY-MM-DD); add your holidays
+
+steps:                    # days relative to the release day
+  distributor: -21
+  pitch: -14              # Spotify needs at least 7 days
+  announce: -7
+  canvas: -7
+  links: 1
+  task_time: "10:00"
+
+shorts:
+  weekdays: [mon, wed, fri]
+  times: { youtube: "18:00", tiktok: "20:00", instagram: "20:00", x: "18:00" }
+  per_song_per_week: 1    # songs interleave across the slots
+  first_on_release_day: true
+
+posts:
+  instagram: "20:00"
+  x: "18:00"
+  linkedin_weekday: tue
+  linkedin_time: "09:00"
+
+# Slots taken outside any project calendar, e.g. Shorts planned by hand:
+booked: []
+#  - { date: 2027-01-04, kind: short, label: A1 }
+#  - { date: 2027-01-08, kind: release, label: Another song }

@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Release-Board</title>
+<style>
+  :root {
+    --bg: #f6f5f2; --panel: #ffffff; --ink: #1d1d1f; --muted: #6b6b70; --line: #e3e1dc;
+    --accent: #3a5ccc; --ok: #2f8a4c; --warn: #b7791f; --bad: #c53030; --chip: #efeee9;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #151517; --panel: #1e1e21; --ink: #ececee; --muted: #9b9ba3; --line: #2e2e33; --accent: #7c9bff; --chip: #2a2a2f; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-size: 14px; line-height: 1.45; }
+  .app { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
+  aside { border-right: 1px solid var(--line); background: var(--panel); padding: 16px 12px; position: sticky; top: 0; height: 100vh; overflow: auto; }
+  aside h1 { font-size: 15px; margin: 0 4px 12px; }
+  .nav-item { display: block; width: 100%; text-align: left; border: 0; background: none; color: inherit; padding: 8px 10px; border-radius: 8px; cursor: pointer; font: inherit; }
+  .nav-item:hover { background: var(--chip); }
+  .nav-item.active { background: var(--accent); color: #fff; }
+  .nav-item.active .sub { color: #e8ecff; }
+  .sub { color: var(--muted); font-size: 12px; display: block; }
+  .bar { height: 3px; background: var(--line); border-radius: 2px; margin-top: 5px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; background: var(--ok); }
+  main { padding: 20px 28px 60px; max-width: 1180px; }
+  header.project { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 4px; }
+  header.project h2 { margin: 0; font-size: 22px; }
+  .tabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--line); margin: 16px 0 18px; }
+  .tab { border: 0; background: none; color: var(--muted); padding: 8px 12px; cursor: pointer; font: inherit; border-bottom: 2px solid transparent; }
+  .tab.active { color: var(--ink); border-color: var(--accent); }
+  .tab .count { font-size: 11px; color: var(--muted); margin-left: 4px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin-bottom: 14px; }
+  .card.done { opacity: 0.6; }
+  .card-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .card-head h3 { margin: 0; font-size: 15px; flex: 1; min-width: 200px; }
+  .when { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; }
+  .chip { display: inline-block; background: var(--chip); border-radius: 999px; padding: 1px 8px; font-size: 12px; color: var(--muted); }
+  .files { display: flex; gap: 10px; flex-wrap: wrap; margin: 12px 0 4px; }
+  .file { width: 168px; font-size: 12px; }
+  .file .media { width: 168px; height: 112px; background: var(--chip); border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+  .file .media.tall { height: 200px; }
+  .file img, .file video { max-width: 100%; max-height: 100%; display: block; }
+  .file audio { width: 168px; }
+  .file .name { color: var(--muted); word-break: break-all; margin-top: 3px; }
+  .file .name b { color: var(--ink); font-weight: 600; display: block; }
+  .field { margin-top: 12px; }
+  .field-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .field-head strong { color: var(--ink); font-weight: 600; font-size: 13px; }
+  .count.over { color: var(--bad); font-weight: 600; }
+  pre.value { margin: 0; white-space: pre-wrap; word-break: break-word; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; max-height: 340px; overflow: auto; }
+  button.copy, button.small { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 6px; padding: 3px 9px; cursor: pointer; font: 12px inherit; }
+  button.copy.copied { color: var(--ok); border-color: var(--ok); }
+  ul.check { list-style: none; padding: 0; margin: 12px 0 0; }
+  ul.check li { padding: 2px 0; }
+  ul.check label { cursor: pointer; }
+  .pointer { margin-top: 10px; font-size: 13px; }
+  .pointer a { color: var(--accent); }
+  .posted { display: flex; gap: 8px; align-items: center; margin-left: auto; }
+  .posted input[type=url] { width: 260px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); font: inherit; font-size: 12px; }
+  .done-toggle { display: flex; align-items: center; gap: 5px; font-weight: 600; cursor: pointer; }
+  .notes { background: var(--panel); border: 1px dashed var(--line); border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; color: var(--muted); font-size: 13px; }
+  .notes ul { margin: 4px 0 0 18px; padding: 0; }
+  .todos { border-left: 3px solid var(--warn); padding: 6px 12px; margin: 10px 0; background: var(--panel); border-radius: 0 8px 8px 0; font-size: 13px; }
+  .todos summary { cursor: pointer; font-weight: 600; }
+  .empty { color: var(--muted); padding: 20px 0; }
+  .week { margin-bottom: 22px; }
+  .week h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 6px; }
+  .event { display: grid; grid-template-columns: 110px 60px 170px 1fr 26px; gap: 10px; align-items: center; padding: 7px 10px; border-radius: 8px; background: var(--panel); border: 1px solid var(--line); margin-bottom: 4px; cursor: pointer; }
+  .event:hover { border-color: var(--accent); }
+  .event.done { opacity: 0.55; }
+  .event .proj { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .event.past:not(.done) .day { color: var(--bad); font-weight: 600; }
+  .toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+  .toolbar a { color: var(--accent); }
+  .pf { display: inline-block; min-width: 72px; text-align: center; border-radius: 999px; padding: 1px 8px; font-size: 12px; color: #fff; }
+  .pf-youtube, .pf-shorts { background: #c4302b; } .pf-tiktok { background: #111; } .pf-instagram { background: #b03a8a; }
+  .pf-spotify, .pf-distributor { background: #1d9a52; } .pf-x { background: #333; } .pf-linkedin { background: #0a66c2; } .pf-microsite { background: #6b5bd6; }
+  .flash { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .error { color: var(--bad); }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <h1 id="board-title">Release-Board</h1>
+    <button class="nav-item" data-view="calendar" id="nav-calendar"></button>
+    <div id="nav-projects"></div>
+  </aside>
+  <main id="main"><p class="empty">…</p></main>
+</div>
+<script>
+(function () {
+  'use strict';
+  var L = {
+    de: {
+      calendar: 'Kalender (alle Projekte)', open: 'nur offene', ics: 'Kalender als .ics', release: 'Release', proposed: 'vorgeschlagen',
+      done: 'erledigt', posted: 'Gepostet', finished: 'Erledigt', url: 'Live-URL', copy: 'Kopieren', copied: 'Kopiert', chars: 'Zeichen', bytes: 'Bytes',
+      todos: 'Offene TODOs', none: 'Hier gibt es nichts zu posten.', profile: 'Profil', points: 'Verweist auf', noProjects: 'Kein Projekt mit Release-Paket oder Kalender gefunden.',
+      week: 'Woche ab', save: 'Speichern', progress: 'erledigt', noEvents: 'Keine Termine.', open_file: 'öffnen', failed: 'Fehler'
+    },
+    en: {
+      calendar: 'Calendar (all projects)', open: 'open only', ics: 'Calendar as .ics', release: 'Release', proposed: 'proposed',
+      done: 'done', posted: 'Posted', finished: 'Done', url: 'Live URL', copy: 'Copy', copied: 'Copied', chars: 'characters', bytes: 'bytes',
+      todos: 'Open TODOs', none: 'Nothing to post here.', profile: 'Profile', points: 'Points to', noProjects: 'No project with a release package or calendar.',
+      week: 'Week of', save: 'Save', progress: 'done', noEvents: 'No events.', open_file: 'open', failed: 'Error'
+    }
+  };
+  var lang = 'de';
+  var t = function (key) { return (L[lang] || L.en)[key]; };
+  var state = { projects: [], view: 'calendar', project: null, tab: null, openOnly: true, data: null, focus: null };
+
+  function el(tag, attrs, children) {
+    var node = document.createElement(tag);
+    if (attrs) Object.keys(attrs).forEach(function (key) {
+      if (key === 'class') node.className = attrs[key];
+      else if (key === 'text') node.textContent = attrs[key];
+      else if (key.slice(0, 2) === 'on') node.addEventListener(key.slice(2), attrs[key]);
+      else if (attrs[key] !== undefined && attrs[key] !== null && attrs[key] !== false) node.setAttribute(key, attrs[key] === true ? '' : attrs[key]);
+    });
+    (children || []).forEach(function (child) { if (child !== null && child !== undefined) node.appendChild(typeof child === 'string' ? document.createTextNode(child) : child); });
+    return node;
+  }
+  function api(path, options) {
+    return fetch(path, options).then(function (res) { return res.json().then(function (body) { if (!res.ok) throw new Error(body.error || res.statusText); return body; }); });
+  }
+  function when(at) {
+    if (!at) return '';
+    var day = at.slice(0, 10), parts = day.split('-');
+    var weekday = new Intl.DateTimeFormat(lang, { weekday: 'short', timeZone: 'UTC' }).format(new Date(day + 'T12:00:00Z'));
+    var date = lang === 'de' ? parts[2] + '.' + parts[1] + '.' + parts[0] : day;
+    return weekday + ' ' + date + ' · ' + at.slice(11, 16);
+  }
+  function count(value, field) {
+    if (field.unit === 'bytes') return new TextEncoder().encode(value).length;
+    var text = field.counting === 'x' ? value.replace(/https?:\/\/\S+/g, 'xxxxxxxxxxxxxxxxxxxxxxx') : value;
+    return Array.from(text).length;
+  }
+  function media(slug, path) { return '/media/' + encodeURIComponent(slug) + '/' + path.split('/').map(encodeURIComponent).join('/'); }
+
+  function renderNav() {
+    var calendar = document.getElementById('nav-calendar');
+    calendar.textContent = t('calendar');
+    calendar.className = 'nav-item' + (state.view === 'calendar' ? ' active' : '');
+    calendar.onclick = function () { state.view = 'calendar'; render(); };
+    var list = document.getElementById('nav-projects');
+    list.innerHTML = '';
+    state.projects.forEach(function (project) {
+      if (project.error) { list.appendChild(el('div', { class: 'nav-item error', text: project.slug + ': ' + project.error })); return; }
+      var share = project.total ? Math.round(100 * project.done / project.total) : 0;
+      var sub = (project.releaseDate ? project.releaseDate + (project.proposed ? ' (' + t('proposed') + ')' : '') : '—') + ' · ' + project.done + '/' + project.total;
+      var bar = el('div', { class: 'bar' }, [el('i', { style: 'width:' + share + '%' })]);
+      list.appendChild(el('button', {
+        class: 'nav-item' + (state.view === 'project' && state.project === project.slug ? ' active' : ''),
+        onclick: function () { openProject(project.slug); }
+      }, [project.title, el('span', { class: 'sub', text: sub }), bar]));
+    });
+  }
+
+  function openProject(slug, tab, focus) {
+    state.view = 'project'; state.project = slug; state.focus = focus || null;
+    api('/api/projects/' + encodeURIComponent(slug)).then(function (data) {
+      state.data = data;
+      lang = data.language && data.language.toLowerCase().indexOf('de') === 0 ? 'de' : 'en';
+      var ids = data.platforms.map(function (p) { return p.id; });
+      if (tab && ids.indexOf(tab) >= 0) state.tab = tab;
+      else if (ids.indexOf(state.tab) < 0) state.tab = ids[0];
+      render();
+    }).catch(showError);
+  }
+
+  function setStatus(id, change) {
+    var slug = state.project;
+    return api('/api/projects/' + encodeURIComponent(slug) + '/status', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(Object.assign({ id: id }, change))
+    }).then(function (status) {
+      state.data.status = status;
+      return api('/api/projects').then(function (projects) { state.projects = projects; renderNav(); });
+    }).catch(showError);
+  }
+
+  function renderField(field) {
+    var value = field.value;
+    var n = count(value, field);
+    var over = field.limit && n > field.limit;
+    var counter = field.limit ? el('span', { class: 'count' + (over ? ' over' : ''), text: n + '/' + field.limit + ' ' + t(field.unit === 'bytes' ? 'bytes' : 'chars') }) : null;
+    var button = el('button', { class: 'copy', text: t('copy') });
+    button.onclick = function () {
+      navigator.clipboard.writeText(value).then(function () {
+        button.textContent = t('copied'); button.classList.add('copied');
+        setTimeout(function () { button.textContent = t('copy'); button.classList.remove('copied'); }, 1400);
+      });
+    };
+    return el('div', { class: 'field' }, [
+      el('div', { class: 'field-head' }, [el('strong', { text: field.label }), el('span', {}, [counter, field.note ? ' · ' + field.note : null, ' ', button])]),
+      el('pre', { class: 'value', text: value })
+    ]);
+  }
+
+  function renderFile(file) {
+    var src = media(state.project, file.path);
+    var box;
+    if (file.kind === 'image') box = el('div', { class: 'media' }, [el('img', { src: src, alt: file.label, loading: 'lazy' })]);
+    else if (file.kind === 'video') box = el('div', { class: 'media' + (/9x16/.test(file.path) ? ' tall' : '') }, [el('video', { src: src, controls: true, preload: 'metadata' })]);
+    else if (file.kind === 'audio') box = el('audio', { src: src, controls: true, preload: 'none' });
+    else box = el('div', { class: 'media' }, [el('a', { href: src, target: '_blank', text: t('open_file') })]);
+    return el('div', { class: 'file' }, [box, el('div', { class: 'name' }, [el('b', { text: file.label }), el('a', { href: src, target: '_blank', text: 'release/' + file.path })])]);
+  }
+
+  function renderPost(post) {
+    var status = state.data.status.items[post.id] || {};
+    var done = el('input', { type: 'checkbox', checked: status.done ? true : undefined });
+    done.onchange = function () { setStatus(post.id, { done: done.checked }).then(render); };
+    var posted = el('div', { class: 'posted' }, [el('label', { class: 'done-toggle' }, [done, t(post.url ? 'posted' : 'finished')])]);
+    if (post.url) {
+      var input = el('input', { type: 'url', placeholder: t('url'), value: status.url || '' });
+      input.onchange = function () { setStatus(post.id, { url: input.value.trim() || null }).then(function () { openProject(state.project, state.tab, post.id); }); };
+      posted.insertBefore(input, posted.firstChild);
+    }
+    var checklist = post.checklist.length ? el('ul', { class: 'check' }, post.checklist.map(function (item, index) {
+      var key = post.id + '#' + index;
+      var box = el('input', { type: 'checkbox', checked: (state.data.status.items[key] || {}).done ? true : undefined });
+      box.onchange = function () { setStatus(key, { done: box.checked }); };
+      return el('li', {}, [el('label', {}, [box, ' ', item])]);
+    })) : null;
+    var pointer = post.pointer ? el('div', { class: 'pointer' }, [t('points') + ': ', /^https?:/.test(post.pointer) ? el('a', { href: post.pointer, target: '_blank', text: post.pointer }) : post.pointer]) : null;
+    var card = el('section', { class: 'card' + (status.done ? ' done' : ''), id: 'post-' + post.id }, [
+      el('div', { class: 'card-head' }, [el('h3', { text: post.heading }), post.at ? el('span', { class: 'when', text: when(post.at) }) : null, posted]),
+      post.files.length ? el('div', { class: 'files' }, post.files.map(renderFile)) : null,
+    ].concat(post.fields.map(renderField)).concat([checklist, pointer]));
+    return card;
+  }
+
+  function renderProject() {
+    var data = state.data, main = document.getElementById('main');
+    main.innerHTML = '';
+    var total = data.calendar.length, done = data.calendar.filter(function (e) { return (data.status.items[e.id] || {}).done; }).length;
+    main.appendChild(el('header', { class: 'project' }, [
+      el('h2', { text: (data.artist ? data.artist + ' – ' : '') + data.title }),
+      data.releaseDate ? el('span', { class: 'chip', text: t('release') + ' ' + data.releaseDate + (data.proposed ? ' (' + t('proposed') + ')' : '') }) : null,
+      el('span', { class: 'chip', text: done + '/' + total + ' ' + t('progress') })
+    ]));
+    if (data.todos.length) {
+      main.appendChild(el('details', { class: 'todos' }, [el('summary', { text: t('todos') + ' (' + data.todos.length + ')' }), el('ul', {}, data.todos.map(function (todo) { return el('li', { text: todo }); }))]));
+    }
+    var tabs = el('nav', { class: 'tabs' });
+    data.platforms.forEach(function (platform) {
+      var open = platform.posts.filter(function (p) { return !(data.status.items[p.id] || {}).done; }).length;
+      tabs.appendChild(el('button', { class: 'tab' + (state.tab === platform.id ? ' active' : ''), onclick: function () { state.tab = platform.id; state.focus = null; render(); } },
+        [platform.label, el('span', { class: 'count', text: platform.posts.length ? open + '/' + platform.posts.length : '–' })]));
+    });
+    main.appendChild(tabs);
+    var platform = data.platforms.filter(function (p) { return p.id === state.tab; })[0];
+    if (!platform) return;
+    var notes = el('div', { class: 'notes' }, [
+      platform.profile ? el('div', {}, [t('profile') + ': ', /^https?:/.test(platform.profile) ? el('a', { href: platform.profile, target: '_blank', text: platform.profile }) : platform.profile]) : null,
+      el('ul', {}, platform.notes.map(function (note) { return el('li', { text: note }); }))
+    ]);
+    main.appendChild(notes);
+    if (platform.skipped) main.appendChild(el('p', { class: 'empty', text: platform.skipped }));
+    else if (!platform.posts.length) main.appendChild(el('p', { class: 'empty', text: t('none') }));
+    platform.posts.forEach(function (post) { main.appendChild(renderPost(post)); });
+    if (state.focus) {
+      var target = document.getElementById('post-' + state.focus);
+      if (target) { target.scrollIntoView({ block: 'center' }); target.classList.add('flash'); setTimeout(function () { target.classList.remove('flash'); }, 1600); }
+      state.focus = null;
+    }
+  }
+
+  function tabOf(event) {
+    if (event.platform === 'distributor') return 'spotify';
+    return event.platform;
+  }
+
+  function renderCalendar() {
+    var main = document.getElementById('main');
+    main.innerHTML = '';
+    var filter = el('input', { type: 'checkbox', checked: state.openOnly ? true : undefined });
+    filter.onchange = function () { state.openOnly = filter.checked; renderCalendar(); };
+    main.appendChild(el('div', { class: 'toolbar' }, [el('h2', { text: t('calendar'), style: 'margin:0;font-size:20px' }), el('label', {}, [filter, ' ', t('open')]), el('a', { href: '/calendar.ics', text: t('ics') })]));
+    api('/api/calendar').then(function (events) {
+      var now = Date.now();
+      var shown = events.filter(function (e) { return !state.openOnly || !e.done; });
+      if (!shown.length) { main.appendChild(el('p', { class: 'empty', text: t('noEvents') })); return; }
+      var weeks = {};
+      shown.forEach(function (e) {
+        var d = new Date(e.at.slice(0, 10) + 'T12:00:00Z'), back = (d.getUTCDay() + 6) % 7;
+        d.setUTCDate(d.getUTCDate() - back);
+        var key = d.toISOString().slice(0, 10);
+        (weeks[key] = weeks[key] || []).push(e);
+      });
+      Object.keys(weeks).sort().forEach(function (week) {
+        var parts = week.split('-');
+        var box = el('div', { class: 'week' }, [el('h3', { text: t('week') + ' ' + (lang === 'de' ? parts[2] + '.' + parts[1] + '.' + parts[0] : week) })]);
+        weeks[week].forEach(function (e) {
+          box.appendChild(el('div', {
+            class: 'event' + (e.done ? ' done' : '') + (Date.parse(e.at) < now ? ' past' : ''),
+            onclick: function () { openProject(e.project, tabOf(e), e.id); }
+          }, [
+            el('span', { class: 'day', text: when(e.at).split(' · ')[0] }),
+            el('span', { class: 'when', text: e.at.slice(11, 16) }),
+            el('span', { class: 'proj', text: e.title }),
+            el('span', {}, [el('span', { class: 'pf pf-' + e.platform, text: e.platform === 'shorts' ? 'Shorts' : e.platform }), ' ', e.label]),
+            el('span', { text: e.done ? '✓' : '' })
+          ]));
+        });
+        main.appendChild(box);
+      });
+    }).catch(showError);
+  }
+
+  function showError(error) {
+    var main = document.getElementById('main');
+    main.appendChild(el('p', { class: 'error', text: t('failed') + ': ' + error.message }));
+  }
+
+  function syncHash() {
+    var hash = state.view === 'project' && state.project ? '#/p/' + state.project + '/' + (state.tab || '') : '#/calendar';
+    if (location.hash !== hash) history.replaceState(null, '', hash);
+  }
+
+  function render() {
+    syncHash();
+    renderNav();
+    if (state.view === 'project' && state.data) renderProject(); else renderCalendar();
+  }
+
+  function route() {
+    var match = /^#\/p\/([a-z0-9-]+)\/?([a-z]*)$/.exec(location.hash);
+    if (match && (state.view !== 'project' || state.project !== match[1] || (match[2] && state.tab !== match[2]))) openProject(match[1], match[2] || undefined);
+    else if (!match && state.view !== 'calendar') { state.view = 'calendar'; render(); }
+    else if (!match) render();
+  }
+  window.addEventListener('hashchange', route);
+
+  api('/api/projects').then(function (projects) {
+    state.projects = projects;
+    if (!projects.length) { document.getElementById('main').innerHTML = ''; document.getElementById('main').appendChild(el('p', { class: 'empty', text: t('noProjects') })); renderNav(); return; }
+    route();
+  }).catch(showError);
+})();
+</script>
+</body>
+</html>

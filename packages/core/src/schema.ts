@@ -832,7 +832,46 @@ export const UploadShortSchema = z.object({
       pinned_comment: z.string().min(1).optional(),
     })
     .optional(),
+  /** The Short as a native video post on X; the link to the main video goes in a reply. */
+  x: z.object({ post: z.string().min(1), hashtags: z.array(HashtagSchema).default([]) }).optional(),
   summary_en: EnglishSummarySchema.optional(),
+});
+
+/** The release announcement on X: the post with a native video, and the reply that holds the YouTube link. */
+export const UploadXSchema = z.object({
+  post: z.string().min(1),
+  hashtags: z.array(HashtagSchema).default([]),
+  /** The reply under the post; the YouTube link is appended to it. */
+  reply: z.string().min(1).optional(),
+  /** The Short attached to the post; the first Short when omitted. */
+  media: z.string().min(1).optional(),
+});
+
+/**
+ * LinkedIn: whether the song suits it (a political, work, tech, or AI angle),
+ * decided by the agent with a reason, and the post when it does.
+ */
+export const UploadLinkedInSchema = z
+  .object({
+    decision: z.enum(['post', 'skip']),
+    reason: z.string().min(1),
+    post: z.string().min(1).optional(),
+    hashtags: z.array(HashtagSchema).default([]),
+    /** The video attached to the post: `main` (the 1:1 or 16:9 render) or a Short name. */
+    media: z.string().min(1).default('main'),
+  })
+  .superRefine((value, ctx) => {
+    if (value.decision === 'post' && !value.post) ctx.addIssue({ code: 'custom', path: ['post'], message: 'decision post needs the post text' });
+  });
+
+/** The song's page on the artist microsite: the texts the page shows beside video, lyrics, and links. */
+export const UploadMicrositeSchema = z.object({
+  /** One or two sentences for the release list and link previews. */
+  teaser: z.string().min(1),
+  /** The page text about the song: a few paragraphs, Markdown. */
+  text: z.string().min(1),
+  /** A line of the lyrics to feature, quoted as sung. */
+  quote: z.string().min(1).optional(),
 });
 
 /**
@@ -851,6 +890,11 @@ export const UploadDataSchema = z
     instagram_post: z.object({ caption: z.string().min(1), hashtags: z.array(HashtagSchema).default([]) }).optional(),
     /** Spotify for Artists: the Artist Pick message and the editorial pitch. */
     spotify: z.object({ artist_pick: z.string().min(1).optional(), pitch: z.string().min(1).optional() }).optional(),
+    /** The announcement a week before the release: an Instagram story with the cover, a YouTube post, and an X post. */
+    announcement: z.object({ text: z.string().min(1), hashtags: z.array(HashtagSchema).default([]) }).optional(),
+    x: UploadXSchema.optional(),
+    linkedin: UploadLinkedInSchema.optional(),
+    microsite: UploadMicrositeSchema.optional(),
   })
   .superRefine((data, ctx) => {
     const seen = new Set<string>(['main']);
@@ -861,6 +905,129 @@ export const UploadDataSchema = z
       seen.add(short.name);
     });
   });
+
+const WeekdaySchema = z.enum(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']);
+const ClockSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'use HH:MM');
+const DaySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'use YYYY-MM-DD');
+
+/**
+ * `config/release-schedule.yaml`: the workspace's release rules. Every
+ * project's calendar takes the next free slots under them, so releases and
+ * Shorts of different songs never collide. Optional; the defaults are a
+ * Friday release (Global Release Day) in the computer's time zone.
+ */
+export const ReleaseScheduleSchema = z.object({
+  version: z.literal(1),
+  /** IANA time zone of every time below, e.g. `Europe/Berlin`; defaults to the computer's time zone. */
+  timezone: z.string().min(1).optional(),
+  release: z
+    .object({
+      weekday: WeekdaySchema.default('fri'),
+      /** When the song goes live on the streaming services (Global Release Day: Friday 00:00). */
+      song_time: ClockSchema.default('00:00'),
+      /** When the main video goes live on YouTube. */
+      video_time: ClockSchema.default('18:00'),
+      /** Publish the main video as a YouTube Premiere. */
+      premiere: z.boolean().default(true),
+      /** At least this many weeks between two releases. */
+      min_gap_weeks: z.number().int().min(0).default(1),
+      /** The earliest release day, in days from today: distributor delivery and the pitch need the lead. */
+      lead_days: z.number().int().min(0).default(21),
+      /** No release on these days: `MM-DD` every year or `YYYY-MM-DD` once. Defaults to Christmas and New Year. */
+      skip: z
+        .array(z.string().regex(/^(\d{4}-)?\d{2}-\d{2}$/, 'use MM-DD or YYYY-MM-DD'))
+        .default(['12-24', '12-25', '12-26', '12-31', '01-01']),
+    })
+    .prefault({}),
+  /** Tasks before and after the release, in days relative to the release day. */
+  steps: z
+    .object({
+      distributor: z.number().int().max(0).default(-21),
+      pitch: z.number().int().max(-7).default(-14),
+      announce: z.number().int().max(-1).default(-7),
+      canvas: z.number().int().max(0).default(-7),
+      links: z.number().int().min(0).default(1),
+      /** When a task without a posting time is due. */
+      task_time: ClockSchema.default('10:00'),
+    })
+    .prefault({}),
+  /** Shorts, Reels, and TikToks after the release: one per slot day, songs interleaved. */
+  shorts: z
+    .object({
+      weekdays: z.array(WeekdaySchema).min(1).default(['mon', 'wed', 'fri']),
+      times: z
+        .object({
+          youtube: ClockSchema.default('18:00'),
+          tiktok: ClockSchema.default('20:00'),
+          instagram: ClockSchema.default('20:00'),
+          x: ClockSchema.default('18:00'),
+        })
+        .prefault({}),
+      /** At most this many Shorts of one song per week (Monday to Sunday). */
+      per_song_per_week: z.number().int().min(1).default(1),
+      /** The first Short goes out on the release day. */
+      first_on_release_day: z.boolean().default(true),
+    })
+    .prefault({}),
+  /** Posting times of the release-day posts. */
+  posts: z
+    .object({
+      instagram: ClockSchema.default('20:00'),
+      x: ClockSchema.default('18:00'),
+      /** LinkedIn: the first such weekday after the release, in the morning. */
+      linkedin_weekday: WeekdaySchema.default('tue'),
+      linkedin_time: ClockSchema.default('09:00'),
+    })
+    .prefault({}),
+  /** Slots taken outside any project calendar, e.g. Shorts planned by hand. */
+  booked: z
+    .array(z.object({ date: DaySchema, kind: z.enum(['release', 'short']).default('short'), label: z.string().min(1) }))
+    .default([]),
+});
+
+export const CalendarPlatformSchema = z.enum(['distributor', 'spotify', 'youtube', 'shorts', 'tiktok', 'instagram', 'x', 'linkedin', 'microsite']);
+
+/** One dated step of a release calendar. */
+export const CalendarEventSchema = z.object({
+  /** Stable key, also the key of its status: `youtube`, `pitch`, `short:Z1-intro:tiktok`, ... */
+  id: z.string().min(1),
+  /** Local date-time with offset, e.g. `2026-12-11T18:00:00+01:00`. */
+  at: z.string().min(1),
+  platform: CalendarPlatformSchema,
+  /** What happens: distributor, pitch, announce, canvas, song, artist-pick, youtube, community, story, post, page, links, short. */
+  step: z.string().min(1),
+  /** `main`, a Short name, or the announcement. */
+  item: z.string().min(1).default('main'),
+});
+
+/** `review/calendar.yaml`: when what goes online where. `release` writes it and keeps the dates of events it already holds. */
+export const ReleaseCalendarSchema = z.object({
+  version: z.literal(1),
+  project: z.string().min(1),
+  title: z.string().min(1),
+  release_date: DaySchema,
+  /** True while `release.release_date` in project.yaml is not set: the date is the calendar's proposal. */
+  proposed: z.boolean().default(false),
+  timezone: z.string().min(1),
+  events: z.array(CalendarEventSchema).default([]),
+});
+
+/** `review/release-status.json`: what the user has posted, keyed by calendar event, with the live URL. */
+export const ReleaseStatusSchema = z.object({
+  version: z.literal(1),
+  items: z
+    .record(
+      z.string(),
+      z.object({
+        done: z.boolean().default(false),
+        /** When it was marked done. */
+        at: z.string().optional(),
+        /** The live post, video, or track. */
+        url: z.string().url().optional(),
+      }),
+    )
+    .default({}),
+});
 
 export const PublishStatusSchema = z.enum(['uploaded', 'scheduled', 'draft', 'processing', 'failed']);
 
@@ -906,6 +1073,10 @@ export const PLATFORM_LIMITS = {
   tiktok: { caption: 2200, hashtags: 10 },
   /** Spotify for Artists: the editorial pitch. */
   spotify: { pitch: 500 },
+  /** X without Premium: 280 characters per post (links count as 23); one or two hashtags. */
+  x: { post: 280, hashtags: 2 },
+  /** LinkedIn: 3,000 characters; about 210 show before "see more"; at most three hashtags. */
+  linkedin: { post: 3000, hook: 210, hashtags: 3 },
 } as const;
 
 const LimitOverrides = <T extends Record<string, number>>(limits: T) =>
@@ -948,6 +1119,8 @@ export const ChannelConfigSchema = z.object({
       instagram: LimitOverrides(PLATFORM_LIMITS.instagram).optional(),
       tiktok: LimitOverrides(PLATFORM_LIMITS.tiktok).optional(),
       spotify: LimitOverrides(PLATFORM_LIMITS.spotify).optional(),
+      x: LimitOverrides(PLATFORM_LIMITS.x).optional(),
+      linkedin: LimitOverrides(PLATFORM_LIMITS.linkedin).optional(),
     })
     .prefault({}),
   /** AI disclosure defaults: YouTube "altered or synthetic content", TikTok AI label, Instagram "AI info", distributor AI credits. */
@@ -974,6 +1147,8 @@ export const ReleaseFileKindSchema = z.enum([
   'lyrics',
   'text',
   'readme',
+  'calendar',
+  'microsite',
 ]);
 
 /** One file of the release folder. */
@@ -1044,6 +1219,11 @@ export type PublishPlatform = z.infer<typeof PublishPlatformSchema>;
 export type UploadMain = z.infer<typeof UploadMainSchema>;
 export type UploadShort = z.infer<typeof UploadShortSchema>;
 export type UploadData = z.infer<typeof UploadDataSchema>;
+export type ReleaseSchedule = z.infer<typeof ReleaseScheduleSchema>;
+export type CalendarPlatform = z.infer<typeof CalendarPlatformSchema>;
+export type CalendarEvent = z.infer<typeof CalendarEventSchema>;
+export type ReleaseCalendar = z.infer<typeof ReleaseCalendarSchema>;
+export type ReleaseStatus = z.infer<typeof ReleaseStatusSchema>;
 export type PublishStatus = z.infer<typeof PublishStatusSchema>;
 export type PublishEntry = z.infer<typeof PublishEntrySchema>;
 export type PublishLog = z.infer<typeof PublishLogSchema>;

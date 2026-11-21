@@ -157,7 +157,7 @@ A vertical excerpt of the finished video for YouTube Shorts and similar feeds: 9
 _Avoid_: clip (an AI clip is a generated shot), teaser, reel
 
 **Upload Data**:
-`review/upload.yaml`: the structured upload texts of the main video and of every Short, per platform (YouTube, Instagram, TikTok, Spotify for Artists), with file, thumbnail, language, and the made-for-kids and synthetic-content declarations. The source of the upload text, the release texts, and every publish.
+`review/upload.yaml`: the structured upload texts of the main video and of every Short, per platform (YouTube, Instagram, TikTok, Spotify for Artists, X, LinkedIn, the microsite) and the announcement, with file, thumbnail, language, and the made-for-kids and synthetic-content declarations. The source of the upload text, the release texts, and every publish.
 _Avoid_: metadata, upload manifest
 
 **Upload Text**:
@@ -195,6 +195,22 @@ _Avoid_: brand kit (a **Brand Kit** is visual), profile
 **Distributor**:
 The service that delivers a song to streaming stores, such as DistroKid. Its upload stays manual.
 _Avoid_: label, aggregator
+
+**Release Schedule**:
+`config/release-schedule.yaml`: the workspace's release rules: release weekday and times, lead steps, Short slots and posting times, holidays, booked slots. Optional; the defaults are a Friday release in the computer's time zone.
+_Avoid_: posting plan, cadence
+
+**Release Calendar**:
+`review/calendar.yaml`: when what goes online where for one project, planned in the next free slots of the release schedule without colliding with other projects. Each entry is an event with an id, a time, a platform, and a step.
+_Avoid_: release plan (the plan is the calendar's table in the release folder), timeline
+
+**Release Board**:
+The local page `release-board` serves over all release folders: per platform the posts with files, texts, limits, and settings, the calendar of all projects, and the user's done state and live URLs in `review/release-status.json`.
+_Avoid_: dashboard, CMS
+
+**Microsite**:
+The artist's own website. A song's page is built from `renders/release/microsite/<slug>.json`.
+_Avoid_: landing page, link-in-bio
 
 **TODO**:
 A gap in the release package that only the user can close, such as a missing songwriter or an `<ID>` link. It never fails QA.

@@ -38,7 +38,9 @@
               "canvas",
               "lyrics",
               "text",
-              "readme"
+              "readme",
+              "calendar",
+              "microsite"
             ]
           },
           "bytes": {

@@ -10,6 +10,7 @@ import {
   providerForRole,
   recordSpend,
   remainingBudget,
+  repoRoot,
   resolveModelRole,
   saveState,
   setStageDone,
@@ -301,9 +302,40 @@ program
   .option('--no-render', 'List missing or stale renders as TODOs instead of rendering them')
   .option('--canvas-from <time>', 'Canvas start: seconds or an anchor, e.g. section:chorus_1 (default: a lyric-free window near the first chorus)')
   .option('--canvas-seconds <n>', 'Canvas length, 3-8 s (default 6)', (value) => Number(value))
-  .action((project: string | undefined, options: { render: boolean; canvasFrom?: string; canvasSeconds?: number }) =>
+  .option('--replan', 'Plan the release calendar again instead of keeping its times')
+  .action((project: string | undefined, options: { render: boolean; canvasFrom?: string; canvasSeconds?: number; replan?: boolean }) =>
     run(async () => {
-      await runRelease({ projectDir: projectDirFromArg(project), render: options.render, canvasFrom: options.canvasFrom, canvasSeconds: options.canvasSeconds });
+      await runRelease({ projectDir: projectDirFromArg(project), render: options.render, canvasFrom: options.canvasFrom, canvasSeconds: options.canvasSeconds, replan: options.replan });
+    }),
+  );
+
+program
+  .command('calendar [project]')
+  .description(
+    'Plan review/calendar.yaml: when what goes online where, in the next free slots of config/release-schedule.yaml ' +
+      '(release day, Shorts slots, posting times), without colliding with other projects. Keeps times already planned.',
+  )
+  .option('--replan', 'Plan again from scratch instead of keeping the planned times')
+  .action((project: string | undefined, options: { replan?: boolean }) =>
+    run(async () => {
+      const { runCalendar } = await import('./release-calendar.js');
+      await runCalendar({ projectDir: projectDirFromArg(project), root: repoRoot(), replan: options.replan });
+    }),
+  );
+
+program
+  .command('release-board')
+  .description(
+    'Open the release board: a local page with every project\'s release package per platform (files, texts to copy, limits, ' +
+      'settings, links), the release calendar of all projects, and checkboxes for what is posted (review/release-status.json).',
+  )
+  .option('--port <n>', 'Port on 127.0.0.1', (value) => Number(value), 4848)
+  .action((options: { port: number }) =>
+    run(async () => {
+      const { startBoard } = await import('./release-board.js');
+      const { url } = await startBoard({ root: repoRoot(), port: options.port });
+      console.log(`Release board: ${url}  (Ctrl+C to stop)`);
+      await new Promise(() => undefined);
     }),
   );
 

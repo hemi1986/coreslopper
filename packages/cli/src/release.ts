@@ -13,8 +13,10 @@ import {
   chaptersFromSections,
   channelTodos,
   formatId,
+  calendarIcs,
   hashFileStream,
   loadChannel,
+  loadReleaseSchedule,
   loadProject,
   platformLimits,
   platformTextProblems,
@@ -49,7 +51,9 @@ import {
   type FfmpegRunner,
   type Prober,
 } from './release-media.js';
-import { readmeText, releaseLabels, releaseTexts, youtubeDescriptionText, type ReleaseTextInput } from './release-texts.js';
+import { readmeText, releaseLabels, releaseTexts, youtubeDescriptionText, calendarEventLabel, type ReleaseTextInput } from './release-texts.js';
+import { calendarInput, loadStatus, planCalendar } from './release-calendar.js';
+import { micrositeSong } from './release-microsite.js';
 import { listThumbnails } from './thumbnail-files.js';
 import { loadUploadData, uploadPaths } from './upload-text.js';
 import { parseTimePoint } from './short.js';
@@ -80,6 +84,8 @@ export interface ReleaseOptions {
   /** Canvas start: seconds or an anchor such as `section:chorus_1`. */
   canvasFrom?: string;
   canvasSeconds?: number;
+  /** Plan the release calendar again instead of keeping the times it holds. */
+  replan?: boolean;
   deps?: Partial<ReleaseDeps>;
 }
 
@@ -168,7 +174,7 @@ class ReleaseWriter {
 }
 
 /** song.json as written by setup and import-song; empty when missing or unreadable. */
-async function songJson(project: LoadedProject): Promise<Record<string, unknown>> {
+export async function songJson(project: LoadedProject): Promise<Record<string, unknown>> {
   try {
     return JSON.parse(await readFile(project.paths.song, 'utf8')) as Record<string, unknown>;
   } catch {
@@ -374,6 +380,29 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
     files,
     durationSeconds: timing?.audio.duration,
   };
+  // The calendar: the next free slots under config/release-schedule.yaml; kept times stay.
+  const schedule = await loadReleaseSchedule(root);
+  input.premiere = schedule.release.premiere;
+  input.calendar = await planCalendar(
+    project.paths.root,
+    calendarInput({
+      slug,
+      title: identity.title,
+      kind: input.kind,
+      releaseDate: project.config.release?.release_date,
+      data,
+      shorts: files.shorts.map((short) => short.name),
+    }),
+    { root, now: deps.now(), replan: options.replan, schedule },
+  );
+  const labels = releaseLabels(language);
+  const ics = calendarIcs([input.calendar], (calendar, event) => `${calendar.title}: ${calendarEventLabel(event, labels, schedule.release.premiere)}`);
+  await writer.text('calendar.ics', ics, 'calendar', { events: input.calendar.events.length, release_date: input.calendar.release_date });
+  if (data?.microsite) {
+    const lyrics = existsSync(project.paths.lyrics) ? plainLyrics(await readFile(project.paths.lyrics, 'utf8')) : undefined;
+    const song = micrositeSong(input, { status: await loadStatus(project.paths.root), calendar: input.calendar, lyrics: music ? lyrics : undefined });
+    await writer.text(`microsite/${slug}.json`, `${JSON.stringify(song, null, 2)}\n`, 'microsite', {});
+  }
   if (data) {
     const problems = platformTextProblems(data, limits, { music });
     errors.push(...problems.errors);

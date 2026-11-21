@@ -145,7 +145,7 @@ Notes land in `review/notes/<video-stem>.json`. No stage waits for them; on a fi
 
 Once the master passes, the skill makes three YouTube thumbnails: the main character, the cameo or key scene, and the ensemble. The agent picks the stills and writes the hook; the `thumbnail` command composes each image deterministically with the brand fonts and the style bible's palette, as a 1280x720 sRGB JPEG under 2 MB. The art director reviews all three ([ADR 0018](adr/0018-thumbnails.md)).
 
-Then it builds the rest of the release package ([ADR 0019](adr/0019-release-package.md), [ADR 0024](adr/0024-release-folder-manual-distribution.md)). The agent picks three Short moments on section boundaries (typically hook or intro, chorus, climax or drop; 30–50 s each); the `short` command cuts them from `renders/9x16.mp4`, frame-accurately with audio fades, and refuses more than 60 s. Each Short gets a 1080x1920 thumbnail (`thumbnail --format 9x16`), the song a 3000x3000 cover (`thumbnail --format 1x1`, artist and title only). The agent writes every platform's texts into `review/upload.yaml` in the project's language: YouTube title, description, tags, pinned comment, and community post; per Short the YouTube, Instagram, and TikTok texts; the Spotify Artist Pick and pitch. Then `release` assembles the folder:
+Then it builds the rest of the release package ([ADR 0019](adr/0019-release-package.md), [ADR 0024](adr/0024-release-folder-manual-distribution.md)). The agent picks three Short moments on section boundaries (typically hook or intro, chorus, climax or drop; 30–50 s each); the `short` command cuts them from `renders/9x16.mp4`, frame-accurately with audio fades, and refuses more than 60 s. Each Short gets a 1080x1920 thumbnail (`thumbnail --format 9x16`), the song a 3000x3000 cover (`thumbnail --format 1x1`, artist and title only). The agent writes every platform's texts into `review/upload.yaml` in the project's language: YouTube title, description, tags, pinned comment, and community post; per Short the YouTube, Instagram, and TikTok texts; the Spotify Artist Pick and pitch; the announcement a week before; the X post; the LinkedIn decision (post or skip, from the song's theme) and post; and the microsite page texts ([ADR 0028](adr/0028-release-board-and-calendar.md), platform rules in [release-platforms.md](release-platforms.md)). Then `release` plans the release calendar and assembles the folder:
 
 ```text
 renders/release/
@@ -156,8 +156,14 @@ renders/release/
   shorts/              <name>-9x16.mp4 + <name>-thumb.jpg
   audio/               <artist> - <title>.wav (PCM 16/24 bit, ≥ 44.1 kHz, stereo, no normalisation)
   streaming/           cover-3000x3000.jpg, canvas-9x16.mp4 (3–8 s, silent loop), lyrics.txt, lyrics.lrc
-  texts/               youtube.md, shorts.md, instagram.md, tiktok.md, spotify.md, release-plan.md
+  texts/               youtube.md, shorts.md, instagram.md, tiktok.md, spotify.md, x.md, linkedin.md, release-plan.md
+  calendar.ics         the release calendar for a calendar app
+  microsite/           <slug>.json: the song page data for the artist microsite
 ```
+
+The release calendar `review/calendar.yaml` takes the next free release day and Short slots under the workspace's `config/release-schedule.yaml` (default: Friday, the song at 00:00 and the video at 18:00 as a Premiere, distributor T−21, pitch T−14, announcement T−7, Shorts Mo/We/Fr with songs interleaved, no releases on Christmas and New Year; time zone of the computer unless set), so no two projects collide. `release.release_date` in `project.yaml` wins; without it the date is a proposal. Times already planned stay; `calendar --replan` plans again.
+
+`npm run cli -- release-board` serves a local page over every release folder: per platform the posts with their files, the texts to copy with counters, the settings to check, and the links; the calendar of all projects with an `.ics` export. The user ticks off what is posted and enters live URLs (`review/release-status.json`); the live YouTube URL fills the link in the X and LinkedIn texts and the microsite data.
 
 `release` renders a format only when it is missing or stale (its inputs hash in `state.json` changed), hardlinks or copies every other file, converts the song only when it is not already a deliverable WAV, cuts the canvas from a lyric-free window near the first chorus with a crossfaded seam, and rewrites only its own files. Missing release facts (songwriters, genres, AI credits, release date) and `<ID>` links from `config/channel.yaml` become TODOs in `README.md` and in the texts; they never fail the stage. `review/upload.md` stays as a pointer to the folder.
 

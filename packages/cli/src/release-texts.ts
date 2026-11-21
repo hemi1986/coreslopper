@@ -1,10 +1,10 @@
 import {
-  RELEASE_PLAN,
   TODO,
   chapterTime,
-  planDate,
+  type CalendarEvent,
   type ChannelConfig,
   type Chapter,
+  type ReleaseCalendar,
   type PlatformLimits,
   type ReleaseMetadata,
   type UploadData,
@@ -24,6 +24,10 @@ export interface ReleaseTextInput {
   title: string;
   data?: UploadData;
   release?: ReleaseMetadata;
+  /** The release calendar; the plan lists its events. */
+  calendar?: ReleaseCalendar;
+  /** The main video goes out as a YouTube Premiere (config/release-schedule.yaml). */
+  premiere?: boolean;
   channel?: ChannelConfig;
   limits: PlatformLimits;
   chapters: Chapter[];
@@ -94,6 +98,7 @@ interface Labels {
     afterUpload: string;
     s4a: string;
     canvas: string;
+    video: (file: string) => string;
     artistPick: string;
     pitch: string;
     pitchNote: string;
@@ -104,10 +109,23 @@ interface Labels {
     heading: string;
     day: string;
     date: string;
+    time: string;
     step: string;
-    noDate: string;
-    steps: Record<(typeof RELEASE_PLAN)[number]['key'], string>;
+    proposed: (date: string) => string;
+    fixed: (date: string) => string;
+    ics: string;
   };
+  cal: {
+    steps: Record<'distributor' | 'pitch' | 'canvas' | 'song' | 'artist-pick' | 'youtube' | 'premiere' | 'community' | 'story' | 'page' | 'links', string>;
+    announce: Record<'instagram' | 'youtube' | 'x', string>;
+    post: Record<'instagram' | 'x' | 'linkedin', string>;
+    short: (name: string, platform: string) => string;
+    platforms: Record<'distributor' | 'spotify' | 'youtube' | 'shorts' | 'tiktok' | 'instagram' | 'x' | 'linkedin' | 'microsite', string>;
+  };
+  announce: { heading: string; image: string };
+  videoLink: string;
+  x: { heading: string; post: string; reply: string; media: (file: string) => string; replyNote: string; short: string };
+  li: { heading: string; skipped: (reason: string) => string; reason: string; post: string; hook: (n: number, limit: number) => string; media: (file: string) => string; noLinkNote: string };
   readme: { heading: string; folders: Record<'video' | 'thumbnails' | 'shorts' | 'audio' | 'streaming' | 'texts', string>; order: string; steps: string[]; todos: string; none: string; manifest: string };
 }
 
@@ -192,6 +210,7 @@ const EN: Labels = {
     afterUpload: 'leave empty for a new ISRC',
     s4a: 'Spotify for Artists',
     canvas: 'Canvas (upload once the song is in Spotify for Artists)',
+    video: (file) => `Music video (beta, if your account has it): upload \`${file}\` under Music → the song → Video, then make it the Artist Pick`,
     artistPick: 'Artist Pick message',
     pitch: 'Editorial pitch (mood, genre, instruments, story)',
     pitchNote: 'Pitch at least 7 days, better 3 weeks before the release date; only unreleased songs can be pitched.',
@@ -202,19 +221,49 @@ const EN: Labels = {
     heading: 'Release plan',
     day: 'Day',
     date: 'Date',
+    time: 'Time',
     step: 'Step',
-    noDate: 'No release date yet: days are relative to the release day (day 0).',
+    proposed: (date) => `Proposed release day ${date}: set release.release_date in project.yaml to fix it (the distributor needs it).`,
+    fixed: (date) => `Release day ${date}. A fixed release date and an editorial pitch need at least three weeks.`,
+    ics: 'Import calendar.ics into your calendar app; release-board shows the calendar of every project.',
+  },
+  cal: {
     steps: {
       distributor: 'Upload audio, cover, and metadata to the distributor (spotify.md)',
       pitch: 'Pitch the song in Spotify for Artists (spotify.md)',
-      canvas: 'Upload the Canvas and set the Artist Pick in Spotify for Artists',
-      youtube: 'Publish or premiere the main video on YouTube (youtube.md)',
-      short1: 'Post Short 1 on YouTube, Instagram, and TikTok (shorts.md, instagram.md, tiktok.md)',
-      social: 'Story with link sticker; community post; feed post',
-      links: 'Add the Spotify link to the YouTube description, the pinned comment, and the bios',
-      short2: 'Post Short 2 on all three platforms',
-      short3: 'Post Short 3 on all three platforms',
+      canvas: 'Upload the Canvas in Spotify for Artists',
+      song: 'The song goes live on the streaming services',
+      'artist-pick': 'Set the Artist Pick (the music video or the song)',
+      youtube: 'Publish the main video on YouTube (youtube.md)',
+      premiere: 'Main video as a YouTube Premiere (youtube.md)',
+      community: 'YouTube post about the video',
+      story: 'Instagram story with a link sticker to the video',
+      page: 'Publish the song page on the microsite',
+      links: 'Add the Spotify link to the YouTube description and the pinned comment',
     },
+    announce: { instagram: 'Announcement: Instagram story with the cover', youtube: 'Announcement: YouTube post with the cover', x: 'Announcement on X with the cover' },
+    post: { instagram: 'Instagram feed post', x: 'Post on X with the video; YouTube link in the reply', linkedin: 'LinkedIn post' },
+    short: (name, platform) => `${name} on ${platform}`,
+    platforms: { distributor: 'Distributor', spotify: 'Spotify', youtube: 'YouTube', shorts: 'YouTube Shorts', tiktok: 'TikTok', instagram: 'Instagram', x: 'X', linkedin: 'LinkedIn', microsite: 'Microsite' },
+  },
+  announce: { heading: 'Announcement', image: 'Image: the streaming cover' },
+  videoLink: 'link to the main video',
+  x: {
+    heading: 'X',
+    post: 'Post',
+    reply: 'Reply with the link',
+    media: (file) => `Video: \`${file}\` (native upload)`,
+    replyNote: 'Post the reply right after the post: links in the post itself reach fewer people.',
+    short: 'Short',
+  },
+  li: {
+    heading: 'LinkedIn',
+    skipped: (reason) => `No LinkedIn post for this song: ${reason}`,
+    reason: 'Why',
+    post: 'Post',
+    hook: (n, limit) => `first paragraph ${n}/${limit} characters before "see more"`,
+    media: (file) => `Video: \`${file}\` (native upload)`,
+    noLinkNote: 'Upload the video natively; put the YouTube link at the end of the post.',
   },
   readme: {
     heading: 'Release package',
@@ -320,6 +369,7 @@ const DE: Labels = {
     afterUpload: 'leer lassen für einen neuen ISRC',
     s4a: 'Spotify for Artists',
     canvas: 'Canvas (hochladen, sobald der Song in Spotify for Artists auftaucht)',
+    video: (file) => `Musikvideo (Beta, falls dein Konto es hat): \`${file}\` unter Musik → Song → Video hochladen und als Artist Pick setzen`,
     artistPick: 'Artist-Pick-Text',
     pitch: 'Pitch an die Redaktion (Stimmung, Genre, Instrumente, Story)',
     pitchNote: 'Pitch mindestens 7 Tage, besser 3 Wochen vor dem Release; nur unveröffentlichte Songs lassen sich pitchen.',
@@ -330,19 +380,49 @@ const DE: Labels = {
     heading: 'Release-Plan',
     day: 'Tag',
     date: 'Datum',
+    time: 'Uhrzeit',
     step: 'Schritt',
-    noDate: 'Noch kein Release-Datum: Tage relativ zum Release-Tag (Tag 0).',
+    proposed: (date) => `Vorgeschlagener Release-Tag ${date}: release.release_date in project.yaml setzen, um ihn festzulegen (der Distributor braucht ihn).`,
+    fixed: (date) => `Release-Tag ${date}. Ein fester Release-Termin und ein Pitch brauchen mindestens drei Wochen Vorlauf.`,
+    ics: 'calendar.ics in die Kalender-App importieren; release-board zeigt den Kalender aller Projekte.',
+  },
+  cal: {
     steps: {
       distributor: 'Audio, Cover und Metadaten beim Distributor hochladen (spotify.md)',
       pitch: 'Song in Spotify for Artists pitchen (spotify.md)',
-      canvas: 'Canvas hochladen und Artist Pick setzen (Spotify for Artists)',
-      youtube: 'Hauptvideo auf YouTube veröffentlichen oder als Premiere (youtube.md)',
-      short1: 'Short 1 auf YouTube, Instagram und TikTok (shorts.md, instagram.md, tiktok.md)',
-      social: 'Story mit Link-Sticker; Community-Post; Feed-Post',
-      links: 'Spotify-Link in YouTube-Beschreibung, angepinnten Kommentar und Bios eintragen',
-      short2: 'Short 2 auf allen drei Plattformen',
-      short3: 'Short 3 auf allen drei Plattformen',
+      canvas: 'Canvas in Spotify for Artists hochladen',
+      song: 'Der Song geht auf den Streamingdiensten online',
+      'artist-pick': 'Artist Pick setzen (Musikvideo oder Song)',
+      youtube: 'Hauptvideo auf YouTube veröffentlichen (youtube.md)',
+      premiere: 'Hauptvideo als YouTube-Premiere (youtube.md)',
+      community: 'YouTube-Post zum Video',
+      story: 'Instagram-Story mit Link-Sticker zum Video',
+      page: 'Song-Seite auf der Microsite veröffentlichen',
+      links: 'Spotify-Link in YouTube-Beschreibung und angepinnten Kommentar eintragen',
     },
+    announce: { instagram: 'Ankündigung: Instagram-Story mit Cover', youtube: 'Ankündigung: YouTube-Post mit Cover', x: 'Ankündigung auf X mit Cover' },
+    post: { instagram: 'Instagram-Feed-Post', x: 'Post auf X mit Video; YouTube-Link als Antwort', linkedin: 'LinkedIn-Beitrag' },
+    short: (name, platform) => `${name} auf ${platform}`,
+    platforms: { distributor: 'Distributor', spotify: 'Spotify', youtube: 'YouTube', shorts: 'YouTube Shorts', tiktok: 'TikTok', instagram: 'Instagram', x: 'X', linkedin: 'LinkedIn', microsite: 'Microsite' },
+  },
+  announce: { heading: 'Ankündigung', image: 'Bild: das Streaming-Cover' },
+  videoLink: 'Link zum Hauptvideo',
+  x: {
+    heading: 'X',
+    post: 'Post',
+    reply: 'Antwort mit Link',
+    media: (file) => `Video: \`${file}\` (direkt hochladen)`,
+    replyNote: 'Die Antwort direkt nach dem Post setzen: Links im Post selbst erreichen weniger Leute.',
+    short: 'Short',
+  },
+  li: {
+    heading: 'LinkedIn',
+    skipped: (reason) => `Kein LinkedIn-Beitrag zu diesem Song: ${reason}`,
+    reason: 'Begründung',
+    post: 'Beitrag',
+    hook: (n, limit) => `erster Absatz ${n}/${limit} Zeichen vor „mehr anzeigen“`,
+    media: (file) => `Video: \`${file}\` (direkt hochladen)`,
+    noLinkNote: 'Video direkt hochladen; den YouTube-Link ans Ende des Beitrags.',
   },
   readme: {
     heading: 'Release-Paket',
@@ -438,6 +518,8 @@ function youtubeText(input: ReleaseTextInput, l: Labels): string {
   lines.push('', `## ${l.tags} (${l.chars(tags.length, input.limits.youtube.tags)})`, '', ...block(tags || l.todo('main.tags')));
   lines.push('', `## ${l.pinned}`, '', ...block(main?.pinned_comment ?? l.todo('main.pinned_comment in review/upload.yaml')));
   lines.push('', `## ${l.community}`, '', ...block(main?.community_post ?? l.todo('main.community_post in review/upload.yaml')));
+  const announcement = announcementText(input);
+  if (announcement) lines.push('', `## ${l.announce.heading}`, '', `_${l.announce.image}_`, '', ...block(announcement));
   if (main?.summary_en) lines.push('', `## ${l.english}`, '', ...block(`${main.summary_en.title}\n\n${main.summary_en.description}`));
   lines.push('', `## ${l.checklist}`, '');
   lines.push(checkbox(l.yt.visibility), checkbox(l.yt.synthetic(synthetic)), checkbox(l.yt.kids(main?.made_for_kids ?? false)));
@@ -470,6 +552,8 @@ function shortsText(input: ReleaseTextInput, l: Labels): string {
 function instagramText(input: ReleaseTextInput, l: Labels): string {
   const lines = [`# ${l.ig.heading}`, ''];
   const youtube = channelLink(input.channel, 'youtube', l);
+  const announcement = announcementText(input);
+  if (announcement) lines.push(`## ${l.announce.heading} (${l.ig.story})`, '', `_${l.announce.image}_`, '', ...block(announcement), '');
   for (const file of input.files.shorts) {
     const ig = shortFor(input, file.name)?.instagram;
     lines.push(`## ${l.ig.reel}: ${file.name}`, '', `**${l.file}:** \`${file.video}\``, '');
@@ -514,9 +598,9 @@ export function tiktokDescription(tt: { caption: string; hashtags: string[]; ove
   return [tt.caption.trim(), (tt.overlay ?? pointer).trim(), tt.hashtags.join(' ')].filter(Boolean).join('\n\n');
 }
 
-function spotifyText(input: ReleaseTextInput, l: Labels): string {
+/** The distributor form, field by field in its order: label and the value to paste. */
+export function distributorRows(input: ReleaseTextInput, l: Labels): [string, string][] {
   const release = input.release;
-  const distributor = release?.distributor === 'distrokid' ? 'DistroKid' : 'Distributor';
   const value = (given: string | undefined, field: string) => given ?? l.todo(`release.${field} in project.yaml`);
   const yesNo = (given: boolean | undefined) => (given === undefined ? l.todo('release.explicit in project.yaml') : given ? l.sp.yes : l.sp.no);
   const ai = release?.ai_credits;
@@ -524,7 +608,7 @@ function spotifyText(input: ReleaseTextInput, l: Labels): string {
     .map((part) => `${l.sp.aiParts[part]}: ${ai?.[part] ? l.sp.aiShare[ai[part]] : l.todo(`release.ai_credits.${part}`)}`)
     .join(' · ');
   const f = l.sp.fields;
-  const rows: [string, string][] = [
+  return [
     [f.artist, input.artist ?? l.todo('release.artist in project.yaml')],
     [f.featured, release?.featured_artists.length ? release.featured_artists.join(', ') : '—'],
     [f.title, input.title],
@@ -536,11 +620,17 @@ function spotifyText(input: ReleaseTextInput, l: Labels): string {
     [f.label, release?.label ?? '—'],
     [f.isrc, release?.isrc ?? `— (${l.sp.afterUpload})`],
     [f.ai, `${aiLine}${release?.ai_tool ? ` (${release.ai_tool})` : ''}${release?.license_note ? ` — ${release.license_note}` : ''}`],
-    [f.date, value(release?.release_date, 'release_date')],
+    [f.date, value(release?.release_date ?? (input.calendar ? `${input.calendar.release_date}${input.calendar.proposed ? ` (${l.todo('proposed, set release.release_date')})` : ''}` : undefined), 'release_date')],
     [f.cover, input.files.cover ? `\`${input.files.cover}\`` : l.todo('streaming/cover-3000x3000.jpg')],
     [f.audio, input.files.audio ? `\`${input.files.audio}\`` : l.todo('audio WAV')],
     [f.lyrics, input.files.lyricsTxt ? `\`${input.files.lyricsTxt}\`` : '—'],
   ];
+}
+
+function spotifyText(input: ReleaseTextInput, l: Labels): string {
+  const release = input.release;
+  const distributor = release?.distributor === 'distrokid' ? 'DistroKid' : 'Distributor';
+  const rows = distributorRows(input, l);
   const pitch = input.data?.spotify?.pitch;
   const lines = [
     `# ${l.sp.heading}`,
@@ -557,6 +647,7 @@ function spotifyText(input: ReleaseTextInput, l: Labels): string {
     '',
     input.files.canvas ? `\`${input.files.canvas}\`` : l.todo('streaming/canvas-9x16.mp4'),
     '',
+    ...(input.files.master ? [checkbox(l.sp.video(input.files.master)), ''] : []),
     `### ${l.sp.artistPick}`,
     '',
     ...block(input.data?.spotify?.artist_pick ?? l.todo('spotify.artist_pick in review/upload.yaml')),
@@ -574,16 +665,101 @@ function spotifyText(input: ReleaseTextInput, l: Labels): string {
   return `${lines.join('\n')}\n`;
 }
 
+/** One line naming a calendar event, in the labels' language. */
+export function calendarEventLabel(event: Pick<CalendarEvent, 'step' | 'platform' | 'item'>, l: Labels, premiere = true): string {
+  if (event.step === 'short') return l.cal.short(event.item, l.cal.platforms[event.platform]);
+  if (event.step === 'announce') return l.cal.announce[event.platform as 'instagram' | 'youtube' | 'x'] ?? `${l.announce.heading}: ${l.cal.platforms[event.platform]}`;
+  if (event.step === 'post') return l.cal.post[event.platform as 'instagram' | 'x' | 'linkedin'] ?? l.cal.platforms[event.platform];
+  if (event.step === 'youtube' && premiere) return l.cal.steps.premiere;
+  return l.cal.steps[event.step as keyof Labels['cal']['steps']] ?? event.step;
+}
+
+/** Weekday, date, and time of an event's local `at`, e.g. `Fr 11.12.2026 18:00`. */
+export function calendarWhen(at: string, language: string): { weekday: string; date: string; time: string } {
+  const day = at.slice(0, 10);
+  const weekday = new Intl.DateTimeFormat(language, { weekday: 'short', timeZone: 'UTC' }).format(new Date(`${day}T12:00:00Z`));
+  const [y, m, d] = day.split('-');
+  return { weekday, date: language.toLowerCase().startsWith('de') ? `${d}.${m}.${y}` : day, time: at.slice(11, 16) };
+}
+
 function planText(input: ReleaseTextInput, l: Labels): string {
-  const date = input.release?.release_date;
-  const steps = RELEASE_PLAN.filter((step) => input.kind === 'music-video' || !['distributor', 'pitch', 'canvas', 'links'].includes(step.key));
+  const calendar = input.calendar;
   const lines = [`# ${l.plan.heading}`, ''];
-  if (!date) lines.push(`_${l.plan.noDate}_`, '');
-  else lines.push(`_${l.sp.leadTime}_`, '');
-  lines.push(`| ${l.plan.day} | ${l.plan.date} | ${l.plan.step} |`, '|---|---|---|');
-  for (const step of steps) {
-    lines.push(`| ${step.day > 0 ? `+${step.day}` : step.day} | ${date ? planDate(date, step.day) : '—'} | ${l.plan.steps[step.key]} |`);
+  if (!calendar) return `${[...lines, l.todo('no release calendar')].join('\n')}\n`;
+  lines.push(`_${calendar.proposed ? l.plan.proposed(calendar.release_date) : l.plan.fixed(calendar.release_date)}_`, '');
+  lines.push(`| ${l.plan.day} | ${l.plan.date} | ${l.plan.time} | ${l.plan.step} |`, '|---|---|---|---|');
+  for (const event of calendar.events) {
+    const when = calendarWhen(event.at, input.language);
+    const offset = Math.round((Date.parse(`${event.at.slice(0, 10)}T12:00:00Z`) - Date.parse(`${calendar.release_date}T12:00:00Z`)) / 86_400_000);
+    lines.push(`| ${offset > 0 ? `+${offset}` : offset} | ${when.weekday} ${when.date} | ${when.time} | ${calendarEventLabel(event, l, input.premiere ?? true)} |`);
   }
+  lines.push('', `_${l.plan.ics}_`);
+  return `${lines.join('\n')}\n`;
+}
+
+/** The release announcement, the same text on every platform it goes to. */
+export function announcementText(input: ReleaseTextInput): string | undefined {
+  const a = input.data?.announcement;
+  return a ? [a.text.trim(), a.hashtags.join(' ')].filter(Boolean).join('\n\n') : undefined;
+}
+
+/** The X post with its hashtags, and the reply that carries the YouTube link. */
+export function xTexts(post: { post: string; hashtags: string[]; reply?: string }, youtubeUrl: string): { post: string; reply: string } {
+  return {
+    post: [post.post.trim(), post.hashtags.join(' ')].filter(Boolean).join('\n\n'),
+    reply: [post.reply?.trim() ?? '', youtubeUrl].filter(Boolean).join(' '),
+  };
+}
+
+/** The main video's URL once it is live; before that a bracketed slot the user fills in (the release board does it). */
+export function youtubeTarget(l: Labels, live?: string): string {
+  return live ?? `[${l.videoLink}]`;
+}
+
+function xText(input: ReleaseTextInput, l: Labels): string {
+  const lines = [`# ${l.x.heading}`, ''];
+  const youtube = youtubeTarget(l);
+  const announcement = announcementText(input);
+  if (announcement) lines.push(`## ${l.announce.heading}`, '', `_${l.announce.image}_`, '', ...block(announcement), '');
+  const x = input.data?.x;
+  if (x) {
+    const texts = xTexts(x, youtube);
+    const media = input.files.shorts.find((short) => short.name === (x.media ?? input.files.shorts[0]?.name));
+    lines.push(`## ${l.x.post} (${l.chars(count(texts.post), input.limits.x.post)})`, '');
+    if (media) lines.push(l.x.media(media.video), '');
+    lines.push(...block(texts.post), '', `### ${l.x.reply}`, '', ...block(texts.reply), '', `_${l.x.replyNote}_`, '');
+  } else lines.push(l.todo('x in review/upload.yaml'), '');
+  for (const file of input.files.shorts) {
+    const post = shortFor(input, file.name)?.x;
+    if (!post) continue;
+    const texts = xTexts({ ...post, reply: undefined }, youtube);
+    lines.push(`## ${l.x.short}: ${file.name}`, '', l.x.media(file.video), '', ...block(texts.post), '', `### ${l.x.reply}`, '', ...block(texts.reply), '');
+  }
+  return `${lines.join('\n').trimEnd()}\n`;
+}
+
+/** The LinkedIn post with its hashtags and the link at the end. */
+export function linkedinPostText(post: { post?: string; hashtags: string[] }, youtubeUrl: string): string {
+  return [post.post?.trim() ?? '', youtubeUrl, post.hashtags.join(' ')].filter(Boolean).join('\n\n');
+}
+
+/** The release file a post's `media` names: the master (or the square render) or a Short. */
+export function mediaFile(input: Pick<ReleaseTextInput, 'files'>, media: string | undefined): string | undefined {
+  if (!media || media === 'main') return input.files.master;
+  return input.files.shorts.find((short) => short.name === media)?.video;
+}
+
+function linkedinText(input: ReleaseTextInput, l: Labels): string {
+  const lines = [`# ${l.li.heading}`, ''];
+  const li = input.data?.linkedin;
+  if (!li) return `${[...lines, l.todo('linkedin in review/upload.yaml (decision post or skip)')].join('\n')}\n`;
+  if (li.decision === 'skip') return `${[...lines, l.li.skipped(li.reason)].join('\n')}\n`;
+  const text = linkedinPostText(li, youtubeTarget(l));
+  const hook = (li.post ?? '').split(/\n\s*\n/)[0] ?? '';
+  const file = mediaFile(input, li.media);
+  lines.push(`**${l.li.reason}:** ${li.reason}`, '');
+  if (file) lines.push(l.li.media(file), '');
+  lines.push(`## ${l.li.post} (${l.chars(count(text), input.limits.linkedin.post)}; ${l.li.hook(count(hook), input.limits.linkedin.hook)})`, '', ...block(text), '', `_${l.li.noLinkNote}_`);
   return `${lines.join('\n')}\n`;
 }
 
@@ -620,6 +796,8 @@ export function releaseTexts(input: ReleaseTextInput): Record<string, string> {
     'instagram.md': instagramText(input, l),
     'tiktok.md': tiktokText(input, l),
     ...(input.kind === 'music-video' ? { 'spotify.md': spotifyText(input, l) } : {}),
+    'x.md': xText(input, l),
+    ...(input.data?.linkedin?.decision === 'post' ? { 'linkedin.md': linkedinText(input, l) } : {}),
     'release-plan.md': planText(input, l),
   };
 }

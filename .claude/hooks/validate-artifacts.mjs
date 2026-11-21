@@ -24,6 +24,8 @@ const TRACKED = new Set([
   'sets.yaml',
   'upload.yaml',
   'channel.yaml',
+  'release-schedule.yaml',
+  'calendar.yaml',
 ]);
 
 function readStdin() {
@@ -79,8 +81,8 @@ const file = payload?.tool_input?.file_path ?? payload?.tool_input?.path;
 if (!file) process.exit(0);
 if (!TRACKED.has(basename(file))) process.exit(0);
 
-// config/channel.yaml belongs to the workspace, not to a project or series.
-const isChannel = basename(file) === 'channel.yaml' && basename(dirname(resolve(file))) === 'config';
+// config/channel.yaml and config/release-schedule.yaml belong to the workspace, not to a project or series.
+const isChannel = ['channel.yaml', 'release-schedule.yaml'].includes(basename(file)) && basename(dirname(resolve(file))) === 'config';
 const artifactRoot = isChannel ? undefined : findArtifactRoot(file);
 if (!isChannel && (!artifactRoot || !artifactRoot.dir.split(sep).includes(artifactRoot.folder))) process.exit(0);
 

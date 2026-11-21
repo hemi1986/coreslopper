@@ -130,10 +130,33 @@ shorts:
       overlay: "<'Full video on YouTube: @handle' in the project's language>"  # pointer line in the description; TikTok Studio has no text overlay
       pinned_comment: "<optional>"
     platforms: [youtube, tiktok]
+    # x: { post: "<the Short's line for X>", hashtags: ['#topic'] }   # optional: the Short also goes to X
 # instagram_post: { caption: "...", hashtags: [...] }   # optional feed post for the release
 spotify:
   artist_pick: "<one line pinned on the artist profile>"
   pitch: "<at most 500 characters: mood, genre, instruments, story>"
+announcement:                      # a week before: Instagram story with the cover, YouTube post, X
+  text: "<the release day and one line that makes people curious; no link>"
+  hashtags: ['#topic']             # at most 5
+x:
+  post: "<at most 280 characters with the hashtags; no link: it goes in the reply>"
+  hashtags: ['#topic']             # one or two
+  reply: "<'Full video:' in the project's language; release appends the YouTube link>"
+  media: Z1-intro                  # the Short uploaded with the post
+linkedin:
+  decision: post                   # post | skip
+  reason: "<one sentence: why the song does or does not suit LinkedIn>"
+  post: |                          # only with decision post
+    <first paragraph at most 210 characters: the hook before "see more">
+
+    <a personal story: what the song is about at work, in society, or in tech, and how it was made>
+  hashtags: ['#KI']                # at most three
+  media: main                      # main or a Short name
+microsite:
+  teaser: "<one or two sentences for the release list and link previews>"
+  text: |
+    <a few paragraphs about the song for its page on the artist microsite, Markdown>
+  quote: "<one line of the lyrics as sung>"
 ```
 
 - Write each platform's text for that platform: YouTube explains, Instagram hooks in the first line, TikTok talks. Identical Instagram and TikTok captions fail the check.
@@ -141,6 +164,10 @@ spotify:
 - Every Short in `renders/shorts/` gets an entry; `related: main` becomes a checklist item, since YouTube sets the related video only by hand.
 - `made_for_kids` and `synthetic_media` follow the brief; `config/channel.yaml` sets the disclosure defaults of the other platforms.
 - Episodes have no `spotify` block.
+- **LinkedIn is a decision.** Post when the song has a political, work, business, tech, or AI angle that a professional audience discusses (war profits, data sovereignty, AI and jobs, how an AI pipeline makes a video); skip a love song, a party song, or plain satire without that angle. Write the reason in either case. A post reads as a person's story, not as an ad.
+- **X and LinkedIn carry no link in the text you write:** `release` adds the YouTube link (the live one once the user enters it on the release board) to the X reply and the end of the LinkedIn post.
+- **The microsite** text is the song's own page: what the song is about and how it was made, in the voice of the brief; facts follow the same rules as the YouTube description.
+- What each platform takes (limits, clickable links, AI labels) is in `docs/release-platforms.md`.
 
 ## 8. Build the release folder
 
@@ -149,7 +176,7 @@ npm run cli -- release projects/<slug>
 npm run cli -- upload-text projects/<slug>
 ```
 
-`release` renders only formats that are missing or stale, copies (hardlinks) everything else, converts the song to a deliverable WAV only when needed, cuts the Spotify canvas, writes the lyrics files, lays out `texts/` and `README.md`, and records `manifest.json`. A `✖` line is a broken limit: fix `upload.yaml` and run it again. When it reports that the canvas window shows lyrics, run it again with `--canvas-from <seconds or anchor>` on a part without lyrics (an instrumental or the drop) and check a frame of `streaming/canvas-9x16.mp4` with the art director: no text, no logos. `upload-text` keeps `review/upload.md` as a pointer to the folder.
+`release` plans the release calendar first (`review/calendar.yaml`, the next free slots under `config/release-schedule.yaml`; it keeps times already planned and never touches `project.yaml`), then renders only formats that are missing or stale, copies (hardlinks) everything else, converts the song to a deliverable WAV only when needed, cuts the Spotify canvas, writes the lyrics files, lays out `texts/` and `README.md`, and records `manifest.json`. A `✖` line is a broken limit: fix `upload.yaml` and run it again. When it reports that the canvas window shows lyrics, run it again with `--canvas-from <seconds or anchor>` on a part without lyrics (an instrumental or the drop) and check a frame of `streaming/canvas-9x16.mp4` with the art director: no text, no logos. `upload-text` keeps `review/upload.md` as a pointer to the folder. The release folder also gets `texts/x.md`, `texts/linkedin.md` (with a LinkedIn post), `texts/release-plan.md` with the calendar's dates and times, `calendar.ics`, and `microsite/<slug>.json`. The user works from `npm run cli -- release-board`; you do not start it.
 
 `npm run cli -- publish projects/<slug> --dry-run` also checks the YouTube and TikTok limits; uploading stays the user's command.
 

@@ -31,9 +31,9 @@ export interface ReleaseCheck {
   evidence: string;
 }
 
-/** The texts every release folder has; `spotify.md` only for a music video. */
+/** The texts every release folder has; `spotify.md` only for a music video, `linkedin.md` only when the song gets a LinkedIn post. */
 export function expectedTexts(music: boolean): string[] {
-  return ['youtube.md', 'shorts.md', 'instagram.md', 'tiktok.md', ...(music ? ['spotify.md'] : []), 'release-plan.md'];
+  return ['youtube.md', 'shorts.md', 'instagram.md', 'tiktok.md', ...(music ? ['spotify.md'] : []), 'x.md', 'release-plan.md'];
 }
 
 const check = (name: string, result: CheckResult, evidence: string): ReleaseCheck => ({ name, result, evidence });

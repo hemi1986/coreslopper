@@ -14,5 +14,7 @@ export default defineConfig({
     include: ['tests/**/*.test.ts'],
     environment: 'node',
     testTimeout: 30_000,
+    // The release calendar defaults to the computer's time zone; tests pin one.
+    env: { TZ: 'Europe/Berlin' },
   },
 });

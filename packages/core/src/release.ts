@@ -172,6 +172,8 @@ export function platformLimits(channel?: ChannelConfig) {
     instagram: merge(PLATFORM_LIMITS.instagram, channel?.limits.instagram),
     tiktok: merge(PLATFORM_LIMITS.tiktok, channel?.limits.tiktok),
     spotify: merge(PLATFORM_LIMITS.spotify, channel?.limits.spotify),
+    x: merge(PLATFORM_LIMITS.x, channel?.limits.x),
+    linkedin: merge(PLATFORM_LIMITS.linkedin, channel?.limits.linkedin),
   };
 }
 export type PlatformLimits = ReturnType<typeof platformLimits>;
@@ -281,36 +283,41 @@ export function platformTextProblems(
     if (chars(caption) > limits.instagram.caption) errors.push(`instagram post: caption has ${chars(caption)} characters, limit ${limits.instagram.caption}`);
     if (data.instagram_post.hashtags.length > limits.instagram.hashtags) errors.push(`instagram post: ${data.instagram_post.hashtags.length} hashtags, limit ${limits.instagram.hashtags}`);
   }
+  // X: links count as 23 characters each; the YouTube link sits in the reply, not in the post.
+  const xLength = (text: string) => chars(text.replace(/https?:\/\/\S+/g, 'x'.repeat(23)));
+  const xPost = (post: string, hashtags: string[]) => [post.trim(), hashtags.join(' ')].filter(Boolean).join('\n\n');
+  if (!data.x) missing.push('x');
+  else {
+    const post = xPost(data.x.post, data.x.hashtags);
+    if (xLength(post) > limits.x.post) errors.push(`x: post has ${xLength(post)} characters, limit ${limits.x.post}`);
+    if (data.x.hashtags.length > limits.x.hashtags) errors.push(`x: ${data.x.hashtags.length} hashtags, limit ${limits.x.hashtags}`);
+    if (data.x.reply && xLength(data.x.reply) + 24 > limits.x.post) errors.push(`x: reply with the link has ${xLength(data.x.reply) + 24} characters, limit ${limits.x.post}`);
+    if (data.x.media && !data.shorts.some((short) => short.name === data.x?.media)) errors.push(`x: media ${data.x.media} is not a Short in upload.yaml`);
+  }
+  for (const short of data.shorts) {
+    if (!short.x) continue;
+    const post = xPost(short.x.post, short.x.hashtags);
+    if (xLength(post) > limits.x.post) errors.push(`x ${short.name}: post has ${xLength(post)} characters, limit ${limits.x.post}`);
+    if (short.x.hashtags.length > limits.x.hashtags) errors.push(`x ${short.name}: ${short.x.hashtags.length} hashtags, limit ${limits.x.hashtags}`);
+  }
+  if (!data.linkedin) missing.push('linkedin (decision post or skip, with the reason)');
+  else if (data.linkedin.decision === 'post' && data.linkedin.post) {
+    const post = [data.linkedin.post.trim(), data.linkedin.hashtags.join(' ')].filter(Boolean).join('\n\n');
+    if (chars(post) > limits.linkedin.post) errors.push(`linkedin: post has ${chars(post)} characters, limit ${limits.linkedin.post}`);
+    if (data.linkedin.hashtags.length > limits.linkedin.hashtags) errors.push(`linkedin: ${data.linkedin.hashtags.length} hashtags, limit ${limits.linkedin.hashtags}`);
+    const hook = data.linkedin.post.split(/\n\s*\n/)[0] ?? '';
+    if (chars(hook) > limits.linkedin.hook) errors.push(`linkedin: the first paragraph has ${chars(hook)} characters; only ${limits.linkedin.hook} show before "see more"`);
+    if (data.linkedin.media !== 'main' && !data.shorts.some((short) => short.name === data.linkedin?.media)) errors.push(`linkedin: media ${data.linkedin.media} is not main or a Short`);
+  }
+  if (!data.microsite) missing.push('microsite');
+  if (!data.announcement) missing.push('announcement');
+  else if (data.announcement.hashtags.length > limits.instagram.hashtags) {
+    errors.push(`announcement: ${data.announcement.hashtags.length} hashtags, limit ${limits.instagram.hashtags} (Instagram)`);
+  }
   if (options.music) {
     if (!data.spotify?.pitch) missing.push('spotify.pitch');
     else if (chars(data.spotify.pitch) > limits.spotify.pitch) errors.push(`spotify: pitch has ${chars(data.spotify.pitch)} characters, limit ${limits.spotify.pitch}`);
     if (!data.spotify?.artist_pick) missing.push('spotify.artist_pick');
   }
   return { errors, missing };
-}
-
-/** The release schedule relative to the release day, with dates when one is set. */
-export interface PlanStep {
-  /** Days relative to the release day (negative: before). */
-  day: number;
-  key: 'distributor' | 'pitch' | 'canvas' | 'youtube' | 'short1' | 'short2' | 'short3' | 'social' | 'links';
-}
-
-export const RELEASE_PLAN: PlanStep[] = [
-  { day: -21, key: 'distributor' },
-  { day: -14, key: 'pitch' },
-  { day: -7, key: 'canvas' },
-  { day: 0, key: 'youtube' },
-  { day: 0, key: 'short1' },
-  { day: 0, key: 'social' },
-  { day: 1, key: 'links' },
-  { day: 2, key: 'short2' },
-  { day: 4, key: 'short3' },
-];
-
-/** The calendar date of a plan step, for a release date `YYYY-MM-DD`. */
-export function planDate(releaseDate: string, day: number): string {
-  const date = new Date(`${releaseDate}T12:00:00Z`);
-  date.setUTCDate(date.getUTCDate() + day);
-  return date.toISOString().slice(0, 10);
 }
