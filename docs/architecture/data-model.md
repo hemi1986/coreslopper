@@ -299,6 +299,78 @@ optional Lip-sync (defaults to Video, or to fal.ai when Video is `comfyui` or `t
 manifest's cost sum, HS-92) and Reserved, which is never written above 0 (HS-93, to be removed). The batch cap
 is `batch_cap_usd` in `project.yaml`, or 30 % of the remaining budget.
 
+### AGG-Series – Series (as-is)
+
+One folder per series, `projects/<slug>/` with `series.yaml` (`SeriesSchema`) and `state.json`
+(`SeriesStateSchema`), loaded together by `loadSeries` (`packages/core/src/project.ts:380-416`). The canon files
+beside them (`bible.md`, `style.yaml`, `characters.yaml`, `sets.yaml`, references) belong to the character slice.
+The commitment spans the series and the `project.yaml` of every episode that names it; nothing stores the episode
+list in the series (`packages/cli/src/series.ts:43-74`).
+
+| Attribute | Type | Required | Source |
+|---|---|---|---|
+| Slug, Title, Description | Slug (shared namespace with projects); text | yes; yes; no | EVT-SeriesCreated |
+| Formats, Providers, Brand | as in a project; copied into each new episode | yes | EVT-SeriesCreated |
+| Series budget | Money (USD), `budget_usd`; optional in the schema, required by `new-series` (HS-106) | yes | EVT-SeriesCreated |
+| Batch cap | Money, `batch_cap_usd`; default 30 % of the remaining series budget | no | EVT-SeriesCreated |
+| Episode plan | list of Planned Episode: number (unique), title, logline | default empty | EVT-SeriesCreated |
+| Creative limits | `episode_seconds` {min, max}, `lipsync_seconds_max` | no | EVT-SeriesCreated |
+| Canon spend | Money, `state.json` `budget.spentUsd`; `totalUsd` must equal the series budget (HS-107) | yes | EVT-CanonSpendRecorded |
+
+**Derived**: Episode budgets (sum of the episodes' `budget_usd`) and the Uncommitted Series Budget (series budget −
+canon spend − episode budgets), computed by `seriesBudget` on every read.
+
+### AGG-Script – Script (as-is)
+
+`script.yaml` of an episode (`ScriptSchema`, `packages/core/src/schema.ts:587-657`), parsed whole by `loadProject`
+and checked whole against the canon by `validateScript` (`packages/core/src/episode.ts:59-104`). Written only by
+the agent (HS-121).
+
+| Attribute | Type | Required | Source |
+|---|---|---|---|
+| Title | text | yes | EVT-ScriptWritten |
+| Chat | typing speed (characters per second) and hold (seconds) | when the script has chat lines | EVT-ScriptWritten |
+| Scene | id (unique), set (of the canon), description, ambience prompt (`atmo`) | id, set yes | EVT-ScriptWritten |
+| Script line | id (unique), kind `dialogue` \| `voiceover` \| `announcement` \| `chat` \| `sfx` \| `pause`, pause after | yes | EVT-ScriptWritten |
+| Spoken line fields | speaker (a canon character), `text_de` (TTS rule), `text_en` (subtitle), `direction` (unused today, HS-112) | speaker and text yes | EVT-ScriptWritten |
+| Chat line fields | speaker, `text_de` (shown on screen), `text_en` | yes | EVT-ScriptWritten |
+| Sfx line fields | prompt, duration, optional `text_en` (on-screen text) | prompt, duration yes | EVT-ScriptWritten |
+| Pause line fields | duration | yes | EVT-ScriptWritten |
+
+`with` (overlap) is parsed and always refused.
+
+### AGG-TakeRegistry – Take registry (as-is)
+
+`takes.json` of an episode (`TakesSchema`, `schema.ts:666-684`), written whole and sorted by `saveTakes`
+(`packages/cli/src/takes.ts:51-57`), with the files `audio/lines/<line-id>.wav` and
+`audio/ambience/<scene-id>.wav` (48 kHz mono). No lock; one voice-track run at a time.
+
+| Attribute | Type | Required | Source |
+|---|---|---|---|
+| Take (per audible line id) | source `generated` \| `imported`, duration (s), text hash, file hash | yes, file hash optional | EVT-TakeGenerated, EVT-TakeImported |
+| Ambience (per scene id) | the same fields; the hash covers the prompt only | yes | EVT-AmbienceGenerated |
+
+**Take status** (computed, `takes.ts:65-76`): `current`, `missing`, `stale`, `replaced`, `unregistered`. The text
+hash covers kind, speaker and spoken text, or an effect's prompt and length; the reference voice and the direction
+are to join it (HS-111, HS-112).
+
+### AGG-EpisodeTrack – Episode track (as-is)
+
+Written together by `episode-track` (`packages/cli/src/episode-track.ts:148-253`): `timing.json` (TimingSchema with
+no tempo, empty beats, downbeats and onsets, words empty), `timing.effective.json`, `audio/episode.wav` and
+`audio/stems/<character>.wav` for every speaker with spoken lines. The timing overrides are the user's and only
+read (BC-Timing).
+
+| Attribute | Type | Required | Source |
+|---|---|---|---|
+| Duration | seconds; the mix and each speaker stem have exactly this length | yes | EVT-EpisodeTrackBuilt |
+| Sections, Lines | one section per scene, one line per script line, in playing order, with `text_de` | yes | EVT-EpisodeTrackBuilt |
+| Energy | RMS envelope of the finished mix | yes | EVT-EpisodeTrackBuilt |
+| Mix | takes, ambience (gain 0.3), optional `audio/music.wav` (gain 0.25), raised to the project loudness target | yes | EVT-EpisodeTrackBuilt |
+
+**Derived outside the aggregate**: subtitles `renders/<slug>.en.srt` (EVT-SubtitlesWritten) and lip-sync audio
+segments `assets/audio-segments/<name>.mp3|wav` cut from a speaker stem (EVT-LipSyncAudioCut).
+
 ## Lifecycle
 
 Stage state as the code allows it today. Every transition is accepted from every status (HS-11); the diagram

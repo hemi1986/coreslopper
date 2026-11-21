@@ -53,6 +53,9 @@ state in memory), one core transition (`setStageRunning`, `setStageDone`, `setSt
 - The generation queue is the exception to "rules in core": its states, transitions and Zod schema live in
   `packages/cli/src/queue.ts`, the verdict type and the blocking-defect rule in `review-image.ts` (gap G-39).
   `queue.json` is written whole through temp file and rename, without a lock (G-32).
+- Take status, the blocking rule (`packages/cli/src/takes.ts`) and the series budget sum (`series.ts`) also live
+  in the CLI; they belong in core (G-116). Episode audio work shells out to ffmpeg through `resolveBinary`
+  (`media.ts`); it is deterministic, with fixed gains and a loudness target, and uses no speech recognition.
 - Long-running work is a background process with its own lock file and a `wait` command (`queue run` /
   `queue wait`, `assets/queue.lock`); a stage runner starts it with the Bash tool's `run_in_background`.
 - Agent judgement inside a command runs headless: `claude -p --agent <name> --json-schema <schema>`
@@ -130,5 +133,8 @@ directory. `tests/helpers/release-fixture.ts` builds release projects.
 | Storyboard rule | `resolveStoryboard` on an inline `Storyboard`, `Timing`, style and character bible | unit | `tests/storyboard-characterization.test.ts`, `tests/continuity.test.ts` |
 | Generation runner | `GenerationRunner` with `MockProvider` (or a stub provider), a temp cache dir and manifest | unit | `tests/providers.test.ts`, `tests/generation-characterization.test.ts` |
 | Generation batch | `runBatch(target, items, { dryRun, providerFactory, cacheKey, log: false })` on an inline `BatchTarget`; a unique `cacheKey` keeps the workspace cache out of it | integration | `tests/generate-workflow.test.ts`, `tests/generation-characterization.test.ts` |
+| Script rule | `validateScript`, `takeSource`, `placeLines` on the demo script (`projects/demo-episode/script.yaml`) and canon | unit | `tests/episode.test.ts`, `tests/series-characterization.test.ts` |
+| Series budget | `createSeries` / `createProject` in a temp workspace with copies of `config/`, `templates/` and `brand/` | integration | `tests/series-budget.test.ts` |
+| Episode audio | `voiceTrack`, `importTakes`, `episodeTrack` on a temp copy of the demo canon and episode, mock provider; skipped without ffmpeg | integration | `tests/episode-track.test.ts` |
 | Provider adapter | the adapter with a fake `fetchImpl` (cloud) or a fake ComfyUI server | unit | `tests/fal-provider.test.ts`, `tests/topview.test.ts`, `tests/comfyui.test.ts` |
 | Agent instruction | not testable deterministically | – | `workspace/.claude/commands/video-next.md` |

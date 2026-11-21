@@ -465,7 +465,7 @@ _Avoid_: review-fix (as a term), review stage
 ## Series and episodes
 
 **Series**:
-A set of episodes that share one canon, stored in `projects/<slug>/` (marked by its `series.yaml`) beside its episodes.
+A set of episodes that share one canon and one series budget, stored in `projects/<slug>/` (marked by its `series.yaml`) beside its episodes. A series is not a project: it has no stages.
 _Avoid_: show, season
 
 **Canon**:
@@ -473,8 +473,12 @@ What every episode of a series shares and none may change: the series bible, sty
 _Avoid_: lore, shared assets
 
 **Series Budget**:
-The umbrella budget of a series: the canon's generations plus every episode's own budget must fit in it.
+The umbrella budget of a series: the canon's generations plus every episode's own budget must fit in it. Every series has one, set in `series.yaml`.
 _Avoid_: season budget, pooled budget
+
+**Uncommitted Series Budget**:
+What is left of a series budget after the canon's spend and every episode's budget; a new episode's budget must fit in it.
+_Avoid_: remaining budget, free budget
 
 **Series Bible**:
 The written premise, tone, world rules, and episode plan of a series.
@@ -484,12 +488,20 @@ _Avoid_: brief, treatment
 The planned episodes of a series, each with a number, a title, and an optional logline.
 _Avoid_: season plan, schedule
 
+**Planned Episode**:
+An entry of the episode plan. It may have no project yet; an episode whose number the plan does not list is an episode outside the plan.
+_Avoid_: unplanned episode
+
+**Canon Gap**:
+What a series canon still lacks before episodes can use it: no characters or sets, a character or set without a reference, or a character without a reference voice.
+_Avoid_: missing asset, incomplete canon
+
 **Creative Limit**:
 An optional bound a series sets on its episodes, such as episode length or lip-sync shot length. Technical limits of a model are not creative limits.
 _Avoid_: constraint, max duration
 
 **Episode**:
-One installment of a series: a project of kind `episode` with a number, a script, and its own budget.
+One installment of a series: a project of kind `episode` with a number, a script, and its own budget. It copies the series' formats, providers, and brand once, when it is created.
 _Avoid_: part, chapter
 
 **Script**:
@@ -533,23 +545,35 @@ A named look the story puts a character in from some shot on, such as an open ha
 _Avoid_: outfit, variant, pose
 
 **Take**:
-The audio of one script line, generated or recorded by the user.
+The audio of one audible script line (spoken or sound effect), generated or recorded by the user and registered in the take registry.
 _Avoid_: clip, recording, segment
 
+**Take Registry**:
+The record of an episode's takes and ambience (`takes.json`): per take its source (generated or imported), length, the hash of what it was made from, and the hash of its file.
+_Avoid_: take list, audio index
+
+**Take Status**:
+Whether a take still fits its script line: current, missing, stale (its line changed), replaced (someone swapped the file), or unregistered (a file without an entry). A replaced, unregistered, or stale imported take stops the voice track.
+_Avoid_: take state
+
+**Voice Track**:
+The episode stage that makes the takes and ambience: it generates what is missing or stale and keeps every imported take.
+_Avoid_: speaker stem, episode track
+
 **Ambience**:
-The background sound of a scene, such as room tone or machine hum, laid under its takes.
-_Avoid_: background music, soundscape
+The background sound of a scene, such as room tone or machine hum, laid under its takes; its prompt is the scene's `atmo` field.
+_Avoid_: background music, soundscape, atmo
 
 **Episode Track**:
-The finished audio of an episode, mixed from its takes, ambience, and optional music. It takes the place of the song.
-_Avoid_: soundtrack, song, mix
+The finished audio of an episode, mixed from its takes, ambience, and optional music by the effective timing, together with its speaker stems. It takes the place of the song.
+_Avoid_: soundtrack, song, mix, voice track
 
 **Speaker Stem**:
 The episode track reduced to one speaker's takes, at full length; the driving audio for that character's lip-sync.
-_Avoid_: voice track, dialogue stem
+_Avoid_: dialogue stem
 
 **Subtitles**:
-The translated text of the spoken and chat lines, plus on-screen text an sfx line names (a label, a sign), timed by the effective timing.
+The translated text of the spoken and chat lines, plus on-screen text an sfx line names (a label, a sign), timed by the effective timing. Spoken text is German and subtitles are English today.
 _Avoid_: captions, lyrics
 
 ## Model bench

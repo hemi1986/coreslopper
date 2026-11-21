@@ -15,6 +15,10 @@
 | GAP-AGG-Storyboard | as-is boundary | [AGG-Storyboard](events.yaml) | [BC-Storyboard](context-map.as-is.md#bc-storyboard--storyboard) | – | storyboard.yaml per project is parsed whole with StoryboardSchema, only by loadProject (packages/core/src/project.ts:242-243)<br>resolveStoryboard checks all shots together – unique ids, order, coverage, chaining – against the effective timing and the bibles, in one call whose only caller is validateProject (packages/core/src/timing.ts:455-577; packages/cli/src/validate.ts:106)<br>the hook validates the whole project on every edit of storyboard.yaml and blocks a failing edit (workspace/.claude/hooks/validate-artifacts.mjs:13-15; packages/cli/src/validate-file.ts:124-127) | Decide the target boundary |
 | GAP-AGG-CachedGeneration | as-is boundary | [AGG-CachedGeneration](events.yaml) | [BC-Generation](context-map.as-is.md#bc-generation--generation) | – | one record per cache key, .cache/generations/<key>/result.json with the provider's files, shared by every project and series of the workspace (packages/providers/src/runner.ts:86-87,167-195; packages/cli/src/generate.ts:711)<br>the key is the SHA-256 of the canonical request – operation, provider, model, prompt, negative prompt, seed, size, duration, params, each reference's path and content hash, the audio hash and start, the workflow fingerprint (runner.ts:53-84; packages/core/src/hash.ts:25-45)<br>runBatch is the one path every generation takes – generate, the queue, region patches, the voice track and the bench (generate.ts:667-672; queue.ts:628; patch.ts:96; voice-track.ts:137,191; bench.ts:577,634,675) | Decide the target boundary |
 | GAP-AGG-ModelRoles | as-is boundary | [AGG-ModelRoles](events.yaml) | [BC-Generation](context-map.as-is.md#bc-generation--generation) | – | config/models.yaml is parsed whole with ModelsConfigSchema on every batch and estimate (packages/core/src/schema.ts:714-762; packages/cli/src/generate.ts:678)<br>resolveModelRole and providerForRole pick a role's model, params and price for the project's provider in one place (packages/core/src/models.ts:26-98) | Decide the target boundary |
+| GAP-AGG-Series | as-is boundary | [AGG-Series](events.yaml) | [BC-Series](context-map.as-is.md#bc-series--series) | – | series.yaml and state.json of projects/<slug>/, loaded together by loadSeries (packages/core/src/project.ts:380-416), created together by new-series (packages/cli/src/new-series.ts:67-104)<br>the uncommitted series budget is computed in one place from the series state and the project.yaml of every episode that names the series (packages/cli/src/series.ts:43-74) and checked by createProject for the CLI and the board wizard (packages/cli/src/new-project.ts:205-216; board-wizard.ts:394)<br>canon generations are booked in the series' own state.json and manifest (packages/cli/src/generate.ts:260-277) | Decide the target boundary |
+| GAP-AGG-Script | as-is boundary | [AGG-Script](events.yaml) | [BC-Series](context-map.as-is.md#bc-series--series) | – | script.yaml of an episode, parsed whole with ScriptSchema by loadProject (packages/core/src/project.ts:262; schema.ts:587-657)<br>validateScript checks the whole script against the series canon and throws one error listing every issue (packages/core/src/episode.ts:59-104); the workspace hook runs it on every edit (packages/cli/src/validate-file.ts:134-145) | Decide the target boundary |
+| GAP-AGG-TakeRegistry | as-is boundary | [AGG-TakeRegistry](events.yaml) | [BC-Series](context-map.as-is.md#bc-series--series) | – | takes.json of an episode, written whole and sorted by saveTakes (packages/cli/src/takes.ts:51-57); its writers are voice-track and import-takes (packages/cli/src/voice-track.ts:99-200; media.ts:395-460)<br>every take's status follows from its file, the registered file hash and the text hash of its script line (takes.ts:65-87; packages/core/src/episode.ts:139-153) | Decide the target boundary |
+| GAP-AGG-EpisodeTrack | as-is boundary | [AGG-EpisodeTrack](events.yaml) | [BC-Series](context-map.as-is.md#bc-series--series) | – | episodeTrack places the lines from the take durations and writes timing.json, timing.effective.json, audio/episode.wav and audio/stems/<character>.wav together in one run from the effective timing (packages/cli/src/episode-track.ts:148-253) | Decide the target boundary |
 <!-- kataster:gap-register:end -->
 
 ## Gaps found by the adoption of the project and stage pipeline (2026-11-21)
@@ -239,3 +243,48 @@ Decisions (by recommendation, not reviewed by the user):
   the setup skill; budget check before a batch and on every recorded spend; the append-only error history
   (`state.errors`); the read-only production view and watchdog (ADR 0030, 0031); the import direction between
   packages (now checked).
+
+## Gaps found by the adoption of the series slice (2026-11-22)
+
+Candidates only – no stories until the user asks (`/adopt <scope> --stories`). Priority is a suggestion.
+
+| # | Class | Gap | Evidence | Source | Priority |
+|---|---|---|---|---|---|
+| G-105 | Exists but contradicts | A canon generation is checked against the series total minus canon spend only; episode budgets are not subtracted, so the canon can spend money already committed to episodes | `packages/cli/src/generate.ts:260-277`; `packages/cli/src/series.ts:60-74` | HS-105 | medium |
+| G-106 | Exists but contradicts | `budget_usd` of a series is optional in the schema, and a test pins that episodes are then unchecked and the canon cannot generate; `new-series`, the skill and the glossary require it | `packages/core/src/schema.ts:556-559`; `tests/series-budget.test.ts:99`; `packages/cli/src/new-series.ts:72` | HS-106 | low |
+| G-107 | Missing | No command changes a series budget; the new-series skill tells the agent to edit `series.yaml` and `state.json` together by hand (as G-13 for a project) | `workspace/.claude/skills/new-series/SKILL.md` step 3; `packages/cli/src/validate-file.ts:50-62` | HS-107 | low |
+| G-108 | Exists but contradicts | The series commitment is checked only when an episode is created; a later change of an episode's `budget_usd` is not checked against it | `packages/cli/src/new-project.ts:205-216` | HS-122 | low |
+| G-109 | Exists but contradicts | `new --kind episode` and the wizard accept an episode number the series already has; `series-status` only reports the duplicate | `packages/cli/src/new-project.ts:101-109`; `packages/cli/src/series.ts:143-146` | HS-108 | low |
+| G-110 | Exists but contradicts | `SeriesFacts.unplanned` names planned episodes without a project, while the series-status test calls episodes outside the plan "unplanned" | `packages/core/src/production.ts:113-114`; `tests/series-status.test.ts:31` | HS-109 | low |
+| G-111 | Exists but contradicts | Canon readiness flags a reference voice only when a listed file is missing; a character with no voice at all passes, against the comment "speaking characters without a reference voice" | `packages/cli/src/board-production.ts:336-346` | HS-110 | low |
+| G-112 | Exists but contradicts | A spoken take's text hash leaves out the speaker's reference voice and transcript, so a changed voice keeps every old take current | `packages/core/src/episode.ts:144-148` | HS-111 | medium |
+| G-113 | Dead | `direction` ("Acting direction for the take") is written by the skill and the demo script but never read: it reaches neither the voice model nor the take hash | `packages/core/src/schema.ts:600-601`; `packages/cli/src/voice-track.ts:52-66` | HS-112 | low |
+| G-114 | Exists but contradicts | The spoken language is fixed in field names and rules – `text_de`, the TTS rule's German abbreviations and examples, the `audio.voice` notes, `--subtitles en` only – while the new-series skill grills "the languages of speech and subtitles"; intended for now, a lock-in once a series in another language comes | `packages/core/src/schema.ts:597`; `packages/core/src/episode.ts:29-41`; `config/models.yaml` `audio.voice`; `packages/cli/src/render.ts:42-43` | HS-113 | low |
+| G-115 | Exists but contradicts | `limits.episode_seconds` is checked only in QA, not when the episode track is built; `series-status.md` says the command checks the length against it | `packages/cli/src/qa.ts:314-322`; `packages/cli/src/series.ts:164-168`; `workspace/.claude/commands/series-status.md` | HS-114 | low |
+| G-116 | Exists but contradicts | Take status, the blocking rule and the series budget sum are domain rules in the CLI, while the conventions put rules in core | `packages/cli/src/takes.ts:65-87`; `packages/cli/src/series.ts:60-74` | HS-115 | low |
+| G-117 | Exists but contradicts | `SubtitleCue` is defined in core (with `id`) and again in remotion (without) | `packages/core/src/episode.ts:225`; `packages/remotion/src/types.ts:26` | HS-116 | low |
+| G-118 | Exists but contradicts | An episode's generation `out` path may reach any file of the canon folder, existing ones included; ADR 0025 allows only appending, ADR 0016 no write at all | `packages/cli/src/generate.ts:658-665` | HS-117 | medium |
+| G-119 | Exists but contradicts | ADR 0016 is out of date: "first version" with a hand-written canon and `new-series` later, `takes.json` without `file_hash`, "never writes the canon", `series/` paths; ADR 0042 records the state, the status note follows once it is accepted | `docs/adr/0016-episode-projects.md` | HS-120 | low |
+| G-120 | Exists but contradicts | `seriesNextAction` proposes `/new-episode` without a slug; `series-status.md` says `/new-episode <slug>` | `packages/core/src/production.ts:120`; `workspace/.claude/commands/series-status.md` | analyst | low |
+| G-121 | Missing | No test pinned the take source (subtitle and pause do not stale a take), the leading voice description under the TTS rule, the series' next action, or that an episode keeps its settings when the series changes (covered now by `tests/series-characterization.test.ts`); still none for the ambience clamp, an effect longer than the role's maximum, or a speaker without a reference voice | `tests/episode-track.test.ts`; `tests/series-budget.test.ts` | analyst | low |
+
+Decisions (by recommendation, not reviewed by the user):
+
+- GAP-AGG-Series, GAP-AGG-Script, GAP-AGG-TakeRegistry and GAP-AGG-EpisodeTrack: the boundaries stay as
+  recovered (`as-is`).
+- Exists and is intended:
+  - the series in `projects/` beside its episodes, one slug namespace (ADR 0035);
+  - the umbrella series budget, checked when an episode is created;
+  - `budget_usd` as the source and `state.json` as its copy;
+  - episode settings copied once;
+  - episodes outside the plan allowed;
+  - the script validated whole by the hook, written only by the agent (user);
+  - the take registry with its five statuses, imported takes never generated over, stale generated takes
+    generated again;
+  - generated voices on ComfyUI with the speaker's reference voice (user);
+  - the constructed, deterministic episode track with an optional music bed;
+  - lip-sync audio of an episode from the speaker stem;
+  - German speech with English subtitles for now (user).
+
+  ADR 0042 (proposed) records them.
+- `lipsync-audio.ts` and the lead-only muting are music-video logic (BC-Timing, ADR 0026), not this slice's.

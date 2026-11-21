@@ -48,6 +48,9 @@ external_systems:
   - id: EXT-AudioModels
     name: Local audio models
     description: Demucs (vocal separation), WhisperX (speech recognition and word alignment), librosa (beats, onsets, energy) and the MelBand-Roformer karaoke model (lead stem), run locally by the song analysis (ADR 0008, 0026)
+  - id: EXT-FFmpeg
+    name: FFmpeg
+    description: Converts recordings and generated audio to 48 kHz mono WAV, mixes the episode track and the speaker stems, raises the mix to the loudness target and cuts lip-sync audio segments (packages/cli/src/episode-track.ts, media.ts)
 
 bounded_contexts:
   - id: BC-Pipeline
@@ -68,6 +71,9 @@ bounded_contexts:
   - id: BC-Generation
     name: Generation
     purpose: Turns the items of a generation batch into provider calls for a model role – each refused up front when the batch does not fit the budget, served from the generation cache when the same request ran before, recorded in the manifest, and billed to the project budget at its planned cost
+  - id: BC-Series
+    name: Series
+    purpose: Keeps a series' umbrella budget and episode plan and creates its episodes, and turns an episode's script into takes, an episode track with speaker stems, subtitles and lip-sync audio – the episode's replacement for the song
 
 aggregates:
   - id: AGG-Project
@@ -194,6 +200,62 @@ aggregates:
       - A paid provider runs a role only with a known price; a local or mock generation costs nothing (the code does this at resolution, models.ts:62-68, generate.ts:372-380,689 – not when the file is loaded)
       - A Pika workflow loads only the model files its family's lock allows (the code does this, packages/providers/src/comfyui.ts:374-405)
       - Only the agent changes the model roles and a project's model overrides, at the user's request (user, 2026-11-21, HS-88)
+  - id: AGG-Series
+    name: Series
+    context: BC-Series
+    status: as-is
+    evidence:
+      - series.yaml and state.json of projects/<slug>/, loaded together by loadSeries (packages/core/src/project.ts:380-416), created together by new-series (packages/cli/src/new-series.ts:67-104)
+      - the uncommitted series budget is computed in one place from the series state and the project.yaml of every episode that names the series (packages/cli/src/series.ts:43-74) and checked by createProject for the CLI and the board wizard (packages/cli/src/new-project.ts:205-216; board-wizard.ts:394)
+      - canon generations are booked in the series' own state.json and manifest (packages/cli/src/generate.ts:260-277)
+    invariants:
+      - The canon's spend plus every episode's budget fits in the series budget, whenever an episode is created, an episode budget changes or the canon generates (decided 2026-11-22, HS-105, HS-122; the code checks it only when an episode is created, and canon generations only against total minus canon spend – gap register)
+      - Every series has a budget (decided 2026-11-22, HS-106; new-series requires it, the schema leaves it optional – gap register)
+      - budget_usd in series.yaml is the source; state.json budget.totalUsd is a copy that must stay equal (the code enforces it, packages/cli/src/validate-file.ts:50-62, generate.ts:265; HS-107)
+      - A series and a project never share a slug (the code does this, new-series.ts:77; ADR 0035)
+      - An episode number belongs to one episode of the series (decided 2026-11-22, HS-108; series-status only reports a duplicate – gap register)
+      - An episode copies formats, providers and brand from series.yaml once, when it is created; nothing is inherited later (the code does this, new-project.ts:101-134; ADR 0016)
+      - An episode may add files to the canon but never overwrites an existing one (decided 2026-11-22, HS-117; generate lets an episode's out path reach any canon file – gap register; the canon files themselves belong to the character slice)
+  - id: AGG-Script
+    name: Script
+    context: BC-Series
+    status: as-is
+    evidence:
+      - script.yaml of an episode, parsed whole with ScriptSchema by loadProject (packages/core/src/project.ts:262; schema.ts:587-657)
+      - validateScript checks the whole script against the series canon and throws one error listing every issue (packages/core/src/episode.ts:59-104); the workspace hook runs it on every edit (packages/cli/src/validate-file.ts:134-145)
+    invariants:
+      - Scene and script line ids are unique; every scene plays in a set of the canon and every speaker is a character of the canon (the code does this, episode.ts:59-104)
+      - Every spoken and chat line has a subtitle text; a script with chat lines has a typing speed and a hold (the code does this)
+      - Spoken text follows the TTS rule – numbers, symbols and abbreviations spelled out; a leading voice description in brackets is not spoken and not checked (the code does this, episode.ts:29-41; ADR 0015)
+      - Script lines play strictly one after another; an overlapping line (with) is refused (the code does this; ADR 0016)
+      - Only the agent writes script.yaml, in the script stage and when the user asks for a change (user, 2026-11-22, HS-121)
+  - id: AGG-TakeRegistry
+    name: Take registry
+    context: BC-Series
+    status: as-is
+    evidence:
+      - takes.json of an episode, written whole and sorted by saveTakes (packages/cli/src/takes.ts:51-57); its writers are voice-track and import-takes (packages/cli/src/voice-track.ts:99-200; media.ts:395-460)
+      - every take's status follows from its file, the registered file hash and the text hash of its script line (takes.ts:65-87; packages/core/src/episode.ts:139-153)
+    invariants:
+      - Every audible script line (spoken and sfx) has one take and every scene with an ambience prompt one ambience; chat and pause lines have none (the code does this, episode.ts:135-137; voice-track.ts)
+      - A take is current while its file is the registered one and its line's kind, speaker and spoken text – or the effect's prompt and length – are unchanged; an ambience while its prompt is unchanged (the code does this, takes.ts:70-76, episode.ts:139-153)
+      - A take also goes stale when its speaker's reference voice or its acting direction changes (decided 2026-11-22, HS-111, HS-112; the text hash leaves both out and direction is never read – gap register)
+      - An imported take is never generated over; a replaced or unregistered file, or a stale imported take, stops the voice track until the user imports or deletes it (the code does this, takes.ts:79-87)
+      - A stale or missing generated take is generated again without a stop; a current take comes from the registry (the code does this, voice-track.ts)
+      - One recording per script line (the code does this, media.ts:395-460)
+  - id: AGG-EpisodeTrack
+    name: Episode track
+    context: BC-Series
+    status: as-is
+    evidence:
+      - episodeTrack places the lines from the take durations and writes timing.json, timing.effective.json, audio/episode.wav and audio/stems/<character>.wav together in one run from the effective timing (packages/cli/src/episode-track.ts:148-253)
+    invariants:
+      - Every audible line has a current take before the track is built (the code does this, episode-track.ts:157)
+      - A spoken line lasts as long as its take, an sfx or pause line its duration, a chat line its characters at the typing speed plus the hold, each followed by its pause; scenes cover the episode from 0 without gaps (the code does this, packages/core/src/episode.ts:156-206)
+      - The mix and every speaker stem follow the effective timing, so a timing override moves sound and picture together (the code does this; ADR 0016)
+      - The episode track and every speaker stem last exactly the timing's duration, and the mix meets the project's loudness target (the code does this, episode-track.ts:224-253)
+      - The timing has no tempo, no beats, downbeats or onsets; its energy is the RMS envelope of the mix (the code does this; ADR 0016)
+      - The episode's length stays within the series' episode length, checked when the track is built (decided 2026-11-22, HS-114; only QA checks it – gap register)
 
 events:
   - id: EVT-ProjectCreated
@@ -391,6 +453,74 @@ events:
     name: ComfyUI restarted
     context: BC-Generation
     data: [Server URL]
+  - id: EVT-SeriesCreated
+    name: Series created
+    aggregate: AGG-Series
+    data: [Slug, Title, Series budget, Master format, Providers, Brand kit]
+    description: "new-series writes series.yaml, state.json, a starter style.yaml from the brand kit and bible.md from templates/series (packages/cli/src/new-series.ts:67-104)"
+  - id: EVT-EpisodeCreated
+    name: Episode created
+    aggregate: AGG-Series
+    pivotal: true
+    data: [Episode slug, Episode number, Title, Episode budget, Uncommitted series budget]
+    description: "new --kind episode or the board wizard: a project of kind episode with the series' formats, providers and brand and the title from the episode plan (packages/cli/src/new-project.ts:101-134,201-216)"
+  - id: EVT-EpisodeRefused
+    name: Episode refused
+    context: BC-Series
+    data: [Episode budget, Uncommitted series budget]
+    description: "The episode budget exceeds the uncommitted series budget; no folder is created (new-project.ts:205-216)"
+  - id: EVT-CanonSpendRecorded
+    name: Canon spend recorded
+    aggregate: AGG-Series
+    data: [Planned cost, Canon spend]
+    description: "A canon generation (generate --series) is billed to the series' state.json (packages/cli/src/generate.ts:260-277)"
+  - id: EVT-ScriptWritten
+    name: Script written
+    aggregate: AGG-Script
+    data: [Title, Scenes, Script lines, Chat speed]
+  - id: EVT-ScriptRevised
+    name: Script revised
+    aggregate: AGG-Script
+    data: [Changed script lines]
+  - id: EVT-ScriptValidated
+    name: Script validated
+    aggregate: AGG-Script
+    data: [Issues]
+  - id: EVT-TakeGenerated
+    name: Take generated
+    aggregate: AGG-TakeRegistry
+    data: [Script line, Duration, Text hash, File hash]
+    description: "Speech through audio.voice with the speaker's reference voice, effects through audio.sfx, converted to 48 kHz mono WAV in audio/lines/<line-id>.wav (packages/cli/src/voice-track.ts:52-200)"
+  - id: EVT-AmbienceGenerated
+    name: Ambience generated
+    aggregate: AGG-TakeRegistry
+    data: [Scene, Duration, Prompt hash]
+    description: "audio.sfx at the scene's length on the first run, clamped to the role's maximum; the mix loops or trims it later (voice-track.ts:147-200)"
+  - id: EVT-TakeImported
+    name: Take imported
+    aggregate: AGG-TakeRegistry
+    data: [Script line, Duration, Text hash, File hash]
+    description: "import-takes registers a recording in audio/lines/ as imported and converts other formats (packages/cli/src/media.ts:395-460)"
+  - id: EVT-VoiceTrackStopped
+    name: Voice track stopped
+    context: BC-Series
+    data: [Script line, Take status, Reason]
+    description: "A replaced, unregistered or stale imported take, a speaker without a reference voice, or an effect longer than the role's maximum; nothing is generated (packages/cli/src/takes.ts:79-87; voice-track.ts:55-60,125-128)"
+  - id: EVT-EpisodeTrackBuilt
+    name: Episode track built
+    aggregate: AGG-EpisodeTrack
+    pivotal: true
+    data: [Duration, Scenes, Script lines, Speaker stems, Loudness]
+  - id: EVT-SubtitlesWritten
+    name: Subtitles written
+    context: BC-Series
+    data: [Cues, Language, File]
+    description: "renders/<slug>.en.srt from the script and the effective timing; render --subtitles en burns the same cues in (packages/cli/src/subtitles.ts; render.ts:155-160)"
+  - id: EVT-LipSyncAudioCut
+    name: Lip-sync audio cut
+    context: BC-Series
+    data: [Character, Start, End, File]
+    description: "audio-segment --character cuts a lip-sync shot's audio from the speaker stem into assets/audio-segments/ (packages/cli/src/media.ts:75-136)"
 
 commands:
   - id: CMD-CreateProject
@@ -679,6 +809,91 @@ commands:
     actor: ACT-QueueRun
     produces: [EVT-ComfyUIRestarted]
     description: "comfy restart, and the queue run between two tries of a failed or hung generation, through COMFYUI_RESTART_COMMAND (packages/cli/src/comfy.ts:62; queue.ts:641)"
+  - id: CMD-RecordCanonSpend
+    name: Record canon spend
+    actor: ACT-SetupSkill
+    aggregate: AGG-Series
+    produces: [EVT-CanonSpendRecorded]
+    description: "runBatch for generate --series records the planned cost of every new canon generation in the series' state.json (packages/cli/src/generate.ts:260-277)"
+    rules:
+      - Before a canon batch, its worst-case estimate fits the series total minus canon spend and the batch cap; episode budgets are not subtracted (generate.ts:260-277; HS-105 decided otherwise – gap register)
+  - id: CMD-CreateSeries
+    name: Create a series
+    actor: ACT-SetupSkill
+    aggregate: AGG-Series
+    produces: [EVT-SeriesCreated]
+    description: "new-series in the new-series skill, or the board wizard (POST /api/new/series)"
+    rules:
+      - A series budget is required (new-series.ts:72; HS-106)
+      - The slug is not taken in projects/ (new-series.ts:77; ADR 0035)
+  - id: CMD-CreateEpisode
+    name: Create an episode
+    actor: ACT-SetupSkill
+    aggregate: AGG-Series
+    produces: [EVT-EpisodeCreated, EVT-EpisodeRefused]
+    description: "new --kind episode in the new-episode skill, or the board wizard (POST /api/new/episode)"
+    rules:
+      - The episode budget fits the uncommitted series budget – series budget minus canon spend minus every other episode's budget (new-project.ts:205-216)
+      - The episode number is not taken in the series (decided 2026-11-22, HS-108; not checked today – gap register)
+      - Formats, providers and brand are copied from series.yaml, the title from the episode plan (new-project.ts:101-134)
+  - id: CMD-WriteScript
+    name: Write the script
+    actor: ACT-SetupSkill
+    aggregate: AGG-Script
+    produces: [EVT-ScriptWritten]
+    description: "The new-episode skill grills the user against the bible, the episode plan and the canon and writes script.yaml in the script stage"
+    rules:
+      - A story that needs a character or set the canon lacks stops until the series canon has it; an episode cannot add one (new-episode skill step 2)
+  - id: CMD-ReviseScript
+    name: Revise the script
+    actor: ACT-Orchestrator
+    aggregate: AGG-Script
+    produces: [EVT-ScriptRevised]
+    description: "The agent changes script.yaml when the user asks for a different text, pause or line (user, 2026-11-22, HS-121); the voice track and the episode track run again"
+  - id: CMD-ValidateScript
+    name: Validate the script
+    actor: ACT-StageRunner
+    aggregate: AGG-Script
+    produces: [EVT-ScriptValidated]
+    description: "validate-file on every edit of script.yaml (the workspace hook), and validate for the whole episode"
+  - id: CMD-GenerateTakes
+    name: Generate the takes
+    actor: ACT-StageRunner
+    aggregate: AGG-TakeRegistry
+    produces: [EVT-TakeGenerated, EVT-AmbienceGenerated, EVT-VoiceTrackStopped]
+    description: "voice-track in the voice-track stage, with --dry-run for the estimate; one runBatch on the episode budget"
+    rules:
+      - Every blocking take is listed and nothing is generated until all are resolved (voice-track.ts)
+      - Only missing and stale generated takes are generated; current takes are kept (voice-track.ts)
+      - Speech needs a reference voice for its speaker or an imported take (voice-track.ts:55-60)
+  - id: CMD-ImportTakes
+    name: Import takes
+    actor: ACT-User
+    aggregate: AGG-TakeRegistry
+    produces: [EVT-TakeImported]
+    description: "import-takes [--lines] after the user put recordings into audio/lines/"
+  - id: CMD-BuildEpisodeTrack
+    name: Build the episode track
+    actor: ACT-StageRunner
+    aggregate: AGG-EpisodeTrack
+    produces: [EVT-EpisodeTrackBuilt]
+    description: "episode-track in the episode-track stage, and again after a script change or a timing override; deterministic, no speech recognition"
+    rules:
+      - An optional audio/music.wav is laid under the whole episode at a fixed gain, ambience at another (episode-track.ts:37-38,224-225)
+  - id: CMD-WriteSubtitles
+    name: Write subtitles
+    actor: ACT-StageRunner
+    aggregate: AGG-Script
+    produces: [EVT-SubtitlesWritten]
+    description: "subtitles in qa-export; cues from the subtitled lines and the sfx lines with on-screen text, in playing order, timed by the effective timing"
+    rules:
+      - Subtitles are English only today (render.ts:42-43; HS-113)
+  - id: CMD-CutLipSyncAudio
+    name: Cut lip-sync audio
+    actor: ACT-StageRunner
+    aggregate: AGG-EpisodeTrack
+    produces: [EVT-LipSyncAudioCut]
+    description: "audio-segment --character for a lip-sync shot of an episode, from the speaker stem; the lead-only muting of a music video never applies, because an episode's timing has no words"
 
 policies:
   - id: POL-RunNextStage
@@ -719,12 +934,17 @@ policies:
   - id: POL-RecordPlannedSpend
     name: Every new generation is billed at its planned cost
     when: [EVT-GenerationCompleted]
-    then: [CMD-RecordSpend]
+    then: [CMD-RecordSpend, CMD-RecordCanonSpend]
     description: "runBatch records the planned cost of every result that is not a reuse and saves the state after each item (generate.ts:753-763); the provider's actual charge stays in the adapter's raw result (user and decided 2026-11-21, HS-92)"
   - id: POL-RestartComfyUIOnFailure
     name: A failed local generation restarts ComfyUI before the next try
     when: [EVT-GenerationFailed]
     then: [CMD-RestartComfyUI]
+  - id: POL-ValidateEveryScriptEdit
+    name: Every script edit is validated
+    when: [EVT-ScriptWritten, EVT-ScriptRevised]
+    then: [CMD-ValidateScript]
+    description: "The workspace hook runs validate-file on every edit of script.yaml and blocks a failing edit; only the script is checked against the canon, because the timing is rebuilt from it (packages/cli/src/validate-file.ts:134-145)"
 
 read_models:
   - id: RM-Status
@@ -818,6 +1038,24 @@ read_models:
     used_by: [ACT-StageRunner, ACT-User]
     fields: [Server URL, Reachable, Running, Pending, VRAM used and total, Recent prompts]
     description: "comfy status and doctor (packages/cli/src/comfy.ts:19)"
+  - id: RM-SeriesStatus
+    name: Series status
+    fed_by: [EVT-SeriesCreated, EVT-EpisodeCreated, EVT-CanonSpendRecorded]
+    used_by: [ACT-User, ACT-SetupSkill]
+    fields: [Series, Series budget, Canon spend, Episode budgets, Uncommitted series budget, Characters, Sets, Episode plan, Episodes, Canon gaps, Next action]
+    description: "series-status and the board's series view (packages/cli/src/series.ts:101-209; board-production.ts:336-370; packages/core/src/production.ts:109-122)"
+  - id: RM-TakeStatus
+    name: Take status
+    fed_by: [EVT-TakeGenerated, EVT-AmbienceGenerated, EVT-TakeImported, EVT-ScriptRevised]
+    used_by: [ACT-StageRunner, ACT-User]
+    fields: [Script line, Status, Source, Duration, Blocking reason, Planned cost]
+    description: "voice-track --dry-run: the takes to generate, the blocking takes and the estimate (packages/cli/src/voice-track.ts)"
+  - id: RM-Subtitles
+    name: Subtitles
+    fed_by: [EVT-SubtitlesWritten]
+    used_by: [ACT-User]
+    fields: [Cue, Start, End, Text]
+    description: "renders/<slug>.en.srt, beside the master render in the release package"
 
 hotspots:
   - id: HS-1
@@ -1330,6 +1568,106 @@ hotspots:
     refs: [BC-Generation]
     status: resolved
     resolution: "ADR 0041, Proposed: one generation path, the budget check per batch, the workspace cache by content, planned spend equal to the manifest, no double charge, provider rules in adapters and model roles; amends 0006, 0014 and 0017 (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-103
+    question: "The slice holds the series' budget and episode plan and the episode's script, takes, episode track and subtitles. One context, or a canon context and an episode-audio context?"
+    refs: [BC-Series]
+    status: resolved
+    resolution: "One context, Series (BC-Series): the series budget and episode plan, the creation of episodes, the script, the take registry, the episode track, subtitles and lip-sync audio. The canon files (characters, sets, plates, props, style) belong to the character slice; an episode's stages to BC-Pipeline; generation to BC-Generation (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-104
+    question: "Which consistency boundaries does the code show?"
+    refs: [AGG-Series, AGG-Script, AGG-TakeRegistry, AGG-EpisodeTrack]
+    status: resolved
+    resolution: "Four as-is aggregates: the series (series.yaml and state.json with the commitment across its episodes), the script (validated whole), the take registry (takes.json with its files) and the episode track (timing, mix and stems written together) (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-105
+    question: "Canon generations are checked against the series total minus canon spend only; episode budgets are not subtracted, so the canon can spend money already promised to episodes, against the glossary's Series Budget. Which holds?"
+    refs: [AGG-Series]
+    status: resolved
+    resolution: "The glossary: canon spend plus every episode budget fits in the series budget, also for a canon generation – gap, medium (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-106
+    question: "new-series, the skill and the glossary require a series budget; the schema makes budget_usd optional and a test pins that episodes are then unchecked. Is a series without a budget legal?"
+    refs: [AGG-Series]
+    status: resolved
+    resolution: "No: every series has a budget; the schema follows the command. The demo series has one – gap, low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-107
+    question: "The series budget lives in series.yaml (budget_usd) and in state.json (budget.totalUsd), and the skill tells the agent to change both by hand. Which is the source?"
+    refs: [AGG-Series]
+    status: resolved
+    resolution: "As for a project (HS-5): budget_usd in series.yaml is the source, state.json a copy that must stay equal; no command changes a series budget – gap, low, beside G-13 (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-108
+    question: "new --kind episode accepts an episode number the series already has; series-status only reports the duplicate. Refuse it?"
+    refs: [CMD-CreateEpisode]
+    status: resolved
+    resolution: "Yes: an episode number belongs to one episode; new and the wizard refuse a taken one. An episode outside the plan stays allowed – gap, low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-109
+    question: "'unplanned' means a planned episode without a project in production.ts and an episode outside the plan in the series-status test. Terms?"
+    refs: [RM-SeriesStatus]
+    status: resolved
+    resolution: "Planned episode for an entry of the episode plan; an episode outside the plan for a project the plan does not list; the code field unplanned is a spelling to avoid – gap, low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-110
+    question: "Canon readiness counts a reference voice as a gap only when a listed file is missing; a character with no voice at all passes, and the comment says 'speaking characters without a reference voice'. Which holds?"
+    refs: [RM-SeriesStatus]
+    status: resolved
+    resolution: "A character without a reference voice is a canon gap unless the series' audio provider is mock (every line recorded); voice-track still stops on a speaker without one – gap, low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-111
+    question: "The take's text hash leaves out the speaker's reference voice, so a changed voice keeps every old take current. Should a voice change make takes stale?"
+    refs: [AGG-TakeRegistry]
+    status: resolved
+    resolution: "Yes: the content hash of the reference voice and its transcript is part of a spoken take's source – gap, medium, because the user generates every voice (user, 2026-11-22: voices are generated on ComfyUI) (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-112
+    question: "direction ('Acting direction for the take') is written by the skill but never read: it does not reach the voice model and is not hashed. A leading voice description in brackets in the spoken text is the only way a direction reaches the model today. Wire it or drop it?"
+    refs: [AGG-TakeRegistry]
+    status: resolved
+    resolution: "One mechanism: direction is the acting direction; voice-track sends it as the leading voice description and hashes it, and the bracket form in the spoken text stays accepted – gap, low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-113
+    question: "The spoken text is text_de, the TTS rule's abbreviations and the audio.voice notes are German, subtitles are English only, while the new-series skill grills 'the languages of speech and subtitles' and the glossary calls subtitles 'translated text'. Decision or leftover?"
+    refs: [AGG-Script, CMD-WriteSubtitles]
+    status: resolved
+    resolution: "German speech with English subtitles is how the product works today and how it is used (user, 2026-11-22); language-bound fields are a known lock-in. The spoken and subtitle language become series settings when a series in another language needs them; until then nothing is renamed – gap, low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-114
+    question: "limits.episode_seconds is checked only in QA; series-status.md says the command checks the length against it. Where is the episode length checked?"
+    refs: [AGG-EpisodeTrack]
+    status: resolved
+    resolution: "When the episode track is built, which is the first point that knows the length; QA keeps its check; series-status.md is corrected – gap, low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-115
+    question: "Take status, the blocking rule and the series budget sit in cli, while the conventions put domain rules in core and name only the queue as an exception. Accident or decision?"
+    refs: [AGG-TakeRegistry, AGG-Series]
+    status: resolved
+    resolution: "Accident: the take status and blocking rule and the series budget sum are domain rules and belong in core; file access stays in cli – gap, low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-116
+    question: "SubtitleCue is defined in core (with id) and again in remotion (without). One definition?"
+    refs: [EVT-SubtitlesWritten]
+    status: resolved
+    resolution: "One definition in core, which remotion may import – gap, low; the render slice owns the composition side (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-117
+    question: "ADR 0016 says an episode never writes the canon; ADR 0025 lets it append plates, props and states but never change an existing entry; generate lets an episode's out path reach any file of the canon folder, existing ones included. Which holds?"
+    refs: [AGG-Series]
+    status: resolved
+    resolution: "ADR 0025: an episode adds new canon files and entries but never overwrites an existing one; the code refuses an episode's out path onto an existing canon file – gap, medium. The canon files' own rules belong to the character slice (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-118
+    question: "Terms: the glossary lists 'voice track' under Speaker Stem's Avoid, but Voice Track is the stage that makes takes and ambience; the schema calls the ambience prompt atmo; take statuses, the take registry, the uncommitted series budget, canon gaps and lip-sync audio have no glossary entry."
+    refs: [BC-Series]
+    status: resolved
+    resolution: "Voice Track is the stage that makes the takes and ambience (glossary entry; removed from Speaker Stem's Avoid); Ambience stays the term and atmo its field spelling; new entries Take Registry, Take Status, Uncommitted Series Budget, Canon Gap, Planned Episode (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-119
+    question: "Code comments call a series 'a project of its own'; the glossary's Project is one music video or one episode. Is a series a project?"
+    refs: [BC-Series]
+    status: resolved
+    resolution: "No: a project is what runs through stages (a music video or an episode, project.yaml); a series lives in projects/ beside its episodes (ADR 0035) but is not a project. The comments are a spelling to avoid (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-120
+    question: "ADR 0016 is out of date: 'first version' with a hand-written canon and new-series later (shipped the same day), takes.json without file_hash, 'never writes the canon', series/ paths (moved by ADR 0035). Record the slice as it is?"
+    refs: [BC-Series]
+    status: resolved
+    resolution: "ADR 0042, Proposed: the series budget as a commitment, episode settings copied once, the canon append-only for episodes, the take registry and its staleness, the constructed episode track, the spoken language as it is; amends 0016 (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-121
+    question: "Who changes script.yaml after the script stage?"
+    refs: [AGG-Script]
+    status: resolved
+    resolution: "Only the agent, when the user asks; the user never edits the file (user, 2026-11-22)"
+  - id: HS-122
+    question: "The series budget is checked only when an episode is created: a later change of an episode's budget_usd and two creations at once go unchecked, and nothing locks the files. Enough?"
+    refs: [AGG-Series]
+    status: resolved
+    resolution: "The commitment holds whenever an episode budget changes too; the check runs where budgets change, once a budget command exists (G-13, G-107). Parallel creation stays unguarded: one setup skill or wizard runs at a time – gap, low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
 
 flows:
   - id: FLOW-AutonomousStage
@@ -1350,3 +1688,9 @@ flows:
   - id: FLOW-Generation
     name: From a batch item to a billed generation
     sequence: [ACT-QueueRun, CMD-RunGenerationBatch, EVT-GenerationCompleted, POL-RecordPlannedSpend, CMD-RecordSpend, EVT-SpendRecorded, RM-Manifest]
+  - id: FLOW-Episode
+    name: From a series to a created episode
+    sequence: [ACT-SetupSkill, CMD-CreateSeries, EVT-SeriesCreated, CMD-CreateEpisode, EVT-EpisodeCreated, RM-SeriesStatus]
+  - id: FLOW-EpisodeTrack
+    name: From the script to the episode track
+    sequence: [ACT-SetupSkill, CMD-WriteScript, EVT-ScriptWritten, POL-ValidateEveryScriptEdit, CMD-ValidateScript, EVT-ScriptValidated, ACT-StageRunner, CMD-GenerateTakes, EVT-TakeGenerated, CMD-BuildEpisodeTrack, EVT-EpisodeTrackBuilt, CMD-WriteSubtitles, EVT-SubtitlesWritten]

@@ -936,3 +936,204 @@ lip-sync audio. It is the largest caller of this slice outside the queue.
 | HS-100 | Provider rules in adapters and model roles; one provider list | recommendation | ADR 0041, G-97, G-98, G-100 |
 | HS-101 | The code is right about capabilities and the local lip-sync; docs follow | recommendation; medium because the agent reads the docs | glossary, G-93, G-94 |
 | HS-102 | ADR 0041 | recommendation | `docs/adr/0041-generation-funnel.md` |
+
+# Adoption – series
+Date: 2026-11-22 · Commit: 2ec8a70 · Slice: the series budget and episode plan, episode creation, the script, the take registry, the voice track, the episode track, subtitles and lip-sync audio (concept `series`) · Analysts: 3 lenses
+
+## Scope
+
+- **Slice:**
+  - core: `episode.ts`; the series, script and take schemas and the episode fields of `ProjectConfigSchema` in
+    `schema.ts`; series and episode loading in `project.ts`; `EPISODE_STAGES` in `state.ts`;
+    `seriesNextAction` in `production.ts`;
+  - cli: `series.ts`, `new-series.ts`, `new-project.ts` (episode path), `voice-track.ts`, `takes.ts`,
+    `episode-track.ts`, `subtitles.ts`, `import-takes` and `audio-segment --character` in `media.ts`, and the
+    series parts of `validate.ts`, `validate-file.ts`, `generate.ts`, `status.ts` and `board-production.ts`;
+  - workspace: the skills `new-series`, `new-episode`, `voice-track` and `episode-track`, the `series-status`
+    command, and the demo canon and episode.
+
+  No shared library.
+- **Out of scope:**
+  - the canon files (characters, sets, plates, props, style, the character library): slice `character`;
+  - rendering and the compositions, `Subtitles.tsx` read for coupling only: slice `render`;
+  - the timing merge, the storyboard and the generation runner: already adopted;
+  - `lipsync-audio.ts` and the lead-only muting: music-video logic (BC-Timing).
+- **Intent:** domain model, as for the earlier slices. **Language:** artifacts `en`, UI `en`.
+- **Since the last slice:** no code change (same night). `slice.ts --cluster episode` and `--cluster sery` found
+  the seeds; the scope was completed by hand from the callers.
+
+| Layer | Files |
+|---|---|
+| core (domain) | `episode.ts`; `SeriesSchema`, `SeriesStateSchema`, `ScriptSchema`, `TakesSchema` and the episode project fields in `schema.ts`; `loadSeries`, `seriesDir` in `project.ts`; `EPISODE_STAGES`; `seriesNextAction` |
+| cli (application) | `series.ts`, `new-series.ts`, `new-project.ts`, `voice-track.ts`, `takes.ts`, `episode-track.ts`, `subtitles.ts`, `media.ts` (`importTakes`, lip-sync segments), the commands in `index.ts`; series parts of `validate*.ts`, `generate.ts` (`seriesTarget`), `board-production.ts`, `board-wizard.ts` |
+| workspace (orchestration) | `new-series`, `new-episode`, `voice-track`, `episode-track` skills; `series-status.md`; episode parts of `stage-runner.md` |
+| fixtures | `projects/demo-series/`, `projects/demo-episode/` |
+| tests | `episode.test.ts`, `episode-track.test.ts`, `episode-lipsync.test.ts`, `episode-render.test.ts`, `series-budget.test.ts`, `series-status.test.ts` |
+
+## How this slice was decided
+
+As in the earlier slices, there were no code-level questions. Every technical hotspot was decided by the
+recommendation and is marked "not reviewed by the user – delegated". The user answered four questions about how
+they work:
+1. All voices are generated on ComfyUI; they record nothing themselves.
+2. At least one episode went all the way to release.
+3. Speech is German and subtitles are English, as the code does it today.
+4. Only the agent changes a script once it is written.
+
+Answer 1 makes the stale take after a voice change medium (G-112) and keeps the import path intended but rare.
+Answer 2 confirms the episode path works end to end; nothing in it is dead. Answer 3 keeps `text_de` and the
+English subtitles as they are, with generic languages as a later gap (G-114, low). Answer 4 makes the agent the
+only writer of `script.yaml` (HS-121). ADR 0042 stays `Proposed`.
+
+## What the repository is (facts)
+
+- **Series.** A folder in `projects/` with `series.yaml` and `state.json`. `new-series` requires a budget and a
+  free slug and writes the starter canon. Episodes are found by scanning the sibling `project.yaml` files; the
+  series stores no episode list.
+- **Series budget.** The uncommitted series budget is the series budget minus canon spend minus every episode
+  budget. It is checked only when an episode is created. Canon generations check total minus canon spend,
+  without the episode budgets. `budget_usd` is optional in the schema and kept twice.
+- **Episode.** A project of kind `episode`. It copies formats, providers and brand once and has the stages
+  `setup`, `script`, `voice-track`, `episode-track`, then the shared four. Duplicate episode numbers and episodes
+  outside the plan pass `new`.
+- **Script.** Six line kinds:
+  - spoken: dialogue, voiceover, announcement;
+  - subtitled: the spoken kinds plus chat;
+  - audible: the spoken kinds plus sfx.
+
+  `validateScript` lists every broken rule in one error, and the hook runs it on every edit. The TTS rule
+  rejects digits, symbols and German abbreviations, but a leading voice description in brackets is exempt.
+  `with` (overlap) is always refused.
+- **Takes.** `takes.json` has five statuses: current, missing, stale, replaced and unregistered. What blocks:
+  - a replaced or unregistered take always;
+  - a stale take only if it was imported; a stale generated take is regenerated.
+
+  The hash covers kind, speaker and `text_de`, or an effect's prompt and duration, or an ambience's prompt. It
+  leaves out the reference voice and `direction`, and `direction` is never read.
+- **Episode track.** It is deterministic: it places the lines one after another from the take durations. In one
+  run it writes the timing, the mix and one stem per speaker from the effective timing. The mix uses fixed gains
+  for ambience and the optional music, plus a loudness target.
+- **Subtitles and lip-sync audio.** Subtitles are English only, as `renders/<slug>.en.srt` or burned in. Lip-sync
+  audio comes from the speaker stem.
+- **Checks and locks.** `limits.episode_seconds` is checked only in QA. There are no locks on `takes.json` or
+  the series state.
+- **History.** Almost the whole slice landed on 2026-11-10. The one breaking change is `3ac49cc` (series into
+  `projects/`). There are no reverts or TODOs.
+
+## Domain model (decided by recommendation)
+
+- **Context:** `BC-Series` – Series.
+  - Episodes are projects of BC-Pipeline.
+  - Takes and canon references are generated through BC-Generation.
+  - The episode track writes the timing that BC-Timing merges.
+  - The canon files are read here but belong to the character slice.
+- **Aggregates (all `as-is`):**
+  - `AGG-Series`: the commitment of canon spend and episode budgets, one slug namespace, one episode per number,
+    settings copied once, and the canon append-only for episodes.
+  - `AGG-Script`: validated whole, written only by the agent.
+  - `AGG-TakeRegistry`: one take per audible line; staleness from the line, the reference voice and the
+    direction; imported takes protected.
+  - `AGG-EpisodeTrack`: built whole from the takes and the effective timing; the length limit is checked when it
+    is built.
+- **Commands:** create a series, create an episode, record canon spend, write, revise and validate the script,
+  generate the takes, import takes, build the episode track, write subtitles, cut lip-sync audio.
+- **Policy:** every script edit is validated; a canon generation's planned cost is recorded (an extension of
+  `POL-RecordPlannedSpend`).
+- **Read models:** series status, take status, subtitles. **Flows:** `FLOW-Episode`, `FLOW-EpisodeTrack`.
+- **Glossary:**
+  - New: **Uncommitted Series Budget**, **Planned Episode**, **Canon Gap**, **Take Registry**, **Take Status**,
+    **Voice Track**.
+  - Sharpened: **Series** (not a project), **Series Budget** (always set), **Episode** (settings copied once),
+    **Take**, **Ambience** (avoid "atmo"), **Episode Track**, **Speaker Stem** (no longer avoids "voice
+    track"), **Subtitles** (German speech and English subtitles today).
+- **ADR:** 0042 (Proposed), which amends 0016.
+
+## Package documentation written
+
+- `.claude/rules/series.md` – path-scoped slice doc; nothing left `[OPEN]`.
+- `docs/engineering/conventions.md` – take status and the series budget as further rules outside core, ffmpeg,
+  three seams (script rule, series budget, episode audio).
+- `docs/architecture/data-model.md`, `docs/domain/context-map.as-is.md` – the four aggregates and `BC-Series`.
+
+## Contradictions found and how they were resolved
+
+| Contradiction | Resolution |
+|---|---|
+| Glossary: canon plus episodes fit in the series budget, versus canon generations ignoring episode budgets | the glossary (G-105) |
+| Series budget mandatory (command, skill, glossary) versus optional in the schema | mandatory (G-106) |
+| ADR 0016 "never writes the canon", ADR 0025 append-only, versus any canon file writable | ADR 0025 (G-118) |
+| `direction` documented as acting direction, versus never read | wired, hashed (G-113) |
+| ADR 0016: a changed canon changes cache keys, versus takes ignoring the reference voice | a voice change stales the take (G-112) |
+| `new-series` grills "the languages of speech and subtitles", versus `text_de`, the German TTS rule and English subtitles | as it is, generic later (G-114) |
+| `series-status.md` checks the episode length, versus only QA | checked when the episode track is built (G-115) |
+| Glossary Speaker Stem avoids "voice track", versus the stage `voice-track` | Voice Track is the stage; glossary corrected |
+| `unplanned` for two different things | Planned Episode and episode outside the plan (G-110) |
+| "A series is a project of its own" (comments), versus the glossary's Project | a series is not a project |
+| Canon readiness: "speaking characters without a reference voice", versus only a missing listed file | a missing voice is a canon gap (G-111) |
+| Rules in core (conventions), versus take status and the series budget in cli | accident (G-116) |
+| ADR 0016 as a "first version" with a demo canon, without `file_hash`, with `series/` paths | ADR 0042 (G-119) |
+
+## Rules and checks
+
+| Rule | Enforcement | State |
+|---|---|---|
+| A spoken take goes stale on its speaker or spoken text, not on its subtitle or pause; an effect on its prompt or length; an ambience only on its prompt; chat and pause lines have no take | `tests/series-characterization.test.ts` | green |
+| A leading voice description is exempt from the TTS rule, the spoken text after it is not | `tests/series-characterization.test.ts` | green |
+| The series' next action: canon, then planned episodes, then done | `tests/series-characterization.test.ts` | green |
+| An episode keeps its formats, providers and brand when the series changes later | `tests/series-characterization.test.ts` | green |
+| Script validation, take status and blocking, the uncommitted series budget, canon generations on the series budget, imported takes protected, the constructed timing | existing `tests/episode*.test.ts`, `series-budget.test.ts`, `series-status.test.ts` | green |
+| The slice stays inside the package import direction | slice 1 boundary rule and `tests/package-boundaries.test.ts` | green |
+| Commitment on canon generations, mandatory series budget, one episode per number, canon append-only, voice and direction in the take hash, length at the episode track | documentation until stories build them (G-105–G-118) | – |
+
+## Gap register (candidates – stories only with --stories)
+
+17 candidates, G-105 to G-121, in `docs/domain/gap-register.md`:
+- 14 *exist but contradict*. The highest are G-105 (canon spend ignores episode budgets), G-112 (voice change
+  leaves takes current) and G-118 (an episode can overwrite canon files), all medium.
+- 2 are *missing*: G-107 (no series budget command) and G-121 (tests).
+- 1 is *dead*: G-113 (`direction`).
+
+## Deliberately left alone
+
+- Production code, the four skills, `series-status.md`, and ADRs 0016, 0025, 0026 and 0035, which are accepted.
+  ADR 0042 amends 0016. Only the glossary was corrected.
+- The canon files and their rules: the character slice. The episode's appended plates, props and states on the
+  episode budget and manifest (`stage-runner.md`) are noted there.
+- Cloud speech (ADR 0016 "not decided"): voices are generated locally.
+- `lipsync-audio.ts`, `separate_lead.py` and the echo scan: music-video logic.
+- `checkTakes` probing WAV lengths while `voice-track` trusts `takes.json`: an analyst's note, not checked.
+- The board's German UI strings in `board/production.js`: a UI locale, not domain.
+
+## Open hotspots
+
+None. HS-103 to HS-122 are resolved, four of them partly by the user's answers.
+
+## Next slice
+
+`character` per the adoption plan: the character library, style and character bibles, sets, plates and props –
+the canon files this slice reads and episodes append to.
+
+## Decision log
+
+| # | Decision | How | Written to |
+|---|---|---|---|
+| HS-111 | A changed reference voice makes a take stale | user (voices generated, 2026-11-22) and recommendation; medium | `AGG-TakeRegistry`, ADR 0042, G-112 |
+| HS-113 | German speech and English subtitles as they are; languages per series later | user (2026-11-22) and recommendation | glossary (Subtitles), ADR 0042, G-114 |
+| HS-121 | Only the agent writes `script.yaml` | user (2026-11-22) | `AGG-Script`, `CMD-ReviseScript` |
+| HS-103 | One context, Series | recommendation | `BC-Series` |
+| HS-104 | Four as-is aggregates | recommendation | `AGG-Series`, `AGG-Script`, `AGG-TakeRegistry`, `AGG-EpisodeTrack` |
+| HS-105 | Canon spend plus episode budgets fit, also for canon generations | recommendation; medium | `AGG-Series`, ADR 0042, G-105 |
+| HS-106 | Every series has a budget | recommendation | `AGG-Series`, glossary, G-106 |
+| HS-107 | `budget_usd` the source, `state.json` a copy; no budget command yet | recommendation, as HS-5 | `AGG-Series`, G-107 |
+| HS-108 | One episode per number; episodes outside the plan allowed | recommendation | `CMD-CreateEpisode`, G-109 |
+| HS-109 | Planned Episode; episode outside the plan | recommendation | glossary, G-110 |
+| HS-110 | A character without a reference voice is a canon gap unless every line is recorded | recommendation | glossary (Canon Gap), G-111 |
+| HS-112 | `direction` reaches the voice and the hash | recommendation | `AGG-TakeRegistry`, ADR 0042, G-113 |
+| HS-114 | The episode length is checked when the track is built | recommendation | `AGG-EpisodeTrack`, G-115 |
+| HS-115 | Take status and the series budget sum belong in core | recommendation | conventions, G-116 |
+| HS-116 | One `SubtitleCue` in core | recommendation | G-117 |
+| HS-117 | Episodes add to the canon and never overwrite it | recommendation; medium | `AGG-Series`, ADR 0042, G-118 |
+| HS-118 | Voice Track, Ambience, Take Registry, Take Status, Uncommitted Series Budget, Canon Gap, Planned Episode | recommendation | glossary |
+| HS-119 | A series is not a project | recommendation | glossary (Series) |
+| HS-120 | ADR 0042 | recommendation | `docs/adr/0042-series-and-episode-audio.md`, G-119 |
+| HS-122 | The commitment also holds when an episode budget changes; parallel creation unguarded | recommendation | `AGG-Series`, G-108 |

@@ -3,12 +3,13 @@
 > Recovered from code by `/adopt` on 2026-11-21 at b195086. This is **not a target**.
 > Target: [context-map.md](context-map.md) · Gap register: [gap-register.md](gap-register.md).
 
-Adopted slices: project and stage pipeline; human review; art-director verdicts and the generation queue (decided by recommendation); song timing and lyrics (decided by recommendation, four answers from the user); the storyboard (decided by recommendation, four answers from the user); generation and the provider adapters (decided by recommendation, four answers from the user). Other areas – release, series canon,
-character library, model bench – appear only as neighbours until their own slice is adopted.
+Adopted slices: project and stage pipeline; human review; art-director verdicts and the generation queue (decided by recommendation); song timing and lyrics (decided by recommendation, four answers from the user); the storyboard (decided by recommendation, four answers from the user); generation and the provider adapters (decided by recommendation, four answers from the user); series budget, script, takes and the episode track (decided by recommendation, four answers from the user). Other areas – release, the canon files and
+character library, render, model bench – appear only as neighbours until their own slice is adopted.
 
 ```mermaid
 flowchart LR
-  BC-Pipeline -->|reads canon, books canon spend separately| Series[Series canon - not adopted]
+  BC-Series -->|an episode is a project of kind episode with its own budget and stages| BC-Pipeline
+  BC-Series -->|reads characters, sets and reference voices; may add canon files| Canon
   BC-Review -->|open rounds come before the next autonomous stage; fixes reset qa-export| BC-Pipeline
   BC-Review -->|notes map to storyboard shots and timing sections| BC-Storyboard
   BC-Pipeline -->|done project feeds release| Release[Release - not adopted]
@@ -18,7 +19,10 @@ flowchart LR
   BC-Generation -->|cloud adapters: fal.ai, Higgsfield, Topview| Providers[Cloud providers - external]
   BC-Generation -->|tagged workflows on the user's GPU| ComfyUI[ComfyUI server - external]
   Bench[Model bench - not adopted] -->|own budget and manifest, same runBatch| BC-Generation
-  Series -->|voice track, canon references through runBatch| BC-Generation
+  BC-Series -->|takes and ambience through runBatch on the episode budget; canon generations on the series budget| BC-Generation
+  BC-Series -->|mix, stems, conversion, lip-sync segments| FFmpeg[FFmpeg - external]
+  BC-Series -->|episode track writes timing.json; overrides move sound and picture| BC-Timing
+  BC-Series -->|subtitle cues, episode.wav| Render
   BC-GenerationQueue -->|items built from storyboard shots and their references| BC-Storyboard
   BC-GenerationQueue -->|needs-fix count, failed verdicts| BC-Pipeline
   BC-Pipeline -->|audio-analysis stage runs the song analysis| BC-Timing
@@ -26,7 +30,7 @@ flowchart LR
   BC-Pipeline -->|storyboard stage, shared by both kinds| BC-Storyboard
   BC-Storyboard -->|refers to sets, plates, props, character states| Canon[Bibles and canon - not adopted]
   BC-Storyboard -->|resolved shots as render props| Render
-  BC-Storyboard -->|episode: scenes as sections, chat lines| Series
+  BC-Storyboard -->|episode: scenes as sections, chat lines, lip-sync limit| BC-Series
   BC-Timing -->|effective timing as render props| Render[Render - not adopted]
   BC-Review -->|sections and beats on the review timeline| BC-Timing
   BC-Timing -->|echo spans, lead stem for lip-sync segments| Lipsync[Lip-sync audio - not adopted]
@@ -199,3 +203,44 @@ Boundaries:
   `generate.ts` and the lip-sync fallback in `models.ts`. The provider list is kept five times (HS-100).
 - Readers of the manifest: the QA checker (cost sum equals recorded spend, `qa.ts:230-262`). The bench keeps its
   own manifest and budget (bench slice).
+
+### BC-Series – Series
+Purpose (as recovered, decided by recommendation HS-103): keeps a series' umbrella budget and episode plan and
+creates its episodes, and turns an episode's script into takes, an episode track with speaker stems, subtitles and
+lip-sync audio – the episode's replacement for the song (ADR 0016, ADR 0042 proposed).
+Core terms: Series, Series Budget, Uncommitted Series Budget, Episode Plan, Planned Episode, Creative Limit, Canon
+Gap, Episode, Script, Scene, Script Line, Speaker, Reference Voice, Take, Take Registry, Take Status, Ambience,
+Voice Track, Episode Track, Speaker Stem, Subtitles.
+Evidence:
+- the series `projects/<slug>/series.yaml` and `state.json` (`SeriesSchema`, `SeriesStateSchema`,
+  `packages/core/src/schema.ts:543-664`), loaded by `loadSeries` (`packages/core/src/project.ts:380-416`), created
+  by `new-series` (`packages/cli/src/new-series.ts:67-104`) and the board wizard (`POST /api/new/series`)
+- the series budget sum `seriesBudget` (`packages/cli/src/series.ts:43-74`), checked by `createProject` for an
+  episode (`packages/cli/src/new-project.ts:205-216`); canon generations through `seriesTarget`
+  (`packages/cli/src/generate.ts:260-277`); `series-status` and the board's series view (`series.ts:101-209`,
+  `board-production.ts:336-370`, `packages/core/src/production.ts:109-122`)
+- the script `script.yaml` (`ScriptSchema`, `schema.ts:587-657`) and its rules (`packages/core/src/episode.ts`),
+  checked by the hook (`packages/cli/src/validate-file.ts:134-145`)
+- the take registry `takes.json` (`TakesSchema`, `schema.ts:666-684`) with `audio/lines/` and `audio/ambience/`,
+  written by `voice-track` (`packages/cli/src/voice-track.ts`) and `import-takes` (`media.ts:395-460`); take status
+  in `takes.ts`
+- the episode track `episode-track` (`packages/cli/src/episode-track.ts`): `timing.json`, `audio/episode.wav`,
+  `audio/stems/<character>.wav`; subtitles `subtitles` (`subtitles.ts`, `renders/<slug>.en.srt`); lip-sync audio
+  `audio-segment --character` (`media.ts:75-136`)
+- the stages `setup`, `script`, `voice-track`, `episode-track` (`EPISODE_STAGES`, `packages/core/src/state.ts:102-151`)
+  and the skills `new-series`, `new-episode`, `voice-track`, `episode-track`
+Boundaries:
+- An episode is a project (BC-Pipeline): its stages, state and budget ledger are `AGG-Project`'s; this context adds
+  the series commitment at creation and the episode's audio.
+- The canon files – `characters.yaml`, `sets.yaml`, `style.yaml`, `bible.md` and references – are read here (sets,
+  speakers, reference voices, display rules) but belong to the character slice, not adopted. An episode may add
+  files to the canon; overwriting one is a gap (HS-117).
+- Takes, ambience and canon references are generated through `runBatch` (BC-Generation): takes on the episode
+  budget, canon generations on the series budget, which ignores episode budgets today (HS-105).
+- `episode-track` is the writer of an episode's `timing.json`; the overrides stay the user's and the merge and
+  check are BC-Timing's. Storyboard checks read the script's scenes, chat lines and the series' lip-sync limit.
+- Render reads `audio/episode.wav` and the subtitle cues; `SubtitleCue` is defined twice (HS-116). The lead-only
+  lip-sync audio of a music video (`lipsync-audio.ts`, ADR 0026) is not this context's.
+- Writers of `script.yaml`: the agent only (HS-121). Writers of `takes.json`: `voice-track` and `import-takes`. No
+  locks; one stage at a time.
+

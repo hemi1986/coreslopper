@@ -98,6 +98,33 @@ flowchart LR
         EVT_ModelRolesChanged["Model roles changed"]:::evt
         EVT_ComfyUIRestarted["ComfyUI restarted"]:::evt
     end
+    subgraph BC_Series["Series"]
+        CMD_RecordCanonSpend["Record canon spend"]:::cmd
+        CMD_CreateSeries["Create a series"]:::cmd
+        CMD_CreateEpisode["Create an episode"]:::cmd
+        CMD_WriteScript["Write the script"]:::cmd
+        CMD_ReviseScript["Revise the script"]:::cmd
+        CMD_ValidateScript["Validate the script"]:::cmd
+        CMD_GenerateTakes["Generate the takes"]:::cmd
+        CMD_ImportTakes["Import takes"]:::cmd
+        CMD_BuildEpisodeTrack["Build the episode track"]:::cmd
+        CMD_WriteSubtitles["Write subtitles"]:::cmd
+        CMD_CutLipSyncAudio["Cut lip-sync audio"]:::cmd
+        EVT_SeriesCreated["Series created"]:::evt
+        EVT_EpisodeCreated["⭐ Episode created"]:::evt
+        EVT_EpisodeRefused["Episode refused"]:::evt
+        EVT_CanonSpendRecorded["Canon spend recorded"]:::evt
+        EVT_ScriptWritten["Script written"]:::evt
+        EVT_ScriptRevised["Script revised"]:::evt
+        EVT_ScriptValidated["Script validated"]:::evt
+        EVT_TakeGenerated["Take generated"]:::evt
+        EVT_AmbienceGenerated["Ambience generated"]:::evt
+        EVT_TakeImported["Take imported"]:::evt
+        EVT_VoiceTrackStopped["Voice track stopped"]:::evt
+        EVT_EpisodeTrackBuilt["⭐ Episode track built"]:::evt
+        EVT_SubtitlesWritten["Subtitles written"]:::evt
+        EVT_LipSyncAudioCut["Lip-sync audio cut"]:::evt
+    end
     ACT_User(["User"]):::act
     ACT_Orchestrator(["Orchestrator"]):::act
     ACT_SetupSkill(["Setup skill"]):::act
@@ -108,6 +135,7 @@ flowchart LR
     EXT_Provider[["Generation provider"]]:::ext
     EXT_ComfyUI[["ComfyUI server"]]:::ext
     EXT_AudioModels[["Local audio models"]]:::ext
+    EXT_FFmpeg[["FFmpeg"]]:::ext
     POL_RunNextStage{{"Run the next autonomous stage"}}:::pol
     POL_HardStop{{"A hard stop fails the stage and halts the pipeline"}}:::pol
     POL_AnswerOpenRounds{{"Open review rounds are answered before the next autonomous stage"}}:::pol
@@ -117,6 +145,7 @@ flowchart LR
     POL_ValidateEveryStoryboardEdit{{"Every storyboard edit is validated"}}:::pol
     POL_RecordPlannedSpend{{"Every new generation is billed at its planned cost"}}:::pol
     POL_RestartComfyUIOnFailure{{"A failed local generation restarts ComfyUI before the next try"}}:::pol
+    POL_ValidateEveryScriptEdit{{"Every script edit is validated"}}:::pol
     RM_Status[("Status")]:::rm
     RM_NextAction[("Next action")]:::rm
     RM_ProductionView[("Production view")]:::rm
@@ -133,6 +162,9 @@ flowchart LR
     RM_Manifest[("Manifest")]:::rm
     RM_GenerationEstimate[("Generation estimate")]:::rm
     RM_ComfyUIStatus[("ComfyUI status")]:::rm
+    RM_SeriesStatus[("Series status")]:::rm
+    RM_TakeStatus[("Take status")]:::rm
+    RM_Subtitles[("Subtitles")]:::rm
     ACT_SetupSkill --> CMD_CreateProject
     CMD_CreateProject --> EVT_ProjectCreated
     ACT_Orchestrator --> CMD_StartStage
@@ -216,6 +248,31 @@ flowchart LR
     CMD_ChangeModelRoles --> EVT_ModelRolesChanged
     ACT_QueueRun --> CMD_RestartComfyUI
     CMD_RestartComfyUI --> EVT_ComfyUIRestarted
+    ACT_SetupSkill --> CMD_RecordCanonSpend
+    CMD_RecordCanonSpend --> EVT_CanonSpendRecorded
+    ACT_SetupSkill --> CMD_CreateSeries
+    CMD_CreateSeries --> EVT_SeriesCreated
+    ACT_SetupSkill --> CMD_CreateEpisode
+    CMD_CreateEpisode --> EVT_EpisodeCreated
+    CMD_CreateEpisode --> EVT_EpisodeRefused
+    ACT_SetupSkill --> CMD_WriteScript
+    CMD_WriteScript --> EVT_ScriptWritten
+    ACT_Orchestrator --> CMD_ReviseScript
+    CMD_ReviseScript --> EVT_ScriptRevised
+    ACT_StageRunner --> CMD_ValidateScript
+    CMD_ValidateScript --> EVT_ScriptValidated
+    ACT_StageRunner --> CMD_GenerateTakes
+    CMD_GenerateTakes --> EVT_TakeGenerated
+    CMD_GenerateTakes --> EVT_AmbienceGenerated
+    CMD_GenerateTakes --> EVT_VoiceTrackStopped
+    ACT_User --> CMD_ImportTakes
+    CMD_ImportTakes --> EVT_TakeImported
+    ACT_StageRunner --> CMD_BuildEpisodeTrack
+    CMD_BuildEpisodeTrack --> EVT_EpisodeTrackBuilt
+    ACT_StageRunner --> CMD_WriteSubtitles
+    CMD_WriteSubtitles --> EVT_SubtitlesWritten
+    ACT_StageRunner --> CMD_CutLipSyncAudio
+    CMD_CutLipSyncAudio --> EVT_LipSyncAudioCut
     EVT_StageCompleted --> POL_RunNextStage
     EVT_StageSkipped --> POL_RunNextStage
     POL_RunNextStage --> CMD_StartStage
@@ -234,8 +291,12 @@ flowchart LR
     POL_ValidateEveryStoryboardEdit --> CMD_ValidateStoryboard
     EVT_GenerationCompleted --> POL_RecordPlannedSpend
     POL_RecordPlannedSpend --> CMD_RecordSpend
+    POL_RecordPlannedSpend --> CMD_RecordCanonSpend
     EVT_GenerationFailed --> POL_RestartComfyUIOnFailure
     POL_RestartComfyUIOnFailure --> CMD_RestartComfyUI
+    EVT_ScriptWritten --> POL_ValidateEveryScriptEdit
+    EVT_ScriptRevised --> POL_ValidateEveryScriptEdit
+    POL_ValidateEveryScriptEdit --> CMD_ValidateScript
     EVT_StageStarted -.-> RM_Status
     EVT_StageCompleted -.-> RM_Status
     EVT_StageFailed -.-> RM_Status
@@ -321,6 +382,19 @@ flowchart LR
     EVT_ComfyUIRestarted -.-> RM_ComfyUIStatus
     RM_ComfyUIStatus -.-> ACT_StageRunner
     RM_ComfyUIStatus -.-> ACT_User
+    EVT_SeriesCreated -.-> RM_SeriesStatus
+    EVT_EpisodeCreated -.-> RM_SeriesStatus
+    EVT_CanonSpendRecorded -.-> RM_SeriesStatus
+    RM_SeriesStatus -.-> ACT_User
+    RM_SeriesStatus -.-> ACT_SetupSkill
+    EVT_TakeGenerated -.-> RM_TakeStatus
+    EVT_AmbienceGenerated -.-> RM_TakeStatus
+    EVT_TakeImported -.-> RM_TakeStatus
+    EVT_ScriptRevised -.-> RM_TakeStatus
+    RM_TakeStatus -.-> ACT_StageRunner
+    RM_TakeStatus -.-> ACT_User
+    EVT_SubtitlesWritten -.-> RM_Subtitles
+    RM_Subtitles -.-> ACT_User
     classDef evt fill:#a3391f,stroke:#e65100,color:#fff
     classDef cmd fill:#64b5f6,stroke:#0d47a1,color:#000
     classDef pol fill:#ce93d8,stroke:#4a148c,color:#000
@@ -525,6 +599,70 @@ flowchart LR
     classDef hs fill:#e57373,stroke:#b71c1c,color:#fff
 ```
 
+### From a series to a created episode
+
+```mermaid
+flowchart LR
+    ACT_SetupSkill(["Setup skill"]):::act
+    CMD_CreateSeries["Create a series"]:::cmd
+    EVT_SeriesCreated["Series created"]:::evt
+    CMD_CreateEpisode["Create an episode"]:::cmd
+    EVT_EpisodeCreated["⭐ Episode created"]:::evt
+    RM_SeriesStatus[("Series status")]:::rm
+    ACT_SetupSkill --> CMD_CreateSeries
+    CMD_CreateSeries --> EVT_SeriesCreated
+    EVT_SeriesCreated --> CMD_CreateEpisode
+    CMD_CreateEpisode --> EVT_EpisodeCreated
+    EVT_EpisodeCreated --> RM_SeriesStatus
+    classDef evt fill:#a3391f,stroke:#e65100,color:#fff
+    classDef cmd fill:#64b5f6,stroke:#0d47a1,color:#000
+    classDef pol fill:#ce93d8,stroke:#4a148c,color:#000
+    classDef rm fill:#81c784,stroke:#1b5e20,color:#000
+    classDef act fill:#a3751f,stroke:#f57f17,color:#000
+    classDef ext fill:#f48fb1,stroke:#880e4f,color:#000
+    classDef agg fill:#ffe082,stroke:#ff6f00,color:#000
+    classDef hs fill:#e57373,stroke:#b71c1c,color:#fff
+```
+
+### From the script to the episode track
+
+```mermaid
+flowchart LR
+    ACT_SetupSkill(["Setup skill"]):::act
+    CMD_WriteScript["Write the script"]:::cmd
+    EVT_ScriptWritten["Script written"]:::evt
+    POL_ValidateEveryScriptEdit{{"Every script edit is validated"}}:::pol
+    CMD_ValidateScript["Validate the script"]:::cmd
+    EVT_ScriptValidated["Script validated"]:::evt
+    ACT_StageRunner(["Stage runner"]):::act
+    CMD_GenerateTakes["Generate the takes"]:::cmd
+    EVT_TakeGenerated["Take generated"]:::evt
+    CMD_BuildEpisodeTrack["Build the episode track"]:::cmd
+    EVT_EpisodeTrackBuilt["⭐ Episode track built"]:::evt
+    CMD_WriteSubtitles["Write subtitles"]:::cmd
+    EVT_SubtitlesWritten["Subtitles written"]:::evt
+    ACT_SetupSkill --> CMD_WriteScript
+    CMD_WriteScript --> EVT_ScriptWritten
+    EVT_ScriptWritten --> POL_ValidateEveryScriptEdit
+    POL_ValidateEveryScriptEdit --> CMD_ValidateScript
+    CMD_ValidateScript --> EVT_ScriptValidated
+    EVT_ScriptValidated --> ACT_StageRunner
+    ACT_StageRunner --> CMD_GenerateTakes
+    CMD_GenerateTakes --> EVT_TakeGenerated
+    EVT_TakeGenerated --> CMD_BuildEpisodeTrack
+    CMD_BuildEpisodeTrack --> EVT_EpisodeTrackBuilt
+    EVT_EpisodeTrackBuilt --> CMD_WriteSubtitles
+    CMD_WriteSubtitles --> EVT_SubtitlesWritten
+    classDef evt fill:#a3391f,stroke:#e65100,color:#fff
+    classDef cmd fill:#64b5f6,stroke:#0d47a1,color:#000
+    classDef pol fill:#ce93d8,stroke:#4a148c,color:#000
+    classDef rm fill:#81c784,stroke:#1b5e20,color:#000
+    classDef act fill:#a3751f,stroke:#f57f17,color:#000
+    classDef ext fill:#f48fb1,stroke:#880e4f,color:#000
+    classDef agg fill:#ffe082,stroke:#ff6f00,color:#000
+    classDef hs fill:#e57373,stroke:#b71c1c,color:#fff
+```
+
 ## Bounded Contexts & Aggregates
 
 | Context | Purpose | Aggregates | Events |
@@ -535,6 +673,7 @@ flowchart LR
 | Timing (`BC-Timing`) | Turns the user's song and lyrics into a measured timing, merges the user's timing overrides into the effective timing, and resolves symbolic anchors to seconds for every later stage | Project timing, Lyrics | Song imported, Song loudness normalized, Lyrics written, Song analyzed, Lead stem separated, Timing overridden |
 | Storyboard (`BC-Storyboard`) | Turns the treatment or script, the effective timing and the bibles into an ordered list of shots that covers the song or episode track, checks every shot's source, continuity references and limits, and hands resolved shots to the queue, render, QA and review | Storyboard | Storyboard written, Storyboard revised, Storyboard validated, Contact sheet written |
 | Generation (`BC-Generation`) | Turns the items of a generation batch into provider calls for a model role – each refused up front when the batch does not fit the budget, served from the generation cache when the same request ran before, recorded in the manifest, and billed to the project budget at its planned cost | Cached generation, Model roles | Generation batch refused, Generation completed, Generation reused from the cache, Generation failed, Clip restored, Generation filed, Model roles changed, ComfyUI restarted |
+| Series (`BC-Series`) | Keeps a series' umbrella budget and episode plan and creates its episodes, and turns an episode's script into takes, an episode track with speaker stems, subtitles and lip-sync audio – the episode's replacement for the song | Series, Script, Take registry, Episode track | Series created, Episode created, Episode refused, Canon spend recorded, Script written, Script revised, Script validated, Take generated, Ambience generated, Take imported, Voice track stopped, Episode track built, Subtitles written, Lip-sync audio cut |
 
 ## Aggregates
 
@@ -548,3 +687,7 @@ flowchart LR
 | Storyboard (`AGG-Storyboard`) | Storyboard | as-is | storyboard.yaml per project is parsed whole with StoryboardSchema, only by loadProject (packages/core/src/project.ts:242-243)<br>resolveStoryboard checks all shots together – unique ids, order, coverage, chaining – against the effective timing and the bibles, in one call whose only caller is validateProject (packages/core/src/timing.ts:455-577; packages/cli/src/validate.ts:106)<br>the hook validates the whole project on every edit of storyboard.yaml and blocks a failing edit (workspace/.claude/hooks/validate-artifacts.mjs:13-15; packages/cli/src/validate-file.ts:124-127) |
 | Cached generation (`AGG-CachedGeneration`) | Generation | as-is | one record per cache key, .cache/generations/<key>/result.json with the provider's files, shared by every project and series of the workspace (packages/providers/src/runner.ts:86-87,167-195; packages/cli/src/generate.ts:711)<br>the key is the SHA-256 of the canonical request – operation, provider, model, prompt, negative prompt, seed, size, duration, params, each reference's path and content hash, the audio hash and start, the workflow fingerprint (runner.ts:53-84; packages/core/src/hash.ts:25-45)<br>runBatch is the one path every generation takes – generate, the queue, region patches, the voice track and the bench (generate.ts:667-672; queue.ts:628; patch.ts:96; voice-track.ts:137,191; bench.ts:577,634,675) |
 | Model roles (`AGG-ModelRoles`) | Generation | as-is | config/models.yaml is parsed whole with ModelsConfigSchema on every batch and estimate (packages/core/src/schema.ts:714-762; packages/cli/src/generate.ts:678)<br>resolveModelRole and providerForRole pick a role's model, params and price for the project's provider in one place (packages/core/src/models.ts:26-98) |
+| Series (`AGG-Series`) | Series | as-is | series.yaml and state.json of projects/<slug>/, loaded together by loadSeries (packages/core/src/project.ts:380-416), created together by new-series (packages/cli/src/new-series.ts:67-104)<br>the uncommitted series budget is computed in one place from the series state and the project.yaml of every episode that names the series (packages/cli/src/series.ts:43-74) and checked by createProject for the CLI and the board wizard (packages/cli/src/new-project.ts:205-216; board-wizard.ts:394)<br>canon generations are booked in the series' own state.json and manifest (packages/cli/src/generate.ts:260-277) |
+| Script (`AGG-Script`) | Series | as-is | script.yaml of an episode, parsed whole with ScriptSchema by loadProject (packages/core/src/project.ts:262; schema.ts:587-657)<br>validateScript checks the whole script against the series canon and throws one error listing every issue (packages/core/src/episode.ts:59-104); the workspace hook runs it on every edit (packages/cli/src/validate-file.ts:134-145) |
+| Take registry (`AGG-TakeRegistry`) | Series | as-is | takes.json of an episode, written whole and sorted by saveTakes (packages/cli/src/takes.ts:51-57); its writers are voice-track and import-takes (packages/cli/src/voice-track.ts:99-200; media.ts:395-460)<br>every take's status follows from its file, the registered file hash and the text hash of its script line (takes.ts:65-87; packages/core/src/episode.ts:139-153) |
+| Episode track (`AGG-EpisodeTrack`) | Series | as-is | episodeTrack places the lines from the take durations and writes timing.json, timing.effective.json, audio/episode.wav and audio/stems/<character>.wav together in one run from the effective timing (packages/cli/src/episode-track.ts:148-253) |
