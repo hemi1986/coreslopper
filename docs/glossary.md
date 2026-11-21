@@ -204,8 +204,12 @@ _Avoid_: posting plan, cadence
 `review/calendar.yaml`: when what goes online where for one project, planned in the next free slots of the release schedule without colliding with other projects. Each entry is an event with an id, a time, a platform, and a step.
 _Avoid_: release plan (the plan is the calendar's table in the release folder), timeline
 
+**Board**:
+The workspace's local page (`board`). Its **production view** shows every project and series as the pipeline leaves them, with the next command for Claude Code; its release view is the release board.
+_Avoid_: dashboard, studio
+
 **Release Board**:
-The local page `release-board` serves over all release folders: per platform the posts with files, texts, limits, and settings, the calendar of all projects, and the user's done state and live URLs in `review/release-status.json`.
+The board's release view over all release folders: per platform the posts with files, texts, limits, and settings, the calendar of all projects, and the user's done state and live URLs in `review/release-status.json`.
 _Avoid_: dashboard, CMS
 
 **Release Approval**:
@@ -215,6 +219,10 @@ _Avoid_: go-live, publish (the **Publish** command uploads privately)
 **Release Autopilot**:
 `release-run`, started by a timer every few minutes: for an approved release it posts each calendar event that a platform API can post, at the event's time, and leaves the rest to the user. A post it cannot be sure about waits for the user instead of going out twice.
 _Avoid_: scheduler, bot, cron job
+
+**Watchdog**:
+The round `watch` runs every few minutes (the board container or `release-timer`): the release autopilot, then the production scan, which records stage, render, queue, and budget events and **stalled** stages (running, but no file changed for an hour) for the board. It reads and records; it never changes a stage or starts Claude Code.
+_Avoid_: monitor, daemon, supervisor
 
 **Autopilot Log**:
 `review/autopilot.json`: one entry per autopilot step on a calendar event (running, posted, uploaded, scheduled, draft, failed) and the user's retry and force marks.
@@ -358,9 +366,17 @@ _Avoid_: boilerplate
 The final step that produces all format renders, the review report, and the release package; also the optional extraction of a project into its own repository.
 _Avoid_: render
 
+**User Reference**:
+Material the user hands over for the grilling and the bibles: mood boards, photos of people, places, their own storyboards, video concepts, footage, voice recordings, and links. Listed in `references.yaml` of a project or series canon (kind, subject, note), with the files in `assets/references/`; added in the board's wizard or with `reference add|link`. Not to be confused with the generated references of characters, sets, and props.
+_Avoid_: moodboard (one kind of it), input files
+
 **Review Note**:
-A user's free-text remark on one frame of a render, saved by the review player in `review/notes/<video-stem>.json` with its frame and time.
+A user's free-text remark on one frame or a range of frames of a render, saved by the board's review view or the desktop review player in `review/notes/<video-stem>.json` with its frame and time. A note without a round is a draft.
 _Avoid_: annotation, comment, feedback
+
+**Review Round**:
+The draft notes of one render that the user sent to the agent in one click, frozen in `review/rounds/<NNN>.json` with each note's shots and section. The agent answers every note in `<NNN>.replies.json` (`fixed`, `partly`, `not-fixed`, `question`); until then the round is open and `/video-next` works on it first.
+_Avoid_: ticket, feedback batch, review pass
 
 ## Series and episodes
 

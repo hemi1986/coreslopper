@@ -216,6 +216,8 @@ export function findSourceAudio(dir: string, stem: 'song' | 'vocals'): string | 
 export interface ImportSongOptions {
   song?: string;
   vocals?: string;
+  /** Where warnings go (default: the console). */
+  warn?: (message: string) => void;
 }
 
 /** Convert an audio file to a 48 kHz WAV with the given channel count. */
@@ -249,6 +251,7 @@ function toWav(ffmpeg: string, source: string, destination: string): void {
  */
 export async function importSong(projectDir: string, options: ImportSongOptions = {}): Promise<void> {
   const ffmpeg = resolveBinary('ffmpeg');
+  const warn = options.warn ?? ((message: string) => console.warn(message));
   const project = await loadProject(projectDir);
   const audioDir = join(project.paths.root, 'audio');
   const stemsDir = join(audioDir, 'stems');
@@ -273,12 +276,10 @@ export async function importSong(projectDir: string, options: ImportSongOptions 
     toWav(ffmpeg, vocals, vocalsWav);
     const vocalsDuration = probeDuration(vocalsWav);
     if (Math.abs(vocalsDuration - duration) > 0.5) {
-      console.warn(
-        `Warning: the vocal stem is ${vocalsDuration.toFixed(2)} s, the song ${duration.toFixed(2)} s. Export both from the same session so they line up.`,
-      );
+      warn(`Warning: the vocal stem is ${vocalsDuration.toFixed(2)} s, the song ${duration.toFixed(2)} s. Export both from the same session so they line up.`);
     }
   } else {
-    console.warn(`No vocal stem at ${vocalsWav}; audio analysis will separate vocals with Demucs.`);
+    warn(`No vocal stem at ${vocalsWav}; audio analysis will separate vocals with Demucs.`);
   }
 
   let existing: Record<string, unknown> = {};

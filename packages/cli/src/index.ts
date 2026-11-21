@@ -349,17 +349,49 @@ program
   );
 
 program
-  .command('release-board')
+  .command('board')
+  .alias('release-board')
   .description(
-    'Open the release board: a local page with every project\'s release package per platform (files, texts to copy, limits, ' +
-      'settings, links), the release calendar of all projects, and checkboxes for what is posted (review/release-status.json).',
+    'Open the board: a local page over the workspace. Production shows every project and series (stages, budget, queue, ' +
+      'reviews, renders, and the next command for Claude Code); release shows each release package per platform (files, ' +
+      'texts to copy, limits, settings, links), the release calendar of all projects, and what is posted (review/release-status.json).',
   )
-  .option('--port <n>', 'Port on 127.0.0.1', (value) => Number(value), 4848)
-  .action((options: { port: number }) =>
+  .option('--port <n>', 'Port', (value) => Number(value), 4848)
+  .option('--host <address>', 'Address to listen on; 0.0.0.0 only inside a container whose port is published to 127.0.0.1', '127.0.0.1')
+  .option('--watch <minutes>', 'Also run the watchdog round (release-run and the production scan) every N minutes, as the container does', (value) => Number(value))
+  .action((options: { port: number; host: string; watch?: number }) =>
     run(async () => {
       const { startBoard } = await import('./release-board.js');
-      const { url } = await startBoard({ root: repoRoot(), port: options.port });
-      console.log(`Release board: ${url}  (Ctrl+C to stop)`);
+      const { url } = await startBoard({ root: repoRoot(), port: options.port, host: options.host });
+      console.log(`Board: ${url.replace('://0.0.0.0:', '://127.0.0.1:')}  (Ctrl+C to stop)`);
+      if (options.watch !== undefined) {
+        if (!(options.watch >= 1)) throw new ValidationError('--watch takes minutes, at least 1');
+        const { watchLoop } = await import('./production-watch.js');
+        watchLoop({ root: repoRoot(), everyMinutes: options.watch });
+        console.log(`Watchdog: a round every ${options.watch} minute(s); do not also run release-timer.`);
+      }
+      await new Promise(() => undefined);
+    }),
+  );
+
+program
+  .command('watch')
+  .description(
+    'One watchdog round: the release autopilot (release-run) and the production scan, which records stage, render, queue, and budget ' +
+      'events and stalled stages in .cache/watch/ for the board. Run by the timer or the board container; never by a pipeline stage.',
+  )
+  .option('--every <minutes>', 'Keep running and start a round every N minutes', (value) => Number(value))
+  .option('--no-autopilot', 'Only the production scan')
+  .action((options: { every?: number; autopilot: boolean }) =>
+    run(async () => {
+      const { watchLoop, watchRound } = await import('./production-watch.js');
+      if (options.every === undefined) {
+        const { errors } = await watchRound({ root: repoRoot(), autopilot: options.autopilot, every: Number(process.env.CORESLOPPER_TIMER_EVERY) || undefined });
+        if (errors.length) process.exitCode = 1;
+        return;
+      }
+      if (!(options.every >= 1)) throw new ValidationError('--every takes minutes, at least 1');
+      watchLoop({ root: repoRoot(), everyMinutes: options.every });
       await new Promise(() => undefined);
     }),
   );
@@ -405,7 +437,7 @@ program
 
 program
   .command('release-timer [action]')
-  .description('The timer that runs release-run: show (default) | install | remove | status. WSL: Windows Task Scheduler; Linux: systemd user timer; macOS: launchd.')
+  .description('The timer that runs the watchdog round (watch: release-run and the production scan): show (default) | install | remove | status. WSL: Windows Task Scheduler; Linux: systemd user timer; macOS: launchd. Not needed when the board container runs.')
   .option('--every <minutes>', 'Minutes between runs', (value) => Number(value), 5)
   .action((action: string | undefined, options: { every: number }) =>
     run(async () => {
@@ -552,6 +584,62 @@ async function loadAndSave(project: string | undefined) {
   const loaded = await loadProject(projectDir);
   return { loaded, projectDir };
 }
+
+program
+  .command('lyrics <project>')
+  .description('Write lyrics.txt from a file, once every sung line sits under a section tag; --propose prints tags for untagged lyrics instead (blocks that repeat become [Chorus]).')
+  .requiredOption('--file <path>', 'The lyrics as plain text')
+  .option('--propose', 'Print the lyrics with proposed section tags and the section list; write nothing')
+  .action((project: string, options: { file: string; propose?: boolean }) =>
+    run(async () => {
+      const { readFile } = await import('node:fs/promises');
+      const text = await readFile(options.file, 'utf8');
+      if (options.propose) {
+        const { lyricsSections, proposeTags } = await import('@coreslopper/core');
+        const tagged = proposeTags(text);
+        console.log(tagged);
+        for (const section of lyricsSections(tagged).sections) console.log(`[${section.tag}] ${section.lines[0] ?? ''}`);
+        return;
+      }
+      const { writeLyrics } = await import('./board-wizard.js');
+      await writeLyrics(projectDirFromArg(project), text);
+      console.log('✔ lyrics.txt written');
+    }),
+  );
+
+program
+  .command('reference <action> [target]')
+  .description('The user\'s references of a project or series canon (references.yaml, files in assets/references/): list | add --file | link --url | remove --id. Kinds: look, character, location, storyboard, concept, footage, voice, other.')
+  .option('--series', 'The target is a series canon, not a project')
+  .option('--file <path>', 'add: the file to copy in')
+  .option('--url <url>', 'link: the address')
+  .option('--title <title>', 'link: a title')
+  .option('--kind <kind>', 'What it is', 'other')
+  .option('--subject <text>', 'Who or what it shows')
+  .option('--note <text>', 'What the user wants from it')
+  .option('--id <id>', 'remove: the reference id')
+  .action((action: string, target: string | undefined, options: { series?: boolean; file?: string; url?: string; title?: string; kind: string; subject?: string; note?: string; id?: string }) =>
+    run(async () => {
+      const wizard = await import('./board-wizard.js');
+      const dir = options.series ? seriesDirFromArg(target ?? '.') : projectDirFromArg(target);
+      const which = validateChoice(action, ['list', 'add', 'link', 'remove'] as const, 'action');
+      if (which === 'add') {
+        if (!options.file) throw new ValidationError('add needs --file <path>');
+        const reference = await wizard.addReferenceFromPath(dir, options.file, { kind: options.kind, subject: options.subject, note: options.note });
+        console.log(`✔ ${reference.id} ${reference.file}`);
+      } else if (which === 'link') {
+        const reference = await wizard.addReferenceLink(dir, { url: options.url, title: options.title, kind: options.kind, subject: options.subject, note: options.note });
+        console.log(`✔ ${reference.id} ${reference.url}`);
+      } else if (which === 'remove') {
+        await wizard.removeReference(dir, options.id);
+        console.log(`✔ ${options.id} removed`);
+      } else {
+        for (const reference of (await wizard.loadReferences(dir)).references) {
+          console.log(`${reference.id}  ${reference.kind.padEnd(10)} ${reference.file ?? reference.url}${reference.subject ? `  · ${reference.subject}` : ''}${reference.note ? `  · ${reference.note}` : ''}`);
+        }
+      }
+    }),
+  );
 
 program
   .command('stage-start <project> <stage>')

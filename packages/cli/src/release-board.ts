@@ -1,20 +1,26 @@
 import { createReadStream, existsSync } from 'node:fs';
-import { readFile, readdir, stat } from 'node:fs/promises';
+import { readFile, readdir, rm, stat } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ValidationError, calendarIcs, loadChannel, repoRoot, type ReleaseCalendar } from '@coreslopper/core';
 import { boardProject, type BoardProject } from './release-board-data.js';
+import { loadEvents, loadSnapshot } from './production-watch.js';
+import { editNote, reviewData, submitRound } from './board-review.js';
+import { SLUG, productionDetail, productionOverview, productionSeries, projectDirs, seriesDirs } from './board-production.js';
 import { loadCalendar, updateStatus } from './release-calendar.js';
 import { releaseDir } from './release.js';
 
-// The release board: a local web page over every project's release folder.
-// Per platform it shows which file goes where, the texts to paste with their
-// limits, the settings to check, and the calendar; the user ticks off what is
-// posted and enters the live URL, which lands in review/release-status.json.
-// Bound to 127.0.0.1 only; it reads the release folders and writes the
-// status files, the approval, and the autopilot's retry and takeover marks
-// (and, on approval of a proposed date, release.release_date in project.yaml).
+// The board: a local web page over the workspace. Its production view shows
+// every project and series as the pipeline leaves them (stages, budget,
+// queue, reviews, renders, the next command for Claude Code). Its release
+// view shows, per platform, which file goes where, the texts to paste with
+// their limits, the settings to check, and the calendar; the user ticks off
+// what is posted and enters the live URL, which lands in
+// review/release-status.json. Writes come only from its own page (see
+// trustedWrite): the status files, the approval, and the autopilot's retry and
+// takeover marks (and, on approval of a proposed date,
+// release.release_date in project.yaml).
 
 export interface BoardOptions {
   /** The workspace (or repository) root; projects live in its projects/. */
@@ -47,9 +53,21 @@ const MIME: Record<string, string> = {
   '.srt': 'text/plain; charset=utf-8',
   '.md': 'text/plain; charset=utf-8',
   '.ics': 'text/calendar; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.yaml': 'text/plain; charset=utf-8',
+  '.yml': 'text/plain; charset=utf-8',
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
 };
 
-const SLUG = /^[a-z0-9][a-z0-9-]*$/;
+/** What the board serves from a project, relative to the project: its media folders and its documents. */
+const PROJECT_FILES = /^(renders|review|assets|characters|sets|props)\/|^(brief\.md|treatment\.md|storyboard\.md|timing\.report\.md|lyrics\.txt|script\.yaml)$/;
+/** What the board serves from a series canon. */
+const SERIES_FILES = /^(characters|sets|props|assets|review)\/|^(bible\.md)$/;
+/** The page's own files in ./board/. */
+const PAGE_FILE = /^[a-z][a-z0-9-]*\.(js|css)$/;
+const pageDir = fileURLToPath(new URL('./board/', import.meta.url));
 
 /** Project directories of the workspace that have a release folder or a calendar. */
 export async function boardProjectDirs(root: string): Promise<string[]> {
@@ -89,19 +107,28 @@ const LOOPBACK_HOST = /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/i;
  * Origin of that same host when the browser sends one, and a JSON body
  * (which a cross-site page cannot send without a preflight the board never answers).
  */
-export function trustedWrite(req: Pick<IncomingMessage, 'headers'>): string | undefined {
+export function trustedWrite(req: Pick<IncomingMessage, 'headers'>, upload = false): string | undefined {
   const host = req.headers.host ?? '';
   if (!LOOPBACK_HOST.test(host)) return 'writes are accepted from the board on 127.0.0.1 only';
   const origin = req.headers.origin;
   if (origin !== undefined && origin !== `http://${host}`) return 'writes are accepted from the board page only';
   const site = req.headers['sec-fetch-site'];
   if (site !== undefined && site !== 'same-origin' && site !== 'none') return 'writes are accepted from the board page only';
+  // An upload is a raw file body, which a cross-site page cannot send without a preflight either; it must name its origin.
+  if (upload) {
+    if (origin === undefined) return 'uploads are accepted from the board page only';
+    if (!/^application\/octet-stream\b/i.test(req.headers['content-type'] ?? '')) return 'uploads need content-type application/octet-stream';
+    return undefined;
+  }
   if (!/^application\/json\b/i.test(req.headers['content-type'] ?? '')) return 'writes need content-type application/json';
   return undefined;
 }
 
 /** Serve a file of a release folder, with byte ranges so videos seek. */
 async function serveMedia(req: IncomingMessage, res: ServerResponse, base: string, rel: string): Promise<void> {
+  // Served files are data, never a page that runs: an SVG or HTML file opened from here gets no scripts.
+  res.setHeader('x-content-type-options', 'nosniff');
+  res.setHeader('content-security-policy', "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'; sandbox");
   const target = resolve(base, rel);
   if (!target.startsWith(resolve(base) + sep)) return send(res, 403, 'forbidden', 'text/plain');
   const info = await stat(target).catch(() => undefined);
@@ -137,6 +164,89 @@ export function boardHandler(options: BoardOptions = {}) {
     refreshing.set(dir, next);
     return next;
   };
+  const workspaceDir = async (list: (root: string) => Promise<string[]>, slug: string, what: string) => {
+    const dir = SLUG.test(slug) ? (await list(root)).find((entry) => entry.split(sep).at(-1) === slug) : undefined;
+    if (!dir) throw new ValidationError(`unknown ${what} ${slug}`);
+    return dir;
+  };
+  const scopeDir = (scope: string, slug: string) =>
+    scope === 'series' ? workspaceDir(seriesDirs, slug, 'series') : workspaceDir(projectDirs, slug, 'project');
+  /** The wizard for new projects, series, and episodes; true when it answered the request. */
+  const wizardRoute = async (req: IncomingMessage, res: ServerResponse, path: string, query: URLSearchParams): Promise<boolean> => {
+    const wizard = await import('./board-wizard.js');
+    const answer = (value: unknown) => {
+      json(res, value);
+      return true;
+    };
+    if (req.method === 'GET' && path === '/api/new/options') return answer(await wizard.wizardOptions(root));
+    if (req.method === 'POST' && path === '/api/new/video') {
+      const dir = await wizard.createVideoProject(root, (await body(req)) as never);
+      return answer({ slug: dir.split(sep).at(-1) });
+    }
+    if (req.method === 'POST' && path === '/api/new/series') {
+      const dir = await wizard.createSeriesCanon(root, (await body(req)) as never);
+      return answer({ slug: dir.split(sep).at(-1) });
+    }
+    if (req.method === 'POST' && path === '/api/new/episode') {
+      const dir = await wizard.createEpisode(root, (await body(req)) as never);
+      return answer({ slug: dir.split(sep).at(-1) });
+    }
+    const videoMatch = /^\/api\/new\/video\/([^/]+)(?:\/(lyrics|finish))?$/.exec(path);
+    if (videoMatch) {
+      const dir = await scopeDir('project', videoMatch[1]!);
+      if (req.method === 'GET' && !videoMatch[2]) return answer(await wizard.videoWizardState(dir));
+      if (req.method === 'POST' && videoMatch[2] === 'lyrics') {
+        const change = (await body(req)) as { text?: unknown; preview?: unknown };
+        if (change.preview) {
+          const { lyricsSections, proposeTags } = await import('@coreslopper/core');
+          const text = proposeTags(typeof change.text === 'string' ? change.text : '');
+          return answer({ text, ...lyricsSections(text) });
+        }
+        await wizard.writeLyrics(dir, change.text);
+        return answer(await wizard.videoWizardState(dir));
+      }
+      if (req.method === 'POST' && videoMatch[2] === 'finish') {
+        await wizard.finishSetup(dir);
+        return answer(await wizard.videoWizardState(dir));
+      }
+    }
+    const referencesMatch = /^\/api\/new\/(project|series)\/([^/]+)\/references$/.exec(path);
+    if (referencesMatch) {
+      const dir = await scopeDir(referencesMatch[1]!, referencesMatch[2]!);
+      if (req.method === 'GET') return answer(await wizard.loadReferences(dir));
+      if (req.method === 'POST') {
+        const change = (await body(req)) as Record<string, unknown>;
+        if (change.action === 'link') await wizard.addReferenceLink(dir, change as never, now());
+        else if (change.action === 'update') await wizard.updateReference(dir, change.id, change as never);
+        else if (change.action === 'delete') await wizard.removeReference(dir, change.id);
+        else throw new ValidationError('action must be link, update, or delete');
+        return answer(await wizard.loadReferences(dir));
+      }
+    }
+    const uploadMatch = /^\/api\/upload\/(project|series)\/([^/]+)\/(song|vocals|reference)$/.exec(path);
+    if (req.method === 'POST' && uploadMatch) {
+      const [, scope, slug, target] = uploadMatch as unknown as [string, 'project' | 'series', string, 'song' | 'vocals' | 'reference'];
+      const dir = await scopeDir(scope, slug);
+      const name = query.get('name') ?? '';
+      if (target === 'reference') {
+        const file = await wizard.referenceTarget(dir, name);
+        await wizard.receiveUpload(req, file, wizard.UPLOAD_LIMITS.reference.bytes);
+        try {
+          const reference = await wizard.recordReferenceFile(dir, file, name.slice(0, 300), { kind: query.get('kind'), subject: query.get('subject'), note: query.get('note') }, now());
+          return answer(reference);
+        } catch (error) {
+          await rm(file, { force: true });
+          throw error;
+        }
+      }
+      if (scope !== 'project') throw new ValidationError('a series has no song');
+      const file = await wizard.audioTarget(dir, target, name);
+      await wizard.receiveUpload(req, file, wizard.UPLOAD_LIMITS.audio.bytes);
+      const { warnings } = await wizard.importUploadedSong(dir);
+      return answer({ ...(await wizard.videoWizardState(dir)), warnings });
+    }
+    return false;
+  };
   const projectDir = async (slug: string) => {
     if (!SLUG.test(slug)) throw new ValidationError(`unknown project ${slug}`);
     const dir = join(root, 'projects', slug);
@@ -160,12 +270,69 @@ export function boardHandler(options: BoardOptions = {}) {
       const url = new URL(req.url ?? '/', 'http://localhost');
       const path = decodeURIComponent(url.pathname);
       if (req.method !== 'GET') {
-        const refused = trustedWrite(req);
+        const refused = trustedWrite(req, path.startsWith('/api/upload/'));
         if (refused) return json(res, { error: refused }, 403);
       }
       if (req.method === 'GET' && path === '/') {
-        const page = await readFile(fileURLToPath(new URL('./release-board.html', import.meta.url)), 'utf8');
-        return send(res, 200, page, 'text/html; charset=utf-8');
+        return send(res, 200, await readFile(join(pageDir, 'index.html'), 'utf8'), MIME['.html']);
+      }
+      const pageMatch = /^\/board\/([^/]+)$/.exec(path);
+      if (req.method === 'GET' && pageMatch) {
+        if (!PAGE_FILE.test(pageMatch[1]!)) return send(res, 404, 'not found', 'text/plain');
+        const file = await readFile(join(pageDir, pageMatch[1]!), 'utf8').catch(() => undefined);
+        return file === undefined ? send(res, 404, 'not found', 'text/plain') : send(res, 200, file, MIME[extname(pageMatch[1]!)]);
+      }
+      if (req.method === 'GET' && path === '/api/production') return json(res, await productionOverview(root));
+      if (req.method === 'GET' && path === '/api/activity') {
+        const snapshot = await loadSnapshot(root);
+        return json(res, {
+          ...(snapshot ? { lastRound: snapshot.at, every: snapshot.every } : {}),
+          stalled: Object.entries(snapshot?.projects ?? {}).filter(([, pulse]) => pulse.stalled).map(([slug]) => slug),
+          events: await loadEvents(root, 50),
+        });
+      }
+      const productionMatch = /^\/api\/production\/(projects|series)\/([^/]+)$/.exec(path);
+      if (req.method === 'GET' && productionMatch) {
+        if (productionMatch[1] === 'series') {
+          const detail = await productionSeries(await workspaceDir(seriesDirs, productionMatch[2]!, 'series'));
+          return 'error' in detail ? json(res, detail, 500) : json(res, detail);
+        }
+        return json(res, await productionDetail(await workspaceDir(projectDirs, productionMatch[2]!, 'project')));
+      }
+      const reviewMatch = /^\/api\/review\/([^/]+)(?:\/(notes|submit))?$/.exec(path);
+      if (reviewMatch) {
+        const dir = await workspaceDir(projectDirs, reviewMatch[1]!, 'project');
+        if (req.method === 'GET' && !reviewMatch[2]) return json(res, await reviewData(dir));
+        if (req.method === 'POST' && reviewMatch[2] === 'notes') {
+          const change = (await body(req)) as Record<string, unknown>;
+          const action = change.action;
+          if (action !== 'add' && action !== 'update' && action !== 'delete') throw new ValidationError('action must be add, update, or delete');
+          return json(res, await editNote(dir, change.video, {
+            action,
+            id: typeof change.id === 'string' ? change.id : undefined,
+            seconds: change.seconds as number | undefined,
+            end_seconds: change.end_seconds as number | null | undefined,
+            text: change.text as string | undefined,
+          }, now()));
+        }
+        if (req.method === 'POST' && reviewMatch[2] === 'submit') {
+          const change = (await body(req)) as { video?: unknown };
+          return json(res, await submitRound(dir, change.video, now()));
+        }
+      }
+      if (path.startsWith('/api/new') || path.startsWith('/api/upload/')) {
+        const handled = await wizardRoute(req, res, path, url.searchParams);
+        if (handled) return;
+      }
+      const fileMatch = /^\/(files|series-files)\/([^/]+)\/(.+)$/.exec(path);
+      if (req.method === 'GET' && fileMatch) {
+        const series = fileMatch[1] === 'series-files';
+        const rel = fileMatch[3]!;
+        if (!(series ? SERIES_FILES : PROJECT_FILES).test(rel) || rel.split('/').some((part) => part === '..' || part.startsWith('.'))) {
+          return send(res, 403, 'forbidden', 'text/plain');
+        }
+        const base = await workspaceDir(series ? seriesDirs : projectDirs, fileMatch[2]!, series ? 'series' : 'project');
+        return serveMedia(req, res, base, rel);
       }
       if (req.method === 'GET' && path === '/api/channel') {
         const channel = await loadChannel(root).catch(() => undefined);

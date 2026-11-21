@@ -24,8 +24,8 @@ The song always exists already. There is no lyric-writing or song-generation sta
 
 ## 1. Setup
 
-- Skill: `new-video`
-- Input: project data, pasted lyrics, the song at `audio/song.wav` and the vocal stem at `audio/stems/vocals.wav`
+- Skill: `new-video`, or the board's wizard for the same steps ([board.md](board.md#new-projects))
+- Input: project data, pasted lyrics, the song at `audio/song.wav` and the vocal stem at `audio/stems/vocals.wav`, and optional user references (`references.yaml`, files in `assets/references/`)
 - Output: `project.yaml`, `lyrics.txt`, `song.json`, `audio/song.wav`, `audio/stems/vocals.wav` (optional)
 
 ```bash
@@ -126,16 +126,18 @@ npm run cli -- render projects/my-video --format 1x1
 
 Completion: preview plays with the song; master is 1080p30 H.264; derivatives use designed layouts; no clipping.
 
-### Review notes
+### Review notes and rounds
 
-The user can watch any render in the review player and leave notes on exact frames ([ADR 0022](adr/0022-review-player.md), [scripts/review-player](../scripts/review-player/README.md)):
+The user watches renders in the board's review view (`npm run cli -- board`, tab **Review**), leaves notes on exact frames or ranges, and sends them to the agent as a **review round** ([ADR 0032](adr/0032-web-review-rounds.md), [board.md](board.md#review)). The round is frozen in `review/rounds/<NNN>.json` with each note's shots and section; `status` prints a `Review:` line while it is open, and `/video-next` answers it before any stage: a `review-fix` runner follows `assembly-render`, re-renders the preview, and writes one reply per note to `review/rounds/<NNN>.replies.json`, which the board shows beside the notes.
+
+The desktop player writes the same notes ([ADR 0022](adr/0022-review-player.md), [scripts/review-player](../scripts/review-player/README.md)):
 
 ```bash
 npm run cli -- review projects/my-video                 # newer of preview and master
 npm run cli -- review projects/my-video --format 9x16
 ```
 
-Notes land in `review/notes/<video-stem>.json`. No stage waits for them; on a fix pass, `assembly-render` maps each note to its shot and works through them.
+Notes land in `review/notes/<video-stem>.json`. No stage waits for them; the board sends them in a round, or the user asks for a fix pass in chat.
 
 ## 9. QA & export
 
@@ -163,7 +165,7 @@ renders/release/
 
 The release calendar `review/calendar.yaml` takes the next free release day and Short slots under the workspace's `config/release-schedule.yaml` (default: Friday, the song at 00:00 and the video at 18:00 as a Premiere, distributor T−21, pitch T−14, announcement T−7, Shorts Mo/We/Fr with songs interleaved, no releases on Christmas and New Year; time zone of the computer unless set), so no two projects collide. `release.release_date` in `project.yaml` wins; without it the date is a proposal. Times already planned stay; `calendar --replan` plans again.
 
-`npm run cli -- release-board` serves a local page over every release folder: per platform the posts with their files, the texts to copy with counters, the settings to check, and the links; the calendar of all projects with an `.ics` export. The user ticks off what is posted and enters live URLs (`review/release-status.json`); the live YouTube URL fills the link in the X and LinkedIn texts and the microsite data. A project finished before the calendar existed, or a song that is already out, joins through the `release-backfill` skill: it records what is published, writes the missing texts, plans the open slots, and marks the past done (`calendar --done-until`).
+`npm run cli -- board` serves the workspace's page; its release view covers every release folder: per platform the posts with their files, the texts to copy with counters, the settings to check, and the links; the calendar of all projects with an `.ics` export. The user ticks off what is posted and enters live URLs (`review/release-status.json`); the live YouTube URL fills the link in the X and LinkedIn texts and the microsite data. A project finished before the calendar existed, or a song that is already out, joins through the `release-backfill` skill: it records what is published, writes the missing texts, plans the open slots, and marks the past done (`calendar --done-until`).
 
 **Approve release** on the board hands the release to the release autopilot ([ADR 0029](adr/0029-release-autopilot.md), [publishing.md](publishing.md#release-autopilot)): `release-run`, on the timer `release-timer install` sets up, posts each event a platform API can post at its calendar time and leaves the rest on the board. Nothing in the pipeline approves a release or runs the autopilot.
 

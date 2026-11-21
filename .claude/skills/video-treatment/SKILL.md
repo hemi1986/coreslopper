@@ -16,6 +16,7 @@ license: MIT
 
 - `brief.md`
 - `lyrics.txt` and `song.json` (duration, language)
+- The user references in `references.yaml`: a storyboard or concept of the user's is the treatment's starting point.
 - `brand/<kit>/` or project brand overrides
 - `docs/glossary.md`
 

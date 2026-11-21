@@ -4,16 +4,17 @@
 
 ## Commands
 
+- The board's wizard (`npm run cli -- board`, **+ New**) can do the form part first: project data, lyrics, song, and user references (`references.yaml`); the skills below then resume at the grilling.
 - `/new-video [slug]` — skill that creates a project for an existing song (or resumes one): asks for project data and lyrics, imports the song and vocal stem, then grills the user into the brief and treatment. Runs in the main session, not in a stage runner.
 - `/new-series [slug]` — skill that creates a series canon (bible, characters, sets, episode plan, references) through the series budget. Runs in the main session.
 - `/new-episode [slug]` — skill that creates an episode of a series (or resumes one) and grills the user into `script.yaml`. Runs in the main session.
 - `/video-next <slug>` — run all open autonomous stages of a music video (from `audio-analysis` on) or an episode (from `voice-track` on); the kind comes from `status`. Add `--stage <stage>` to run one stage, or `--dry-run` to inspect the next stage.
 - `/video-status [slug]` — read-only stage and budget report.
 - `/model-bench` — skill that compares models, workflows, or ComfyUI servers on the bench cases in `bench/` and scores them with `art-director` agents.
-- `npm run cli -- review <slug>` — the user opens a render in the review player; notes land in `review/notes/`. On a fix pass, follow the review-notes section of `assembly-render`.
+- Review: the user watches renders in the board's review view and sends notes to the agent as review rounds (`review/rounds/<NNN>.json`; `status` prints a `Review:` line per open round). `/video-next` answers open rounds first, through the "Review rounds" section of `assembly-render`. `npm run cli -- review <slug>` is the desktop player for the same notes.
 - `/series-status <series>` — read-only series overview: canon, episodes, stages, spend, length.
 - `/release-backfill <slug>` — skill that brings an existing or already published project into the release calendar: asks what is out, writes the missing release texts, plans the open slots, marks the past done.
-- `npm run cli -- release-board` — the user's local release page: per project and platform the files, texts, and settings, the release calendar of all projects, checkboxes for what is posted, and **Approve release**, which hands the release to the autopilot (`release-run` on a timer, `release-timer install`).
+- `npm run cli -- board` — the user's local page over the workspace. Production shows every project and series and the next command to run here; release shows per project and platform the files, texts, and settings, the release calendar of all projects, checkboxes for what is posted, and **Approve release**, which hands the release to the autopilot (`release-run` on a timer, `release-timer install`).
 - `npm run cli -- publish <slug>` — uploads a finished release package (YouTube private, TikTok drafts); a user command, not a stage. See `docs/publishing.md`.
 
 `/video-next` dispatches one `stage-runner` subagent per stage. Do not inline a whole stage into the main context.
@@ -30,7 +31,7 @@ Create a workspace with `npx coreslopper init <dir>` (or `npx coreslopper@latest
 
 ## Hooks
 
-`.claude/settings.json` registers a `PostToolUse` hook for `Write|Edit`. It validates changes to `storyboard.yaml`, `timing.json`, `timing.overrides.json`, `project.yaml`, `state.json`, `style.yaml`, `characters.yaml`, `script.yaml`, `series.yaml`, `sets.yaml`, `review/upload.yaml`, and `review/calendar.yaml` in projects and series canons, and the workspace's `config/channel.yaml` and `config/release-schedule.yaml`. Exit code 2 blocks the edit and returns the validation message.
+`.claude/settings.json` registers a `PostToolUse` hook for `Write|Edit`. It validates changes to `storyboard.yaml`, `timing.json`, `timing.overrides.json`, `project.yaml`, `state.json`, `style.yaml`, `characters.yaml`, `script.yaml`, `series.yaml`, `sets.yaml`, `review/upload.yaml`, `review/calendar.yaml`, and the replies to review rounds (`review/rounds/<NNN>.replies.json`) in projects and series canons, and the workspace's `config/channel.yaml` and `config/release-schedule.yaml`. Exit code 2 blocks the edit and returns the validation message.
 
 The hook calls `npm run cli -- validate-file <file>`, which is also runnable by hand.
 
@@ -45,7 +46,7 @@ The pipeline and `publish` need no MCP server. The song is always supplied by th
 - Generated media belongs to the project, not the workflow repo.
 - Do not overwrite `timing.overrides.json` or `project.yaml` from a stage runner.
 - A paid batch must pass the cost estimate and the project budget before the first call.
-- `publish`, `publish-auth`, `release-approve`, `release-run`, and `release-timer` run only when the user asks for them; `/video-next` and stage runners never run them. `publish` uploads private videos and drafts; only the user's approval on the release board lets the autopilot post publicly.
+- `publish`, `publish-auth`, `release-approve`, `release-run`, `watch`, `release-timer`, and `docker compose` for the board run only when the user asks for them; `/video-next` and stage runners never run them. `publish` uploads private videos and drafts; only the user's approval on the release board lets the autopilot post publicly.
 
 ## Skill frontmatter
 

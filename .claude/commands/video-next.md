@@ -13,8 +13,20 @@ Run the autonomous pipeline for one project: a music video or an episode of a se
 1. Parse `$ARGUMENTS`: the first token is the project slug. Flags: `--stage <stage>` to run exactly one stage; `--dry-run` to show the next stage and cost without running it.
 2. Run `npm run cli -- status projects/<slug>`. Read the project title, the `Kind:` line, the stage table, budget, and the `Next:` line. The kind decides the stage list; `status` already walks the right one.
 3. If `--dry-run`, stop after printing the kind, the next stage, its skills, and the remaining budget.
-4. If the next stage is missing because everything is done, report success and stop.
-5. If the `Next:` line says `interactive`, stop: the stage needs the user. Tell them to run the setup skill of the kind, which resumes where the project stands: `/new-video <slug>` for a music video (`setup`, `brief`, `treatment`), `/new-episode <slug>` for an episode (`setup`, `script`). Never dispatch an interactive stage to a stage runner.
+4. If `status` prints `Review:` lines, answer those review rounds first (see "Review rounds" below), then run `status` again.
+5. If the next stage is missing because everything is done, report success and stop.
+6. If the `Next:` line says `interactive`, stop: the stage needs the user. Tell them to run the setup skill of the kind, which resumes where the project stands: `/new-video <slug>` for a music video (`setup`, `brief`, `treatment`), `/new-episode <slug>` for an episode (`setup`, `script`). Never dispatch an interactive stage to a stage runner.
+
+## Review rounds
+
+Each `Review:` line of `status` is an open round: notes the user sent from the board's review view. Answer them oldest first, one runner per round:
+
+1. Dispatch **one** `stage-runner` with the project path, the stage ID `review-fix`, the skill `assembly-render` (section "Review rounds"), the round file, and the replies file to write. Add `ai-clips` when a note asks for new or changed generated media.
+2. On `STATUS: blocked`, print the reason and stop; the round stays open.
+3. On success, check the answer: `npm run cli -- validate-file projects/<slug>/review/rounds/<NNN>.replies.json`.
+4. If `qa-export` was done and the fixes changed the picture, run `npm run cli -- stage-reset projects/<slug> qa-export`, so the stage loop builds QA and the release again from the fixed renders.
+
+Done when `status` prints no `Review:` line.
 
 ## Stage loop
 

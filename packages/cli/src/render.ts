@@ -26,6 +26,7 @@ import {
 import type { BrandFont, ChatMessage, FormatId, VideoProps } from '../../remotion/src/types.js';
 import { webpackOverride } from '../../remotion/webpack-override.js';
 import { resolveBinary } from './media.js';
+import { startProgress } from './render-progress.js';
 import { validateProject } from './validate.js';
 
 export interface RenderOptions {
@@ -356,77 +357,87 @@ export async function renderProject(options: RenderOptions): Promise<string> {
       .digest('hex')
       .slice(0, 12);
     const segmentFiles: string[] = [];
-    for (const [index, [start, end]] of segments.entries()) {
-      const file = join(workDir, `seg-${settingsHash}-${start}-${end}.mp4`);
-      segmentFiles.push(file);
-      if (existsSync(`${file}.done`)) {
-        console.log(`  segment ${index + 1}/${segments.length} (frames ${start}-${end}) cached`);
-        continue;
+    const progress = await startProgress(paths.review, outputLocation, last - first + 1);
+    try {
+      for (const [index, [start, end]] of segments.entries()) {
+        const file = join(workDir, `seg-${settingsHash}-${start}-${end}.mp4`);
+        segmentFiles.push(file);
+        const before = start - first;
+        if (existsSync(`${file}.done`)) {
+          console.log(`  segment ${index + 1}/${segments.length} (frames ${start}-${end}) cached`);
+          await progress.update(before + end - start + 1);
+          continue;
+        }
+        console.log(`  segment ${index + 1}/${segments.length} (frames ${start}-${end})`);
+        let lastReported = -1;
+        // A fresh browser and compositor per segment: caches and leaks never
+        // outlive one segment. Video only; the song is muxed once at the end.
+        await renderMedia({
+          composition,
+          serveUrl,
+          codec: 'h264',
+          outputLocation: file,
+          inputProps: props,
+          frameRange: [start, end],
+          muted: true,
+          crf: preview ? 22 : 18,
+          pixelFormat: 'yuv420p',
+          scale: preview ? 0.5 : 1,
+          overwrite: true,
+          concurrency,
+          offthreadVideoCacheSizeInBytes: limits.offthreadVideoCacheSizeInBytes,
+          mediaCacheSizeInBytes: limits.mediaCacheSizeInBytes,
+          offthreadVideoThreads: limits.offthreadVideoThreads,
+          chromiumOptions: { gl: uses3d ? 'swangle' : 'angle' },
+          onProgress: ({ progress: share }) => {
+            void progress.update(before + share * (end - start + 1));
+            const percent = Math.round(share * 100);
+            if (percent >= lastReported + 25) {
+              lastReported = percent;
+              console.log(`    ${percent}%`);
+            }
+          },
+        });
+        await writeFile(`${file}.done`, '');
       }
-      console.log(`  segment ${index + 1}/${segments.length} (frames ${start}-${end})`);
-      let lastReported = -1;
-      // A fresh browser and compositor per segment: caches and leaks never
-      // outlive one segment. Video only; the song is muxed once at the end.
-      await renderMedia({
-        composition,
-        serveUrl,
-        codec: 'h264',
-        outputLocation: file,
-        inputProps: props,
-        frameRange: [start, end],
-        muted: true,
-        crf: preview ? 22 : 18,
-        pixelFormat: 'yuv420p',
-        scale: preview ? 0.5 : 1,
-        overwrite: true,
-        concurrency,
-        offthreadVideoCacheSizeInBytes: limits.offthreadVideoCacheSizeInBytes,
-        mediaCacheSizeInBytes: limits.mediaCacheSizeInBytes,
-        offthreadVideoThreads: limits.offthreadVideoThreads,
-        chromiumOptions: { gl: uses3d ? 'swangle' : 'angle' },
-        onProgress: ({ progress }) => {
-          const percent = Math.round(progress * 100);
-          if (percent >= lastReported + 25) {
-            lastReported = percent;
-            console.log(`    ${percent}%`);
-          }
-        },
-      });
-      await writeFile(`${file}.done`, '');
-    }
 
-    // Join with the concat demuxer (stream copy, no re-encode) and add the
-    // song in the same pass.
-    console.log(`Joining ${segmentFiles.length} segment(s) and muxing audio...`);
-    const listFile = join(workDir, 'segments.txt');
-    await writeFile(listFile, segmentFiles.map((file) => `file '${file.replaceAll("'", "'\\''")}'`).join('\n') + '\n');
-    await ensureDir(dirname(outputLocation));
-    const duration = (last - first + 1) / props.fps;
-    const songPath = props.audioSrc ? join(root, props.audioSrc) : undefined;
-    const audioArgs = songPath
-      ? ['-ss', (first / props.fps).toFixed(6), '-t', duration.toFixed(6), '-i', songPath]
-      : [];
-    const tempOutput = join(workDir, 'joined.mp4');
-    await runFfmpeg([
-      '-threads', '6',
-      '-f', 'concat', '-safe', '0', '-i', listFile,
-      ...audioArgs,
-      '-map', '0:v:0',
-      ...(songPath ? ['-map', '1:a:0', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000'] : []),
-      '-c:v', 'copy',
-      '-t', duration.toFixed(6),
-      '-movflags', '+faststart',
-      tempOutput,
-    ]);
-    // Write locally first, then copy (streamed) to the possibly external renders/ folder.
-    await rm(outputLocation, { force: true });
-    await copyFile(tempOutput, outputLocation);
-    await rm(workDir, { recursive: true, force: true });
-    if (!preview && !options.frames && !options.out) {
-      await recordRender(options.projectDir, outputLocation, await renderInputsHash(props, root));
+      // Join with the concat demuxer (stream copy, no re-encode) and add the
+      // song in the same pass.
+      console.log(`Joining ${segmentFiles.length} segment(s) and muxing audio...`);
+      const listFile = join(workDir, 'segments.txt');
+      await writeFile(listFile, segmentFiles.map((file) => `file '${file.replaceAll("'", "'\\''")}'`).join('\n') + '\n');
+      await ensureDir(dirname(outputLocation));
+      const duration = (last - first + 1) / props.fps;
+      const songPath = props.audioSrc ? join(root, props.audioSrc) : undefined;
+      const audioArgs = songPath
+        ? ['-ss', (first / props.fps).toFixed(6), '-t', duration.toFixed(6), '-i', songPath]
+        : [];
+      const tempOutput = join(workDir, 'joined.mp4');
+      await runFfmpeg([
+        '-threads', '6',
+        '-f', 'concat', '-safe', '0', '-i', listFile,
+        ...audioArgs,
+        '-map', '0:v:0',
+        ...(songPath ? ['-map', '1:a:0', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000'] : []),
+        '-c:v', 'copy',
+        '-t', duration.toFixed(6),
+        '-movflags', '+faststart',
+        tempOutput,
+      ]);
+      // Write locally first, then copy (streamed) to the possibly external renders/ folder.
+      await rm(outputLocation, { force: true });
+      await copyFile(tempOutput, outputLocation);
+      await rm(workDir, { recursive: true, force: true });
+      if (!preview && !options.frames && !options.out) {
+        await recordRender(options.projectDir, outputLocation, await renderInputsHash(props, root));
+      }
+      await progress.done();
+      console.log(`Render written to ${outputLocation}`);
+      return outputLocation;
+    } catch (error) {
+      await progress.fail((error as Error).message.split('\n')[0]!.slice(0, 300));
+      throw error;
     }
-    console.log(`Render written to ${outputLocation}`);
-    return outputLocation;
   } finally {
     await rm(serveUrl, { recursive: true, force: true }).catch(() => undefined);
     await rm(join(workDir, 'public'), { recursive: true, force: true }).catch(() => undefined);

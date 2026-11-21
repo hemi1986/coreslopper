@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "number",
+      "const": 1
+    },
+    "references": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^r[0-9a-f]{6,}$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "look",
+              "character",
+              "location",
+              "storyboard",
+              "concept",
+              "footage",
+              "voice",
+              "other"
+            ]
+          },
+          "file": {
+            "type": "string",
+            "pattern": "^assets\\/references\\/[^/]+$"
+          },
+          "url": {
+            "type": "string",
+            "pattern": "^https?:\\/\\/"
+          },
+          "title": {
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "added": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "added"
+        ]
+      }
+    }
+  },
+  "required": [
+    "version"
+  ]
+}
