@@ -3,17 +3,21 @@
 > Recovered from code by `/adopt` on 2026-11-21 at b195086. This is **not a target**.
 > Target: [context-map.md](context-map.md) · Gap register: [gap-register.md](gap-register.md).
 
-Adopted slices: project and stage pipeline; human review; art-director verdicts and the generation queue (decided by recommendation); song timing and lyrics (decided by recommendation, four answers from the user); the storyboard (decided by recommendation, four answers from the user); generation and the provider adapters (decided by recommendation, four answers from the user); series budget, script, takes and the episode track (decided by recommendation, four answers from the user). Other areas – release, the canon files and
-character library, render, model bench – appear only as neighbours until their own slice is adopted.
+Adopted slices: project and stage pipeline; human review; art-director verdicts and the generation queue (decided by recommendation); song timing and lyrics (decided by recommendation, four answers from the user); the storyboard (decided by recommendation, four answers from the user); generation and the provider adapters (decided by recommendation, four answers from the user); series budget, script, takes and the episode track (decided by recommendation, four answers from the user); the bibles, user references and the character library (decided by recommendation, four answers from the user). Other areas – release, render, model bench – appear only as neighbours until their own slice is adopted.
 
 ```mermaid
 flowchart LR
   BC-Series -->|an episode is a project of kind episode with its own budget and stages| BC-Pipeline
-  BC-Series -->|reads characters, sets and reference voices; may add canon files| Canon
+  BC-Series -->|reads the canon's characters, sets and reference voices; an episode may add plates, props and states| BC-Bibles
   BC-Review -->|open rounds come before the next autonomous stage; fixes reset qa-export| BC-Pipeline
   BC-Review -->|notes map to storyboard shots and timing sections| BC-Storyboard
   BC-Pipeline -->|done project feeds release| Release[Release - not adopted]
-  BC-Pipeline -->|style-character done imports characters| Library[Character library - not adopted]
+  BC-Pipeline -->|style-character stage writes the bibles of a music video| BC-Bibles
+  BC-Pipeline -->|style-character done imports characters| BC-CharacterLibrary
+  BC-CharacterLibrary -->|character use copies an identity and chosen states into a bible| BC-Bibles
+  BC-Bibles -->|character import copies characters with files into the library| BC-CharacterLibrary
+  BC-Bibles -->|sheets, states, plates and props generated and judged as queue items| BC-GenerationQueue
+  BC-Bibles -->|palette, typography, grain| Render
   BC-GenerationQueue -->|every attempt is a one-item batch: budget, cache, manifest, spend| BC-Generation
   BC-Generation -->|planned cost of every new generation recorded as spend| BC-Pipeline
   BC-Generation -->|cloud adapters: fal.ai, Higgsfield, Topview| Providers[Cloud providers - external]
@@ -28,7 +32,7 @@ flowchart LR
   BC-Pipeline -->|audio-analysis stage runs the song analysis| BC-Timing
   BC-Timing -->|effective timing, anchors resolved to seconds| BC-Storyboard
   BC-Pipeline -->|storyboard stage, shared by both kinds| BC-Storyboard
-  BC-Storyboard -->|refers to sets, plates, props, character states| Canon[Bibles and canon - not adopted]
+  BC-Storyboard -->|continuity references to style tokens, characters, sets, plates, props, character states| BC-Bibles
   BC-Storyboard -->|resolved shots as render props| Render
   BC-Storyboard -->|episode: scenes as sections, chat lines, lip-sync limit| BC-Series
   BC-Timing -->|effective timing as render props| Render[Render - not adopted]
@@ -233,7 +237,7 @@ Boundaries:
 - An episode is a project (BC-Pipeline): its stages, state and budget ledger are `AGG-Project`'s; this context adds
   the series commitment at creation and the episode's audio.
 - The canon files – `characters.yaml`, `sets.yaml`, `style.yaml`, `bible.md` and references – are read here (sets,
-  speakers, reference voices, display rules) but belong to the character slice, not adopted. An episode may add
+  speakers, reference voices, display rules) but belong to BC-Bibles (`.claude/rules/character.md`). An episode may add
   files to the canon; overwriting one is a gap (HS-117).
 - Takes, ambience and canon references are generated through `runBatch` (BC-Generation): takes on the episode
   budget, canon generations on the series budget, which ignores episode budgets today (HS-105).
@@ -244,3 +248,53 @@ Boundaries:
 - Writers of `script.yaml`: the agent only (HS-121). Writers of `takes.json`: `voice-track` and `import-takes`. No
   locks; one stage at a time.
 
+### BC-Bibles – Bibles
+Purpose (as recovered, decided by recommendation HS-123): holds what a production must look and sound like before
+any shot is generated – the style bible, the character bible with its character states, the set bible with plates
+and prop references, and the user references – per music video, or once per series canon that every episode
+reads and may only add to (ADR 0025, ADR 0043 proposed).
+Core terms: Style Bible, Character Bible, Set Bible, Character Sheet, Character Identity, Character State, Display
+Rule, Reference Voice, Set, Plate, Prop Reference, Continuity Reference, Canon, Canon Gap, User Reference.
+Evidence:
+- the schemas `StyleBibleSchema`, `CharacterBibleSchema`, `SetBibleSchema` and `ReferencesSchema`
+  (`packages/core/src/schema.ts:373-541,1460-1489`), loaded by `loadProject` – an episode's from its series folder
+  (`packages/core/src/project.ts:85-108,226-250`)
+- the files `style.yaml`, `characters.yaml` with `characters/<id>/`, `sets.yaml` with `sets/<set>/plates/` and
+  `props/<id>/`, `references.yaml` with `assets/references/`, validated by the hook on every edit
+  (`packages/cli/src/validate-file.ts:86-97,234-243`)
+- the writers: the `style-bible` and `character-bible` skills in `style-character` (`packages/core/src/state.ts:52-58`),
+  the `new-series` skill and `new-series` command (`packages/cli/src/new-series.ts:48-104`), `character use`
+  (`packages/cli/src/character-library.ts:452-525`), the `reference` command and the board wizard
+  (`packages/cli/src/board-wizard.ts:72-178`)
+Boundaries:
+- The bibles' consumers resolve continuity references three times – the storyboard check
+  (`packages/core/src/timing.ts:226-366`), QA (`packages/cli/src/qa.ts:76-103,292-313`) and the queue
+  (`packages/cli/src/queue.ts:242-286`) – one resolution is decided (HS-135).
+- Reference images are generated and judged as queue items (BC-GenerationQueue, BC-Generation); a canon by hand
+  with `review-image`. The bibles name the filed paths.
+- In a canon an episode adds plates, prop references and character states and changes nothing; only prompt text
+  says so today (HS-130, HS-117).
+- Render, thumbnails, the voice track and the lip-sync check read the style, the reference voices and the display
+  rules. No locks; one stage at a time, the board writes only user references and character use (HS-134).
+
+### BC-CharacterLibrary – Character library
+Purpose (as recovered, decided by recommendation HS-123): keeps the workspace's reusable characters across
+productions – takes the characters of finished character bibles in and copies a character's identity, and the
+states the user chooses, into a new music video or series canon (ADR 0034, ADR 0043 proposed).
+Core terms: Character Library, Library Character, Character Identity, Character Import, Character Use, Character
+State.
+Evidence:
+- `library/characters/<id>/character.yaml` with `LibraryCharacterSchema` (`packages/core/src/schema.ts:1422-1458`)
+  and its files, checked by `validate-file` (`packages/cli/src/validate-file.ts:246-258`)
+- every rule in `packages/cli/src/character-library.ts`: import and entry matching (`:206-293`), content dedupe
+  (`:141-167`), manual entries (`:328-428`), use (`:452-525`), listing and targets (`:69-112,538-547`)
+- the `character` command (`packages/cli/src/index.ts:655-760`), the automatic import at `stage-done … style-character`
+  (`index.ts:786-794`), the board's Characters view (`packages/cli/src/board/characters.js`) and its routes
+  `/api/library*` and `/library-files/<id>/<file>` (`packages/cli/src/release-board.ts:252-318`)
+Boundaries:
+- Only copies cross to BC-Bibles: a bible's character names its library character in `library`; changing the
+  library never changes a production (ADR 0034).
+- The library belongs to the user: `update` and `init` never touch `library/` (`packages/cli/src/update.ts:43-45`).
+- The board serves library files but never `character.yaml` or dot files; writes follow the board's same-origin
+  rules.
+- A series canon comes in through a skill step, not code (HS-131); the user has not used the library yet.

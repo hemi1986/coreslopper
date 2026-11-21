@@ -19,6 +19,11 @@
 | GAP-AGG-Script | as-is boundary | [AGG-Script](events.yaml) | [BC-Series](context-map.as-is.md#bc-series--series) | – | script.yaml of an episode, parsed whole with ScriptSchema by loadProject (packages/core/src/project.ts:262; schema.ts:587-657)<br>validateScript checks the whole script against the series canon and throws one error listing every issue (packages/core/src/episode.ts:59-104); the workspace hook runs it on every edit (packages/cli/src/validate-file.ts:134-145) | Decide the target boundary |
 | GAP-AGG-TakeRegistry | as-is boundary | [AGG-TakeRegistry](events.yaml) | [BC-Series](context-map.as-is.md#bc-series--series) | – | takes.json of an episode, written whole and sorted by saveTakes (packages/cli/src/takes.ts:51-57); its writers are voice-track and import-takes (packages/cli/src/voice-track.ts:99-200; media.ts:395-460)<br>every take's status follows from its file, the registered file hash and the text hash of its script line (takes.ts:65-87; packages/core/src/episode.ts:139-153) | Decide the target boundary |
 | GAP-AGG-EpisodeTrack | as-is boundary | [AGG-EpisodeTrack](events.yaml) | [BC-Series](context-map.as-is.md#bc-series--series) | – | episodeTrack places the lines from the take durations and writes timing.json, timing.effective.json, audio/episode.wav and audio/stems/<character>.wav together in one run from the effective timing (packages/cli/src/episode-track.ts:148-253) | Decide the target boundary |
+| GAP-AGG-StyleBible | as-is boundary | [AGG-StyleBible](events.yaml) | [BC-Bibles](context-map.as-is.md#bc-bibles--bibles) | – | style.yaml of a music video or series canon, parsed whole with StyleBibleSchema (packages/core/src/schema.ts:373-419) by loadProject (packages/core/src/project.ts:227-250) and by validate-file on every edit (packages/cli/src/validate-file.ts:86-97)<br>an episode's style bible is the canon's (project.ts:89,105-107); new-series writes a starter from the brand kit (packages/cli/src/new-series.ts:48-58) | Decide the target boundary |
+| GAP-AGG-CharacterBible | as-is boundary | [AGG-CharacterBible](events.yaml) | [BC-Bibles](context-map.as-is.md#bc-bibles--bibles) | – | characters.yaml of a music video or series canon, parsed whole with CharacterBibleSchema (packages/core/src/schema.ts:436-489); the files lie in characters/<id>/ beside it<br>written by the character-bible and new-series skills, and by character use through the YAML document with a whole-file schema check before an atomic write (packages/cli/src/character-library.ts:452-525) | Decide the target boundary |
+| GAP-AGG-SetBible | as-is boundary | [AGG-SetBible](events.yaml) | [BC-Bibles](context-map.as-is.md#bc-bibles--bibles) | – | sets.yaml of a music video or series canon, parsed whole with SetBibleSchema (packages/core/src/schema.ts:496-541); plates in sets/<set>/plates/, props in props/<id>/ beside it<br>written by the style-bible skill in style-character (music video) and by new-series (canon); validated by the hook on every edit (packages/cli/src/validate-file.ts:86-97) | Decide the target boundary |
+| GAP-AGG-UserReferences | as-is boundary | [AGG-UserReferences](events.yaml) | [BC-Bibles](context-map.as-is.md#bc-bibles--bibles) | – | references.yaml of a project or series canon with ReferencesSchema (packages/core/src/schema.ts:1460-1489), files in assets/references/<br>every change is a read, a change and an atomic save in board-wizard.ts (packages/cli/src/board-wizard.ts:72-178), used by the reference command and the board wizard; validate-file checks unique ids and that every file exists (packages/cli/src/validate-file.ts:234-243) | Decide the target boundary |
+| GAP-AGG-LibraryCharacter | as-is boundary | [AGG-LibraryCharacter](events.yaml) | [BC-CharacterLibrary](context-map.as-is.md#bc-characterlibrary--character-library) | – | library/characters/<id>/character.yaml with LibraryCharacterSchema (packages/core/src/schema.ts:1422-1458) and the character's files beside it; validate-file checks that the id is the folder and that every named file exists (packages/cli/src/validate-file.ts:246-258)<br>every write – import, new, add-file, update, remove – reads the entry, changes it and saves it atomically in character-library.ts (packages/cli/src/character-library.ts:63-66,206-428) | Decide the target boundary |
 <!-- kataster:gap-register:end -->
 
 ## Gaps found by the adoption of the project and stage pipeline (2026-11-21)
@@ -288,3 +293,45 @@ Decisions (by recommendation, not reviewed by the user):
 
   ADR 0042 (proposed) records them.
 - `lipsync-audio.ts` and the lead-only muting are music-video logic (BC-Timing, ADR 0026), not this slice's.
+
+## Gaps found by the adoption of the bibles and the character library (2026-11-22)
+
+Candidates only – no stories until the user asks (`/adopt <scope> --stories`). Priority is a suggestion; the user
+has not used the character library yet, so its gaps are low.
+
+| # | Class | Gap | Evidence | Source | Priority |
+|---|---|---|---|---|---|
+| G-122 | Exists but contradicts | A character sheet is optional and nothing checks that a recurring on-screen character has one; the queue falls back to the first reference image, and the demo canon has no sheet at all | `packages/core/src/schema.ts:455`; `packages/cli/src/queue.ts:275`; `projects/demo-series/characters.yaml` | HS-125 | medium |
+| G-123 | Exists but contradicts | Canon gaps count only a character's reference images, so a character with a sheet and no further image shows as a gap | `packages/cli/src/board-production.ts:337-346`; `packages/cli/src/series.ts:114` | HS-126 | low |
+| G-124 | Exists but contradicts | Character ids are any non-empty text and may repeat; every lookup (queue, QA, use, speakers) takes the first match silently | `packages/core/src/schema.ts:452,480-489` | HS-127 | medium |
+| G-125 | Exists but contradicts | `sets.yaml` is not among the outputs of `style-character`, and the two skills give `stage-done` different output lists | `packages/core/src/state.ts:52-58`; `workspace/.claude/skills/style-bible/SKILL.md` step 7; `character-bible/SKILL.md` step 7 | HS-129 | low |
+| G-126 | Exists but contradicts | The canon's append-only rule for its bibles is prompt text: an episode's stage can change or remove any entry of the canon's `characters.yaml` or `sets.yaml`; the hook checks only the schema (files: G-118) | `workspace/.claude/agents/stage-runner.md`; `workspace/.claude/hooks/validate-artifacts.mjs`; `packages/cli/src/validate-file.ts:86-97` | HS-130 | medium |
+| G-127 | Exists but contradicts | A series canon's characters reach the library only through a step of the `new-series` skill; plates and states an episode adds never reach it | `packages/cli/src/index.ts:786-794`; `workspace/.claude/skills/new-series/SKILL.md` step 4 | HS-131 | low |
+| G-128 | Exists but contradicts | A re-import with a changed sheet or voice copies the file into the library character without naming it; a state whose renamed id is taken too is skipped after its image was copied | `packages/cli/src/character-library.ts:232,250-265` | HS-132 | low |
+| G-129 | Exists but contradicts | `character use` drops a state's `from` when its parent is not chosen, and nothing checks that `from` names a state of the same character | `packages/cli/src/character-library.ts:482`; `packages/core/src/schema.ts:436-446` | HS-133 | low |
+| G-130 | Exists but contradicts | No lock on a library character, the target's `characters.yaml` on use, or `references.yaml`; the board and an agent writing at once lose one change | `packages/cli/src/character-library.ts:206-525`; `packages/cli/src/board-wizard.ts:72-178`; `packages/cli/src/file-lock.ts` | HS-134 | low |
+| G-131 | Exists but contradicts | A shot's continuity references are resolved three times and differently: QA checks only a prop's first image, the episode canon check only ids | `packages/core/src/timing.ts:226-366`; `packages/cli/src/qa.ts:76-103,292-313`; `packages/cli/src/queue.ts:242-286` | HS-135 | low |
+| G-132 | Exists but contradicts | The display rules are listed three times (schema, cli, board), the file types and reference kinds twice, two file-name cleaners, the library-file check in the cli and the hook; the library's rules all live in the CLI | `packages/core/src/schema.ts:449,1460`; `packages/cli/src/character-library.ts:28-32,121,333`; `packages/cli/src/board/characters.js:71-74`; `packages/cli/src/board-wizard.ts:40,58`; `workspace/.claude/hooks/validate-artifacts.mjs:88-92` | HS-136 | low |
+| G-133 | Missing | The style-bible skill requires a recorded licence for fonts and look references; no field holds one | `workspace/.claude/skills/style-bible/SKILL.md` completion criteria; `packages/core/src/schema.ts:383-419` | HS-138 | low |
+| G-134 | Exists but contradicts | Drifted texts: `character list` prints `series/<slug>`; the hook list in `workspace/CLAUDE.md` leaves out `references.yaml`; `new-series` says episodes never change the canon | `packages/cli/src/index.ts:668`; `workspace/CLAUDE.md` Hooks; `workspace/.claude/skills/new-series/SKILL.md:9` | HS-141 | low |
+| G-135 | Missing | The board's Characters view imports a whole production and cannot name one character or merge into a library character (`--id`, `--into`) | `packages/cli/src/board/characters.js:111`; `packages/cli/src/release-board.ts:274` | HS-142 | low |
+| G-136 | Missing | No test pinned that an episode reads its bibles from the canon, a library character's file paths, a user reference being a file or a link, or the order of a shot's keyframe references (covered now by `tests/character-characterization.test.ts`); still none for the automatic import at `stage-done`, `updateLibraryCharacter`, path traversal on `/library-files`, duplicate character ids, or concurrent writes | `tests/character-library.test.ts`; `tests/continuity.test.ts` | analyst | low |
+
+Decisions (by recommendation, not reviewed by the user):
+
+- GAP-AGG-StyleBible, GAP-AGG-CharacterBible, GAP-AGG-SetBible, GAP-AGG-UserReferences and
+  GAP-AGG-LibraryCharacter: the boundaries stay as recovered (`as-is`).
+- Exists and is intended:
+  - an episode reads its style, characters and sets from the canon and has none of its own;
+  - music videos have their own set bible when shots return to a place or an object (user);
+  - continuity references generated first and judged on their own, corrections regenerated by the agent (user);
+  - user references as a file or a link, used by the grilling and the bibles (user: sometimes);
+  - the library: one character, one library character, files stored once by content, copies not links,
+    states only when chosen, owned by the user and never touched by `update`;
+  - a failed library import only warns;
+  - a bible's files checked where they are used (queue, QA), not when it is written;
+  - the look and the prompts as agent guidance.
+
+  ADR 0043 (proposed) records them.
+- The canon's spend for an episode's appended references stays on the episode budget (ADR 0025); name replacement
+  in Wan prompts for canon generations (`seriesTarget` passes no characters) is the generation slice's.

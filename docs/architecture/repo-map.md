@@ -45,8 +45,8 @@ Files that share a concept stem or a table across layers. These are suggestions 
 | media | cli, remotion, tests | 4 | – | 3 layers: cli, remotion, tests; 3 packages; 4 files | – |
 | board | cli, tests | 7 | – | 2 layers: cli, tests; 2 packages; 7 files | – |
 | publish | cli, tests | 8 | – | 2 layers: cli, tests; 2 packages; 8 files | – |
-| sery | cli, tests | 4 | – | 2 layers: cli, tests; 2 packages; 4 files | – |
-| character | cli, tests | 3 | – | 2 layers: cli, tests; 2 packages; 3 files | – |
+| sery | cli, tests | 5 | – | 2 layers: cli, tests; 2 packages; 5 files | – |
+| character | cli, tests | 3 | – | 2 layers: cli, tests; 2 packages; 3 files | yes |
 | init | cli, tests | 3 | – | 2 layers: cli, tests; 2 packages; 3 files | – |
 | lipsync | cli, tests | 3 | – | 2 layers: cli, tests; 2 packages; 3 files | – |
 | production | cli, core | 3 | – | 2 layers: cli, core; 2 packages; 3 files | – |

@@ -303,7 +303,7 @@ is `batch_cap_usd` in `project.yaml`, or 30 % of the remaining budget.
 
 One folder per series, `projects/<slug>/` with `series.yaml` (`SeriesSchema`) and `state.json`
 (`SeriesStateSchema`), loaded together by `loadSeries` (`packages/core/src/project.ts:380-416`). The canon files
-beside them (`bible.md`, `style.yaml`, `characters.yaml`, `sets.yaml`, references) belong to the character slice.
+beside them (`bible.md`, `style.yaml`, `characters.yaml`, `sets.yaml`, references) belong to BC-Bibles (`AGG-StyleBible`, `AGG-CharacterBible`, `AGG-SetBible`, `AGG-UserReferences`).
 The commitment spans the series and the `project.yaml` of every episode that names it; nothing stores the episode
 list in the series (`packages/cli/src/series.ts:43-74`).
 
@@ -371,6 +371,79 @@ read (BC-Timing).
 **Derived outside the aggregate**: subtitles `renders/<slug>.en.srt` (EVT-SubtitlesWritten) and lip-sync audio
 segments `assets/audio-segments/<name>.mp3|wav` cut from a speaker stem (EVT-LipSyncAudioCut).
 
+### AGG-StyleBible – Style bible (as-is)
+
+`style.yaml` of a music video or series canon (`StyleBibleSchema`, `packages/core/src/schema.ts:373-419`), parsed
+whole. An episode has none of its own; it reads the canon's (`packages/core/src/project.ts:89,105-107`).
+
+| Attribute | Type | Required | Source |
+|---|---|---|---|
+| Name | text | yes | EVT-StyleBibleWritten |
+| Palette | map of name → Colour (#rrggbb) | yes | EVT-StyleBibleWritten |
+| Renderer roles | map of role (background, surface, primary, secondary, accent, text, muted, custom) → palette key or Colour | no | EVT-StyleBibleWritten |
+| Typography | map of key → font family, weight 100–900, size, letter spacing, line height | yes | EVT-StyleBibleWritten |
+| Look | keywords, negatives, look references (agent guidance, HS-138) | default empty | EVT-StyleBibleWritten |
+| Motion | easing (default `easeOut`), grain 0–1 (default 0.08) | default | EVT-StyleBibleWritten |
+
+### AGG-CharacterBible – Character bible (as-is)
+
+`characters.yaml` of a music video or series canon (`CharacterBibleSchema`, `schema.ts:436-489`), with the files in
+`characters/<id>/` beside it. Paths are relative to the bible's folder.
+
+| Attribute | Type | Required | Source |
+|---|---|---|---|
+| Character id | text; unique and script-id shaped decided (HS-127), any non-empty text today | yes | EVT-CharacterBibleWritten |
+| Name, Description | text | yes | EVT-CharacterBibleWritten |
+| Character sheet | Path; required for a recurring on-screen character (HS-125), optional today | no | EVT-CharacterBibleWritten |
+| Reference images | list of Path (face, turnaround, outfits) | default empty | EVT-CharacterBibleWritten |
+| Prompt | text (agent guidance) | no | EVT-CharacterBibleWritten |
+| Reference voice | Path to a WAV and its exact transcript | no | EVT-CharacterBibleWritten |
+| Display rule | `full` | `silhouette` | `screen-only` | `voice-only` (field `face`), default `full` | default | EVT-CharacterBibleWritten |
+| Character states | list: id (unique per character), description, prompt, reference image, derived from (a state of the same character; the sheet when absent) | default empty | EVT-CharacterStateAdded |
+| Library character | id of the library character it is a copy of | no | EVT-LibraryCharacterUsed |
+
+### AGG-SetBible – Set bible (as-is)
+
+`sets.yaml` of a music video or series canon (`SetBibleSchema`, `schema.ts:496-541`); plates in
+`sets/<set>/plates/<id>.png`, props in `props/<id>/`.
+
+| Attribute | Type | Required | Source |
+|---|---|---|---|
+| Set | id (unique), name, description, prompt anchor, reference frames (Paths) | id, name, description, prompt yes | EVT-SetBibleWritten |
+| Plate | per set: id (unique in the set), angle, prompt, reference image (Path) | id, angle yes | EVT-PlateAdded |
+| Prop reference | id (unique), name, description (shape, colour, material, size, attachments), prompt, reference images (Paths) | id, name, description yes | EVT-PropReferenceAdded |
+
+### AGG-UserReferences – User references (as-is)
+
+`references.yaml` of a project or series canon (`ReferencesSchema`, `schema.ts:1460-1489`); files in
+`assets/references/`.
+
+| Attribute | Type | Required | Source |
+|---|---|---|---|
+| Reference id | `r` + hex; unique (checked by validate-file) | yes | EVT-UserReferenceAdded |
+| Kind | `look` | `character` | `location` | `storyboard` | `concept` | `footage` | `voice` | `other` | yes | EVT-UserReferenceAdded |
+| File or link | a Path under `assets/references/`, or an http(s) URL – exactly one | yes | EVT-UserReferenceAdded |
+| Title, Subject, Note | text: original name or link title; who or what it shows; what the user wants from it | no | EVT-UserReferenceAdded, EVT-UserReferenceUpdated |
+| Added | Timestamp | yes | EVT-UserReferenceAdded |
+
+### AGG-LibraryCharacter – Library character (as-is)
+
+`library/characters/<id>/character.yaml` (`LibraryCharacterSchema`, `schema.ts:1422-1458`) and its files, which are
+plain names inside the folder, stored once by content (`packages/cli/src/character-library.ts:141-167`).
+
+| Attribute | Type | Required | Source |
+|---|---|---|---|
+| Id | script id; equals the folder name | yes | EVT-LibraryCharacterCreated |
+| Identity | name, description, prompt, display rule, character sheet, reference images, reference voice with transcript | name, description yes | EVT-LibraryCharacterCreated, EVT-LibraryCharacterExtended, EVT-LibraryFileAdded |
+| Character states | list as in a character bible, extra notes kept; ids unique | default empty | EVT-LibraryCharacterExtended |
+| Tags | list of text | default empty | EVT-LibraryCharacterCreated, EVT-LibraryCharacterUpdated |
+| Origin | `projects/<slug>` or `manual` | yes | EVT-LibraryCharacterCreated |
+| Added | Timestamp | yes | EVT-LibraryCharacterCreated |
+| History | list: when, from where, which files and states | default empty | EVT-LibraryCharacterExtended |
+
+**Derived**: where a library character is used (every `characters.yaml` naming it in `library`) and its cover (the
+sheet, else the first image reference), computed by `listLibrary` on every read.
+
 ## Lifecycle
 
 Stage state as the code allows it today. Every transition is accepted from every status (HS-11); the diagram
@@ -434,4 +507,19 @@ erDiagram
   CACHED_GENERATION }o--|| MODEL_ROLE : "run for"
   MODEL_ROLE ||--o{ PROVIDER_ALTERNATIVE : "per provider"
   QUEUE_ITEM ||--o{ MANIFEST_LINE : "one batch per attempt"
+  PROJECT ||--o| STYLE_BIBLE : "style.yaml (episode: the canon's)"
+  PROJECT ||--o| CHARACTER_BIBLE : "characters.yaml (episode: the canon's)"
+  PROJECT ||--o| SET_BIBLE : "sets.yaml (episode: the canon's)"
+  PROJECT ||--o| USER_REFERENCES : "references.yaml"
+  CHARACTER_BIBLE ||--o{ CHARACTER : "unique ids"
+  CHARACTER ||--o{ CHARACTER_STATE : "derives from sheet or state"
+  SET_BIBLE ||--o{ SET : "unique ids"
+  SET ||--o{ PLATE : "fixed angles"
+  SET_BIBLE ||--o{ PROP_REFERENCE : "unique ids"
+  CHARACTER }o--o| LIBRARY_CHARACTER : "copy of"
+  LIBRARY_CHARACTER ||--o{ CHARACTER_STATE : "states of earlier productions"
+  SHOT }o--o{ CHARACTER : "on screen"
+  SHOT }o--o| PLATE : "keyframe is an edit of"
+  SHOT }o--o{ PROP_REFERENCE : "shows"
+  SHOT }o--o{ CHARACTER_STATE : "names"
 ```

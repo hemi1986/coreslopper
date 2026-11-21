@@ -56,6 +56,11 @@ state in memory), one core transition (`setStageRunning`, `setStageDone`, `setSt
 - Take status, the blocking rule (`packages/cli/src/takes.ts`) and the series budget sum (`series.ts`) also live
   in the CLI; they belong in core (G-116). Episode audio work shells out to ffmpeg through `resolveBinary`
   (`media.ts`); it is deterministic, with fixed gains and a loudness target, and uses no speech recognition.
+- The bibles' rules are schemas in core (`schema.ts`); the character library's rules – entry matching, content
+  dedupe, import and use – live in `packages/cli/src/character-library.ts`, and the display rules, file types and
+  reference kinds are repeated in the CLI and the board's JS (G-132). Library, `references.yaml` and character-use
+  writes are atomic but unlocked (G-130). An episode's bibles are the canon's: read them through `loadProject`,
+  never from the episode folder.
 - Long-running work is a background process with its own lock file and a `wait` command (`queue run` /
   `queue wait`, `assets/queue.lock`); a stage runner starts it with the Bash tool's `run_in_background`.
 - Agent judgement inside a command runs headless: `claude -p --agent <name> --json-schema <schema>`
@@ -135,6 +140,9 @@ directory. `tests/helpers/release-fixture.ts` builds release projects.
 | Generation batch | `runBatch(target, items, { dryRun, providerFactory, cacheKey, log: false })` on an inline `BatchTarget`; a unique `cacheKey` keeps the workspace cache out of it | integration | `tests/generate-workflow.test.ts`, `tests/generation-characterization.test.ts` |
 | Script rule | `validateScript`, `takeSource`, `placeLines` on the demo script (`projects/demo-episode/script.yaml`) and canon | unit | `tests/episode.test.ts`, `tests/series-characterization.test.ts` |
 | Series budget | `createSeries` / `createProject` in a temp workspace with copies of `config/`, `templates/` and `brand/` | integration | `tests/series-budget.test.ts` |
+| Bible schema | `StyleBibleSchema`, `CharacterBibleSchema`, `SetBibleSchema`, `ReferencesSchema`, `LibraryCharacterSchema` `.safeParse` on an inline object | unit | `tests/continuity.test.ts`, `tests/character-characterization.test.ts` |
+| Character library | `importCharacters`, `useCharacter`, `addLibraryCharacter`, `addLibraryFile`, `removeLibraryFile` on a temp workspace (a temp folder is enough without projects) | integration | `tests/character-library.test.ts`, `tests/character-characterization.test.ts` |
+| Keyframe references | `shotReferences(project, shot)` on an inline `LoadedProject` and `Shot` with files in a temp folder | unit | `tests/character-characterization.test.ts` |
 | Episode audio | `voiceTrack`, `importTakes`, `episodeTrack` on a temp copy of the demo canon and episode, mock provider; skipped without ffmpeg | integration | `tests/episode-track.test.ts` |
 | Provider adapter | the adapter with a fake `fetchImpl` (cloud) or a fake ComfyUI server | unit | `tests/fal-provider.test.ts`, `tests/topview.test.ts`, `tests/comfyui.test.ts` |
 | Agent instruction | not testable deterministically | – | `workspace/.claude/commands/video-next.md` |

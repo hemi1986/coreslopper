@@ -153,20 +153,40 @@ Using the last frame of one AI clip as the first frame of the next to preserve c
 _Avoid_: stitching
 
 **Style Bible**:
-The project's authoritative palette, typography, look references, and motion rules.
+The authoritative palette, typography, look references, and motion rules of a music video or series canon. An episode uses its series' style bible.
 _Avoid_: moodboard
 
 **Character Bible**:
-The authoritative descriptions, reference images, and sheets for recurring characters.
+The authoritative recurring characters of a music video or series canon, each with its description, display rule, character sheet, reference images, reference voice, and character states. Character ids are unique and name the character's folder.
 _Avoid_: cast list
 
+**Set Bible**:
+The sets of a music video or series canon with their plates, and the prop references, in `sets.yaml`. A music video has one when its AI shots return to a place or an object.
+_Avoid_: sets file, location list
+
 **Character Sheet**:
-A reference image showing a character's design from multiple angles or expressions; required for every character shot.
+A reference image showing a character's design from multiple angles or expressions. Every recurring character the screen shows has one that passed the art director before anything derives from it; a one-off figure needs none. The `sheet` command's side-by-side comparison image is not a character sheet.
 _Avoid_: portrait
+
+**Character Identity**:
+What stays the same about a character across productions: name, description, prompt, display rule, character sheet, reference images (face, turnaround, outfits), and reference voice. Character states are not part of it.
+_Avoid_: outfit (an outfit image is one of its reference images), look
 
 **Character Library**:
 The workspace's collection of characters to reuse across music videos and series, in `library/characters/<id>/`. Characters of finished character bibles and canons come in by themselves; a project or canon takes a copy with `character use`, and its entry then names the library character in `library`.
 _Avoid_: character database, cast
+
+**Library Character**:
+One entry of the character library: a character's identity, the character states of earlier productions, tags, where it came from first, and the history of later imports. A character of a bible that names it in `library` is a copy of it.
+_Avoid_: library entry, figure
+
+**Character Import**:
+Taking the characters of a character bible into the character library, each into the library character it came from or a new one. Files are stored once by content; an existing library character keeps its identity and gains new reference images and states. Every file of a library character is named by it.
+_Avoid_: sync, export
+
+**Character Use**:
+Copying a library character into a music video or series canon: its identity always, each character state only when chosen, together with the states it derives from. An episode takes its characters from its series canon.
+_Avoid_: import (the other direction), take
 
 **Brand Kit**:
 A reusable package of logo, colors, fonts, tokens, and style guide, stored under `brand/<kit>/`.
@@ -469,7 +489,7 @@ A set of episodes that share one canon and one series budget, stored in `project
 _Avoid_: show, season
 
 **Canon**:
-What every episode of a series shares and none may change: the series bible, style bible, character bible, sets, and their references.
+What every episode of a series shares: the series bible, style bible, character bible, set bible, and their references. An episode's storyboard and assets stages may add plates, prop references, and character states to it, on the episode's budget; no episode changes or removes an entry.
 _Avoid_: lore, shared assets
 
 **Series Budget**:
@@ -493,7 +513,7 @@ An entry of the episode plan. It may have no project yet; an episode whose numbe
 _Avoid_: unplanned episode
 
 **Canon Gap**:
-What a series canon still lacks before episodes can use it: no characters or sets, a character or set without a reference, or a character without a reference voice.
+What a series canon still lacks before episodes can use it: no characters or sets, an on-screen character with neither a character sheet nor a reference image, a set without a reference, or a character without a reference voice.
 _Avoid_: missing asset, incomplete canon
 
 **Creative Limit**:

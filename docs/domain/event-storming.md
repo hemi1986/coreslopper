@@ -125,6 +125,42 @@ flowchart LR
         EVT_SubtitlesWritten["Subtitles written"]:::evt
         EVT_LipSyncAudioCut["Lip-sync audio cut"]:::evt
     end
+    subgraph BC_Bibles["Bibles"]
+        CMD_WriteStyleBible["Write the style bible"]:::cmd
+        CMD_WriteCharacterBible["Write the character bible"]:::cmd
+        CMD_AddCharacterState["Add a character state"]:::cmd
+        CMD_WriteSetBible["Write the set bible"]:::cmd
+        CMD_AddSetReference["Add a plate or prop reference"]:::cmd
+        CMD_AddUserReference["Add a user reference"]:::cmd
+        CMD_UpdateUserReference["Update a user reference"]:::cmd
+        CMD_RemoveUserReference["Remove a user reference"]:::cmd
+        CMD_UseLibraryCharacter["Use a library character"]:::cmd
+        EVT_StyleBibleWritten["Style bible written"]:::evt
+        EVT_CharacterBibleWritten["⭐ Character bible written"]:::evt
+        EVT_CharacterStateAdded["Character state added"]:::evt
+        EVT_SetBibleWritten["Set bible written"]:::evt
+        EVT_PlateAdded["Plate added"]:::evt
+        EVT_PropReferenceAdded["Prop reference added"]:::evt
+        EVT_UserReferenceAdded["User reference added"]:::evt
+        EVT_UserReferenceUpdated["User reference updated"]:::evt
+        EVT_UserReferenceRemoved["User reference removed"]:::evt
+        EVT_LibraryCharacterUsed["⭐ Library character used"]:::evt
+    end
+    subgraph BC_CharacterLibrary["Character library"]
+        CMD_ImportCharacters["Take characters into the library"]:::cmd
+        CMD_AddLibraryCharacter["Add a library character by hand"]:::cmd
+        CMD_AddLibraryFile["Add a file to a library character"]:::cmd
+        CMD_UpdateLibraryCharacter["Update a library character"]:::cmd
+        CMD_RemoveLibraryFile["Remove a file from a library character"]:::cmd
+        CMD_DeleteLibraryCharacter["Delete a library character"]:::cmd
+        EVT_LibraryCharacterCreated["⭐ Library character created"]:::evt
+        EVT_LibraryCharacterExtended["Library character extended"]:::evt
+        EVT_LibraryCharacterUpdated["Library character updated"]:::evt
+        EVT_LibraryFileAdded["Library file added"]:::evt
+        EVT_LibraryFileRemoved["Library file removed"]:::evt
+        EVT_LibraryCharacterDeleted["Library character deleted"]:::evt
+        EVT_LibraryCharacterUseRefused["Library character use refused"]:::evt
+    end
     ACT_User(["User"]):::act
     ACT_Orchestrator(["Orchestrator"]):::act
     ACT_SetupSkill(["Setup skill"]):::act
@@ -146,6 +182,7 @@ flowchart LR
     POL_RecordPlannedSpend{{"Every new generation is billed at its planned cost"}}:::pol
     POL_RestartComfyUIOnFailure{{"A failed local generation restarts ComfyUI before the next try"}}:::pol
     POL_ValidateEveryScriptEdit{{"Every script edit is validated"}}:::pol
+    POL_ImportFinishedCharacters{{"The characters of a finished character bible go into the library"}}:::pol
     RM_Status[("Status")]:::rm
     RM_NextAction[("Next action")]:::rm
     RM_ProductionView[("Production view")]:::rm
@@ -165,6 +202,8 @@ flowchart LR
     RM_SeriesStatus[("Series status")]:::rm
     RM_TakeStatus[("Take status")]:::rm
     RM_Subtitles[("Subtitles")]:::rm
+    RM_CharacterLibrary[("Character library")]:::rm
+    RM_UserReferences[("User references")]:::rm
     ACT_SetupSkill --> CMD_CreateProject
     CMD_CreateProject --> EVT_ProjectCreated
     ACT_Orchestrator --> CMD_StartStage
@@ -273,6 +312,39 @@ flowchart LR
     CMD_WriteSubtitles --> EVT_SubtitlesWritten
     ACT_StageRunner --> CMD_CutLipSyncAudio
     CMD_CutLipSyncAudio --> EVT_LipSyncAudioCut
+    ACT_StageRunner --> CMD_WriteStyleBible
+    CMD_WriteStyleBible --> EVT_StyleBibleWritten
+    ACT_StageRunner --> CMD_WriteCharacterBible
+    CMD_WriteCharacterBible --> EVT_CharacterBibleWritten
+    ACT_StageRunner --> CMD_AddCharacterState
+    CMD_AddCharacterState --> EVT_CharacterStateAdded
+    ACT_StageRunner --> CMD_WriteSetBible
+    CMD_WriteSetBible --> EVT_SetBibleWritten
+    ACT_StageRunner --> CMD_AddSetReference
+    CMD_AddSetReference --> EVT_PlateAdded
+    CMD_AddSetReference --> EVT_PropReferenceAdded
+    ACT_User --> CMD_AddUserReference
+    CMD_AddUserReference --> EVT_UserReferenceAdded
+    ACT_User --> CMD_UpdateUserReference
+    CMD_UpdateUserReference --> EVT_UserReferenceUpdated
+    ACT_User --> CMD_RemoveUserReference
+    CMD_RemoveUserReference --> EVT_UserReferenceRemoved
+    ACT_User --> CMD_ImportCharacters
+    CMD_ImportCharacters --> EVT_LibraryCharacterCreated
+    CMD_ImportCharacters --> EVT_LibraryCharacterExtended
+    ACT_User --> CMD_UseLibraryCharacter
+    CMD_UseLibraryCharacter --> EVT_LibraryCharacterUsed
+    CMD_UseLibraryCharacter --> EVT_LibraryCharacterUseRefused
+    ACT_User --> CMD_AddLibraryCharacter
+    CMD_AddLibraryCharacter --> EVT_LibraryCharacterCreated
+    ACT_User --> CMD_AddLibraryFile
+    CMD_AddLibraryFile --> EVT_LibraryFileAdded
+    ACT_User --> CMD_UpdateLibraryCharacter
+    CMD_UpdateLibraryCharacter --> EVT_LibraryCharacterUpdated
+    ACT_User --> CMD_RemoveLibraryFile
+    CMD_RemoveLibraryFile --> EVT_LibraryFileRemoved
+    ACT_User --> CMD_DeleteLibraryCharacter
+    CMD_DeleteLibraryCharacter --> EVT_LibraryCharacterDeleted
     EVT_StageCompleted --> POL_RunNextStage
     EVT_StageSkipped --> POL_RunNextStage
     POL_RunNextStage --> CMD_StartStage
@@ -297,6 +369,9 @@ flowchart LR
     EVT_ScriptWritten --> POL_ValidateEveryScriptEdit
     EVT_ScriptRevised --> POL_ValidateEveryScriptEdit
     POL_ValidateEveryScriptEdit --> CMD_ValidateScript
+    EVT_StageCompleted --> POL_ImportFinishedCharacters
+    EVT_CharacterBibleWritten --> POL_ImportFinishedCharacters
+    POL_ImportFinishedCharacters --> CMD_ImportCharacters
     EVT_StageStarted -.-> RM_Status
     EVT_StageCompleted -.-> RM_Status
     EVT_StageFailed -.-> RM_Status
@@ -395,6 +470,22 @@ flowchart LR
     RM_TakeStatus -.-> ACT_User
     EVT_SubtitlesWritten -.-> RM_Subtitles
     RM_Subtitles -.-> ACT_User
+    EVT_LibraryCharacterCreated -.-> RM_CharacterLibrary
+    EVT_LibraryCharacterExtended -.-> RM_CharacterLibrary
+    EVT_LibraryCharacterUpdated -.-> RM_CharacterLibrary
+    EVT_LibraryFileAdded -.-> RM_CharacterLibrary
+    EVT_LibraryFileRemoved -.-> RM_CharacterLibrary
+    EVT_LibraryCharacterDeleted -.-> RM_CharacterLibrary
+    EVT_LibraryCharacterUsed -.-> RM_CharacterLibrary
+    RM_CharacterLibrary -.-> ACT_User
+    RM_CharacterLibrary -.-> ACT_SetupSkill
+    RM_CharacterLibrary -.-> ACT_StageRunner
+    EVT_UserReferenceAdded -.-> RM_UserReferences
+    EVT_UserReferenceUpdated -.-> RM_UserReferences
+    EVT_UserReferenceRemoved -.-> RM_UserReferences
+    RM_UserReferences -.-> ACT_User
+    RM_UserReferences -.-> ACT_SetupSkill
+    RM_UserReferences -.-> ACT_StageRunner
     classDef evt fill:#a3391f,stroke:#e65100,color:#fff
     classDef cmd fill:#64b5f6,stroke:#0d47a1,color:#000
     classDef pol fill:#ce93d8,stroke:#4a148c,color:#000
@@ -663,6 +754,84 @@ flowchart LR
     classDef hs fill:#e57373,stroke:#b71c1c,color:#fff
 ```
 
+### From a finished character bible to a character used again
+
+```mermaid
+flowchart LR
+    ACT_StageRunner(["Stage runner"]):::act
+    CMD_WriteCharacterBible["Write the character bible"]:::cmd
+    EVT_CharacterBibleWritten["⭐ Character bible written"]:::evt
+    CMD_CompleteStage["Complete stage"]:::cmd
+    EVT_StageCompleted["Stage completed"]:::evt
+    POL_ImportFinishedCharacters{{"The characters of a finished character bible go into the library"}}:::pol
+    CMD_ImportCharacters["Take characters into the library"]:::cmd
+    EVT_LibraryCharacterCreated["⭐ Library character created"]:::evt
+    RM_CharacterLibrary[("Character library")]:::rm
+    ACT_User(["User"]):::act
+    CMD_UseLibraryCharacter["Use a library character"]:::cmd
+    EVT_LibraryCharacterUsed["⭐ Library character used"]:::evt
+    ACT_StageRunner --> CMD_WriteCharacterBible
+    CMD_WriteCharacterBible --> EVT_CharacterBibleWritten
+    EVT_CharacterBibleWritten --> CMD_CompleteStage
+    CMD_CompleteStage --> EVT_StageCompleted
+    EVT_StageCompleted --> POL_ImportFinishedCharacters
+    POL_ImportFinishedCharacters --> CMD_ImportCharacters
+    CMD_ImportCharacters --> EVT_LibraryCharacterCreated
+    EVT_LibraryCharacterCreated --> RM_CharacterLibrary
+    RM_CharacterLibrary --> ACT_User
+    ACT_User --> CMD_UseLibraryCharacter
+    CMD_UseLibraryCharacter --> EVT_LibraryCharacterUsed
+    classDef evt fill:#a3391f,stroke:#e65100,color:#fff
+    classDef cmd fill:#64b5f6,stroke:#0d47a1,color:#000
+    classDef pol fill:#ce93d8,stroke:#4a148c,color:#000
+    classDef rm fill:#81c784,stroke:#1b5e20,color:#000
+    classDef act fill:#a3751f,stroke:#f57f17,color:#000
+    classDef ext fill:#f48fb1,stroke:#880e4f,color:#000
+    classDef agg fill:#ffe082,stroke:#ff6f00,color:#000
+    classDef hs fill:#e57373,stroke:#b71c1c,color:#fff
+```
+
+### From the treatment to approved continuity references
+
+```mermaid
+flowchart LR
+    ACT_StageRunner(["Stage runner"]):::act
+    CMD_WriteSetBible["Write the set bible"]:::cmd
+    EVT_SetBibleWritten["Set bible written"]:::evt
+    CMD_AddCharacterState["Add a character state"]:::cmd
+    EVT_CharacterStateAdded["Character state added"]:::evt
+    CMD_AddQueueItem["Add queue item"]:::cmd
+    EVT_QueueItemAdded["Queue item added"]:::evt
+    CMD_RunQueue["Run the queue"]:::cmd
+    EVT_AttemptGenerated["Attempt generated"]:::evt
+    POL_JudgeEveryAttempt{{"Every attempt with a verdict target is judged"}}:::pol
+    CMD_GiveVerdict["Give a verdict"]:::cmd
+    EVT_VerdictGiven["⭐ Verdict given"]:::evt
+    CMD_ApplyVerdict["Apply a verdict"]:::cmd
+    EVT_AttemptFiled["⭐ Attempt filed"]:::evt
+    ACT_StageRunner --> CMD_WriteSetBible
+    CMD_WriteSetBible --> EVT_SetBibleWritten
+    EVT_SetBibleWritten --> CMD_AddCharacterState
+    CMD_AddCharacterState --> EVT_CharacterStateAdded
+    EVT_CharacterStateAdded --> CMD_AddQueueItem
+    CMD_AddQueueItem --> EVT_QueueItemAdded
+    EVT_QueueItemAdded --> CMD_RunQueue
+    CMD_RunQueue --> EVT_AttemptGenerated
+    EVT_AttemptGenerated --> POL_JudgeEveryAttempt
+    POL_JudgeEveryAttempt --> CMD_GiveVerdict
+    CMD_GiveVerdict --> EVT_VerdictGiven
+    EVT_VerdictGiven --> CMD_ApplyVerdict
+    CMD_ApplyVerdict --> EVT_AttemptFiled
+    classDef evt fill:#a3391f,stroke:#e65100,color:#fff
+    classDef cmd fill:#64b5f6,stroke:#0d47a1,color:#000
+    classDef pol fill:#ce93d8,stroke:#4a148c,color:#000
+    classDef rm fill:#81c784,stroke:#1b5e20,color:#000
+    classDef act fill:#a3751f,stroke:#f57f17,color:#000
+    classDef ext fill:#f48fb1,stroke:#880e4f,color:#000
+    classDef agg fill:#ffe082,stroke:#ff6f00,color:#000
+    classDef hs fill:#e57373,stroke:#b71c1c,color:#fff
+```
+
 ## Bounded Contexts & Aggregates
 
 | Context | Purpose | Aggregates | Events |
@@ -674,6 +843,8 @@ flowchart LR
 | Storyboard (`BC-Storyboard`) | Turns the treatment or script, the effective timing and the bibles into an ordered list of shots that covers the song or episode track, checks every shot's source, continuity references and limits, and hands resolved shots to the queue, render, QA and review | Storyboard | Storyboard written, Storyboard revised, Storyboard validated, Contact sheet written |
 | Generation (`BC-Generation`) | Turns the items of a generation batch into provider calls for a model role – each refused up front when the batch does not fit the budget, served from the generation cache when the same request ran before, recorded in the manifest, and billed to the project budget at its planned cost | Cached generation, Model roles | Generation batch refused, Generation completed, Generation reused from the cache, Generation failed, Clip restored, Generation filed, Model roles changed, ComfyUI restarted |
 | Series (`BC-Series`) | Keeps a series' umbrella budget and episode plan and creates its episodes, and turns an episode's script into takes, an episode track with speaker stems, subtitles and lip-sync audio – the episode's replacement for the song | Series, Script, Take registry, Episode track | Series created, Episode created, Episode refused, Canon spend recorded, Script written, Script revised, Script validated, Take generated, Ambience generated, Take imported, Voice track stopped, Episode track built, Subtitles written, Lip-sync audio cut |
+| Bibles (`BC-Bibles`) | Holds what a production must look and sound like before any shot is generated – the style bible, the character bible with its character states, the set bible with plates and prop references, and the user references – per music video, or once per series canon that every episode reads and may only add to | Style bible, Character bible, Set bible, User references | Style bible written, Character bible written, Character state added, Set bible written, Plate added, Prop reference added, User reference added, User reference updated, User reference removed, Library character used |
+| Character library (`BC-CharacterLibrary`) | Keeps the workspace's reusable characters across productions – takes the characters of finished character bibles in and copies a character's identity, and the states the user chooses, into a new music video or series canon | Library character | Library character created, Library character extended, Library character updated, Library file added, Library file removed, Library character deleted, Library character use refused |
 
 ## Aggregates
 
@@ -691,3 +862,8 @@ flowchart LR
 | Script (`AGG-Script`) | Series | as-is | script.yaml of an episode, parsed whole with ScriptSchema by loadProject (packages/core/src/project.ts:262; schema.ts:587-657)<br>validateScript checks the whole script against the series canon and throws one error listing every issue (packages/core/src/episode.ts:59-104); the workspace hook runs it on every edit (packages/cli/src/validate-file.ts:134-145) |
 | Take registry (`AGG-TakeRegistry`) | Series | as-is | takes.json of an episode, written whole and sorted by saveTakes (packages/cli/src/takes.ts:51-57); its writers are voice-track and import-takes (packages/cli/src/voice-track.ts:99-200; media.ts:395-460)<br>every take's status follows from its file, the registered file hash and the text hash of its script line (takes.ts:65-87; packages/core/src/episode.ts:139-153) |
 | Episode track (`AGG-EpisodeTrack`) | Series | as-is | episodeTrack places the lines from the take durations and writes timing.json, timing.effective.json, audio/episode.wav and audio/stems/<character>.wav together in one run from the effective timing (packages/cli/src/episode-track.ts:148-253) |
+| Style bible (`AGG-StyleBible`) | Bibles | as-is | style.yaml of a music video or series canon, parsed whole with StyleBibleSchema (packages/core/src/schema.ts:373-419) by loadProject (packages/core/src/project.ts:227-250) and by validate-file on every edit (packages/cli/src/validate-file.ts:86-97)<br>an episode's style bible is the canon's (project.ts:89,105-107); new-series writes a starter from the brand kit (packages/cli/src/new-series.ts:48-58) |
+| Character bible (`AGG-CharacterBible`) | Bibles | as-is | characters.yaml of a music video or series canon, parsed whole with CharacterBibleSchema (packages/core/src/schema.ts:436-489); the files lie in characters/<id>/ beside it<br>written by the character-bible and new-series skills, and by character use through the YAML document with a whole-file schema check before an atomic write (packages/cli/src/character-library.ts:452-525) |
+| Set bible (`AGG-SetBible`) | Bibles | as-is | sets.yaml of a music video or series canon, parsed whole with SetBibleSchema (packages/core/src/schema.ts:496-541); plates in sets/<set>/plates/, props in props/<id>/ beside it<br>written by the style-bible skill in style-character (music video) and by new-series (canon); validated by the hook on every edit (packages/cli/src/validate-file.ts:86-97) |
+| User references (`AGG-UserReferences`) | Bibles | as-is | references.yaml of a project or series canon with ReferencesSchema (packages/core/src/schema.ts:1460-1489), files in assets/references/<br>every change is a read, a change and an atomic save in board-wizard.ts (packages/cli/src/board-wizard.ts:72-178), used by the reference command and the board wizard; validate-file checks unique ids and that every file exists (packages/cli/src/validate-file.ts:234-243) |
+| Library character (`AGG-LibraryCharacter`) | Character library | as-is | library/characters/<id>/character.yaml with LibraryCharacterSchema (packages/core/src/schema.ts:1422-1458) and the character's files beside it; validate-file checks that the id is the folder and that every named file exists (packages/cli/src/validate-file.ts:246-258)<br>every write – import, new, add-file, update, remove – reads the entry, changes it and saves it atomically in character-library.ts (packages/cli/src/character-library.ts:63-66,206-428) |

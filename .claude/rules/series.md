@@ -25,7 +25,7 @@ paths:
 > recommendation plus four answers from the user. The model is in `docs/domain/events.yaml` (`AGG-Series`,
 > `AGG-Script`, `AGG-TakeRegistry`, `AGG-EpisodeTrack`), the decisions in ADR 0042 (proposed), and gaps
 > G-105–G-121 in `docs/domain/gap-register.md`. The canon files (characters, sets, plates, props, style) belong
-> to the character slice, not this one.
+> to BC-Bibles (`.claude/rules/character.md`), not this one.
 
 ## Purpose
 

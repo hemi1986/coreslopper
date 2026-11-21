@@ -15,6 +15,7 @@
 # Slices adopted 2026-11-21: project and stage pipeline (confirmed); human review (confirmed); art-director verdicts and the
 # generation queue (decided by recommendation, not reviewed by the user – see the adoption report); song timing and lyrics
 # (decided by recommendation, four answers from the user); storyboard and generation (decided by recommendation, four answers from the user each).
+# Slices adopted 2026-11-22: series; bibles and the character library (decided by recommendation, four answers from the user each).
 # See docs/domain/adoption-report.md.
 
 version: 1
@@ -74,6 +75,12 @@ bounded_contexts:
   - id: BC-Series
     name: Series
     purpose: Keeps a series' umbrella budget and episode plan and creates its episodes, and turns an episode's script into takes, an episode track with speaker stems, subtitles and lip-sync audio – the episode's replacement for the song
+  - id: BC-Bibles
+    name: Bibles
+    purpose: Holds what a production must look and sound like before any shot is generated – the style bible, the character bible with its character states, the set bible with plates and prop references, and the user references – per music video, or once per series canon that every episode reads and may only add to
+  - id: BC-CharacterLibrary
+    name: Character library
+    purpose: Keeps the workspace's reusable characters across productions – takes the characters of finished character bibles in and copies a character's identity, and the states the user chooses, into a new music video or series canon
 
 aggregates:
   - id: AGG-Project
@@ -256,6 +263,68 @@ aggregates:
       - The episode track and every speaker stem last exactly the timing's duration, and the mix meets the project's loudness target (the code does this, episode-track.ts:224-253)
       - The timing has no tempo, no beats, downbeats or onsets; its energy is the RMS envelope of the mix (the code does this; ADR 0016)
       - The episode's length stays within the series' episode length, checked when the track is built (decided 2026-11-22, HS-114; only QA checks it – gap register)
+  - id: AGG-StyleBible
+    name: Style bible
+    context: BC-Bibles
+    status: as-is
+    evidence:
+      - style.yaml of a music video or series canon, parsed whole with StyleBibleSchema (packages/core/src/schema.ts:373-419) by loadProject (packages/core/src/project.ts:227-250) and by validate-file on every edit (packages/cli/src/validate-file.ts:86-97)
+      - an episode's style bible is the canon's (project.ts:89,105-107); new-series writes a starter from the brand kit (packages/cli/src/new-series.ts:48-58)
+    invariants:
+      - Every palette colour is a #rrggbb colour, and every renderer role names a palette key or a #rrggbb colour (the code does this, schema.ts:402-419)
+      - An episode uses its series' style bible and has none of its own (the code does this, project.ts:89,105-107; ADR 0016)
+      - The look keywords, negatives and look references are guidance for the agents; no code reads them (HS-138)
+  - id: AGG-CharacterBible
+    name: Character bible
+    context: BC-Bibles
+    status: as-is
+    evidence:
+      - characters.yaml of a music video or series canon, parsed whole with CharacterBibleSchema (packages/core/src/schema.ts:436-489); the files lie in characters/<id>/ beside it
+      - written by the character-bible and new-series skills, and by character use through the YAML document with a whole-file schema check before an atomic write (packages/cli/src/character-library.ts:452-525)
+    invariants:
+      - The state ids of one character are unique (the code does this, schema.ts:485-489)
+      - Character ids are unique within the bible and have the shape of a script id, since they name the character's folder and its library entry (decided 2026-11-22, HS-127; the schema checks neither – gap register)
+      - Every recurring character the screen shows – any display rule except voice-only – has a character sheet the art director passed before anything derives from it (decided 2026-11-22, HS-125; sheet is optional and the queue falls back to the first reference – gap register)
+      - A character state derives from the character's sheet or from another state of the same character, never from a shot's keyframe (character-bible skill; ADR 0025; no code checks from – gap register)
+      - A character taken from the library keeps its identity and only gains states and references (the code does this for use, character-library.ts:472-523; ADR 0034)
+      - In a series canon an episode adds characters' states and never changes or removes an entry (decided 2026-11-22, HS-130; a prompt rule in stage-runner.md, no code – gap register)
+  - id: AGG-SetBible
+    name: Set bible
+    context: BC-Bibles
+    status: as-is
+    evidence:
+      - sets.yaml of a music video or series canon, parsed whole with SetBibleSchema (packages/core/src/schema.ts:496-541); plates in sets/<set>/plates/, props in props/<id>/ beside it
+      - written by the style-bible skill in style-character (music video) and by new-series (canon); validated by the hook on every edit (packages/cli/src/validate-file.ts:86-97)
+    invariants:
+      - Set ids, prop ids and the plate ids of one set are unique and have the shape of a script id (the code does this, schema.ts:27-30,537-541)
+      - A shot may name a plate or a prop only when the production has a set bible that lists it (the code does this, packages/core/src/timing.ts:326-366)
+      - A plate is empty – no character, no loose prop – and the plates of one set share its light (style-bible skill; the art director judges it, no code)
+      - In a series canon an episode adds plates and prop references and never changes or removes an entry (decided 2026-11-22, HS-130; a prompt rule, no code – gap register)
+  - id: AGG-UserReferences
+    name: User references
+    context: BC-Bibles
+    status: as-is
+    evidence:
+      - references.yaml of a project or series canon with ReferencesSchema (packages/core/src/schema.ts:1460-1489), files in assets/references/
+      - every change is a read, a change and an atomic save in board-wizard.ts (packages/cli/src/board-wizard.ts:72-178), used by the reference command and the board wizard; validate-file checks unique ids and that every file exists (packages/cli/src/validate-file.ts:234-243)
+    invariants:
+      - A user reference is either a file under assets/references/ or an http(s) link, never both (the code does this, schema.ts:1467-1485)
+      - Reference ids are unique and every listed file exists (the code does this, validate-file.ts:234-243)
+      - Removing a user reference deletes its file (the code does this, board-wizard.ts)
+  - id: AGG-LibraryCharacter
+    name: Library character
+    context: BC-CharacterLibrary
+    status: as-is
+    evidence:
+      - library/characters/<id>/character.yaml with LibraryCharacterSchema (packages/core/src/schema.ts:1422-1458) and the character's files beside it; validate-file checks that the id is the folder and that every named file exists (packages/cli/src/validate-file.ts:246-258)
+      - every write – import, new, add-file, update, remove – reads the entry, changes it and saves it atomically in character-library.ts (packages/cli/src/character-library.ts:63-66,206-428)
+    invariants:
+      - The entry's id is its folder's name, and every file it names is a plain file of that folder and exists (the code does this, schema.ts:1422-1428; validate-file.ts:246-258)
+      - One character, one entry – an import goes into the entry it was taken from, into a same-id entry that shares a file with it, or into the entry the user names; anything else becomes a new entry <id>-<slug> (the code does this, character-library.ts:282-293; ADR 0034)
+      - A file is stored once by its content (the code does this, character-library.ts:141-167)
+      - An import keeps the entry's identity, fills in only what is missing and appends references and states; a state id that exists with another image becomes <state>-<slug>; every later import is recorded in the history (the code does this, character-library.ts:206-279)
+      - Every file in the entry's folder is named by character.yaml (decided 2026-11-22, HS-132; a re-import with a changed sheet or voice, or a skipped state, leaves an unnamed file – gap register)
+      - The library belongs to the user – update and init never overwrite it; its media are gitignored and character.yaml stays tracked (the code does this, packages/cli/src/update.ts:43-45; .gitignore)
 
 events:
   - id: EVT-ProjectCreated
@@ -521,6 +590,94 @@ events:
     context: BC-Series
     data: [Character, Start, End, File]
     description: "audio-segment --character cuts a lip-sync shot's audio from the speaker stem into assets/audio-segments/ (packages/cli/src/media.ts:75-136)"
+  - id: EVT-StyleBibleWritten
+    name: Style bible written
+    aggregate: AGG-StyleBible
+    data: [Palette, Renderer roles, Typography, Look, Motion]
+    description: "The style-bible skill writes style.yaml in style-character; new-series writes a starter from the brand kit with an empty look (packages/cli/src/new-series.ts:48-58)"
+  - id: EVT-CharacterBibleWritten
+    name: Character bible written
+    aggregate: AGG-CharacterBible
+    pivotal: true
+    data: [Characters, Character sheets, References, Reference voices, Display rules, Character states]
+    description: "The character-bible skill (music video, style-character) or the new-series skill (canon) writes characters.yaml with the filed sheets and references"
+  - id: EVT-CharacterStateAdded
+    name: Character state added
+    aggregate: AGG-CharacterBible
+    data: [Character, Character state, Description, Derived from, Reference image]
+    description: "character-bible, or the storyboard or assets stage of a production that needs a new look; an episode adds it to the canon (stage-runner.md; ADR 0025)"
+  - id: EVT-SetBibleWritten
+    name: Set bible written
+    aggregate: AGG-SetBible
+    data: [Sets, Plates, Prop references]
+    description: "The style-bible skill (music video, style-character) or new-series (canon) writes sets.yaml"
+  - id: EVT-PlateAdded
+    name: Plate added
+    aggregate: AGG-SetBible
+    data: [Set, Plate, Angle, Reference image]
+    description: "A plate added after the set bible was written, by the storyboard or assets stage; an episode adds it to the canon (ADR 0025)"
+  - id: EVT-PropReferenceAdded
+    name: Prop reference added
+    aggregate: AGG-SetBible
+    data: [Prop, Description, Reference images]
+    description: "A prop reference added after the set bible was written; an episode adds it to the canon (ADR 0025)"
+  - id: EVT-UserReferenceAdded
+    name: User reference added
+    aggregate: AGG-UserReferences
+    data: [Reference id, Kind, File or link, Title, Subject, Note]
+    description: "reference add|link, the board wizard's upload, or the setup skill recording what the user hands over in chat (packages/cli/src/board-wizard.ts:95-150; index.ts:611-642)"
+  - id: EVT-UserReferenceUpdated
+    name: User reference updated
+    aggregate: AGG-UserReferences
+    data: [Reference id, Kind, Subject, Note]
+    description: "The board wizard changes a reference's kind, subject or note (board-wizard.ts)"
+  - id: EVT-UserReferenceRemoved
+    name: User reference removed
+    aggregate: AGG-UserReferences
+    data: [Reference id]
+    description: "reference remove or the board wizard; the file is deleted (board-wizard.ts:150-170)"
+  - id: EVT-LibraryCharacterCreated
+    name: Library character created
+    aggregate: AGG-LibraryCharacter
+    pivotal: true
+    data: [Library character, Name, Description, Display rule, Character sheet, References, Reference voice, Character states, Tags, Origin]
+    description: "An import of a character no entry holds, or character new and the board's form (packages/cli/src/character-library.ts:206-293,328-349)"
+  - id: EVT-LibraryCharacterExtended
+    name: Library character extended
+    aggregate: AGG-LibraryCharacter
+    data: [Library character, Source production, Files added, Character states added]
+    description: "An import into an existing entry: missing identity fields, new references and states; one history row (character-library.ts:245-276)"
+  - id: EVT-LibraryCharacterUpdated
+    name: Library character updated
+    aggregate: AGG-LibraryCharacter
+    data: [Library character, Name, Description, Prompt, Tags]
+    description: "The board's form changes an entry (character-library.ts updateLibraryCharacter)"
+  - id: EVT-LibraryFileAdded
+    name: Library file added
+    aggregate: AGG-LibraryCharacter
+    data: [Library character, File, Role]
+    description: "character add-file or a board upload as sheet, reference or voice; a new sheet moves the old one into the references, a voice needs its transcript (character-library.ts:363-409)"
+  - id: EVT-LibraryFileRemoved
+    name: Library file removed
+    aggregate: AGG-LibraryCharacter
+    data: [Library character, File]
+    description: "character remove --file or the board: the file is deleted and the sheet, reference, voice or state reference naming it is cleared; the state stays (character-library.ts:412-422)"
+  - id: EVT-LibraryCharacterDeleted
+    name: Library character deleted
+    aggregate: AGG-LibraryCharacter
+    data: [Library character]
+    description: "character remove or the board; the copies in productions stay (character-library.ts:424-428)"
+  - id: EVT-LibraryCharacterUsed
+    name: Library character used
+    aggregate: AGG-CharacterBible
+    pivotal: true
+    data: [Library character, Target production, Character states, Files copied]
+    description: "character use or the board copies the identity and the chosen states into the target's characters/<id>/ and characters.yaml with library: <id>; a second use adds what the target lacks (character-library.ts:452-525)"
+  - id: EVT-LibraryCharacterUseRefused
+    name: Library character use refused
+    context: BC-CharacterLibrary
+    data: [Library character, Target production, Reason]
+    description: "The target is an episode (it takes its characters from the series canon), the target has its own character with that id, or a chosen state does not exist; nothing is copied (character-library.ts:452-470)"
 
 commands:
   - id: CMD-CreateProject
@@ -894,6 +1051,123 @@ commands:
     aggregate: AGG-EpisodeTrack
     produces: [EVT-LipSyncAudioCut]
     description: "audio-segment --character for a lip-sync shot of an episode, from the speaker stem; the lead-only muting of a music video never applies, because an episode's timing has no words"
+  - id: CMD-WriteStyleBible
+    name: Write the style bible
+    actor: ACT-StageRunner
+    aggregate: AGG-StyleBible
+    produces: [EVT-StyleBibleWritten]
+    description: "The style-bible skill in style-character, from the brief, the treatment, the brand kit and the user references of kind look and location; in a series the new-series skill"
+    rules:
+      - Starts from the brand kit; a project-local brand/brand.yaml replaces brand/<project.brand>/ (style-bible skill)
+      - Fonts and look references carry a licence that allows the project (style-bible skill; no field records it – HS-138)
+  - id: CMD-WriteCharacterBible
+    name: Write the character bible
+    actor: ACT-StageRunner
+    aggregate: AGG-CharacterBible
+    produces: [EVT-CharacterBibleWritten]
+    description: "The character-bible skill in style-character, or the new-series skill for a canon; sheets and references are generated through the generation queue (music video) or review-image by hand (canon) and filed by their out path"
+    rules:
+      - A character the treatment names that is in the library is used from there instead of a new sheet (character-bible skill; ADR 0034)
+      - A one-off background figure needs no sheet; a recurring character does (character-bible skill; HS-125)
+  - id: CMD-AddCharacterState
+    name: Add a character state
+    actor: ACT-StageRunner
+    aggregate: AGG-CharacterBible
+    produces: [EVT-CharacterStateAdded]
+    description: "character-bible, the storyboard or the assets stage; the reference is an image edit of the sheet or of the from state, queued with review ref state:<character>/<state>"
+    rules:
+      - The state's reference passes the art director against its description before any shot uses it (ADR 0025; character-bible skill)
+      - In an episode only the storyboard and assets stages add to the canon, on the episode's budget (stage-runner.md; HS-130)
+  - id: CMD-WriteSetBible
+    name: Write the set bible
+    actor: ACT-StageRunner
+    aggregate: AGG-SetBible
+    produces: [EVT-SetBibleWritten]
+    description: "The style-bible skill in style-character for a music video whose AI shots return to a place or object; the new-series skill for a canon"
+    rules:
+      - A music video without recurring places or objects has no set bible (style-bible skill; ADR 0025)
+  - id: CMD-AddSetReference
+    name: Add a plate or prop reference
+    actor: ACT-StageRunner
+    aggregate: AGG-SetBible
+    produces: [EVT-PlateAdded, EVT-PropReferenceAdded]
+    description: "The storyboard or assets stage when a shot needs a framing or object the set bible lacks; plates generated empty at the master format's size, props alone on a neutral ground, queued with review ref plate:<set>/<plate> or prop:<id>"
+    rules:
+      - Every plate and prop passes the art director before any shot uses it (ADR 0025; style-bible skill)
+      - In an episode only the storyboard and assets stages add to the canon, on the episode's budget (stage-runner.md; HS-130)
+  - id: CMD-AddUserReference
+    name: Add a user reference
+    actor: ACT-User
+    aggregate: AGG-UserReferences
+    produces: [EVT-UserReferenceAdded]
+    description: "reference add --file or link --url, the board wizard's upload (ACT-BoardWizard), or the setup skill for material handed over in chat (packages/cli/src/board-wizard.ts:95-150)"
+    rules:
+      - A file is copied into assets/references/ under a cleaned name; an upload is at most 4 GB of one of the allowed types (board-wizard.ts:44-75)
+  - id: CMD-UpdateUserReference
+    name: Update a user reference
+    actor: ACT-User
+    aggregate: AGG-UserReferences
+    produces: [EVT-UserReferenceUpdated]
+    description: "The board wizard; the CLI has no update"
+  - id: CMD-RemoveUserReference
+    name: Remove a user reference
+    actor: ACT-User
+    aggregate: AGG-UserReferences
+    produces: [EVT-UserReferenceRemoved]
+    description: "reference remove --id or the board wizard"
+  - id: CMD-ImportCharacters
+    name: Take characters into the library
+    actor: ACT-User
+    aggregate: AGG-LibraryCharacter
+    produces: [EVT-LibraryCharacterCreated, EVT-LibraryCharacterExtended]
+    description: "character import <production> [--series] [--id] [--into], the board's Characters view (scope and slug only), and POL-ImportFinishedCharacters (packages/cli/src/character-library.ts:206-293)"
+    rules:
+      - A character with no file is skipped, or refused when it was named with --id; missing files are reported, not fatal (character-library.ts:223-228)
+  - id: CMD-UseLibraryCharacter
+    name: Use a library character
+    actor: ACT-User
+    aggregate: AGG-CharacterBible
+    produces: [EVT-LibraryCharacterUsed, EVT-LibraryCharacterUseRefused]
+    description: "character use <target> <id> [--series] [--states <ids>|all], the board's character page and the + New wizard, or the setup skill (new-video, new-series) for the characters the user chooses while grilling"
+    rules:
+      - The identity – sheet, references, reference voice – always comes along, each state only when chosen (the code does this, character-library.ts:452-525; ADR 0034)
+      - An episode takes its characters from its series canon, so use goes to the series (the code does this, character-library.ts:455)
+      - The target keeps the library id as the character's id, and a target character of that id that is not linked to the entry refuses the use (the code does this, character-library.ts:468-480)
+      - A chosen state brings the states it derives from along (decided 2026-11-22, HS-133; use drops from instead – gap register)
+  - id: CMD-AddLibraryCharacter
+    name: Add a library character by hand
+    actor: ACT-User
+    aggregate: AGG-LibraryCharacter
+    produces: [EVT-LibraryCharacterCreated]
+    description: "character new or the board's form; the id comes from the name, origin is manual (character-library.ts:328-349)"
+    rules:
+      - An id the library already has is refused (character-library.ts:340)
+  - id: CMD-AddLibraryFile
+    name: Add a file to a library character
+    actor: ACT-User
+    aggregate: AGG-LibraryCharacter
+    produces: [EVT-LibraryFileAdded]
+    description: "character add-file --role ref|sheet|voice or a board upload (character-library.ts:363-409)"
+    rules:
+      - Images are png, jpg or webp and voices wav, at most 512 MB; a voice needs its transcript (character-library.ts:28-32,363-379)
+  - id: CMD-UpdateLibraryCharacter
+    name: Update a library character
+    actor: ACT-User
+    aggregate: AGG-LibraryCharacter
+    produces: [EVT-LibraryCharacterUpdated]
+    description: "The board's form; the CLI has no update"
+  - id: CMD-RemoveLibraryFile
+    name: Remove a file from a library character
+    actor: ACT-User
+    aggregate: AGG-LibraryCharacter
+    produces: [EVT-LibraryFileRemoved]
+    description: "character remove --file or the board"
+  - id: CMD-DeleteLibraryCharacter
+    name: Delete a library character
+    actor: ACT-User
+    aggregate: AGG-LibraryCharacter
+    produces: [EVT-LibraryCharacterDeleted]
+    description: "character remove or the board; the productions keep their copies"
 
 policies:
   - id: POL-RunNextStage
@@ -945,6 +1219,11 @@ policies:
     when: [EVT-ScriptWritten, EVT-ScriptRevised]
     then: [CMD-ValidateScript]
     description: "The workspace hook runs validate-file on every edit of script.yaml and blocks a failing edit; only the script is checked against the canon, because the timing is rebuilt from it (packages/cli/src/validate-file.ts:134-145)"
+  - id: POL-ImportFinishedCharacters
+    name: The characters of a finished character bible go into the library
+    when: [EVT-StageCompleted, EVT-CharacterBibleWritten]
+    then: [CMD-ImportCharacters]
+    description: "Code for a music video – stage-done style-character imports every character with a file, and a failure only warns (packages/cli/src/index.ts:786-794); for a series canon a step of the new-series skill (SKILL.md:70). Decided: code for both kinds (HS-131; gap register)"
 
 read_models:
   - id: RM-Status
@@ -1056,6 +1335,18 @@ read_models:
     used_by: [ACT-User]
     fields: [Cue, Start, End, Text]
     description: "renders/<slug>.en.srt, beside the master render in the release package"
+  - id: RM-CharacterLibrary
+    name: Character library
+    fed_by: [EVT-LibraryCharacterCreated, EVT-LibraryCharacterExtended, EVT-LibraryCharacterUpdated, EVT-LibraryFileAdded, EVT-LibraryFileRemoved, EVT-LibraryCharacterDeleted, EVT-LibraryCharacterUsed]
+    used_by: [ACT-User, ACT-SetupSkill, ACT-StageRunner]
+    fields: [Library character, Name, Cover, Character sheet, References, Reference voice, Character states, Tags, Origin, History, Used in, Targets]
+    description: "character list and the board's Characters view (packages/cli/src/character-library.ts:69-112,538-547; packages/cli/src/board/characters.js); used in lists the productions whose characters.yaml names the entry in library"
+  - id: RM-UserReferences
+    name: User references
+    fed_by: [EVT-UserReferenceAdded, EVT-UserReferenceUpdated, EVT-UserReferenceRemoved]
+    used_by: [ACT-User, ACT-SetupSkill, ACT-StageRunner]
+    fields: [Reference id, Kind, File or link, Title, Subject, Note]
+    description: "reference list and the board wizard; the setup skills open every file before the first grilling question, the bible and storyboard skills read the kinds they need"
 
 hotspots:
   - id: HS-1
@@ -1668,6 +1959,106 @@ hotspots:
     refs: [AGG-Series]
     status: resolved
     resolution: "The commitment holds whenever an episode budget changes too; the check runs where budgets change, once a budget command exists (G-13, G-107). Parallel creation stays unguarded: one setup skill or wizard runs at a time – gap, low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-123
+    question: "The bibles of one production and the workspace's character library: one context or two?"
+    refs: [BC-Bibles, BC-CharacterLibrary]
+    status: resolved
+    resolution: "Two contexts. Bibles holds a production's style, characters, sets and user references; Character library holds the workspace-wide entries and copies between them – a library character and a character of a bible are different things, and only copies cross the boundary (ADR 0034) (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-124
+    question: "Which consistency boundaries does the code show for the bibles and the library, and is the canon an aggregate of its own?"
+    refs: [AGG-StyleBible, AGG-CharacterBible, AGG-SetBible, AGG-UserReferences, AGG-LibraryCharacter]
+    status: resolved
+    resolution: "Five as-is aggregates, one per file that is parsed and written whole – style.yaml, characters.yaml, sets.yaml, references.yaml, library/characters/<id>/character.yaml. The canon is not an aggregate: it is the bibles of a series folder, with the append rule on the character and set bible (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-125
+    question: "The glossary says a character sheet is required for every character shot; the schema makes it optional, nothing checks it, the queue falls back to the first reference, and the demo canon has none. Which holds?"
+    refs: [AGG-CharacterBible]
+    status: resolved
+    resolution: "Every recurring character the screen shows (display rule other than voice-only) has a sheet the art director passed; a one-off figure needs none. Checked when the storyboard names the character in an AI shot – gap, medium. The user's answer (corrections are regenerated by the agent) keeps the sheet the anchor every regeneration derives from (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-126
+    question: "Canon gaps count only a character's references, so a character with a sheet and no further reference shows as a gap while the queue would use the sheet. Does the sheet count?"
+    refs: [AGG-CharacterBible]
+    status: resolved
+    resolution: "Yes: a character's references for canon gaps are its sheet and its reference images; the sheet alone closes the gap, as in the queue – gap, low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-127
+    question: "Sets, plates, props, states and library entries have unique, script-id shaped ids; character ids are any non-empty string and may repeat. Should they follow the others?"
+    refs: [AGG-CharacterBible]
+    status: resolved
+    resolution: "Yes: character ids are unique and script-id shaped, since they name the character's folder, its library entry and the speaker of a script line; a duplicate today makes every lookup take the first silently – gap, medium (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-128
+    question: "Several words compete: outfit (avoided for Character State, but used for identity references in the schema, ADR 0034 and the board), identity, library entry or Figur, set bible or sets, sheet (also the side-by-side sheet command), reference (generated, user, look). Which terms?"
+    refs: [BC-Bibles, BC-CharacterLibrary]
+    status: resolved
+    resolution: "New terms Set Bible, Character Identity and Library Character; Character Use and Character Import as the two directions of a copy. An outfit is a reference image of the character's identity, not a term of its own; Character State keeps outfit under Avoid. Reference image for the generated references of a character, set or prop; User Reference stays for references.yaml. The sheet command's side-by-side image is not a character sheet (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-129
+    question: "sets.yaml is written in style-character, but the stage's outputs list only style.yaml and characters.yaml, and the two skills tell stage-done different outputs. Fix the list?"
+    refs: [AGG-SetBible]
+    status: resolved
+    resolution: "Yes: the set bible is an output of style-character when the production has one, in the stage list and in both skills' stage-done line. The user confirmed sets recur in music videos too, so the set bible is a normal output there – gap, low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-130
+    question: "The glossary says no episode may change the canon, and new-series says episodes never change it, while ADR 0025 and stage-runner.md let the storyboard and assets stages append plates, props and states. And nothing in the code enforces either. Which holds, and where?"
+    refs: [AGG-CharacterBible, AGG-SetBible]
+    status: resolved
+    resolution: "Append-only: an episode's storyboard and assets stages may add plates, prop references and character states, generated on the episode's budget, and never change or remove an entry; the glossary and the new-series skill are corrected. The check belongs where the canon's bibles are written (validate-file against the last version), alongside G-118 for files – gap, medium (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-131
+    question: "Characters come into the library by code only for a music video (stage-done style-character); a series canon relies on a skill step, and states an episode appends to the canon never reach the library. One rule?"
+    refs: [AGG-LibraryCharacter]
+    status: resolved
+    resolution: "One rule in code for both kinds: the characters of a finished character bible – a music video's style-character, a canon once it has no canon gap – go into the library by themselves; an import failure keeps warning without failing the stage. The user has not used the library yet (it is new), so this is low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-132
+    question: "A re-import with a changed sheet or voice copies the file into the entry but leaves sheet and voice as they were, and a state whose renamed id is taken too is skipped after its image was copied. Unnamed files?"
+    refs: [AGG-LibraryCharacter]
+    status: resolved
+    resolution: "Every file in an entry is named by character.yaml: a changed sheet joins the references, a changed voice is not copied and is reported, and a skipped state is reported and copies nothing – gap, low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-133
+    question: "character use drops a state's from when the state it derives from is not chosen, so the chain ADR 0025 keeps explicit is lost silently. Keep the chain?"
+    refs: [AGG-CharacterBible]
+    status: resolved
+    resolution: "A chosen state brings the states it derives from along, so from always names a state of the same character; from is checked to name one – gap, low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-134
+    question: "No lock guards characters.yaml, sets.yaml, references.yaml or a library entry; the board and an agent may write at once and the last writer wins. Enough?"
+    refs: [AGG-CharacterBible, AGG-UserReferences, AGG-LibraryCharacter]
+    status: resolved
+    resolution: "Lock the library entry, the target's characters.yaml on use, and references.yaml with the existing file lock, as the review and release files are; the bibles themselves are written by one stage at a time. Low – the user adds references only sometimes and the library is new (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-135
+    question: "A shot's continuity references are resolved three times – the storyboard check, QA and the queue – and differently: QA checks only a prop's first image, the episode canon check only ids. One resolution?"
+    refs: [AGG-SetBible, AGG-CharacterBible]
+    status: resolved
+    resolution: "One resolution of a shot's continuity references in core, used by the storyboard check, QA and the queue. The keyframe takes a prop's first reference image; every reference image the bible names must exist – gap, low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-136
+    question: "The display rules are listed three times (schema, cli, board JS), the image and audio types twice, the reference kinds twice, two file-name cleaners, and the library-file check in the cli and in the hook. Accident?"
+    refs: [BC-Bibles, BC-CharacterLibrary]
+    status: resolved
+    resolution: "Accident: one source in core for the display rules, reference kinds and file types, which the board reads from the server; as HS-115 – gap, low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-137
+    question: "validate-file checks that a library entry's and the user references' files exist, but not those of characters.yaml or sets.yaml. Should it?"
+    refs: [AGG-CharacterBible, AGG-SetBible]
+    status: resolved
+    resolution: "As it is: a bible is written before its images are generated, so its files are checked where they are used – the queue before a keyframe and QA before export (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-138
+    question: "Nothing in code reads the style bible's look, or the prompts of characters, states, plates and props; the style-bible skill demands a recorded licence for fonts and references, and no field holds one. Intended?"
+    refs: [AGG-StyleBible]
+    status: resolved
+    resolution: "The look and the prompts are agent guidance and stay unchecked. The licence criterion has nowhere to be recorded – gap, low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-139
+    question: "stage-done style-character only warns when the library import fails. Should it fail the stage?"
+    refs: [AGG-LibraryCharacter]
+    status: resolved
+    resolution: "No: the stage's outputs are the bibles; the library is a convenience for later productions (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-140
+    question: "Do the bibles and the library need an ADR beside 0025 and 0034?"
+    refs: [BC-Bibles, BC-CharacterLibrary]
+    status: resolved
+    resolution: "ADR 0043 (proposed) records the two contexts, the character identity, the sheet for every recurring on-screen character, the canon's append rule and who may append, one import rule for both kinds, and one resolution of continuity references; it amends 0025 and 0034 (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-141
+    question: "Texts that drifted: character list prints series/<slug>; workspace/CLAUDE.md's hook list leaves out references.yaml; new-series says episodes never change the canon. Fix?"
+    refs: [BC-Bibles, BC-CharacterLibrary]
+    status: resolved
+    resolution: "Yes, as one text fix – gap, low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-142
+    question: "The board's Characters view imports a whole production and cannot name a character or merge into an entry (--id, --into), so two copies of one character land as two entries from the board. Needed?"
+    refs: [AGG-LibraryCharacter]
+    status: resolved
+    resolution: "Later: the CLI covers it, and the user has not used the library yet – gap, low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
 
 flows:
   - id: FLOW-AutonomousStage
@@ -1694,3 +2085,9 @@ flows:
   - id: FLOW-EpisodeTrack
     name: From the script to the episode track
     sequence: [ACT-SetupSkill, CMD-WriteScript, EVT-ScriptWritten, POL-ValidateEveryScriptEdit, CMD-ValidateScript, EVT-ScriptValidated, ACT-StageRunner, CMD-GenerateTakes, EVT-TakeGenerated, CMD-BuildEpisodeTrack, EVT-EpisodeTrackBuilt, CMD-WriteSubtitles, EVT-SubtitlesWritten]
+  - id: FLOW-CharacterReuse
+    name: From a finished character bible to a character used again
+    sequence: [ACT-StageRunner, CMD-WriteCharacterBible, EVT-CharacterBibleWritten, CMD-CompleteStage, EVT-StageCompleted, POL-ImportFinishedCharacters, CMD-ImportCharacters, EVT-LibraryCharacterCreated, RM-CharacterLibrary, ACT-User, CMD-UseLibraryCharacter, EVT-LibraryCharacterUsed]
+  - id: FLOW-ContinuityReferences
+    name: From the treatment to approved continuity references
+    sequence: [ACT-StageRunner, CMD-WriteSetBible, EVT-SetBibleWritten, CMD-AddCharacterState, EVT-CharacterStateAdded, CMD-AddQueueItem, EVT-QueueItemAdded, CMD-RunQueue, EVT-AttemptGenerated, POL-JudgeEveryAttempt, CMD-GiveVerdict, EVT-VerdictGiven, CMD-ApplyVerdict, EVT-AttemptFiled]

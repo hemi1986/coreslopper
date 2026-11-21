@@ -563,6 +563,7 @@
       "name": "sery",
       "terms": [
         "budget",
+        "characterization",
         "sery",
         "statu"
       ],
@@ -571,6 +572,7 @@
         "packages/cli/src/new-series.ts",
         "packages/cli/src/series.ts",
         "tests/series-budget.test.ts",
+        "tests/series-characterization.test.ts",
         "tests/series-status.test.ts"
       ],
       "packages": [
@@ -581,11 +583,11 @@
         "cli",
         "tests"
       ],
-      "score": 12,
+      "score": 13,
       "reasons": [
         "2 layers: cli, tests",
         "2 packages",
-        "4 files"
+        "5 files"
       ]
     },
     {
@@ -612,7 +614,9 @@
         "2 layers: cli, tests",
         "2 packages",
         "3 files"
-      ]
+      ],
+      "adopted": true,
+      "adoptedAt": "2026-11-21"
     },
     {
       "name": "init",

@@ -48,7 +48,7 @@ not use "cut" for a shot.
 - When you add a motion component, add it to `MOTION_COMPONENTS` in core and to the switch in `ShotRenderer.tsx`.
   An unknown name falls back silently today (G-75).
 - Change `ShotSchema` only together with `npm run schema`, the skill and the glossary.
-- Sets, plates, props and character states are defined in the bibles and the canon (character slice). The
+- Sets, plates, props and character states are defined in the bibles and the canon (BC-Bibles, `.claude/rules/character.md`). The
   storyboard only names them.
 
 ## Typical pitfalls
