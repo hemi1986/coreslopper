@@ -141,7 +141,7 @@ A SeedVR2 run on a finished local clip at `quality: final`: `restore` sharpens a
 _Avoid_: upscale step, enhancer
 
 **Video Model**:
-The local clip backend of a shot: `ltx` (default; every operation, including lip-sync) or `wan` (Wan 2.2 image-to-video, silent, no lip-sync).
+The ComfyUI workflow family of a local image-to-video or first-last-frame clip, set per item: `ltx` (default) or `wan` (Wan 2.2, image-to-video only, silent, no lip-sync). Pika clips and local lip-sync take their workflow from the model role instead.
 _Avoid_: engine, backend
 
 **AI Clip**:
@@ -303,12 +303,40 @@ A low-fidelity, timed preview of the storyboard before final assets.
 _Avoid_: previz
 
 **Manifest**:
-The append-only record of every generation with model, prompt, seed, references, cost, and cache status.
+The append-only record of every **Generation** of a project or series canon in `assets/manifest.jsonl`: operation, role, provider, model, prompt, seed, references, planned cost, whether it was reused from the cache, and whether it failed. A reuse is recorded at $0. Its costs add up to the project's recorded spend.
 _Avoid_: log
 
 **Generation Batch**:
-A JSON or YAML array of one or more generation requests executed with budget, cache, and manifest checks.
+A JSON or YAML array of one or more generation requests executed with budget, cache, and manifest checks. Its worst-case estimate, reuses included, must fit the remaining budget and the **Batch Cap** before the first call. The generation queue sends one item per batch.
 _Avoid_: job
+
+**Generation**:
+One request of a batch item run for its model role: a new result from the provider, a reuse from the **Generation Cache**, or a failure. Each one is one line in the **Manifest**.
+_Avoid_: job, call, request (the batch item it comes from)
+
+**Generation Operation**:
+The kind of a generation: `generateImage`, `editImage`, `textToVideo`, `imageToVideo`, `firstLastFrameToVideo`, `referenceToVideo`, `lipSync`, `generateAudio`, or `upscaleVideo` (the **Restore Pass**). It decides which references, audio, and duration an item needs.
+_Avoid_: endpoint, task, mode
+
+**Model Role**:
+A named creative job in `config/models.yaml`, such as `image.keyframe` or `video.lipsync`: its base provider, model, params, price, and limits, with a **Provider Alternative** per other provider. The project's provider for the role's kind decides which entry runs; a project may override a role's model in `project.yaml`. Only the agent changes roles, at the user's request; a model switch is a configuration change.
+_Avoid_: model (the slug or workflow a role names), preset
+
+**Provider**:
+What runs the generations of one kind for a project, set in `project.yaml` `providers` (`image`, `video`, `lipsync`, `audio`): a cloud provider (`fal`, `higgsfield`, `topview`), the local provider `comfyui`, or `mock`. Lip-sync falls back to fal.ai when the video provider is ComfyUI or Topview; reference-to-video always runs on ComfyUI.
+_Avoid_: backend, vendor, engine
+
+**Generation Cache**:
+The results of earlier generations under `.cache/generations/<cache key>/`, shared by every project and series of a workspace. A generation with the same **Cache Key** reuses the result at no cost as long as its files exist.
+_Avoid_: asset store
+
+**Project Budget**:
+The `budget_usd` of a project, or the series budget for the canon. Every new paid generation is billed at its planned cost from the model role; the board shows the planned spend, not the provider's invoice. A batch or spend that would exceed it is a hard stop.
+_Avoid_: credits, balance
+
+**Batch Cap**:
+The most one generation batch may cost: `batch_cap_usd`, or 30 % of the remaining budget when it is not set, never more than the remaining budget.
+_Avoid_: limit, quota
 
 **Generation Queue**:
 The list of a project's open generations in `assets/queue.json`, worked by one `queue run` at a time: each item is generated, judged by the art director, and filed at its `out` path once an attempt is approved; a failed image is requeued with the verdict's fix prompt; an item waits for the items it derives from.
@@ -323,8 +351,8 @@ An edit of one box of an image that is pasted back with a soft edge (`patch`), s
 _Avoid_: inpaint, crop fix
 
 **Provider Adapter**:
-The small implementation behind `generateImage`, `editImage`, `textToVideo`, `imageToVideo`, `firstLastFrameToVideo`, and `lipSync`; fal.ai, Higgsfield, and Topview are the cloud adapters (all three lip-sync), ComfyUI is the local video adapter, and mock is the deterministic test adapter.
-_Avoid_: client, SDK
+The small implementation of a **Provider** behind the generation operations. The cloud adapters for fal.ai, Higgsfield, and Topview make stills, edits, text-, image-, and first-last-frame-to-video clips, and lip-sync. The ComfyUI adapter runs tagged workflows on the user's GPU for stills, edits, every clip operation including reference-to-video, lip-sync, audio, and the restore pass. Mock is the deterministic test adapter.
+_Avoid_: client, SDK, backend
 
 **Provider Alternative**:
 The `alternatives.<provider>` entry on a model role in `config/models.yaml`. It supplies the provider-specific model slug, params, and price so the same creative role can run on fal.ai, Higgsfield, or Topview.
@@ -339,7 +367,7 @@ A deterministic provider that returns placeholder assets and costs nothing; used
 _Avoid_: fake
 
 **Cache Key**:
-The SHA-256 hash of a canonical generation request, including reference-file hashes, used to reuse an asset.
+The SHA-256 hash of a canonical generation request: what the provider is sent, the content hashes of its reference and audio files, and the ComfyUI workflow's own hash. It identifies a result in the **Generation Cache**.
 _Avoid_: hash
 
 **Stage**:

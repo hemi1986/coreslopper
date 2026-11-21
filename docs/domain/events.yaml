@@ -14,7 +14,7 @@
 #
 # Slices adopted 2026-11-21: project and stage pipeline (confirmed); human review (confirmed); art-director verdicts and the
 # generation queue (decided by recommendation, not reviewed by the user – see the adoption report); song timing and lyrics
-# (decided by recommendation, four answers from the user).
+# (decided by recommendation, four answers from the user); storyboard and generation (decided by recommendation, four answers from the user each).
 # See docs/domain/adoption-report.md.
 
 version: 1
@@ -65,6 +65,9 @@ bounded_contexts:
   - id: BC-Storyboard
     name: Storyboard
     purpose: Turns the treatment or script, the effective timing and the bibles into an ordered list of shots that covers the song or episode track, checks every shot's source, continuity references and limits, and hands resolved shots to the queue, render, QA and review
+  - id: BC-Generation
+    name: Generation
+    purpose: Turns the items of a generation batch into provider calls for a model role – each refused up front when the batch does not fit the budget, served from the generation cache when the same request ran before, recorded in the manifest, and billed to the project budget at its planned cost
 
 aggregates:
   - id: AGG-Project
@@ -83,6 +86,7 @@ aggregates:
       - A stage is started, done or skipped only when every earlier stage of the kind's list is done or skipped (confirmed 2026-11-21; not enforced in code – gap register)
       - No writer loses another writer's change to the project state, and no recorded spend is lost (confirmed 2026-11-21; not enforced, state.json has no write lock – gap register)
       - The project's error history only grows; the current error of a stage is its last error (the code does this, state.ts:293)
+      - The recorded spend equals the cost sum of the project's manifest – the planned cost of every new generation (the QA checker checks it, packages/cli/src/qa.ts:230-262; decided 2026-11-21, HS-92 – the spend command and a paid call that returns no file break it, gap register)
   - id: AGG-ProjectReview
     name: Project review
     context: BC-Review
@@ -164,6 +168,32 @@ aggregates:
       - A highlight is a word of the shot's text (decided 2026-11-21, HS-81; the code accepts any substring the renderer never shows – gap register)
       - A chained shot chains from an existing shot that ends before it starts (the code does this, timing.ts:556-569)
       - Only the agent writes storyboard.yaml, in the storyboard stage and when the user asks for a change (user, 2026-11-21, HS-77)
+  - id: AGG-CachedGeneration
+    name: Cached generation
+    context: BC-Generation
+    status: as-is
+    evidence:
+      - one record per cache key, .cache/generations/<key>/result.json with the provider's files, shared by every project and series of the workspace (packages/providers/src/runner.ts:86-87,167-195; packages/cli/src/generate.ts:711)
+      - the key is the SHA-256 of the canonical request – operation, provider, model, prompt, negative prompt, seed, size, duration, params, each reference's path and content hash, the audio hash and start, the workflow fingerprint (runner.ts:53-84; packages/core/src/hash.ts:25-45)
+      - runBatch is the one path every generation takes – generate, the queue, region patches, the voice track and the bench (generate.ts:667-672; queue.ts:628; patch.ts:96; voice-track.ts:137,191; bench.ts:577,634,675)
+    invariants:
+      - A request with the same cache key reuses the cached result instead of calling the provider; a reuse costs nothing (the code does this, runner.ts:86-99)
+      - A cached result is reused only while every one of its files exists (the code does this, runner.ts:195-207)
+      - A cached result is written once, after the provider returned at least one existing file (the code does this, runner.ts:167-189)
+      - The cache key depends on what the provider is sent and on the files' content, not on where a reference file lies (decided 2026-11-21, HS-89; the key also hashes the path – gap register)
+      - The cache is shared by every project and series of a workspace (decided 2026-11-21, HS-89; generate.ts:711)
+  - id: AGG-ModelRoles
+    name: Model roles
+    context: BC-Generation
+    status: as-is
+    evidence:
+      - config/models.yaml is parsed whole with ModelsConfigSchema on every batch and estimate (packages/core/src/schema.ts:714-762; packages/cli/src/generate.ts:678)
+      - resolveModelRole and providerForRole pick a role's model, params and price for the project's provider in one place (packages/core/src/models.ts:26-98)
+    invariants:
+      - Every model role names a base provider and model; a role runs on another provider only through its provider alternative or a project's model override (the code does this, models.ts:39-68)
+      - A paid provider runs a role only with a known price; a local or mock generation costs nothing (the code does this at resolution, models.ts:62-68, generate.ts:372-380,689 – not when the file is loaded)
+      - A Pika workflow loads only the model files its family's lock allows (the code does this, packages/providers/src/comfyui.ts:374-405)
+      - Only the agent changes the model roles and a project's model overrides, at the user's request (user, 2026-11-21, HS-88)
 
 events:
   - id: EVT-ProjectCreated
@@ -325,6 +355,42 @@ events:
     aggregate: AGG-Storyboard
     description: "contact-sheet writes review/contact-sheet.svg from the validated storyboard: text cards, no images (packages/cli/src/contact-sheet.ts; HS-71)"
     data: [Shots, Duration, BPM]
+  - id: EVT-GenerationBatchRefused
+    name: Generation batch refused
+    context: BC-Generation
+    data: [Worst-case estimate, Remaining budget, Batch cap]
+    description: "Before the first call, also for a dry run: the batch's worst-case estimate, cache hits included, exceeds the remaining budget or the batch cap (packages/core/src/cost.ts:21-38)"
+  - id: EVT-GenerationCompleted
+    name: Generation completed
+    aggregate: AGG-CachedGeneration
+    pivotal: true
+    data: [Cache key, Operation, Model role, Provider, Model, Prompt, Seed, References, Params, Planned cost, Files]
+  - id: EVT-GenerationReused
+    name: Generation reused from the cache
+    aggregate: AGG-CachedGeneration
+    data: [Cache key, Files]
+  - id: EVT-GenerationFailed
+    name: Generation failed
+    context: BC-Generation
+    data: [Cache key, Operation, Model role, Provider, Model, Error]
+  - id: EVT-ClipRestored
+    name: Clip restored
+    aggregate: AGG-CachedGeneration
+    data: [Clip, Restored clip, Mode, Scale, Color correction]
+    description: "The restore pass of a final local clip, a generation of its own (upscaleVideo) whose result is <clip>_upscaled.mp4 with the clip's audio (packages/cli/src/generate.ts:779-810)"
+  - id: EVT-GenerationFiled
+    name: Generation filed
+    context: BC-Generation
+    data: [Out path, File]
+    description: "A batch item's out copies the result into the project or the series canon (generate.ts:742-751)"
+  - id: EVT-ModelRolesChanged
+    name: Model roles changed
+    aggregate: AGG-ModelRoles
+    data: [Model role, Provider, Model, Params, Pricing]
+  - id: EVT-ComfyUIRestarted
+    name: ComfyUI restarted
+    context: BC-Generation
+    data: [Server URL]
 
 commands:
   - id: CMD-CreateProject
@@ -578,6 +644,41 @@ commands:
     description: "contact-sheet in the storyboard stage (skill step 5); validates first"
     rules:
       - The contact sheet belongs in the board's project view and shows each shot's keyframe once it exists (user, 2026-11-21, HS-71; today an SVG of text cards nobody opens – gap register)
+  - id: CMD-RunGenerationBatch
+    name: Run a generation batch
+    actor: ACT-QueueRun
+    aggregate: AGG-CachedGeneration
+    produces: [EVT-GenerationBatchRefused, EVT-GenerationCompleted, EVT-GenerationReused, EVT-GenerationFailed, EVT-ClipRestored, EVT-GenerationFiled]
+    description: "runBatch, reached through generate, the queue run (one item per batch), patch, voice-track and the bench; the stage runner writes the batches"
+    rules:
+      - Each item's provider comes from the project – providers.image, providers.video, providers.lipsync (fal when video is comfyui or topview), providers.audio (comfyui) – or from --provider; lip-sync follows only --lipsync-provider, reference-to-video always runs on ComfyUI (models.ts:87-98, generate.ts:299-304)
+      - Before the first call, the batch's worst-case estimate – cache hits included – fits the remaining budget and the batch cap; otherwise nothing runs (cost.ts:21-38; decided 2026-11-21, HS-90)
+      - The item's shape fits its operation – references, audio, duration, exactly one of prompt, Flex prompt or FL2VA prompt – and the provider's limits, checked before any call (generate.ts:63-169,287-594)
+      - A cloud clip's length is rounded up to a length the model offers and billed at that length; a lip-sync clip's length comes from its audio (packages/providers/src/duration.ts:16-29; generate.ts:416-428,588-592)
+      - Every generation – a new result, a reuse or a failure – adds one line to the project's or the series canon's manifest (runner.ts:97,158,191); a paid call that returns no file also leaves one (decided 2026-11-21, HS-92; today it leaves none – gap register)
+      - A paid submission is never charged twice – a submission is retried only with an idempotency key the provider honours, or before the provider accepted it (decided 2026-11-21, HS-97; fal is retried without a key – gap register)
+      - A final local clip gets the restore pass unless seedvr2 is off (generate.ts:556-569)
+  - id: CMD-EstimateGeneration
+    name: Estimate a generation
+    actor: ACT-StageRunner
+    aggregate: AGG-ModelRoles
+    produces: [EVT-GenerationBatchRefused]
+    description: "generate --dry-run for a batch, estimate for one role and a number of units"
+    rules:
+      - Uses the same provider, price and both budget limits as a run (decided 2026-11-21, HS-95; estimate checks only the batch cap and always succeeds – gap register)
+  - id: CMD-ChangeModelRoles
+    name: Change model roles
+    actor: ACT-Orchestrator
+    aggregate: AGG-ModelRoles
+    produces: [EVT-ModelRolesChanged]
+    description: "The agent edits config/models.yaml or a project's models overrides at the user's request, after a model bench where it is a switch"
+    rules:
+      - A model switch is a change of the model roles, not of code (ADR 0006; docs/providers.md)
+  - id: CMD-RestartComfyUI
+    name: Restart ComfyUI
+    actor: ACT-QueueRun
+    produces: [EVT-ComfyUIRestarted]
+    description: "comfy restart, and the queue run between two tries of a failed or hung generation, through COMFYUI_RESTART_COMMAND (packages/cli/src/comfy.ts:62; queue.ts:641)"
 
 policies:
   - id: POL-RunNextStage
@@ -615,6 +716,15 @@ policies:
     when: [EVT-StoryboardWritten, EVT-StoryboardRevised]
     then: [CMD-ValidateStoryboard]
     description: "The workspace hook runs validate-file on every edit of storyboard.yaml under projects/ and blocks a failing edit (exit 2)"
+  - id: POL-RecordPlannedSpend
+    name: Every new generation is billed at its planned cost
+    when: [EVT-GenerationCompleted]
+    then: [CMD-RecordSpend]
+    description: "runBatch records the planned cost of every result that is not a reuse and saves the state after each item (generate.ts:753-763); the provider's actual charge stays in the adapter's raw result (user and decided 2026-11-21, HS-92)"
+  - id: POL-RestartComfyUIOnFailure
+    name: A failed local generation restarts ComfyUI before the next try
+    when: [EVT-GenerationFailed]
+    then: [CMD-RestartComfyUI]
 
 read_models:
   - id: RM-Status
@@ -691,6 +801,23 @@ read_models:
     used_by: [ACT-User]
     fields: [Shot, Source, Section, Start, End, Description, Text, Keyframe]
     description: "review/contact-sheet.svg, embedded in the board's production view; the keyframe field is missing today (HS-71)"
+  - id: RM-Manifest
+    name: Manifest
+    fed_by: [EVT-GenerationCompleted, EVT-GenerationReused, EVT-GenerationFailed, EVT-ClipRestored]
+    used_by: [ACT-StageRunner, ACT-User]
+    fields: [Generation id, Cache key, Operation, Model role, Provider, Model, Prompt, Seed, References, Audio, Params, Planned cost, Reused, Files, Status, Error, Created at]
+    description: "assets/manifest.jsonl of a project or series canon (bench: manifest.jsonl at the bench root), append-only, written only by the generation runner (runner.ts:209-226); the QA checker requires its cost sum to equal the recorded spend (packages/cli/src/qa.ts:230-262)"
+  - id: RM-GenerationEstimate
+    name: Generation estimate
+    fed_by: [EVT-ModelRolesChanged, EVT-SpendRecorded]
+    used_by: [ACT-StageRunner]
+    fields: [Item, Model role, Provider, Model, Planned cost, Worst-case estimate, Remaining budget, Batch cap, Notes]
+  - id: RM-ComfyUIStatus
+    name: ComfyUI status
+    fed_by: [EVT-ComfyUIRestarted]
+    used_by: [ACT-StageRunner, ACT-User]
+    fields: [Server URL, Reachable, Running, Pending, VRAM used and total, Recent prompts]
+    description: "comfy status and doctor (packages/cli/src/comfy.ts:19)"
 
 hotspots:
   - id: HS-1
@@ -1123,6 +1250,86 @@ hotspots:
     refs: [BC-Storyboard]
     status: resolved
     resolution: "Shot Source, Layer (with a layer type), Continuity Reference and Lip-Sync Shot in the glossary; 'refs', 'shot list' and 'cut' for a shot avoided; the skill's wording is a gap (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-87
+    question: "Where does generation end – the generation queue, the budget ledger, the bench and the voice track all call runBatch. One context, and what does it own?"
+    refs: [BC-Generation]
+    status: resolved
+    resolution: "One context, Generation (BC-Generation): role resolution, the budget check per batch, the generation cache, the manifest and the provider adapters. The queue stays in BC-GenerationQueue, the budget ledger in AGG-Project (BC-Pipeline); the bench and the voice track are its callers (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-88
+    question: "Which consistency boundaries does generation have – a batch (not stored), the cache record per key, the manifest (an append-only log), config/models.yaml?"
+    refs: [AGG-CachedGeneration, AGG-ModelRoles]
+    status: resolved
+    resolution: "Two as-is aggregates: the cached generation per cache key and the model roles file. The manifest is an append-only log outside them, like the verdict log; a batch is a command, not state. Only the agent changes the model roles (user, 2026-11-21) (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-89
+    question: "The cache is workspace-wide, so one project reuses another's result at $0, and its key hashes each reference's path, so the same file elsewhere misses. Intended?"
+    refs: [AGG-CachedGeneration]
+    status: resolved
+    resolution: "Sharing the cache across the workspace is intended (a series' canon and its episodes reuse references); the key should depend on content, not on paths – gap, low (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-90
+    question: "The budget check before a batch counts cache hits at full price, so a batch that costs nothing can be refused. Count only the items that will run?"
+    refs: [CMD-RunGenerationBatch]
+    status: resolved
+    resolution: "Keep the worst-case check: it is conservative, cheap, and the queue sends one item per batch, so it rarely refuses a free item. Documented as intended (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-91
+    question: "The queue run calls runBatch once per item, so the batch cap guards one item and nothing guards a whole run apart from the project budget; the per-call hook beforeGenerate is set by no caller. Rule?"
+    refs: [CMD-RunGenerationBatch]
+    status: resolved
+    resolution: "The project budget is the hard limit of a queue run; the batch cap limits one batch. beforeGenerate is dead and goes – gap, low (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-92
+    question: "Spend is the planned estimate, not the provider's charge (Topview's charged_usd stays in the raw result). Does the recorded spend have to match the manifest?"
+    refs: [AGG-Project, RM-Manifest]
+    status: resolved
+    resolution: "The recorded spend is the planned cost of every new generation, and it equals the manifest's cost sum (the QA checker's rule). The user reads spend on the board only and does not compare it with the providers' bills (user, 2026-11-21). A paid call without a manifest line, and the spend command without one, are gaps (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-93
+    question: "budget.reservedUsd is subtracted from the remaining budget and shown on the board, but nothing ever writes it. Reservation or dead?"
+    refs: [AGG-Project]
+    status: resolved
+    resolution: "Dead: remove it from the state and the board – gap, low (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-94
+    question: "The spend command raises the recorded spend without a manifest line, which fails the QA checker. Keep it?"
+    refs: [CMD-RecordSpend]
+    status: resolved
+    resolution: "Every recorded spend has a manifest line; the spend command writes one or goes. Low: the user runs no generation command by hand (user, 2026-11-21) (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-95
+    question: "estimate checks only the batch cap, prints a mark and exits 0; a missing price is a ValidationError there and a ConfigError in generate; providers.md documents an estimate flag --lipsync-provider that does not exist. Rule?"
+    refs: [CMD-EstimateGeneration]
+    status: resolved
+    resolution: "estimate applies the same provider choice, both limits and the same errors as generate, and fails when a run would be refused – gap, low (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-96
+    question: "config/defaults.yaml has a retries block (4 attempts, 1000 ms, 600000 ms) that no adapter reads; every adapter has its own timeout and the HTTP helper its own backoff. Wire it or remove it?"
+    refs: [BC-Generation]
+    status: resolved
+    resolution: "The adapters own their timeouts and backoff; the dead block goes – gap, low (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-97
+    question: "fal submissions are retried up to four times on 408, 409, 429, 5xx and network errors without an idempotency key; ADRs 0011 and 0021 derive the key from the request hash. Can a retry charge twice?"
+    refs: [CMD-RunGenerationBatch]
+    status: resolved
+    resolution: "A paid submission is never charged twice: an adapter retries a submission only with an idempotency key the provider honours, or only while the provider cannot have accepted it – gap, medium (the user uses fal, Higgsfield and Topview) (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-98
+    question: "'provider', 'adapter' and 'backend' name one thing; 'model' is a cloud slug or a ComfyUI workflow name; roles, operations and single generations have no glossary entry. Terms?"
+    refs: [BC-Generation]
+    status: resolved
+    resolution: "Provider is the selection per kind (providers.image, .video, .lipsync, .audio); Provider Adapter its implementation; 'backend' avoided. New glossary entries: Model Role, Generation Operation, Generation, Generation Cache, Project Budget, Batch Cap (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-99
+    question: "The glossary's Video Model says ltx is the default for every operation including lip-sync and calls it a 'clip backend', but Pika is the default for reference-to-video and local lip-sync, chosen by the role's workflow. Which holds?"
+    refs: [BC-Generation]
+    status: resolved
+    resolution: "The code: Video Model (ltx or wan) chooses the workflow of image-to-video and first-last-frame clips on ComfyUI; Pika clips and local lip-sync come from the role's workflow. Glossary corrected (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-100
+    question: "Provider knowledge sits outside the adapters: about 280 lines of ComfyUI, Pika, LTX, Wan and SeedVR2 routing in generate.ts, the provider list four times in core and once in providers, 'local costs nothing' three times, the bench's workflow folder ignored by the Pika check. Rule?"
+    refs: [BC-Generation]
+    status: resolved
+    resolution: "Provider-specific rules belong in the adapter or in the model roles, the provider list exists once, and adding a provider means an adapter and a list entry (ADR 0021) – gap, low (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-101
+    question: "Docs contradict the code on capabilities: the glossary and providers.md say the cloud adapters do every operation and ComfyUI only video and lip-sync; providers.md, comfyui/README.md and ADR 0017 name LTX as the local lip-sync, models.yaml and ADR 0027 Pika; providers.md says lip-sync defaults to the video provider. Which is right?"
+    refs: [BC-Generation]
+    status: resolved
+    resolution: "The code and config/models.yaml: the cloud adapters have no reference-to-video, audio or restore; ComfyUI does stills, edits, clips, lip-sync (Pika first, LTX as fallback) and audio; lip-sync falls back to fal when video is comfyui or topview. Glossary corrected now; the other docs are a gap, medium, because the agent reads them when it changes the model roles (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+  - id: HS-102
+    question: "No ADR records the generation funnel as it is – one runBatch for every caller, the worst-case budget check, a workspace-wide cache, planned spend, nine operations. ADR 0006 still says three operations and 'batch state is resumable'. Record it?"
+    refs: [BC-Generation]
+    status: resolved
+    resolution: "ADR 0041, Proposed: one generation path, the budget check per batch, the workspace cache by content, planned spend equal to the manifest, no double charge, provider rules in adapters and model roles; amends 0006, 0014 and 0017 (recommendation, not reviewed by the user – delegated, 2026-11-21)"
 
 flows:
   - id: FLOW-AutonomousStage
@@ -1140,3 +1347,6 @@ flows:
   - id: FLOW-Storyboard
     name: From the treatment to the resolved storyboard
     sequence: [ACT-StageRunner, CMD-WriteStoryboard, EVT-StoryboardWritten, POL-ValidateEveryStoryboardEdit, CMD-ValidateStoryboard, EVT-StoryboardValidated, RM-ResolvedStoryboard, CMD-WriteContactSheet, EVT-ContactSheetWritten, RM-ContactSheet]
+  - id: FLOW-Generation
+    name: From a batch item to a billed generation
+    sequence: [ACT-QueueRun, CMD-RunGenerationBatch, EVT-GenerationCompleted, POL-RecordPlannedSpend, CMD-RecordSpend, EVT-SpendRecorded, RM-Manifest]

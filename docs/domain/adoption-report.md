@@ -738,3 +738,201 @@ ComfyUI. It owns how keyframes and clips are made from this slice's shots and pr
 | HS-84 | The look comes from the storyboard, not a section's name | recommendation | G-83 |
 | HS-85 | ADR 0040 | recommendation | `docs/adr/0040-storyboard.md` |
 | HS-86 | Shot Source, Layer, Continuity Reference, Lip-Sync Shot; avoid "refs", "shot list" and "cut" | recommendation | glossary, G-74 |
+
+# Adoption – generation
+Date: 2026-11-21 · Commit: 512350f · Slice: generation batches, model roles, the budget check, the generation cache, the manifest, the provider adapters and ComfyUI (concept `generation`) · Analysts: 3 lenses
+
+## Scope
+
+- **Slice:**
+  - core: `models.ts`, `cost.ts`, `hash.ts`, `flex.ts`, `fl2va.ts`, and the model roles, providers and budget
+    parts of `schema.ts` and `state.ts`;
+  - providers: every file of `packages/providers/src/` except `publish/`;
+  - cli: `generate.ts`, `clip-options.ts`, `comfy.ts`, `image-ops.ts` and their wiring in `index.ts`;
+  - `config/models.yaml`, `config/defaults.yaml`, `comfyui/`, `docs/providers.md`.
+
+  No shared library.
+- **Out of scope:**
+  - the generation queue and verdicts (verdict slice);
+  - the budget ledger itself (pipeline slice);
+  - the voice track and lip-sync audio segments (series);
+  - the model bench (bench);
+  - the publish and post adapters (publish).
+
+  Consumers were read for coupling only.
+- **Intent:** domain model, as for the earlier slices. **Language:** artifacts `en`, UI `en`.
+- **Since the last slice:** no code change (same day). `slice.ts --cluster generate` found schema and fixture
+  scripts instead of the generation code, so the scope was cut by hand from the providers' callers.
+
+| Layer | Files |
+|---|---|
+| core (domain) | `models.ts`, `cost.ts`, `hash.ts`, `flex.ts`, `fl2va.ts`, `errors.ts`; the `ModelsConfigSchema`, `ProvidersSchema` and `BudgetSchema` parts of `schema.ts`; `recordSpend` and `remainingBudget` in `state.ts` |
+| providers (adapters) | `types.ts`, `runner.ts`, `http.ts`, `duration.ts`, `index.ts`, `mock.ts`, `fal.ts`, `higgsfield.ts`, `topview.ts`, `comfyui.ts` |
+| cli (application) | `generate.ts` (`runBatch`, `resolveItem`, `BatchItemSchema`), `clip-options.ts`, `comfy.ts`, `image-ops.ts`, `index.ts` (`generate`, `estimate`, `spend`, `comfy`) |
+| consumers | `queue.ts`, `patch.ts`, `voice-track.ts`, `bench.ts`, `qa.ts` (manifest check), `doctor.ts`, `release-autopilot.ts` |
+| config and docs | `config/models.yaml`, `config/defaults.yaml`, `comfyui/README.md`, `docs/providers.md`, ADRs 0006, 0011, 0014, 0015, 0017, 0021, 0026, 0027 |
+| tests | `providers.test.ts`, `generate-*.test.ts`, `fal-provider`, `higgsfield`, `topview`, `comfyui`, `models`, `clip-duration`, `lipsync-routing`, `pika-*`, `seedvr2-wan`, `runner-commands`, `image-ops` |
+
+## How this slice was decided
+
+As in the earlier slices, there were no code-level questions. Every technical hotspot was decided by the
+recommendation and is marked "not reviewed by the user – delegated". The user answered four questions about how
+they work:
+1. They generate with all four providers: ComfyUI locally, fal.ai, Higgsfield and Topview.
+2. Generation runs only through the stages and the queue. They never run `generate`, `estimate` or `spend` by
+   hand.
+3. They read spend on the board and do not compare it with the providers' bills.
+4. Only the agent changes the model roles and a project's model overrides.
+
+Answer 1 makes the double charge on a retried fal submission medium (G-86). Answer 2 keeps the hand commands low
+(G-88, G-89). Answer 3 makes planned spend intended. Answer 4 makes the stale provider docs medium (G-93, G-94),
+because the agent reads them. ADR 0041 stays `Proposed`.
+
+## What the repository is (facts)
+
+- **One path.** `runBatch` is the one path for every media generation: `generate`, the queue (one item per
+  call), `patch`, `voice-track` and the bench. No adapter is called around it. The release autopilot's fal file
+  upload is not a generation.
+- **What `runBatch` does:**
+  - it resolves every item's model role for the project's provider;
+  - it checks the batch's worst-case estimate (cache hits included, also for a dry run) against the remaining
+    budget and the batch cap;
+  - it runs one `GenerationRunner` per provider;
+  - it records the planned cost and saves the state after each new result.
+- **The runner** (`packages/providers`) owns:
+  - the cache key: what is sent, the reference paths and content hashes, the audio, the workflow hash;
+  - the workspace-wide cache under `.cache/generations/`;
+  - the append-only manifest. A reuse is recorded at $0 and a failure as `failed`.
+- **Model roles and providers.** There are 20 model roles in `config/models.yaml`, 10 with fal.ai as base and 10
+  with ComfyUI. Provider alternatives cover Higgsfield, Topview and ComfyUI. The project picks providers per kind.
+  Lip-sync falls back to fal.ai when the video provider is ComfyUI or Topview, `audio.*` defaults to ComfyUI, and
+  reference-to-video always runs on ComfyUI.
+- **Operations.** There are nine operations. The cloud adapters implement six: stills, edits, three clip
+  operations and lip-sync. ComfyUI implements all nine: it runs tagged workflows on the user's GPU for stills,
+  edits, every clip operation, lip-sync (Pika first, LTX fallback), audio and the restore pass. Mock writes
+  deterministic placeholders for every operation except the restore pass.
+- **Item checks.** About 15 schema refinements and the provider limits are checked before any call:
+  - the Flex and FL2VA prompts;
+  - the Pika aspect and model locks;
+  - the full-mix guard;
+  - the lip-sync `maxDuration`;
+  - duration snapping.
+- **Dead parts.** `budget.reservedUsd`, the `beforeGenerate` hook and the `retries` block of `defaults.yaml` are
+  never used.
+- **Idempotency.** fal submissions are retried without an idempotency key.
+- **History.** `schema.ts` (34 commits), `generate.ts` (23) and `models.yaml` (18) change most. There are no
+  reverts or TODOs. Two breaking commits are `0c34c20` (ComfyUI runs everything) and `7e810b4` (LTX FLF2V
+  lip-sync).
+
+## Domain model (decided by recommendation)
+
+- **Context:** `BC-Generation` – Generation.
+  - Its callers are the queue (BC-GenerationQueue), the voice track and the canon (series), and the bench.
+  - It bills spend to `AGG-Project` (BC-Pipeline).
+  - Its external systems are the cloud providers and the ComfyUI server.
+- **Aggregates:**
+  - `AGG-CachedGeneration` (`as-is`: one record per cache key, written once, reused while its files exist,
+    shared by the workspace).
+  - `AGG-ModelRoles` (`as-is`: `config/models.yaml` parsed whole and resolved in one place; only the agent
+    changes it).
+  - `AGG-Project` gains one invariant: the recorded spend equals the manifest's cost sum.
+- **Commands:** run a generation batch, estimate a generation, change model roles, restart ComfyUI.
+- **Policies:**
+  - every new generation is billed at its planned cost;
+  - a failed local generation restarts ComfyUI.
+- **Read models:** manifest, generation estimate, ComfyUI status.
+- **Flow:** `FLOW-Generation`.
+- **Glossary:**
+  - New: **Generation**, **Generation Operation**, **Model Role**, **Provider**, **Generation Cache**,
+    **Project Budget**, **Batch Cap**.
+  - Sharpened: **Manifest** (every generation, reuses at $0, equals the spend), **Generation Batch** (the
+    worst-case check, one item per queue batch), **Provider Adapter** (the real capabilities, avoid "backend"),
+    **Cache Key** (content, not paths), **Video Model** (LTX or Wan for local image-to-video and
+    first-last-frame; Pika from the role's workflow).
+- **ADR:** 0041 (Proposed), which amends 0006, 0014 and 0017.
+
+## Package documentation written
+
+- `.claude/rules/generation.md` – path-scoped slice doc; nothing left `[OPEN]`.
+- `docs/engineering/conventions.md` – the one generation path, who owns the cache and the budget, models in
+  configuration, the adapter mechanics, three seams.
+- `docs/architecture/data-model.md`, `docs/domain/context-map.as-is.md` – `AGG-CachedGeneration`,
+  `AGG-ModelRoles`, the manifest line, `BC-Generation`.
+
+## Contradictions found and how they were resolved
+
+| Contradiction | Resolution |
+|---|---|
+| Glossary and `providers.md`: the cloud adapters do every operation, ComfyUI only video and lip-sync, versus the code | the code; glossary corrected, docs a gap (G-93) |
+| Local lip-sync: LTX (`providers.md`, `comfyui/README.md`, ADR 0017) versus Pika first (`models.yaml`, ADR 0027); "defaults to video" versus the fal fallback | the code and ADR 0027 (G-94) |
+| Glossary Video Model: `ltx` for every operation including lip-sync, a "clip backend" | LTX or Wan for local image-to-video and first-last-frame; glossary corrected |
+| ADR 0006: three operations, "batch state is resumable", "abort before the first paid call" | nine operations; no batch state, the cache and the per-item spend make a rerun cheap; the worst-case check holds (ADR 0041, G-103) |
+| ADR 0011 and 0021: an idempotency key from the hash, versus fal retried without one | no double charge (G-86) |
+| ADR 0021: a new provider means an adapter and an enum value, versus five lists and routing in `generate.ts` | provider rules in adapters and roles (G-97) |
+| `defaults.yaml` retries and timeouts, versus hard-coded values in the adapters | adapters own them; the block goes (G-92) |
+| QA: manifest cost sum equals spend, versus `spend` and a paid call without a file | every spend has a manifest line (G-87, G-88) |
+| `estimate` checks the cap only, versus `generate` checking both limits | same rules (G-89) |
+| `workspace/AGENTS.md`, `providers.md` and the ai-clips skill on the cache key, spend per stage and recording spend | stale docs (G-95) |
+
+## Rules and checks
+
+| Rule | Enforcement | State |
+|---|---|---|
+| The worst-case estimate fits the batch cap and the remaining budget before any provider exists, also as a dry run; the cap never exceeds the remaining budget | `tests/generation-characterization.test.ts` | green |
+| ComfyUI and mock cost nothing whatever the role costs | `tests/generation-characterization.test.ts` | green |
+| A new paid generation is billed at its planned cost and saved; a reuse is free; each gets a manifest line and their costs equal the spend | `tests/generation-characterization.test.ts` | green |
+| A failed call is a `failed` manifest line at no cost and is not cached | `tests/generation-characterization.test.ts` | green |
+| Only `runBatch` creates a generation runner; adapters are built only where they feed it (bench) or for a non-generation upload (release autopilot) | `tests/generation-characterization.test.ts` (architecture test) | green |
+| The cache key, cache reuse, role resolution, lip-sync routing, duration snapping, Pika and Flex rules, adapter requests | existing `tests/providers.test.ts`, `models.test.ts`, `lipsync-routing.test.ts`, `clip-duration.test.ts`, `pika-*.test.ts`, adapter tests | green |
+| `packages/providers` imports only core | slice 1 boundary rule and `tests/package-boundaries.test.ts` | green |
+| No double charge, content-only cache key, a manifest line for every spend, `estimate` with both limits | documentation until stories build them (G-86–G-89, G-99) | – |
+
+## Gap register (candidates – stories only with --stories)
+
+19 candidates, G-86 to G-104, in `docs/domain/gap-register.md`:
+- 14 *exist but contradict*. The highest are G-86 (double charge on fal), G-93 (capability docs) and G-94
+  (local lip-sync docs), all medium.
+- 1 is *missing*: G-104 (tests).
+- 3 are *dead*: G-90 (`reservedUsd`), G-91 (`beforeGenerate`), G-92 (the retries config).
+
+## Deliberately left alone
+
+- Production code, `docs/providers.md`, `comfyui/README.md`, the ai-clips skill, and ADRs 0006, 0011, 0014, 0017,
+  0021, 0026 and 0027, which are accepted. ADR 0041 amends 0006, 0014 and 0017. Only the glossary was corrected,
+  because it is this adoption's language.
+- The per-model limits that only agents follow (clip length up to 10 s on Pika, 3–6 s clips, qwen-edit with at most 4
+  references on 16 GB, `asset_batch_size`). They are agent guidance, not checks.
+- The queue's attempt cap and cloud fallback (verdict slice), the state lock (G-1, pipeline slice), the voice
+  track's `maxDuration` check (series), the bench's own manifest and budget (bench), and the release autopilot's
+  fal upload (publish).
+- The model prices in `config/models.yaml`. They are planning estimates; Topview Avatar 4 is marked unverified.
+
+## Open hotspots
+
+None. HS-87 to HS-102 are resolved, three of them partly by the user's answers.
+
+## Next slice
+
+`series` per the adoption plan: series canon, episodes, script, takes, voice track, episode track, subtitles and
+lip-sync audio. It is the largest caller of this slice outside the queue.
+
+## Decision log
+
+| # | Decision | How | Written to |
+|---|---|---|---|
+| HS-88 | Two as-is aggregates, the cached generation and the model roles; only the agent changes the roles | user (2026-11-21) and recommendation | `AGG-CachedGeneration`, `AGG-ModelRoles`, glossary (Model Role) |
+| HS-92 | Planned spend equal to the manifest; the board's planned spend is enough | user (2026-11-21) and recommendation | `POL-RecordPlannedSpend`, `AGG-Project` invariant, G-87, G-95 |
+| HS-97 | No double charge on a retried submission | recommendation; medium because the user uses all cloud providers | `CMD-RunGenerationBatch`, ADR 0041, G-86 |
+| HS-87 | One context, Generation | recommendation | `BC-Generation` |
+| HS-89 | A workspace-wide cache keyed by content | recommendation | `AGG-CachedGeneration`, glossary (Cache Key, Generation Cache), G-99 |
+| HS-90 | The worst-case budget check per batch, cache hits included | recommendation | `CMD-RunGenerationBatch`, glossary (Generation Batch) |
+| HS-91 | The project budget guards a queue run; `beforeGenerate` goes | recommendation | ADR 0041, G-91 |
+| HS-93 | `reservedUsd` goes | recommendation | G-90 |
+| HS-94 | Every recorded spend has a manifest line | recommendation; low because the user runs no hand commands | G-88 |
+| HS-95 | `estimate` follows the rules of a run | recommendation; low | `CMD-EstimateGeneration`, G-89 |
+| HS-96 | The adapters own timeouts and backoff; the retries block goes | recommendation | G-92 |
+| HS-98 | Provider, Provider Adapter, Model Role, Generation, Generation Operation, Generation Cache, Project Budget, Batch Cap; avoid "backend" | recommendation | glossary |
+| HS-99 | Video Model is LTX or Wan for local image-to-video and first-last-frame | recommendation | glossary |
+| HS-100 | Provider rules in adapters and model roles; one provider list | recommendation | ADR 0041, G-97, G-98, G-100 |
+| HS-101 | The code is right about capabilities and the local lip-sync; docs follow | recommendation; medium because the agent reads the docs | glossary, G-93, G-94 |
+| HS-102 | ADR 0041 | recommendation | `docs/adr/0041-generation-funnel.md` |

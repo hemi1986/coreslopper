@@ -13,6 +13,8 @@
 | GAP-AGG-ProjectTiming | as-is boundary | [AGG-ProjectTiming](events.yaml) | [BC-Timing](context-map.as-is.md#bc-timing--timing) | – | timing.json and timing.overrides.json per project are parsed and merged into one effective timing on every project load, and the merge ends in one check of the whole timing (packages/core/src/project.ts:237-241; packages/core/src/timing.ts:61-94)<br>assertTiming checks sections, lines, words, beats and energy of the merged timing together, so one bad override fails the whole timing (timing.ts:96-165)<br>the analysis writes timing.json whole and never writes the overrides (scripts/audio-analysis/analyze.py:430-432, README.md:10) | Decide the target boundary |
 | GAP-AGG-Lyrics | as-is boundary | [AGG-Lyrics](events.yaml) | [BC-Timing](context-map.as-is.md#bc-timing--timing) | – | writeLyrics checks the whole text for section tags and writes lyrics.txt atomically (packages/cli/src/board-wizard.ts:271-278), used by the lyrics command and the board wizard (packages/cli/src/index.ts:588-608; packages/cli/src/release-board.ts:206) | Decide the target boundary |
 | GAP-AGG-Storyboard | as-is boundary | [AGG-Storyboard](events.yaml) | [BC-Storyboard](context-map.as-is.md#bc-storyboard--storyboard) | – | storyboard.yaml per project is parsed whole with StoryboardSchema, only by loadProject (packages/core/src/project.ts:242-243)<br>resolveStoryboard checks all shots together – unique ids, order, coverage, chaining – against the effective timing and the bibles, in one call whose only caller is validateProject (packages/core/src/timing.ts:455-577; packages/cli/src/validate.ts:106)<br>the hook validates the whole project on every edit of storyboard.yaml and blocks a failing edit (workspace/.claude/hooks/validate-artifacts.mjs:13-15; packages/cli/src/validate-file.ts:124-127) | Decide the target boundary |
+| GAP-AGG-CachedGeneration | as-is boundary | [AGG-CachedGeneration](events.yaml) | [BC-Generation](context-map.as-is.md#bc-generation--generation) | – | one record per cache key, .cache/generations/<key>/result.json with the provider's files, shared by every project and series of the workspace (packages/providers/src/runner.ts:86-87,167-195; packages/cli/src/generate.ts:711)<br>the key is the SHA-256 of the canonical request – operation, provider, model, prompt, negative prompt, seed, size, duration, params, each reference's path and content hash, the audio hash and start, the workflow fingerprint (runner.ts:53-84; packages/core/src/hash.ts:25-45)<br>runBatch is the one path every generation takes – generate, the queue, region patches, the voice track and the bench (generate.ts:667-672; queue.ts:628; patch.ts:96; voice-track.ts:137,191; bench.ts:577,634,675) | Decide the target boundary |
+| GAP-AGG-ModelRoles | as-is boundary | [AGG-ModelRoles](events.yaml) | [BC-Generation](context-map.as-is.md#bc-generation--generation) | – | config/models.yaml is parsed whole with ModelsConfigSchema on every batch and estimate (packages/core/src/schema.ts:714-762; packages/cli/src/generate.ts:678)<br>resolveModelRole and providerForRole pick a role's model, params and price for the project's provider in one place (packages/core/src/models.ts:26-98) | Decide the target boundary |
 <!-- kataster:gap-register:end -->
 
 ## Gaps found by the adoption of the project and stage pipeline (2026-11-21)
@@ -177,6 +179,58 @@ Decisions (by recommendation, not reviewed by the user):
   the composition rules, the 3–6 s clip length and the three-revision cap as agent guidance in the skills;
   character sheets checked by the queue before generation, not by `validate`. ADR 0040 (proposed) records them.
 - Footage shots are kept but get low priority: the user does not bring footage.
+
+## Gaps found by the adoption of generation (2026-11-21)
+
+Candidates only – no stories until the user asks (`/adopt <scope> --stories`). Priority is a suggestion. The
+user's four answers set the priorities:
+- They use all four providers (fal.ai, Higgsfield, Topview, ComfyUI), which sets G-86 to medium.
+- Generation runs only through the stages and the queue, never by hand, which keeps G-88 and G-89 low.
+- They read spend on the board and do not compare it with the bills, so planned spend is intended.
+- Only the agent changes the model roles. The agent reads the provider docs, so G-93 and G-94 are medium.
+
+| # | Class | Gap | Evidence | Source | Priority |
+|---|---|---|---|---|---|
+| G-86 | Exists but contradicts | fal submissions are retried up to four times on 408, 409, 429, 5xx and network errors without an idempotency key, so a retry after an accepted submission can charge twice; ADRs 0011 and 0021 derive the key from the request hash, and only Higgsfield and Topview send it | `packages/providers/src/fal.ts:77-83,205-221`; `http.ts:58-100`; `runner.ts:119` | HS-97 | medium |
+| G-87 | Exists but contradicts | A paid call that returns no file, or a file that does not exist, throws without a manifest line and without recorded spend | `packages/providers/src/runner.ts:167-170`; `packages/cli/src/generate.ts:753-763` | HS-92 | low |
+| G-88 | Exists but contradicts | `spend` raises the recorded spend without a manifest line, so the QA checker's rule "manifest cost sum = spend" fails afterwards | `packages/cli/src/index.ts:837-846`; `packages/cli/src/qa.ts:230-262` | HS-94 | low |
+| G-89 | Exists but contradicts | `estimate` checks only the batch cap, prints a mark and exits 0; it never checks the remaining budget; a missing price is a `ValidationError` there and a `ConfigError` in `generate`; `providers.md` documents an estimate `--lipsync-provider` that does not exist | `packages/cli/src/index.ts:849-891`; `generate.ts:376`; `docs/providers.md:155` | HS-95 | low |
+| G-90 | Dead | `budget.reservedUsd` is subtracted from the remaining budget and shown on the board, but nothing writes it above 0 | `packages/core/src/state.ts:199,327`; `packages/cli/src/board/production.js:241` | HS-93 | low |
+| G-91 | Dead | The runner's `beforeGenerate` hook is set by no caller | `packages/providers/src/types.ts:106`; `runner.ts:101` | HS-91 | low |
+| G-92 | Dead | The `retries` block of `config/defaults.yaml` (4 attempts, 1000 ms, 600000 ms) is parsed and read by no adapter; its schema default (180000 ms) differs again | `config/defaults.yaml:28-31`; `packages/core/src/project.ts:328-330`; `http.ts:70,86` | HS-96 | low |
+| G-93 | Exists but contradicts | `docs/providers.md` says the cloud adapters implement every operation and ComfyUI only the video operations and lip-sync, and its interface listing lacks `generateAudio` and `upscaleVideo`; the cloud adapters have no reference-to-video, audio or restore, and ComfyUI also makes stills, edits and audio (glossary corrected in this adoption) | `docs/providers.md:78-92`; `packages/providers/src/types.ts:36-69`; `runner.ts:127-139`; `comfyui.ts:733-760` | HS-101 | medium |
+| G-94 | Exists but contradicts | The docs name LTX FLF2V as the local lip-sync, but `models.yaml` and ADR 0027 run Pika first with LTX as the fallback; `providers.md` says lip-sync defaults to the video provider and in the same row that it falls back to fal; ADR 0017 does not point to ADR 0027 | `docs/providers.md:13,21`; `comfyui/README.md:82`; `config/models.yaml:609-673`; `docs/adr/0017-ltx-lipsync-flf2v-official-templates.md` | HS-101 | medium |
+| G-95 | Exists but contradicts | The docs on spend and the cache are stale. The ai-clips skill warns about "forgetting to record the spend", which `generate` does itself. `providers.md` says spend is recorded per stage, but there is one total. `workspace/AGENTS.md` names five parts of the cache key, but there are more. | `workspace/.claude/skills/ai-clips/SKILL.md:180`; `docs/providers.md:163`; `workspace/AGENTS.md:12`; `runner.ts:68-84` | HS-92, HS-89 | low |
+| G-96 | Exists but contradicts | The full-mix guard for lip-sync audio checks only `<project>/audio/song.*`: a series canon batch and a mix elsewhere pass, and the message names only `vocals.wav`, not the lead stem | `packages/cli/src/generate.ts:172-182` | analyst | low |
+| G-97 | Exists but contradicts | Provider knowledge sits outside the adapters: about 280 lines of ComfyUI, Pika, LTX, Wan and SeedVR2 routing in `resolveItem`, the lip-sync fallback in `models.ts`, the provider list four times in core and once in providers, the operation list three times (cli lacks `upscaleVideo`), "local costs nothing" three times | `generate.ts:65,185,287-594,374,689`; `packages/core/src/models.ts:41,62,87-95`; `schema.ts:11-19`; `packages/providers/src/index.ts:19`; `packages/core/src/bench.ts:22` | HS-100 | low |
+| G-98 | Exists but contradicts | Adapter mechanics are written four times: poll loops with different backoff, reference upload, two `normalizeSeed` with different moduli, three ways to strip adapter-only params | `fal.ts:35,73,240`; `higgsfield.ts:61,70-100,384,409`; `topview.ts:71,76-112,456,504-531`; `comfyui.ts:1186,1212` | HS-100 | low |
+| G-99 | Exists but contradicts | The cache key hashes each reference's path next to its content, so the same file at another path misses the cache | `packages/providers/src/runner.ts:55-60,79` | HS-89 | low |
+| G-100 | Exists but contradicts | The bench gives ComfyUI its own workflow folder, but `resolveItem` classifies Pika workflows from the default folder, so a bench target with its own folder can be routed wrongly | `packages/cli/src/bench.ts:338-341`; `generate.ts:345-348` | analyst | low |
+| G-101 | Exists but contradicts | The queue passes an attempt's stored provider to `runBatch` with an unchecked cast; an invalid value fails late | `packages/cli/src/queue.ts:629` | analyst | low |
+| G-102 | Exists but contradicts | `audio.*` roles default to ComfyUI even in a project whose image and video providers are mock, so a mock project needs `providers.audio: mock` set by hand | `packages/core/src/models.ts:95`; `schema.ts:37-48` | analyst | low |
+| G-103 | Exists but contradicts | ADRs 0006 (three operations, "batch state is resumable") and 0014 (ComfyUI video only) carry no note that later ADRs changed them; ADR 0041 records the state, and the status notes follow once it is accepted | `docs/adr/0006-fal-adapter-cache-budget.md`; `docs/adr/0014-comfyui-local-video.md` | HS-102 | low |
+| G-104 | Missing | No test pinned the worst-case budget check, the batch cap against the remaining budget, the planned spend of a new generation and the free reuse in `runBatch`, or the failed manifest line (covered now by `tests/generation-characterization.test.ts`); still none for the full-mix guard, the lip-sync `maxDuration` refusal, audio only on ComfyUI, `audioStartSeconds` on a cloud provider, the HTTP retry, or `estimate` | `tests/providers.test.ts`; `tests/generate-workflow.test.ts` | analyst | low |
+
+Decisions (by recommendation, not reviewed by the user):
+
+- GAP-AGG-CachedGeneration and GAP-AGG-ModelRoles: the boundaries stay as recovered (`as-is`).
+- Exists and is intended:
+  - one generation path through `runBatch` for every caller;
+  - model roles and prices in configuration, changed only by the agent (user);
+  - the worst-case budget check per batch, cache hits included, also for a dry run;
+  - the project budget, not the batch cap, guards a queue run;
+  - the workspace-wide cache;
+  - planned spend instead of the provider's charge (user);
+  - a reuse recorded at $0;
+  - reference-to-video always on ComfyUI;
+  - the lip-sync fallback to fal.ai when the video provider is ComfyUI or Topview;
+  - ComfyUI and mock costing nothing;
+  - the Pika model locks;
+  - the import direction of `packages/providers`.
+
+  ADR 0041 (proposed) records them.
+- The release autopilot's use of fal's file upload for Instagram media is not a generation; the publish slice
+  owns it.
 
 ## Decisions
 

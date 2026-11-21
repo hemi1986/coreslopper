@@ -134,51 +134,47 @@
   ],
   "ranking": [
     {
-      "path": "packages/cli",
-      "score": 0.61,
-      "reasons": [
-        "320 changed files in recent history",
-        "shared library",
-        "shared infrastructure – not a domain slice"
-      ]
-    },
-    {
       "path": "scripts/audio-analysis",
-      "score": 0.19,
+      "score": 0.15,
       "reasons": [
-        "24 changed files in recent history"
-      ]
-    },
-    {
-      "path": "packages/remotion",
-      "score": 0.16,
-      "reasons": [
-        "61 changed files in recent history",
-        "shared library",
-        "shared infrastructure – not a domain slice"
+        "no churn or consumers recorded"
       ]
     },
     {
       "path": "scripts/review-player",
-      "score": 0.16,
+      "score": 0.15,
       "reasons": [
-        "8 changed files in recent history"
+        "no churn or consumers recorded"
+      ]
+    },
+    {
+      "path": "packages/cli",
+      "score": 0.06,
+      "reasons": [
+        "shared library",
+        "shared infrastructure – not a domain slice"
+      ]
+    },
+    {
+      "path": "packages/remotion",
+      "score": 0.06,
+      "reasons": [
+        "shared library",
+        "shared infrastructure – not a domain slice"
       ]
     },
     {
       "path": "packages/core",
-      "score": 0.04,
+      "score": 0.01,
       "reasons": [
-        "111 changed files in recent history",
         "shared library",
         "layer package – hosts many concepts, not a domain slice"
       ]
     },
     {
       "path": "packages/providers",
-      "score": 0.03,
+      "score": 0.01,
       "reasons": [
-        "77 changed files in recent history",
         "shared library",
         "layer package – hosts many concepts, not a domain slice"
       ]
@@ -231,6 +227,7 @@
     {
       "name": "timing",
       "terms": [
+        "characterization",
         "timing"
       ],
       "tables": [],
@@ -239,6 +236,7 @@
         "packages/remotion/src/lib/timing.ts",
         "scripts/audio-analysis/tests/test_timing_core.py",
         "scripts/audio-analysis/timing_core.py",
+        "tests/timing-characterization.test.ts",
         "tests/timing.test.ts"
       ],
       "packages": [
@@ -253,11 +251,11 @@
         "scripts",
         "tests"
       ],
-      "score": 21,
+      "score": 22,
       "reasons": [
         "4 layers: core, remotion, scripts, tests",
         "4 packages",
-        "5 files"
+        "6 files"
       ],
       "adopted": true,
       "adoptedAt": "2026-11-21"
@@ -856,6 +854,20 @@
     },
     {
       "name": "storyboard",
+      "terms": [],
+      "tables": [],
+      "files": [],
+      "packages": [],
+      "layers": [],
+      "score": 0,
+      "reasons": [
+        "marked adopted manually"
+      ],
+      "adopted": true,
+      "adoptedAt": "2026-11-21"
+    },
+    {
+      "name": "generation",
       "terms": [],
       "tables": [],
       "files": [],

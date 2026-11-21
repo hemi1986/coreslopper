@@ -246,6 +246,59 @@ Decided 2026-11-21, ahead of the code: lip-sync checks for both project kinds (u
 lip-sync shot needs no video prompt and a chained shot no keyframe prompt (HS-73); every layer renderable
 (HS-82); a highlight is one word (HS-81); the agent is the only writer (user, HS-77).
 
+### AGG-CachedGeneration – Cached generation (as-is)
+
+One record per cache key, `.cache/generations/<key>/result.json`, next to the provider's files. The cache is shared
+by every project and series of the workspace (`packages/cli/src/generate.ts:711`). It is written once by
+`GenerationRunner.run` after the provider returned files (`packages/providers/src/runner.ts:167-189`). It is
+reused while all its files exist and never changed or removed by a tool.
+
+| Attribute | Type | Required | Source |
+|---|---|---|---|
+| Cache key | CacheKey (SHA-256 of the canonical request) | yes | EVT-GenerationCompleted |
+| Generation id | `gen_<first 12 of the key>` | yes | EVT-GenerationCompleted |
+| Operation | Generation Operation (9 values) | yes | EVT-GenerationCompleted |
+| Model role | ModelRoleId (`image.keyframe`, `video.lipsync`, …) | yes | EVT-GenerationCompleted |
+| Provider | ProviderKind `fal` \| `higgsfield` \| `topview` \| `comfyui` \| `mock` | yes | EVT-GenerationCompleted |
+| Model | cloud model slug or ComfyUI workflow name | yes | EVT-GenerationCompleted |
+| Prompt, Seed | text (a Flex or FL2VA prompt rendered to text); Integer, derived from model, prompt and operation when absent | yes | EVT-GenerationCompleted |
+| References | list of file paths with their content hash | default empty | EVT-GenerationCompleted |
+| Audio | file path (lip-sync and audio-guided clips) | no | EVT-GenerationCompleted |
+| Params | the role's params merged with the item's | default empty | EVT-GenerationCompleted |
+| Planned cost | Money (USD): units × the role's price; 0 for ComfyUI and mock | yes | EVT-GenerationCompleted |
+| Files | at least one file path in the cache folder | yes | EVT-GenerationCompleted |
+| Created at | Timestamp | yes | EVT-GenerationCompleted |
+
+The size, duration, negative prompt, audio start and workflow fingerprint are part of the key only and are not
+stored.
+
+**Manifest line (`assets/manifest.jsonl` of the project or series canon)**: append-only, outside the aggregate.
+It holds the record above plus Reused (`cached`), Status (`ok` \| `failed`) and Error. Its paths are relative
+to the project, and a reuse is recorded at cost 0. Sources are EVT-GenerationCompleted, EVT-GenerationReused,
+EVT-GenerationFailed and EVT-ClipRestored. A paid call that returns no file writes no line today (HS-92).
+
+### AGG-ModelRoles – Model roles (as-is)
+
+One file per workspace, `config/models.yaml` (`ModelsConfigSchema`, `packages/core/src/schema.ts:714-762`), parsed
+whole on every batch and estimate. A project overrides a role in `project.yaml` `models.<role>`. Only the agent
+changes either, at the user's request (HS-88).
+
+| Attribute | Type | Required | Source |
+|---|---|---|---|
+| Version, Last verified | 1; date of the price check | default; no | EVT-ModelRolesChanged |
+| Model role | ModelRoleId → base Provider (default `fal`), Model, Params, Pricing, Max duration, Notes | yes | EVT-ModelRolesChanged |
+| Provider alternative | per ProviderKind: Model, Params, Pricing, Max duration, Notes | default empty | EVT-ModelRolesChanged |
+| Pricing | Unit `image` \| `second` \| `request`, USD ≥ 0; required at resolution for a paid provider | no | EVT-ModelRolesChanged |
+| ComfyUI locks | per workflow family: the model files each loader input may load | default empty | EVT-ModelRolesChanged |
+
+**Project providers (`project.yaml` `providers`, in AGG-Project's config)**: Image and Video (default `mock`),
+optional Lip-sync (defaults to Video, or to fal.ai when Video is `comfyui` or `topview`) and optional Audio
+(default `comfyui`).
+
+**Budget (in `state.json`, AGG-Project)**: Total, Spent (the planned costs of new generations; equal to the
+manifest's cost sum, HS-92) and Reserved, which is never written above 0 (HS-93, to be removed). The batch cap
+is `batch_cap_usd` in `project.yaml`, or 30 % of the remaining budget.
+
 ## Lifecycle
 
 Stage state as the code allows it today. Every transition is accepted from every status (HS-11); the diagram
@@ -304,4 +357,9 @@ erDiagram
   SHOT }o--|| SECTION : "in"
   SHOT ||--o{ LAYER : "mixed shot"
   SHOT }o--o| SHOT : "chains from"
+  PROJECT ||--o{ MANIFEST_LINE : "assets/manifest.jsonl"
+  MANIFEST_LINE }o--|| CACHED_GENERATION : "records or reuses"
+  CACHED_GENERATION }o--|| MODEL_ROLE : "run for"
+  MODEL_ROLE ||--o{ PROVIDER_ALTERNATIVE : "per provider"
+  QUEUE_ITEM ||--o{ MANIFEST_LINE : "one batch per attempt"
 ```

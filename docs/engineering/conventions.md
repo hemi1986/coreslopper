@@ -1,6 +1,6 @@
 # Engineering conventions – coreslopper
 
-> How the code is built here, recovered by `/adopt` (slices: project and stage pipeline; human review; generation queue and verdicts; timing; storyboard – 2026-11-21). The ADRs
+> How the code is built here, recovered by `/adopt` (slices: project and stage pipeline; human review; generation queue and verdicts; timing; storyboard; generation – 2026-11-21). The ADRs
 > decide WHAT; this file says HOW. Sections other slices own are marked as such. When code and this file
 > disagree, raise it – don't silently follow either.
 
@@ -70,6 +70,17 @@ state in memory), one core transition (`setStageRunning`, `setStageDone`, `setSt
   blocks a failing one. Consumers that build from shots take the resolved storyboard from `validateProject`;
   `buildShotItems` and QA's continuity checks still read the raw one (G-72). Kind-specific checks are branches on
   an optional context (`EpisodeContext`), not a second model.
+- Every media generation is one call of `runBatch` (`packages/cli/src/generate.ts`), whoever asks: `generate`,
+  the queue (one item per call), `patch`, `voice-track`, the bench. It resolves each item's model role and
+  provider, checks the worst-case estimate once, runs one `GenerationRunner` per provider, and records the
+  planned cost and saves the state after each new result. Do not call an adapter around it (ADR 0041).
+- The runner in `packages/providers` owns the generation cache (`<workspace>/.cache/generations/<key>/`) and the
+  manifest append; cli owns the budget, the state and the paths; providers know no project.
+- Models, params and prices live in `config/models.yaml`, never in code; a model switch is a configuration change
+  made by the agent. Provider-specific routing still sits in `generate.ts` `resolveItem` and `models.ts` (G-97).
+- Adapters take an injectable `fetchImpl` and poll interval; HTTP calls go through `fetchJsonWithRetry` and
+  downloads through `downloadOutputs` (`packages/providers/src/http.ts`). Each adapter keeps its own timeout and
+  poll loop (G-98); a submission is retried only with an idempotency key (G-86).
 - User-owned files (`timing.overrides.json`, `lyrics.txt`, imported stems, `project.yaml`) are never replaced by
   a tool; a command that would do so is a hard stop.
 
@@ -117,4 +128,7 @@ directory. `tests/helpers/release-fixture.ts` builds release projects.
 | Song analysis | `analyze.py --no-separate --skip-asr --schema …` on a fixture project; no model loads | integration (pytest) | `scripts/audio-analysis/tests/test_analyze_integration.py` |
 | Timing rule | `mergeTiming`, `assertTiming`, `resolveAnchor` on an inline `Timing` | unit | `tests/timing.test.ts`, `tests/timing-characterization.test.ts` |
 | Storyboard rule | `resolveStoryboard` on an inline `Storyboard`, `Timing`, style and character bible | unit | `tests/storyboard-characterization.test.ts`, `tests/continuity.test.ts` |
+| Generation runner | `GenerationRunner` with `MockProvider` (or a stub provider), a temp cache dir and manifest | unit | `tests/providers.test.ts`, `tests/generation-characterization.test.ts` |
+| Generation batch | `runBatch(target, items, { dryRun, providerFactory, cacheKey, log: false })` on an inline `BatchTarget`; a unique `cacheKey` keeps the workspace cache out of it | integration | `tests/generate-workflow.test.ts`, `tests/generation-characterization.test.ts` |
+| Provider adapter | the adapter with a fake `fetchImpl` (cloud) or a fake ComfyUI server | unit | `tests/fal-provider.test.ts`, `tests/topview.test.ts`, `tests/comfyui.test.ts` |
 | Agent instruction | not testable deterministically | – | `workspace/.claude/commands/video-next.md` |

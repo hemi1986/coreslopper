@@ -63,6 +63,7 @@ flowchart LR
     CMD_ImportSong["Import song"]:::cmd
     CMD_NormalizeSongLoudness["Normalize song loudness"]:::cmd
     CMD_SeparateLeadStem["Separate lead stem"]:::cmd
+    CMD_RestartComfyUI["Restart ComfyUI"]:::cmd
     subgraph BC_Timing["Timing"]
         CMD_WriteLyrics["Write lyrics"]:::cmd
         CMD_AnalyzeSong["Analyze song"]:::cmd
@@ -84,6 +85,19 @@ flowchart LR
         EVT_StoryboardValidated["Storyboard validated"]:::evt
         EVT_ContactSheetWritten["Contact sheet written"]:::evt
     end
+    subgraph BC_Generation["Generation"]
+        CMD_RunGenerationBatch["Run a generation batch"]:::cmd
+        CMD_EstimateGeneration["Estimate a generation"]:::cmd
+        CMD_ChangeModelRoles["Change model roles"]:::cmd
+        EVT_GenerationBatchRefused["Generation batch refused"]:::evt
+        EVT_GenerationCompleted["⭐ Generation completed"]:::evt
+        EVT_GenerationReused["Generation reused from the cache"]:::evt
+        EVT_GenerationFailed["Generation failed"]:::evt
+        EVT_ClipRestored["Clip restored"]:::evt
+        EVT_GenerationFiled["Generation filed"]:::evt
+        EVT_ModelRolesChanged["Model roles changed"]:::evt
+        EVT_ComfyUIRestarted["ComfyUI restarted"]:::evt
+    end
     ACT_User(["User"]):::act
     ACT_Orchestrator(["Orchestrator"]):::act
     ACT_SetupSkill(["Setup skill"]):::act
@@ -101,6 +115,8 @@ flowchart LR
     POL_JudgeEveryAttempt{{"Every attempt with a verdict target is judged"}}:::pol
     POL_ApplyVerdict{{"The queue run applies every verdict"}}:::pol
     POL_ValidateEveryStoryboardEdit{{"Every storyboard edit is validated"}}:::pol
+    POL_RecordPlannedSpend{{"Every new generation is billed at its planned cost"}}:::pol
+    POL_RestartComfyUIOnFailure{{"A failed local generation restarts ComfyUI before the next try"}}:::pol
     RM_Status[("Status")]:::rm
     RM_NextAction[("Next action")]:::rm
     RM_ProductionView[("Production view")]:::rm
@@ -114,6 +130,9 @@ flowchart LR
     RM_ResolvedStoryboard[("Resolved storyboard")]:::rm
     RM_StoryboardTable[("Storyboard table")]:::rm
     RM_ContactSheet[("Contact sheet")]:::rm
+    RM_Manifest[("Manifest")]:::rm
+    RM_GenerationEstimate[("Generation estimate")]:::rm
+    RM_ComfyUIStatus[("ComfyUI status")]:::rm
     ACT_SetupSkill --> CMD_CreateProject
     CMD_CreateProject --> EVT_ProjectCreated
     ACT_Orchestrator --> CMD_StartStage
@@ -184,6 +203,19 @@ flowchart LR
     CMD_ValidateStoryboard --> EVT_StoryboardValidated
     ACT_StageRunner --> CMD_WriteContactSheet
     CMD_WriteContactSheet --> EVT_ContactSheetWritten
+    ACT_QueueRun --> CMD_RunGenerationBatch
+    CMD_RunGenerationBatch --> EVT_GenerationBatchRefused
+    CMD_RunGenerationBatch --> EVT_GenerationCompleted
+    CMD_RunGenerationBatch --> EVT_GenerationReused
+    CMD_RunGenerationBatch --> EVT_GenerationFailed
+    CMD_RunGenerationBatch --> EVT_ClipRestored
+    CMD_RunGenerationBatch --> EVT_GenerationFiled
+    ACT_StageRunner --> CMD_EstimateGeneration
+    CMD_EstimateGeneration --> EVT_GenerationBatchRefused
+    ACT_Orchestrator --> CMD_ChangeModelRoles
+    CMD_ChangeModelRoles --> EVT_ModelRolesChanged
+    ACT_QueueRun --> CMD_RestartComfyUI
+    CMD_RestartComfyUI --> EVT_ComfyUIRestarted
     EVT_StageCompleted --> POL_RunNextStage
     EVT_StageSkipped --> POL_RunNextStage
     POL_RunNextStage --> CMD_StartStage
@@ -200,6 +232,10 @@ flowchart LR
     EVT_StoryboardWritten --> POL_ValidateEveryStoryboardEdit
     EVT_StoryboardRevised --> POL_ValidateEveryStoryboardEdit
     POL_ValidateEveryStoryboardEdit --> CMD_ValidateStoryboard
+    EVT_GenerationCompleted --> POL_RecordPlannedSpend
+    POL_RecordPlannedSpend --> CMD_RecordSpend
+    EVT_GenerationFailed --> POL_RestartComfyUIOnFailure
+    POL_RestartComfyUIOnFailure --> CMD_RestartComfyUI
     EVT_StageStarted -.-> RM_Status
     EVT_StageCompleted -.-> RM_Status
     EVT_StageFailed -.-> RM_Status
@@ -273,6 +309,18 @@ flowchart LR
     RM_StoryboardTable -.-> ACT_StageRunner
     EVT_ContactSheetWritten -.-> RM_ContactSheet
     RM_ContactSheet -.-> ACT_User
+    EVT_GenerationCompleted -.-> RM_Manifest
+    EVT_GenerationReused -.-> RM_Manifest
+    EVT_GenerationFailed -.-> RM_Manifest
+    EVT_ClipRestored -.-> RM_Manifest
+    RM_Manifest -.-> ACT_StageRunner
+    RM_Manifest -.-> ACT_User
+    EVT_ModelRolesChanged -.-> RM_GenerationEstimate
+    EVT_SpendRecorded -.-> RM_GenerationEstimate
+    RM_GenerationEstimate -.-> ACT_StageRunner
+    EVT_ComfyUIRestarted -.-> RM_ComfyUIStatus
+    RM_ComfyUIStatus -.-> ACT_StageRunner
+    RM_ComfyUIStatus -.-> ACT_User
     classDef evt fill:#a3391f,stroke:#e65100,color:#fff
     classDef cmd fill:#64b5f6,stroke:#0d47a1,color:#000
     classDef pol fill:#ce93d8,stroke:#4a148c,color:#000
@@ -450,6 +498,33 @@ flowchart LR
     classDef hs fill:#e57373,stroke:#b71c1c,color:#fff
 ```
 
+### From a batch item to a billed generation
+
+```mermaid
+flowchart LR
+    ACT_QueueRun(["Queue run"]):::act
+    CMD_RunGenerationBatch["Run a generation batch"]:::cmd
+    EVT_GenerationCompleted["⭐ Generation completed"]:::evt
+    POL_RecordPlannedSpend{{"Every new generation is billed at its planned cost"}}:::pol
+    CMD_RecordSpend["Record spend"]:::cmd
+    EVT_SpendRecorded["Spend recorded"]:::evt
+    RM_Manifest[("Manifest")]:::rm
+    ACT_QueueRun --> CMD_RunGenerationBatch
+    CMD_RunGenerationBatch --> EVT_GenerationCompleted
+    EVT_GenerationCompleted --> POL_RecordPlannedSpend
+    POL_RecordPlannedSpend --> CMD_RecordSpend
+    CMD_RecordSpend --> EVT_SpendRecorded
+    EVT_SpendRecorded --> RM_Manifest
+    classDef evt fill:#a3391f,stroke:#e65100,color:#fff
+    classDef cmd fill:#64b5f6,stroke:#0d47a1,color:#000
+    classDef pol fill:#ce93d8,stroke:#4a148c,color:#000
+    classDef rm fill:#81c784,stroke:#1b5e20,color:#000
+    classDef act fill:#a3751f,stroke:#f57f17,color:#000
+    classDef ext fill:#f48fb1,stroke:#880e4f,color:#000
+    classDef agg fill:#ffe082,stroke:#ff6f00,color:#000
+    classDef hs fill:#e57373,stroke:#b71c1c,color:#fff
+```
+
 ## Bounded Contexts & Aggregates
 
 | Context | Purpose | Aggregates | Events |
@@ -459,6 +534,7 @@ flowchart LR
 | Generation queue (`BC-GenerationQueue`) | Gets every generated image and clip of a project approved before anything derives from it – generate an attempt, give it a verdict, requeue it with the fix prompt, or file it | Generation queue | Queue item added, Queue item replaced, Attempt generated, Attempt generation failed, Verdict given, Attempt filed, Queue item requeued, Queue item needs a fix, Attempt accepted, Queue item dropped, Region patched, Queue run stopped |
 | Timing (`BC-Timing`) | Turns the user's song and lyrics into a measured timing, merges the user's timing overrides into the effective timing, and resolves symbolic anchors to seconds for every later stage | Project timing, Lyrics | Song imported, Song loudness normalized, Lyrics written, Song analyzed, Lead stem separated, Timing overridden |
 | Storyboard (`BC-Storyboard`) | Turns the treatment or script, the effective timing and the bibles into an ordered list of shots that covers the song or episode track, checks every shot's source, continuity references and limits, and hands resolved shots to the queue, render, QA and review | Storyboard | Storyboard written, Storyboard revised, Storyboard validated, Contact sheet written |
+| Generation (`BC-Generation`) | Turns the items of a generation batch into provider calls for a model role – each refused up front when the batch does not fit the budget, served from the generation cache when the same request ran before, recorded in the manifest, and billed to the project budget at its planned cost | Cached generation, Model roles | Generation batch refused, Generation completed, Generation reused from the cache, Generation failed, Clip restored, Generation filed, Model roles changed, ComfyUI restarted |
 
 ## Aggregates
 
@@ -470,3 +546,5 @@ flowchart LR
 | Project timing (`AGG-ProjectTiming`) | Timing | as-is | timing.json and timing.overrides.json per project are parsed and merged into one effective timing on every project load, and the merge ends in one check of the whole timing (packages/core/src/project.ts:237-241; packages/core/src/timing.ts:61-94)<br>assertTiming checks sections, lines, words, beats and energy of the merged timing together, so one bad override fails the whole timing (timing.ts:96-165)<br>the analysis writes timing.json whole and never writes the overrides (scripts/audio-analysis/analyze.py:430-432, README.md:10) |
 | Lyrics (`AGG-Lyrics`) | Timing | as-is | writeLyrics checks the whole text for section tags and writes lyrics.txt atomically (packages/cli/src/board-wizard.ts:271-278), used by the lyrics command and the board wizard (packages/cli/src/index.ts:588-608; packages/cli/src/release-board.ts:206) |
 | Storyboard (`AGG-Storyboard`) | Storyboard | as-is | storyboard.yaml per project is parsed whole with StoryboardSchema, only by loadProject (packages/core/src/project.ts:242-243)<br>resolveStoryboard checks all shots together – unique ids, order, coverage, chaining – against the effective timing and the bibles, in one call whose only caller is validateProject (packages/core/src/timing.ts:455-577; packages/cli/src/validate.ts:106)<br>the hook validates the whole project on every edit of storyboard.yaml and blocks a failing edit (workspace/.claude/hooks/validate-artifacts.mjs:13-15; packages/cli/src/validate-file.ts:124-127) |
+| Cached generation (`AGG-CachedGeneration`) | Generation | as-is | one record per cache key, .cache/generations/<key>/result.json with the provider's files, shared by every project and series of the workspace (packages/providers/src/runner.ts:86-87,167-195; packages/cli/src/generate.ts:711)<br>the key is the SHA-256 of the canonical request – operation, provider, model, prompt, negative prompt, seed, size, duration, params, each reference's path and content hash, the audio hash and start, the workflow fingerprint (runner.ts:53-84; packages/core/src/hash.ts:25-45)<br>runBatch is the one path every generation takes – generate, the queue, region patches, the voice track and the bench (generate.ts:667-672; queue.ts:628; patch.ts:96; voice-track.ts:137,191; bench.ts:577,634,675) |
+| Model roles (`AGG-ModelRoles`) | Generation | as-is | config/models.yaml is parsed whole with ModelsConfigSchema on every batch and estimate (packages/core/src/schema.ts:714-762; packages/cli/src/generate.ts:678)<br>resolveModelRole and providerForRole pick a role's model, params and price for the project's provider in one place (packages/core/src/models.ts:26-98) |

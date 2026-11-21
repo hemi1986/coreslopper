@@ -3,8 +3,8 @@
 > Recovered from code by `/adopt` on 2026-11-21 at b195086. This is **not a target**.
 > Target: [context-map.md](context-map.md) · Gap register: [gap-register.md](gap-register.md).
 
-Adopted slices: project and stage pipeline; human review; art-director verdicts and the generation queue (decided by recommendation); song timing and lyrics (decided by recommendation, four answers from the user); the storyboard (decided by recommendation, four answers from the user). Other areas – release, series canon,
-character library, model bench, providers – appear only as neighbours until their own slice is adopted.
+Adopted slices: project and stage pipeline; human review; art-director verdicts and the generation queue (decided by recommendation); song timing and lyrics (decided by recommendation, four answers from the user); the storyboard (decided by recommendation, four answers from the user); generation and the provider adapters (decided by recommendation, four answers from the user). Other areas – release, series canon,
+character library, model bench – appear only as neighbours until their own slice is adopted.
 
 ```mermaid
 flowchart LR
@@ -13,7 +13,12 @@ flowchart LR
   BC-Review -->|notes map to storyboard shots and timing sections| BC-Storyboard
   BC-Pipeline -->|done project feeds release| Release[Release - not adopted]
   BC-Pipeline -->|style-character done imports characters| Library[Character library - not adopted]
-  BC-GenerationQueue -->|every attempt through generate: budget, cache, manifest, spend| Generation[Generation and providers - not adopted]
+  BC-GenerationQueue -->|every attempt is a one-item batch: budget, cache, manifest, spend| BC-Generation
+  BC-Generation -->|planned cost of every new generation recorded as spend| BC-Pipeline
+  BC-Generation -->|cloud adapters: fal.ai, Higgsfield, Topview| Providers[Cloud providers - external]
+  BC-Generation -->|tagged workflows on the user's GPU| ComfyUI[ComfyUI server - external]
+  Bench[Model bench - not adopted] -->|own budget and manifest, same runBatch| BC-Generation
+  Series -->|voice track, canon references through runBatch| BC-Generation
   BC-GenerationQueue -->|items built from storyboard shots and their references| BC-Storyboard
   BC-GenerationQueue -->|needs-fix count, failed verdicts| BC-Pipeline
   BC-Pipeline -->|audio-analysis stage runs the song analysis| BC-Timing
@@ -156,3 +161,41 @@ Boundaries:
 - Episode checks read the script's scenes and chat lines and the series' lip-sync limit; the lip-sync maximum
   comes from `config/models.yaml` (`validate.ts:53-63`).
 - Remotion keeps its own motion component switch and highlight matching (HS-80, HS-81).
+
+### BC-Generation – Generation
+Purpose (as recovered, decided by recommendation HS-87): turns the items of a generation batch into provider calls
+for a model role. A batch that does not fit the budget is refused up front, a request that ran before is served
+from the generation cache, every generation is recorded in the manifest, and every new one is billed at its
+planned cost.
+Core terms: Generation Batch, Generation, Generation Operation, Model Role, Provider, Provider Alternative,
+Provider Adapter, ComfyUI Workflow, Mock Provider, Generation Cache, Cache Key, Manifest, Project Budget, Batch
+Cap, Restore Pass, Video Model.
+Evidence:
+- `runBatch` (`packages/cli/src/generate.ts:667-772`): it resolves every item (`resolveItem`, `:287-594`) and
+  checks the worst-case estimate once (`assertAffordable`, `packages/core/src/cost.ts:21-38`). Then it builds
+  one `GenerationRunner` per provider, records the spend and saves the state after each new result. Its callers
+  are `generate` (`index.ts:897`), the queue (`queue.ts:628`), `patch` (`patch.ts:96`), the voice track
+  (`voice-track.ts:137,191`) and the bench (`bench.ts:577,634,675`).
+- `GenerationRunner` (`packages/providers/src/runner.ts`): the cache key (`:53-84`), the cache under
+  `<workspace>/.cache/generations/<key>/` (`:86-99,167-207`) and the manifest append (`:209-226`).
+- Model roles: `config/models.yaml` (`ModelsConfigSchema`, `schema.ts:714-762`), resolved by
+  `resolveModelRole` and `providerForRole` (`packages/core/src/models.ts:26-98`). The project's choice is in
+  `project.yaml` `providers` (`schema.ts:37-48`).
+- Adapters: `createProvider` (`packages/providers/src/index.ts:20-27`) and the `Provider` interface (`types.ts:36-69`).
+  The adapters are `fal.ts`, `higgsfield.ts`, `topview.ts`, `comfyui.ts` (with the workflows in
+  `comfyui/workflows/` and their tags) and `mock.ts`, sharing `http.ts` and `duration.ts`.
+- The Pika prompt schemas are `flex.ts` and `fl2va.ts` in core; the local clip options are in `clip-options.ts`.
+  The ComfyUI server commands `comfy status` and `comfy restart` are in `comfy.ts`.
+Boundaries:
+- Every media generation goes through `runBatch`; no adapter is called around it. The only exception is not a
+  generation: the release autopilot uses fal's file upload to host Instagram media (`release-autopilot.ts:138`).
+- The budget ledger belongs to `AGG-Project` (BC-Pipeline): `recordSpend` and `saveState` are called by
+  `runBatch`, and `state.json` has no lock (G-1). A series canon batch books against the series budget.
+- The queue (BC-GenerationQueue) sends one item per batch, so the batch cap guards one item and the project budget
+  guards the run (HS-91).
+- `packages/providers` imports only core and knows no project, state or budget. It owns the cache and the
+  manifest file and reads `config/models.yaml` and the workflow folder (`comfyui.ts:165-168,729`).
+- Provider-specific routing lives outside the adapters: ComfyUI, Pika, LTX, Wan and SeedVR2 rules in
+  `generate.ts` and the lip-sync fallback in `models.ts`. The provider list is kept five times (HS-100).
+- Readers of the manifest: the QA checker (cost sum equals recorded spend, `qa.ts:230-262`). The bench keeps its
+  own manifest and budget (bench slice).
