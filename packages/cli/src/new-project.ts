@@ -32,7 +32,7 @@ export interface NewProjectOptions {
   videoProvider?: VideoProviderKind;
   /** Defaults to `music-video`. An episode takes formats, providers, and brand from its series. */
   kind?: ProjectKind;
-  /** Episode only: the series slug (`series/<slug>/series.yaml` must exist). */
+  /** Episode only: the series slug (`projects/<slug>/series.yaml` must exist). */
   series?: string;
   /** Episode only: the episode number. */
   episode?: number;

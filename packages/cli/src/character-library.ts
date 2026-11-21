@@ -188,7 +188,7 @@ export interface ImportOptions {
   now?: Date;
 }
 
-/** `projects/<slug>` or `series/<slug>`, the source as the library records it. */
+/** `projects/<slug>`, the source as the library records it. */
 function sourceLabel(root: string, dir: string): string {
   return relative(resolve(root), resolve(dir)).split(sep).join('/');
 }

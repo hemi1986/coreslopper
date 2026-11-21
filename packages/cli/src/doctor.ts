@@ -16,6 +16,7 @@ import {
 } from '@coreslopper/providers';
 import { detectTools, type ToolCheck } from './tools.js';
 import { isWorkspace, loadWorkspaceEnv } from './workspace.js';
+import { LEGACY_LAYOUT_HINT, legacySeries } from './migrate-layout.js';
 
 export interface DoctorCheck {
   id: string;
@@ -181,6 +182,19 @@ export function autopilotChecks(env: NodeJS.ProcessEnv = process.env, now = new 
   ];
 }
 
+/** Series canons belong in projects/ (ADR 0035); a workspace from before still has them in series/. */
+function layoutCheck(root: string): DoctorCheck {
+  const legacy = legacySeries(root);
+  return {
+    id: 'layout',
+    name: 'Workspace layout',
+    ok: legacy.length === 0,
+    detail: legacy.length ? `series/${legacy.join(', series/')}: ${LEGACY_LAYOUT_HINT}` : 'every project and series in projects/',
+    required: false,
+    group: 'workspace',
+  };
+}
+
 export async function runDoctor(root: string, options: DoctorOptions = {}): Promise<DoctorResult> {
   loadWorkspaceEnv(root);
   const higgsfield = resolveHiggsfieldCredentials();
@@ -196,6 +210,7 @@ export async function runDoctor(root: string, options: DoctorOptions = {}): Prom
       required: true,
       group: 'workspace',
     },
+    layoutCheck(root),
     fileCheck(root, 'templates', 'Project template', 'templates/project/README.md'),
     fileCheck(root, 'config', 'Defaults', 'config/defaults.yaml'),
     fileCheck(root, 'models', 'Model roles and pricing', 'config/models.yaml'),

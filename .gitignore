@@ -43,7 +43,12 @@ projects/*/renders/*
 !projects/*/renders/.gitkeep
 projects/*/timing.effective.json
 
-# Series canon media (references, reference voices); the YAML canon stays tracked
+# A series canon is a project too (projects/<slug>/ with series.yaml): its media fall under the rules above.
+# Its art-director verdicts and review frames live in review/ (a music video keeps them in assets/review/).
+projects/*/review/verdicts.jsonl
+projects/*/review/frames/
+
+# Legacy layout before migrate-layout (series/<slug>/ beside projects/); keeps old canons' media out until they move
 series/*/characters/*
 !series/*/characters/.gitkeep
 series/*/sets/*

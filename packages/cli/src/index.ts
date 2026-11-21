@@ -113,7 +113,7 @@ program
 
 program
   .command('new-series <slug>')
-  .description('Create a series canon in series/<slug>/ from templates/series.')
+  .description('Create a series canon in projects/<slug>/ from templates/series.')
   .requiredOption('--budget <usd>', 'Series budget in USD: canon generations plus every episode budget', (value) => Number(value))
   .option('--title <title>')
   .option('--format <id>', 'Master format: 16x9 | 9x16 | 1x1 | 4x5 (default: config/defaults.yaml)')
@@ -532,7 +532,7 @@ program
   .command('new <slug>')
   .description('Create a new project from templates/project, or an episode from templates/episode.')
   .option('--kind <kind>', 'music-video | episode', 'music-video')
-  .option('--series <slug>', 'Episode: the series in series/<slug>/')
+  .option('--series <slug>', 'Episode: the series in projects/<slug>/')
   .option('--episode <n>', 'Episode: the episode number', (value) => Number(value))
   .option('--title <title>')
   .option('--budget <usd>', 'Project budget in USD (required)', (value) => Number(value))
@@ -638,6 +638,17 @@ program
           console.log(`${reference.id}  ${reference.kind.padEnd(10)} ${reference.file ?? reference.url}${reference.subject ? `  · ${reference.subject}` : ''}${reference.note ? `  · ${reference.note}` : ''}`);
         }
       }
+    }),
+  );
+
+program
+  .command('migrate-layout')
+  .description('Move series canons from series/<slug>/ to projects/<slug>/ and rewrite the paths that point there (ADR 0035). Stops before any change when a slug is taken.')
+  .option('--dry-run', 'Show the moves and rewrites; write nothing')
+  .action((options: { dryRun?: boolean }) =>
+    run(async () => {
+      const { migrateLayout, printLayoutMigration } = await import('./migrate-layout.js');
+      printLayoutMigration(await migrateLayout(repoRoot(), { dryRun: options.dryRun }));
     }),
   );
 
@@ -886,7 +897,7 @@ program
   .command('generate [project]')
   .description('Run a paid or mock generation batch with cache, manifest, and budget checks.')
   .requiredOption('--batch <path>', 'Batch JSON/YAML file')
-  .option('--series <series>', 'Run the batch for a series canon (budget and manifest of series/<series>/) instead of a project')
+  .option('--series <series>', 'Run the batch for a series canon (budget and manifest of projects/<series>/) instead of a project')
   .option('--dry-run', 'Estimate and print the batch without generating')
   .option('--provider <provider>', 'Provider override for this batch: fal | higgsfield | topview | comfyui | mock (lip-sync keeps its own provider)')
   .option('--lipsync-provider <provider>', 'Lip-sync provider override for the lipSync items of this batch: fal | higgsfield | topview | comfyui | mock')

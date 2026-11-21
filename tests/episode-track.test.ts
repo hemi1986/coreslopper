@@ -133,11 +133,11 @@ describe.skipIf(!hasFfmpeg())('voice-track and episode-track on the mock provide
   async function workspace(): Promise<string> {
     const dir = await mkdtemp(join(tmpdir(), 'coreslopper-track-'));
     temporary.push(dir);
-    await cp(join(root, 'series/demo-series'), join(dir, 'series/demo-series'), {
+    await cp(join(root, 'projects/demo-series'), join(dir, 'projects/demo-series'), {
       recursive: true,
       filter: (source) => !source.endsWith('.wav'),
     });
-    execFileSync('node', [join(root, 'scripts/fixtures/generate-voice-refs.mjs'), join(dir, 'series/demo-series')]);
+    execFileSync('node', [join(root, 'scripts/fixtures/generate-voice-refs.mjs'), join(dir, 'projects/demo-series')]);
     const project = join(dir, 'projects/demo-episode');
     await cp(episodeDir, project, {
       recursive: true,

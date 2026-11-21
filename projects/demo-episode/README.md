@@ -2,7 +2,7 @@
 
 Episode 1 of the series `demo-series`, a coreslopper episode project.
 
-The canon (style, characters, sets, and their references) belongs to the series in `series/demo-series/`. This project never copies or changes it.
+The canon (style, characters, sets, and their references) belongs to the series in `projects/demo-series/`. This project never copies or changes it.
 
 ## Start here
 

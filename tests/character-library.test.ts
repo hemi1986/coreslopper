@@ -139,7 +139,7 @@ describe('using a library character', () => {
     await expect(useCharacter(ws, clash, 'nova')).rejects.toThrow(/its own character "nova"/);
 
     await createSeriesCanon(ws, { slug: 'harbor', title: 'Harbor', budget: 50, format: '9x16', imageProvider: 'mock', videoProvider: 'mock', audioProvider: 'mock' } as never);
-    expect((await useCharacter(ws, join(ws, 'series', 'harbor'), 'nova')).files.length).toBe(3);
+    expect((await useCharacter(ws, join(ws, 'projects', 'harbor'), 'nova')).files.length).toBe(3);
     const episode = await video(ws, 'harbor-01');
     await writeFile(join(episode, 'project.yaml'), `${await readFile(join(episode, 'project.yaml'), 'utf8')}kind: episode\n`);
     await expect(useCharacter(ws, episode, 'nova')).rejects.toThrow(/series canon/);

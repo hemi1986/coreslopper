@@ -46,8 +46,8 @@ function titleFromSlug(slug: string): string {
 }
 
 /** A starting style bible from the brand kit, so the canon validates before the skill refines it. */
-async function starterStyle(title: string, brandId: string, root: string): Promise<StyleBible> {
-  const brand = await loadBrand(join(root, 'series'), brandId, root);
+async function starterStyle(title: string, brandId: string, root: string, dir: string): Promise<StyleBible> {
+  const brand = await loadBrand(dir, brandId, root);
   if (!brand) throw new ConfigError(`Brand kit "${brandId}" not found in brand/${brandId}/brand.yaml.`);
   return {
     version: 1,
@@ -60,7 +60,7 @@ async function starterStyle(title: string, brandId: string, root: string): Promi
 }
 
 /**
- * Create `series/<slug>/` from templates/series: series.yaml with formats,
+ * Create `projects/<slug>/` from templates/series (a series is a project; ADR 0035): series.yaml with formats,
  * providers, brand, and budget, a starting style bible from the brand kit,
  * empty character and set bibles, a bible skeleton, and the series state.
  */
@@ -73,8 +73,8 @@ export async function createSeries(options: NewSeriesOptions): Promise<string> {
     throw new ConfigError('A series budget is required. Pass --budget <USD>.');
   }
   const root = options.root ?? repoRoot();
-  const dir = join(root, 'series', slug);
-  if (existsSync(dir)) throw new ValidationError(`Series directory already exists: ${dir}`);
+  const dir = join(root, 'projects', slug);
+  if (existsSync(dir)) throw new ValidationError(`projects/${slug} already exists; series and projects share their slugs.`);
 
   const defaults = await loadDefaults(root);
   const title = options.title?.trim() || titleFromSlug(slug);
@@ -94,7 +94,7 @@ export async function createSeries(options: NewSeriesOptions): Promise<string> {
     limits: {},
   });
 
-  const style = await starterStyle(title, brand, root);
+  const style = await starterStyle(title, brand, root, dir);
   await cp(join(root, 'templates', 'series'), dir, { recursive: true, errorOnExist: true });
   await writeTextAtomic(join(dir, 'series.yaml'), stringify(series));
   await writeTextAtomic(join(dir, 'style.yaml'), stringify(style));

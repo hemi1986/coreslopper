@@ -6,7 +6,7 @@ allowed-tools: Bash, Read, Glob
 
 # /series-status
 
-1. Parse `$ARGUMENTS`: the series slug (a folder in `series/`). Without one, list `series/*/series.yaml` and run the steps below for each series.
+1. Parse `$ARGUMENTS`: the series slug (a folder in `projects/` with a `series.yaml`). Without one, list `projects/*/series.yaml` and run the steps below for each series.
 2. Run `npm run cli -- series-status <series>`.
 3. Summarize:
    - the master format and the creative limits of the series,

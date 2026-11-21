@@ -2,7 +2,7 @@
 
 Episode {{EPISODE}} of the series `{{SERIES}}`, a coreslopper episode project.
 
-The canon (style, characters, sets, and their references) belongs to the series in `series/{{SERIES}}/`. This project never copies or changes it.
+The canon (style, characters, sets, and their references) belongs to the series in `projects/{{SERIES}}/`. This project never copies or changes it.
 
 ## Start here
 

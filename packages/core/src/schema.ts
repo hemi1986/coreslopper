@@ -99,7 +99,7 @@ export const ProjectConfigSchema = z
     version: z.literal(1),
     slug: SlugSchema,
     kind: ProjectKindSchema.default('music-video'),
-    /** Episode only: the series whose canon this episode uses (`series/<slug>/`). */
+    /** Episode only: the series whose canon this episode uses (`projects/<slug>/` with series.yaml). */
     series: SlugSchema.optional(),
     /** Episode only: the episode number within the series. */
     episode: z.number().int().positive().optional(),
@@ -655,7 +655,7 @@ export const ScriptSchema = z.object({
   scenes: z.array(SceneSchema).min(1),
 });
 
-/** `series/<slug>/state.json`: the spend of canon generations against the series budget. */
+/** `projects/<slug>/state.json` of a series: the spend of canon generations against the series budget. */
 export const SeriesStateSchema = z.object({
   version: z.literal(1),
   series: SlugSchema,
@@ -1447,7 +1447,7 @@ export const LibraryCharacterSchema = z
       .default([]),
     /** Free words for finding the character on the board: "pop star", "narrator". */
     tags: z.array(z.string().min(1)).default([]),
-    /** Where the character came from first: `projects/<slug>`, `series/<slug>`, or `manual`. */
+    /** Where the character came from first: `projects/<slug>` or `manual`. */
     origin: z.string().min(1),
     added: z.string().min(1),
     /** Every later import into this entry: when, from where, which files and states it brought. */

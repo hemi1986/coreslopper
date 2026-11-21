@@ -3,8 +3,7 @@
  * Claude Code PostToolUse hook.
  *
  * Reads the hook payload from stdin, finds the edited file, and validates
- * project artifacts (below `projects/`), series canon files (below
- * `series/`), library characters (`library/characters/<id>/character.yaml`), and `config/channel.yaml` with the same CLI the user runs. Exit code 2 blocks the
+ * project and series canon artifacts (below `projects/`), library characters (`library/characters/<id>/character.yaml`), and `config/channel.yaml` with the same CLI the user runs. Exit code 2 blocks the
  * tool call and shows stderr to the agent.
  */
 import { execFileSync } from 'node:child_process';
@@ -64,7 +63,7 @@ function findArtifactRoot(file) {
   let current = dirname(resolve(file));
   while (true) {
     if (existsSync(join(current, 'project.yaml'))) return { dir: current, folder: 'projects' };
-    if (existsSync(join(current, 'series.yaml'))) return { dir: current, folder: 'series' };
+    if (existsSync(join(current, 'series.yaml'))) return { dir: current, folder: 'projects' };
     const parent = dirname(current);
     if (parent === current) return undefined;
     current = parent;

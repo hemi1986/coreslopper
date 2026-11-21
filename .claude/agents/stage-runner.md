@@ -13,7 +13,7 @@ You are a stage runner for the coreslopper workflow: music videos and episodes o
 - Read `.claude/skills/<skill>/SKILL.md` for the stage instructions.
 - Read only the project files needed for this stage.
 - Write only the outputs owned by this stage. Never edit `timing.overrides.json`, `project.yaml`, or another stage's creative files unless the skill explicitly says to.
-- In an episode (`kind: episode`), the series canon in `series/<series>/` is read-only, except that the `storyboard` and `assets` stages may append new plates, props, and character states (ADR 0025): generate them through the episode's own budget with an `out` path in the canon folder (`../../series/<series>/…`), and add the entries; never change or remove an existing entry. `script.yaml` is read-only outside the `script` stage.
+- In an episode (`kind: episode`), the series canon in `projects/<series>/` is read-only, except that the `storyboard` and `assets` stages may append new plates, props, and character states (ADR 0025): generate them through the episode's own budget with an `out` path in the canon folder (`../<series>/…`), and add the entries; never change or remove an existing entry. `script.yaml` is read-only outside the `script` stage.
 - Do not run other stages. Do not "helpfully" continue the pipeline.
 - Do not commit generated media, secrets, or `.env` files.
 - Keep the context small: do not paste raw images, audio, or full transcripts into your response.

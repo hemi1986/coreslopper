@@ -29,7 +29,7 @@ export interface VerdictSummary {
   issues: string[];
 }
 
-/** The path of the verdict log of a project, or of a series canon (`series/<slug>`). */
+/** The path of the verdict log of a project, or of a series canon (`projects/<slug>` with series.yaml). */
 export async function verdictsPath(dir: string): Promise<string> {
   if (existsSync(join(dir, 'series.yaml'))) return join(dir, 'review', 'verdicts.jsonl');
   return join((await loadProject(dir)).paths.assets, 'review', 'verdicts.jsonl');
