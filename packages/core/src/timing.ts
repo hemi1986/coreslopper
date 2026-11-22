@@ -439,15 +439,47 @@ function validateSource(shot: Shot): void {
   }
 }
 
+
+const wordKey = (word: string) => word.toLowerCase().replace(/[^a-z0-9äöüß]/g, '');
+
+function wordMatches(word: string, token: string): boolean {
+  const clean = wordKey(word);
+  return clean === token || (token.length > 2 && clean.includes(token));
+}
+
+/** The words of an on-screen text as the renderer shows them: Suno's parentheses dropped. */
+export function displayWords(text: string): string[] {
+  return text.replace(/[()]/g, ' ').split(/\s+/).filter(Boolean);
+}
+
+/**
+ * Which of a shot's displayed words are highlighted. A one-word highlight marks every word that is it or contains
+ * it; a highlight of several words marks each run of consecutive words that matches it word by word. Validation and
+ * the renderer use this one rule (G-77).
+ */
+export function highlightedWords(words: string[], highlights: string[]): boolean[] {
+  const marked = words.map(() => false);
+  for (const highlight of highlights) {
+    const tokens = displayWords(highlight).map(wordKey).filter(Boolean);
+    if (tokens.length === 0) continue;
+    for (let start = 0; start + tokens.length <= words.length; start += 1) {
+      if (tokens.every((token, offset) => wordMatches(words[start + offset]!, token))) {
+        for (let offset = 0; offset < tokens.length; offset += 1) marked[start + offset] = true;
+      }
+    }
+  }
+  return marked;
+}
+
 function validateText(shot: Shot): void {
   if (shot.highlights.length === 0) return;
   if (!shot.text) {
     throw new ValidationError(`Shot "${shot.id}" has highlights but no text.`);
   }
-  const normalized = shot.text.toLowerCase();
+  const words = displayWords(shot.text);
   for (const highlight of shot.highlights) {
-    if (!normalized.includes(highlight.toLowerCase())) {
-      throw new ValidationError(`Shot "${shot.id}" highlight "${highlight}" is not part of its text.`);
+    if (!highlightedWords(words, [highlight]).some(Boolean)) {
+      throw new ValidationError(`Shot "${shot.id}" highlight "${highlight}" is not a word or a run of words of its text.`);
     }
   }
 }

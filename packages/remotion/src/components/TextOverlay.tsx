@@ -1,5 +1,6 @@
 import type { StyleBible, Timing } from '@coreslopper/core';
 import { interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
+import { highlightedWords } from '@coreslopper/core/browser';
 import { displayLyric, lineForText } from '../lib/timing';
 
 interface TextOverlayProps {
@@ -26,14 +27,6 @@ function splitWords(text: string): string[] {
   return displayLyric(text).split(/\s+/).filter(Boolean);
 }
 
-function isHighlight(word: string, highlights: string[]): boolean {
-  const clean = word.toLowerCase().replace(/[^a-z0-9äöüß]/g, '');
-  return highlights.some((highlight) => {
-    const normalized = highlight.toLowerCase().replace(/[^a-z0-9äöüß]/g, '');
-    return clean === normalized || (normalized.length > 2 && clean.includes(normalized));
-  });
-}
-
 function timedWords(
   text: string,
   highlights: string[],
@@ -43,13 +36,14 @@ function timedWords(
   shotEnd: number,
 ): TimedWord[] {
   const words = splitWords(text);
+  const marked = highlightedWords(words, highlights);
   const line = lineForText(timing, section, text);
   if (line && line.words.length === words.length) {
     return words.map((word, index) => ({
       text: word,
       start: line.words[index]!.start,
       end: line.words[index]!.end,
-      highlight: isHighlight(word, highlights),
+      highlight: marked[index]!,
     }));
   }
   const span = Math.max(0.2, shotEnd - shotStart);
@@ -58,7 +52,7 @@ function timedWords(
     text: word,
     start: shotStart + index * step,
     end: shotStart + (index + 1) * step,
-    highlight: isHighlight(word, highlights),
+    highlight: marked[index]!,
   }));
 }
 

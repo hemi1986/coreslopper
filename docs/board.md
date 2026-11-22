@@ -18,13 +18,13 @@ docker compose logs -f board          # the watchdog's rounds
 docker compose down                   # stop it
 ```
 
-The container works the same on Linux, macOS, and Windows (Docker Desktop; on Windows keep the workspace inside WSL and run `docker compose` there). The first start installs the dependencies into a volume, which takes a minute; it installs again by itself after `coreslopper update` changed `package-lock.json`. Rebuild the image with `docker compose build` after an update changed `docker/`.
+The container works the same on Linux, macOS, and Windows (Docker Desktop; on Windows keep the workspace inside WSL and run `docker compose` there). The first start installs the dependencies into a volume, which takes a minute; it installs again by itself after `coreslopper update` changed `package-lock.json`. Rebuild the image with `docker compose build` after an update changed `docker/`; `update` says so.
 
 Settings for the container go into the workspace's `.env`, which compose reads too:
 
 | Variable | Purpose |
 |---|---|
-| `TZ` | Time zone for release planning, e.g. `Europe/Paris`; without it the container plans in UTC unless `config/release-schedule.yaml` sets `timezone`. |
+| `TZ` | Time zone for release planning, e.g. `Europe/Paris`; without it the container plans in UTC unless `config/release-schedule.yaml` sets `timezone`. The release view and `doctor` warn when they would. |
 | `CORESLOPPER_BOARD_PORT` | Port on the computer (default 4848). |
 | `CORESLOPPER_MEDIA_DIR` | The media drive of `media-link`; mounted at the same path so linked `renders/` and `assets/` resolve. |
 | `CORESLOPPER_MEDIA_MOUNT` | The folder to mount instead, when `CORESLOPPER_MEDIA_DIR` contains `{slug}`. |
@@ -52,7 +52,7 @@ On a character's page, **Use in** copies it into a music video or series canon: 
 
 ## Production
 
-The start page groups the projects: **your turn** (a command to run in Claude Code, or a release to approve), **running**, the **series**, and the projects whose release is approved. A card shows the stages as a strip, the current stage, the budget, the generation queue, failed art-director reviews, renders in progress, and the next step with a copy button. The page does not refresh itself: **Refresh** at the top of the navigation reloads the navigation and the current view. It keeps the view while a video plays or a field holds unsaved input, so it never restarts a video or discards what you typed.
+The start page groups the projects: **your turn** (a command to run in Claude Code, or a release to approve), **running**, the **series**, and the projects whose release is approved. A card shows the stages as a strip, the current stage, the budget, the generation queue, failed art-director reviews, renders in progress, and the next step with a copy button. A project that is done and released (every release event ticked off, or its release day past) folds into **Released** at the end of the navigation. The group opens when you open one of its projects. The page does not refresh itself: **Refresh** at the top of the navigation reloads the navigation and the current view. It keeps the view while a video plays or a field holds unsaved input, so it never restarts a video or discards what you typed.
 
 A project page lists every stage with its attempts, times, and errors, the budget, the written documents (brief, treatment, lyrics or script, timing report, storyboard, QA report), the renders with a player, the contact sheet, the queue items, and the reviewed images, failed ones first. A series page shows its canon with the gaps that keep episodes from starting, the series budget, and its planned and created episodes.
 

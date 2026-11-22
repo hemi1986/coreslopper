@@ -142,8 +142,8 @@ export interface UpdateResult {
   /** False when the workspace had no recorded baseline (created before `update` existed). */
   hadBaseline: boolean;
   changes: UpdateChange[];
-  /** Locally changed files that upstream did not touch. */
-  keptLocal: number;
+  /** Locally changed files that upstream did not touch: the workspace's own edits, candidates to carry upstream. */
+  keptLocal: string[];
   dryRun: boolean;
   installed: boolean;
   uvSynced: boolean;
@@ -217,7 +217,7 @@ export async function updateWorkspace(options: UpdateOptions): Promise<UpdateRes
   const dryRun = Boolean(options.dryRun);
   const changes: UpdateChange[] = [];
   const nextFiles: Record<string, string> = {};
-  let keptLocal = 0;
+  const keptLocal: string[] = [];
 
   options.onProgress?.(`Comparing the workspace with coreslopper ${toVersion}...`);
   const upstream = await hashRuntime(runtime);
@@ -262,7 +262,7 @@ export async function updateWorkspace(options: UpdateOptions): Promise<UpdateRes
 
     if (baseHash !== undefined && upstreamHash === baseHash) {
       // Changed locally, unchanged upstream: the local version wins.
-      keptLocal += 1;
+      keptLocal.push(path);
       continue;
     }
 
@@ -296,6 +296,11 @@ export async function updateWorkspace(options: UpdateOptions): Promise<UpdateRes
   if (legacy.size) warnings.push(LEGACY_LAYOUT_HINT);
   if (dirtyGit && !dryRun) {
     warnings.push('The workspace had uncommitted changes before the update; "git diff" now mixes them with the update.');
+  }
+  if (changes.some((change) => change.path.startsWith('docker/') || change.path === 'compose.yaml')) {
+    warnings.push(
+      `The board container's files ${dryRun ? 'would change' : 'changed'}: run "docker compose build" before the next "docker compose up -d".`,
+    );
   }
   if (!hadBaseline) {
     warnings.push(
@@ -362,7 +367,10 @@ export function printUpdateSummary(result: UpdateResult): void {
     const suffix = change.action === 'conflict' ? `  → ${change.path}${CONFLICT_SUFFIX}` : '';
     console.log(`  ${LABELS[change.action]}: ${change.path}${suffix}`);
   }
-  if (result.keptLocal > 0) console.log(`  ${result.keptLocal} locally changed file(s) kept; upstream did not change them.`);
+  if (result.keptLocal.length > 0) {
+    console.log(`  ${result.keptLocal.length} locally changed file(s) kept; upstream did not change them:`);
+    for (const path of result.keptLocal) console.log(`    = ${path}`);
+  }
   for (const warning of result.warnings) console.warn(`  ! ${warning}`);
 
   const conflicts = result.changes.filter((change) => change.action === 'conflict').length;

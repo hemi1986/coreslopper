@@ -8,6 +8,7 @@ import {
   buildCalendar,
   calendarIcs,
   scheduleZone,
+  scheduleZoneWarning,
   eventDay,
   nextReleaseDay,
   weekdayOf,
@@ -168,5 +169,14 @@ describe('release calendar', () => {
     expect(ics).toContain('UID:alpha-short-A1-hook-tiktok@coreslopper');
     expect(ics).toContain('SUMMARY:alpha: youtube\\, ok\\; done');
     expect(calendarIcs([calendar], () => 'x')).toBe(calendarIcs([calendar], () => 'x'));
+  });
+});
+
+describe('the release time zone warning', () => {
+  it('warns only when no zone is configured and the computer runs on UTC, as the board container does by default', () => {
+    expect(scheduleZoneWarning({}, 'UTC')).toContain('timezone');
+    expect(scheduleZoneWarning({}, 'Etc/UTC')).toContain('timezone');
+    expect(scheduleZoneWarning({ timezone: 'UTC' }, 'UTC')).toBeUndefined();
+    expect(scheduleZoneWarning({}, 'America/New_York')).toBeUndefined();
   });
 });

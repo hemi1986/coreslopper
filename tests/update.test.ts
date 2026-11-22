@@ -98,7 +98,7 @@ describe('workspace update', () => {
       'skills/obsolete.md': 'removed',
       'skills/obsolete-edited.md': 'kept-removed-upstream',
     });
-    expect(result.keptLocal).toBe(1);
+    expect(result.keptLocal).toEqual(['skills/local-only.md']);
 
     expect(await read(target, 'skills/untouched.md')).toBe('v2\n');
     expect(await read(target, 'skills/local-only.md')).toBe('mine\n');
@@ -169,6 +169,29 @@ describe('workspace update', () => {
     expect(actions(result.changes)).toEqual({ 'skills/a.md': 'updated' });
     expect(await read(target, 'skills/a.md')).toBe('v1\n');
     expect(await read(target, 'coreslopper.workspace.json')).toBe(markerBefore);
+  });
+
+  it('names the workspace’s own edits, also in a dry run', async () => {
+    const v1 = await runtimeFixture('9.9.0', { 'skills/a.md': 'v1\n', 'skills/b.md': 'v1\n', 'skills/c.md': 'v1\n' });
+    const target = await workspaceFrom(v1);
+    await writeFile(join(target, 'skills/b.md'), 'mine\n');
+    await writeFile(join(target, 'skills/a.md'), 'mine\n');
+    const v2 = await runtimeFixture('9.10.0', { 'skills/a.md': 'v1\n', 'skills/b.md': 'v1\n', 'skills/c.md': 'v2\n' });
+
+    const result = await updateWorkspace({ targetDir: target, runtimeDir: v2, install: false, dryRun: true });
+
+    expect([...result.keptLocal].sort()).toEqual(['skills/a.md', 'skills/b.md']);
+  });
+
+  it('says when the board container’s files changed and the image needs a build', async () => {
+    const v1 = await runtimeFixture('9.9.0', { 'docker/Dockerfile': 'FROM node:22\n', 'skills/a.md': 'v1\n' });
+    const target = await workspaceFrom(v1);
+    const unchanged = await updateWorkspace({ targetDir: target, runtimeDir: await runtimeFixture('9.10.0', { 'docker/Dockerfile': 'FROM node:22\n', 'skills/a.md': 'v2\n' }), install: false });
+    expect(unchanged.warnings.join('\n')).not.toContain('docker compose build');
+
+    const v3 = await runtimeFixture('9.11.0', { 'docker/Dockerfile': 'FROM node:24\n', 'skills/a.md': 'v2\n' });
+    const result = await updateWorkspace({ targetDir: target, runtimeDir: v3, install: false });
+    expect(result.warnings.join('\n')).toContain('docker compose build');
   });
 
   it('treats differences as conflicts without a baseline and overwrites them with --force', async () => {

@@ -185,7 +185,8 @@ As-is, core reads the clock itself (`new Date()` in every transition and in `cre
 injected. The watchdog takes `options.now` (`packages/cli/src/production-watch.ts`). Vitest pins `TZ`.
 The release slice takes `now` everywhere (`ReleaseDeps.now`, `CalendarContext.now`, `updateStatus(…, now)`, the
 board's `now`); calendar times are local ISO with the offset of the schedule's `timezone`, else the computer's
-zone, so a calendar planned in the board container is in UTC unless `TZ` is set (G-167). Status and manifest times are UTC.
+zone, so a calendar planned in the board container is in UTC unless `TZ` is set; `scheduleZoneWarning` (core) names it on
+the board and in `doctor`. Status and manifest times are UTC.
 The autopilot takes `now` through `AutopilotDeps.now`; the adapters take `now` and `sleep` (TikTok as a number,
 X and Instagram as a `Date`). The YouTube quota day is Pacific time, the one hard-coded zone.
 

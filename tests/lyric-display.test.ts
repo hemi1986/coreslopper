@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Timing } from '@coreslopper/core';
+import { highlightedWords } from '../packages/core/src/index.ts';
 import { displayLyric, lineForText } from '../packages/remotion/src/lib/timing.ts';
 
 describe('lyric display', () => {
@@ -15,5 +16,12 @@ describe('lyric display', () => {
     } as unknown as Timing;
     expect(lineForText(timing, 'chorus_1', 'My Machine (my machine)')?.id).toBe('l1');
     expect(lineForText(timing, 'chorus_1', 'my machine my machine')?.id).toBe('l1');
+  });
+
+  it('highlights a phrase of several words, and a single word wherever it stands', () => {
+    const words = displayLyric('We burn the night, burn it down').split(' ');
+    expect(highlightedWords(words, ['burn the night'])).toEqual([false, true, true, true, false, false, false]);
+    expect(highlightedWords(words, ['Burn'])).toEqual([false, true, false, false, true, false, false]);
+    expect(highlightedWords(words, ['the burn'])).toEqual(words.map(() => false));
   });
 });

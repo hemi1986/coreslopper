@@ -23,6 +23,18 @@ export function scheduleZone(schedule: Pick<ReleaseSchedule, 'timezone'>): strin
   return schedule.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC';
 }
 
+/**
+ * A warning when release times would be planned in UTC only because no zone is configured – the board container's
+ * default (`TZ` unset in compose.yaml). Undefined when the schedule names a zone or the computer is not on UTC.
+ */
+export function scheduleZoneWarning(
+  schedule: Pick<ReleaseSchedule, 'timezone'>,
+  computerZone: string = Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC',
+): string | undefined {
+  if (schedule.timezone || !/^(Etc\/)?(UTC|GMT|Universal|Zulu)$/i.test(computerZone)) return undefined;
+  return 'Release times are planned in UTC: set timezone in config/release-schedule.yaml (or TZ for the board container)';
+}
+
 /** `config/release-schedule.yaml` of the workspace, or the defaults when there is none. */
 export async function loadReleaseSchedule(root: string): Promise<ReleaseSchedule> {
   const path = join(root, 'config', 'release-schedule.yaml');

@@ -145,7 +145,7 @@ An AI-clip shot whose frontal face keyframe is animated by the vocal segment bet
 _Avoid_: talking shot, singing shot
 
 **Highlight**:
-A word of a shot's on-screen text that the renderer emphasises.
+A word, or a run of consecutive words, of a shot's on-screen text that the renderer emphasises.
 _Avoid_: accent, emphasis
 
 **Focus Point**:

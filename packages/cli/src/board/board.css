@@ -15,6 +15,7 @@ aside h1 { font-size: 15px; margin: 0 4px 12px; }
 .nav-item:hover { background: var(--chip); }
 .nav-item.active { background: var(--accent); color: #fff; }
 .nav-item.active .sub { color: #e8ecff; }
+.nav-group summary { cursor: pointer; color: var(--muted); font-size: 12px; padding: 8px 10px; }
 .sub { color: var(--muted); font-size: 12px; display: block; }
 .bar { height: 3px; background: var(--line); border-radius: 2px; margin-top: 5px; overflow: hidden; }
 .bar > i { display: block; height: 100%; background: var(--ok); }

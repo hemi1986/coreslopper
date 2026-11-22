@@ -245,7 +245,7 @@ aggregates:
       - Every continuity reference exists – style token, character, set, plate, prop, character state – a plate belongs to one of the shot's sets, and a character state belongs to a character on screen in the shot (the code does this, timing.ts:226-366)
       - In an episode a shot's set and plate are the set of its scene, and a ChatWindow shows chat lines of the shot's own scene (the code does this, timing.ts:296-321,374-393)
       - A lip-sync shot is an AI clip of an existing character who shows a face, no longer than the lip-sync model's maximum and, in an episode, the series' limit – in a music video as in an episode (user and decided 2026-11-21, HS-72; the code checks episodes only – gap register)
-      - A highlight is a word of the shot's text (decided 2026-11-21, HS-81; the code accepts any substring the renderer never shows – gap register)
+      - A highlight is a word or a run of consecutive words of the shot's text; validation and the renderer match it by one rule in core (decided 2026-11-21, HS-81; widened to runs of words 2026-11-22, G-77)
       - A chained shot chains from an existing shot that ends before it starts (the code does this, timing.ts:556-569)
       - Only the agent writes storyboard.yaml, in the storyboard stage and when the user asks for a change (user, 2026-11-21, HS-77)
   - id: AGG-CachedGeneration
@@ -2953,7 +2953,7 @@ hotspots:
     question: "Validation accepts a highlight that is any substring of the text; the renderer highlights single normalized words, so a multi-word highlight passes and never shows. Rule?"
     refs: [AGG-Storyboard]
     status: resolved
-    resolution: "A highlight is one word of the text; validation and renderer match the same way – gap (recommendation, not reviewed by the user – delegated, 2026-11-21)"
+    resolution: "A highlight is one word of the text; validation and renderer match the same way – gap (recommendation, not reviewed by the user – delegated, 2026-11-21). Widened 2026-11-22: the user missed a highlight of several words, so a highlight is a word or a run of consecutive words, matched by highlightedWords in core (G-77, closed)"
   - id: HS-82
     question: "A mixed shot's AI-clip layer validates with only prompts.video and then renders empty (no asset); a ChatWindow layer reads the shot's motion.props. Layer contract?"
     refs: [AGG-Storyboard]

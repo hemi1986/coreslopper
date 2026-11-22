@@ -87,7 +87,6 @@ Container (`docs/glossary.md`); Workspace Payload, Engineering Layer, Sandbox Wo
   (G-183, medium).
 - `docs/onboarding.md` says to run `update --force` once without a baseline. A plain update records the baseline;
   `--force` overwrites local edits (G-186, medium).
-- `update` names none of the user's own changes (G-182), and says nothing when `docker/` changed (G-184).
 - A directory without a marker passes as a workspace, and so does the upstream repository (G-185).
 - `update` is in the npx CLI only, `migrate-layout` in the workspace CLI only. The workspace CLI's `init` finds no
   runtime in a workspace (G-188).

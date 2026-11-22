@@ -14,6 +14,7 @@ import {
   linkedinTokenDaysLeft,
   instagramTokenDaysLeft,
 } from '@coreslopper/providers';
+import { loadReleaseSchedule, scheduleZoneWarning } from '@coreslopper/core';
 import { detectTools, type ToolCheck } from './tools.js';
 import { isWorkspace, loadWorkspaceEnv } from './workspace.js';
 import { LEGACY_LAYOUT_HINT, legacySeries } from './migrate-layout.js';
@@ -195,6 +196,32 @@ function layoutCheck(root: string): DoctorCheck {
   };
 }
 
+/** The release schedule's time zone: a warning when releases would be planned in UTC only by default (G-167). */
+async function scheduleZoneCheck(root: string): Promise<DoctorCheck> {
+  let schedule;
+  try {
+    schedule = await loadReleaseSchedule(root);
+  } catch (error) {
+    return {
+      id: 'release-zone',
+      name: 'Release time zone',
+      ok: false,
+      detail: `config/release-schedule.yaml: ${error instanceof Error ? error.message : String(error)}`,
+      required: false,
+      group: 'workspace',
+    };
+  }
+  const warning = scheduleZoneWarning(schedule);
+  return {
+    id: 'release-zone',
+    name: 'Release time zone',
+    ok: !warning,
+    detail: warning ?? (schedule.timezone ? `${schedule.timezone} (config/release-schedule.yaml)` : `${Intl.DateTimeFormat().resolvedOptions().timeZone} (this computer)`),
+    required: false,
+    group: 'workspace',
+  };
+}
+
 export async function runDoctor(root: string, options: DoctorOptions = {}): Promise<DoctorResult> {
   loadWorkspaceEnv(root);
   const higgsfield = resolveHiggsfieldCredentials();
@@ -211,6 +238,7 @@ export async function runDoctor(root: string, options: DoctorOptions = {}): Prom
       group: 'workspace',
     },
     layoutCheck(root),
+    await scheduleZoneCheck(root),
     fileCheck(root, 'templates', 'Project template', 'templates/project/README.md'),
     fileCheck(root, 'config', 'Defaults', 'config/defaults.yaml'),
     fileCheck(root, 'models', 'Model roles and pricing', 'config/models.yaml'),
