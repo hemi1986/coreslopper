@@ -212,7 +212,7 @@ export async function createProject(options: NewProjectOptions): Promise<string>
     return projectDir;
   }
   if (kind === 'meme') {
-    console.log(`Next: write the idea into pitch.md, then run /new-meme ${slug} in Claude Code to grill it into script.yaml.`);
+    console.log(`Next: run /new-meme ${slug} in Claude Code to grill the pitch into script.yaml.`);
     return projectDir;
   }
   const audio = relativeToRoot(join(projectDir, 'audio'), root);

@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import { parse } from 'yaml';
 import { loadProject } from '@coreslopper/core';
+import { createMeme, finishSetup, wizardOptions } from '../packages/cli/src/board-wizard.ts';
 import { addLibraryCharacter } from '../packages/cli/src/character-library.ts';
 import { boardHandler } from '../packages/cli/src/release-board.ts';
 
@@ -121,5 +122,36 @@ describe('ST-008: the meme wizard', () => {
     expect(String(refused.body.error)).toMatch(/slug "office-prank" is taken/);
     expect(await readFile(join(ws, 'projects', 'office-prank', 'keep.txt'), 'utf8')).toBe('mine');
     expect(existsSync(join(ws, 'projects', 'office-prank', 'project.yaml'))).toBe(false);
+  });
+});
+
+describe('createMeme as new --kind meme runs it', () => {
+  it('derives the title from the slug, defaults the budget to 10 USD, and writes the pitch in the user words', async () => {
+    const ws = await workspace();
+    const dir = await createMeme(ws, { slug: 'office-prank', imageProvider: 'mock', videoProvider: 'mock', idea: '  The printer takes revenge ', setting: 'an open-plan office', internal: true });
+    const project = await loadProject(dir);
+    expect(project.config).toMatchObject({ title: 'Office Prank', budget_usd: 10, distribution: 'internal' });
+    expect(await readFile(join(dir, 'pitch.md'), 'utf8')).toBe('# Pitch\n\n## Idea\n\nThe printer takes revenge\n\n## Setting\n\nan open-plan office\n');
+  });
+
+  it('refuses an unknown library character and a budget under the minimum before any folder exists', async () => {
+    const ws = await workspace();
+    const input = { slug: 'office-prank', imageProvider: 'mock', videoProvider: 'mock', idea: 'The printer takes revenge' };
+    await expect(createMeme(ws, { ...input, characters: ['ghost'] })).rejects.toThrow(/no library character "ghost"/);
+    await expect(createMeme(ws, { ...input, budget: 0.01 })).rejects.toThrow(/at least/);
+    expect(existsSync(join(ws, 'projects', 'office-prank'))).toBe(false);
+  });
+
+  it('finishes a meme setup only once pitch.md holds the idea', async () => {
+    const ws = await workspace();
+    const dir = await createMeme(ws, { slug: 'office-prank', imageProvider: 'mock', videoProvider: 'mock', idea: 'The printer takes revenge' });
+    await writeFile(join(dir, 'pitch.md'), '\n');
+    await expect(finishSetup(dir)).rejects.toThrow(/the idea in pitch.md/);
+  });
+
+  it('offers the library characters and the meme budget default in the wizard options', async () => {
+    const ws = await workspace();
+    await withOfficeRobot(ws);
+    expect(await wizardOptions(ws, {})).toMatchObject({ library: [{ id: 'office-robot', name: 'Office Robot' }], memeDefaultBudgetUsd: 10 });
   });
 });

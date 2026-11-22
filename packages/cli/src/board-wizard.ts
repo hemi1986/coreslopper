@@ -20,6 +20,7 @@ import {
   writeJsonAtomic,
   writeTextAtomic,
   type ImageProviderKind,
+  type LipSyncProviderKind,
   type Reference,
   type ReferenceKind,
   type References,
@@ -418,11 +419,14 @@ export async function createEpisode(root: string, input: NewEpisodeInput): Promi
 
 export interface NewMemeInput {
   slug: unknown;
-  title: unknown;
+  /** The CLI may leave it out; it is then derived from the slug. */
+  title?: unknown;
   /** Defaults to `MEME_DEFAULT_BUDGET_USD`. */
   budget?: unknown;
   imageProvider: unknown;
   videoProvider: unknown;
+  /** Defaults to the video provider's lip-sync default. */
+  lipsyncProvider?: LipSyncProviderKind;
   /** Required: what the meme is about, in the user's words. */
   idea: unknown;
   setting?: unknown;
@@ -467,10 +471,12 @@ export async function createMeme(root: string, input: NewMemeInput): Promise<str
     root,
     slug,
     kind: 'meme',
-    title: required(input.title, 'title'),
+    // The CLI may leave the title out; createProject derives it from the slug.
+    title: optionalText(input.title, 'title', 200),
     budget: input.budget === undefined || input.budget === '' ? MEME_DEFAULT_BUDGET_USD : budget(input.budget),
     imageProvider: choice(input.imageProvider, IMAGE_PROVIDERS, 'image provider') as ImageProviderKind,
     videoProvider: choice(input.videoProvider, VIDEO_PROVIDERS, 'video provider') as VideoProviderKind,
+    ...(input.lipsyncProvider ? { lipsyncProvider: input.lipsyncProvider } : {}),
     ...distribution(input.internal),
   });
   try {
@@ -492,6 +498,9 @@ export interface WizardOptions {
   formats: string[];
   series: Array<{ slug: string; title: string; canonReady: boolean; remainingUsd?: number; next?: { episode: number; title: string }; created: number[] }>;
   slugs: string[];
+  /** The library characters a meme can take, sorted by id. */
+  library: Array<{ id: string; name: string }>;
+  memeDefaultBudgetUsd: number;
 }
 
 /** What the wizard offers: providers with credentials, the series with their next planned episode, and the slugs in use. */
@@ -522,6 +531,10 @@ export async function wizardOptions(root: string, env: NodeJS.ProcessEnv = proce
     formats: Object.keys(FORMAT_SIZES),
     series,
     slugs: [...(await projectDirs(root)), ...(await seriesDirs(root))].map((dir) => basename(dir)),
+    library: (await (await import('./character-library.js')).listLibrary(root)).characters
+      .map((entry) => ({ id: entry.id, name: entry.name }))
+      .sort((a, b) => a.id.localeCompare(b.id)),
+    memeDefaultBudgetUsd: MEME_DEFAULT_BUDGET_USD,
   };
 }
 
