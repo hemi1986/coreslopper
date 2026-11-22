@@ -68,13 +68,13 @@ Candidates only – no stories until the user asks (`/adopt <scope> --stories`).
 
 | # | Class | Gap | Evidence | Source | Priority |
 |---|---|---|---|---|---|
-| G-17 | Exists but contradicts | The desktop player takes no lock and rewrites the whole notes file from memory: a board note or a round mark written while it is open is lost, and the note can be sent twice | `scripts/review-player/review_notes.py:33-37,72-76` | HS-16 | high |
-| G-18 | Exists but contradicts | The desktop player deletes sent notes (`remove_last`) | `scripts/review-player/review_notes.py:52-59` | HS-16 | high |
+| G-17 | Exists but contradicts | The desktop player takes no lock and rewrites the whole notes file from memory: a board note or a round mark written while it is open is lost, and the note can be sent twice | `scripts/review-player/review_notes.py:33-37,72-76` | HS-16 | closed 2026-11-22: desktop player retired (ADR 0050) |
+| G-18 | Exists but contradicts | The desktop player deletes sent notes (`remove_last`) | `scripts/review-player/review_notes.py:52-59` | HS-16 | closed 2026-11-22: desktop player retired (ADR 0050) |
 | G-19 | Exists but contradicts | Any replies file answers a round, also an incomplete one; completeness is checked only by the hook after the write | `packages/core/src/review.ts:42-45`; `validate-file.ts:219-232` | HS-18 | medium |
 | G-20 | Exists but contradicts | An unreadable round file makes the board count nothing open, while `status` fails | `packages/cli/src/board-review.ts:84-88,273` | HS-18 | medium |
 | G-21 | Exists but contradicts | Sending writes the round file and the note marks separately; a crash between them sends the same notes again | `packages/cli/src/board-review.ts:264-266` | Q8 | medium |
 | G-22 | Exists but contradicts | The agent may write notes and round files; only an instruction forbids it, the hook checks replies only | `workspace/.claude/hooks/validate-artifacts.mjs:13-30,84-85` | HS-25 | medium |
-| G-23 | Exists but contradicts | The desktop player computes frames with `round(t × fps)` and the container fps; the board with `floor` and the format fps | `scripts/review-player/review_player.py:44,66`; `packages/core/src/review.ts:16` | HS-16 | low |
+| G-23 | Exists but contradicts | The desktop player computes frames with `round(t × fps)` and the container fps; the board with `floor` and the format fps | `scripts/review-player/review_player.py:44,66`; `packages/core/src/review.ts:16` | HS-16 | closed 2026-11-22: desktop player retired (ADR 0050) |
 | G-24 | Exists but contradicts | `assembly-render` takes desktop notes "asked for in chat"; the board sends them in the next round | `workspace/.claude/skills/assembly-render/SKILL.md` "Review rounds" | HS-17 | low |
 | G-25 | Exists but contradicts | ADR 0032 resets `qa-export` after every round; the rule is: only when the fix pass changed a render | `docs/adr/0032-web-review-rounds.md` Decision | HS-20 | low |
 | G-26 | Exists but contradicts | Docs say open rounds come "before any stage"; a running and an open interactive stage come first | `docs/pipeline.md` "Review notes and rounds", `docs/board.md` "Review", ADR 0032, test title in `tests/board-review.test.ts:50` | slice 1 HS-14 | low |
@@ -135,7 +135,7 @@ after the analysis, the agent enters corrections). Priority is a suggestion.
 | # | Class | Gap | Evidence | Source | Priority |
 |---|---|---|---|---|---|
 | G-49 | Exists but contradicts | A lyric line in parentheses becomes an untimed cue and a leading `(…)` is dropped as a direction, so backing vocals get no timing and a lip-sync segment cannot silence them | `scripts/audio-analysis/timing_core.py:265-301`; `packages/cli/src/lipsync-audio.ts:18-41` | HS-50 | high |
-| G-50 | Exists but contradicts | Without `--vocals` the analysis runs Demucs and overwrites the imported `audio/stems/vocals.wav`; it ignores `song.json`'s `vocals` | `analyze.py:41-50,344-351` | HS-56 | high |
+| G-50 | Exists but contradicts | Without `--vocals` the analysis runs Demucs and overwrites the imported `audio/stems/vocals.wav`; it ignores `song.json`'s `vocals` | `analyze.py:41-50,344-351` | HS-56 | closed 2026-11-22: the analysis defaults to the imported stem |
 | G-51 | Exists but contradicts | A missing Demucs falls back to the mix with exit 0; zero recognized words fall back to energy sections while the report names WhisperX | `analyze.py:121-135,371,388-400` | HS-57 | medium |
 | G-52 | Exists but contradicts | The schema check's default path is relative to the working directory; the documented call from `scripts/audio-analysis` skips it silently | `analyze.py:425-428`; `audio-analysis/SKILL.md` step 2 | HS-58 | medium |
 | G-53 | Exists but contradicts | `validate` needs `storyboard.yaml`, so the skill's step 5 and the hook on every override edit fail during `audio-analysis` | `packages/cli/src/validate.ts:80-83`; `validate-file.ts:128-133` | HS-63 | medium |

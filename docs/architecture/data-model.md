@@ -61,7 +61,7 @@ mechanical flag (no reader). Music video: `setup`✋ `brief`✋ `treatment`✋ `
 ### AGG-ProjectReview – Project review (as-is)
 
 Files in `projects/<slug>/review/`. The board changes notes and sends rounds under one lock per project
-(`review/.notes.lock`); the desktop player writes notes without it; the agent writes replies.
+(`review/.notes.lock`); the agent writes replies.
 
 **Notes file (one per render, `notes/<video-stem>.json`)** – Render (file name), Frame rate, Notes.
 

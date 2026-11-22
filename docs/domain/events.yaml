@@ -176,15 +176,15 @@ aggregates:
       - round numbers from all rounds of the project (packages/core/src/review.ts:37; board-review.ts:242)
       - notes per render in review/notes/<video-stem>.json, rounds in review/rounds/<NNN>.json (board-review.ts:50,62-78)
     invariants:
-      - A sent note never changes (the board enforces it, board-review.ts:213; the desktop player does not)
+      - A sent note never changes (the board enforces it, board-review.ts:213)
       - Round numbers are unique and ascending per project (the code takes the highest plus one under the lock)
       - A round holds every draft of one render at the time it was sent, at least one (board-review.ts:240-241)
       - A round's replies answer every note of the round and no other (validate-file, validate-file.ts:219-232; not checked when a round counts as answered)
       - A round is answered exactly once, by one fix pass (confirmed 2026-11-21; the code does not check it)
       - A note is sent in exactly one round (confirmed 2026-11-21; a crash between the two writes of a send breaks it – gap register)
       - A round is open until a valid replies file answers every note of it; an unreadable round counts as open, never as nothing open (confirmed 2026-11-21; the code counts any replies file – gap register)
-      - Notes and rounds belong to the user; only the board and the desktop player write them, the agent writes only replies (confirmed 2026-11-21; an instruction only – gap register)
-      - Every writer of notes – the board and the desktop player – keeps sent notes unchanged and loses no other writer's change; a note's frame is floor(seconds × format fps) (confirmed 2026-11-21; the desktop player breaks all three – gap register)
+      - Notes and rounds belong to the user; only the board writes them, the agent writes only replies (confirmed 2026-11-21; an instruction only – gap register)
+      - The board is the only writer of notes; a note's frame is floor(seconds × format fps) (confirmed 2026-11-21; the desktop player, a second writer that broke these invariants, is retired by ADR 0050, 2026-11-22)
   - id: AGG-GenerationQueue
     name: Generation queue
     context: BC-GenerationQueue
@@ -1522,7 +1522,7 @@ commands:
     produces: [EVT-SongAnalyzed]
     description: "analyze.py in the audio-analysis stage, run by the stage runner through the audio-analysis skill; no CLI command runs it"
     rules:
-      - Analyzes the imported vocal stem from song.json; separates the vocals from the mix only when none was imported and never overwrites an imported stem (HS-56; without --vocals Demucs overwrites it today – gap register)
+      - Analyzes the imported vocal stem from song.json; separates the vocals from the mix only when none was imported and never overwrites an imported stem (HS-56; analyze.py imported_vocals, 2026-11-22)
       - A missing separation or speech recognition model stops the analysis; it falls back to the mix or to energy-based sections only when asked to, and the report says which (HS-57; a missing Demucs and zero recognized words fall back silently today – gap register)
       - Validates timing.json against the generated schema before writing it (HS-58; skipped when run from scripts/audio-analysis – gap register)
       - Section ids follow the tag text – [Verse 2] is verse_2, a repeated unnumbered tag is numbered in order, a repeated numbered tag is refused; line ids are positional (HS-55; ids drift today – gap register)
@@ -2628,7 +2628,7 @@ hotspots:
     question: "The desktop review player deletes sent notes, takes no lock, rewrites the whole notes file from memory, and rounds frames differently than the board. What is its role: a full second writer bound by the same rules, a fallback with fewer rights, or retired?"
     refs: [AGG-ProjectReview, CMD-DeleteReviewNote]
     status: resolved
-    resolution: "A fallback writer bound by the same invariants as the board: sent notes stay unchanged, no other writer's change is lost, frame = floor(seconds × format fps). Today's deviations are gap candidates, data loss with high priority. (user, 2026-11-21)"
+    resolution: "A fallback writer bound by the same invariants as the board: sent notes stay unchanged, no other writer's change is lost, frame = floor(seconds × format fps). Today's deviations are gap candidates, data loss with high priority. (user, 2026-11-21) Changed: the player is retired, the board is the only writer (user, 2026-11-22; ADR 0050)."
   - id: HS-17
     question: "Desktop-player notes reach the agent with the next round (docs/board.md) or when the user asks in chat (assembly-render). Which is the one way?"
     refs: [CMD-SendReviewRound]
@@ -2688,7 +2688,7 @@ hotspots:
     question: "ADR 0032 speaks of offsetting notes on Shorts, but the board lists only renders/ top-level files, so Shorts can be reviewed only with the desktop player. Are Shorts reviewed?"
     refs: [CMD-AddReviewNote]
     status: resolved
-    resolution: "Shorts are not reviewed in the board; the 9:16 render they are cut from is. Intended as is; the desktop player covers special cases. (user, 2026-11-21)"
+    resolution: "Shorts are not reviewed in the board; the 9:16 render they are cut from is. Intended as is; the desktop player covers special cases. (user, 2026-11-21) The desktop player is retired by ADR 0050 (2026-11-22); Shorts are not reviewed."
   - id: HS-29
     question: "What is the context called – 'Generation queue' (the glossary term and the board's word) or 'Art direction' (the job: get every generated asset approved)?"
     refs: [BC-GenerationQueue]

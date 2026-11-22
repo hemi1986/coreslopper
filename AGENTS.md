@@ -20,7 +20,7 @@ Read `workspace/AGENTS.md` before changing the pipeline, a stage, a CLI command,
 ```bash
 npm test              # Vitest, mock provider, no API keys
 npm run typecheck
-npm run python:test   # pytest for the audio-analysis and review-notes helpers
+npm run python:test   # pytest for the audio-analysis helpers
 ```
 
 CI runs the same without API keys. GPU tests are opt-in. After a schema change, `npm run schema` regenerates `schema/`.
@@ -76,11 +76,11 @@ Keep this block short: it is loaded into every session. Put rules into the skill
 <!-- Generated from docs/architecture/repo-map.json by repo-map.ts. Do not edit inside this block. -->
 ## Repository map
 
-- **Tooling:** npm workspaces · **Packages:** 6 · **Adopted:** 1 of 6
-- **Layout:** `packages/` (4), `scripts/` (2)
+- **Tooling:** npm workspaces · **Packages:** 5 · **Adopted:** 1 of 5
+- **Layout:** `packages/` (4), `scripts/` (1)
 - **Detail:** `docs/architecture/repo-map.md` – package list, dependency edges, consumers, adoption ranking.
 - **Concept slices:** `episode` (cli, core, tests), `generate` (cli, scripts, tests), `sery` (cli, tests), `init` (cli, tests), `lipsync` (cli, tests) – candidates for `/adopt`, not confirmed domains.
-- **Adopted slices:** `packages/remotion`, concept `review`, concept `timing`, concept `release`, concept `thumbnail`, concept `bench`, concept `media`, concept `board`, concept `publish`, concept `character`, concept `render`, concept `pipeline`, concept `verdict`, concept `storyboard`, concept `generation`, concept `series`, concept `workspace`. Everything else is **not adopted**: run `/adopt` before inferring domain there.
+- **Adopted slices:** `packages/remotion`, concept `timing`, concept `release`, concept `thumbnail`, concept `bench`, concept `review`, concept `media`, concept `board`, concept `publish`, concept `character`, concept `render`, concept `pipeline`, concept `verdict`, concept `storyboard`, concept `generation`, concept `series`, concept `workspace`. Everything else is **not adopted**: run `/adopt` before inferring domain there.
 
 ## Commands
 

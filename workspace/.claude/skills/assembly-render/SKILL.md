@@ -37,7 +37,7 @@ license: MIT
 
 ## Review rounds
 
-The user reviews renders in the board's review view and sends notes to the agent in **review rounds**. A round is `review/rounds/<NNN>.json`, frozen when sent: the reviewed `video` and its `fps`, and per note an `id`, `frame`, `seconds`, an optional range (`end_frame`, `end_seconds`), the `shots` on screen, the `section`, and the `text`. Notes from the desktop player (`npm run cli -- review`) sit in `review/notes/<video-stem>.json` without a round; the user asks for those in chat.
+The user reviews renders in the board's review view and sends notes to the agent in **review rounds**. A round is `review/rounds/<NNN>.json`, frozen when sent: the reviewed `video` and its `fps`, and per note an `id`, `frame`, `seconds`, an optional range (`end_frame`, `end_seconds`), the `shots` on screen, the `section`, and the `text`.
 
 A fix pass:
 

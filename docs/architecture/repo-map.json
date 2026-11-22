@@ -113,118 +113,54 @@
       "roleReasons": [
         "no layer signal"
       ]
-    },
-    {
-      "name": "coreslopper-review-player",
-      "path": "scripts/review-player",
-      "kind": "package",
-      "language": "Python",
-      "manifest": "scripts/review-player/pyproject.toml",
-      "scripts": {},
-      "entryPoints": [],
-      "internalDeps": [],
-      "externalDeps": 4,
-      "consumers": [],
-      "hasTests": true,
-      "adopted": false,
-      "role": "domain",
-      "roleReasons": [
-        "no layer signal"
-      ]
     }
   ],
   "ranking": [
     {
-      "path": "scripts/audio-analysis",
-      "score": 0.15,
-      "reasons": [
-        "no churn or consumers recorded"
-      ]
-    },
-    {
-      "path": "scripts/review-player",
-      "score": 0.15,
-      "reasons": [
-        "no churn or consumers recorded"
-      ]
-    },
-    {
       "path": "packages/cli",
-      "score": 0.06,
+      "score": 0.61,
       "reasons": [
+        "320 changed files in recent history",
         "shared library",
         "shared infrastructure – not a domain slice"
       ]
     },
     {
-      "path": "packages/remotion",
-      "score": 0.06,
+      "path": "scripts/audio-analysis",
+      "score": 0.19,
       "reasons": [
+        "24 changed files in recent history"
+      ]
+    },
+    {
+      "path": "packages/remotion",
+      "score": 0.16,
+      "reasons": [
+        "61 changed files in recent history",
         "shared library",
         "shared infrastructure – not a domain slice"
       ]
     },
     {
       "path": "packages/core",
-      "score": 0.01,
+      "score": 0.04,
       "reasons": [
+        "111 changed files in recent history",
         "shared library",
         "layer package – hosts many concepts, not a domain slice"
       ]
     },
     {
       "path": "packages/providers",
-      "score": 0.01,
+      "score": 0.03,
       "reasons": [
+        "77 changed files in recent history",
         "shared library",
         "layer package – hosts many concepts, not a domain slice"
       ]
     }
   ],
   "slices": [
-    {
-      "name": "review",
-      "terms": [
-        "characterization",
-        "image",
-        "note",
-        "player",
-        "review"
-      ],
-      "tables": [],
-      "files": [
-        "packages/cli/src/board/review.js",
-        "packages/cli/src/review-image.ts",
-        "packages/cli/src/review.ts",
-        "packages/core/src/review.ts",
-        "scripts/review-player/review_notes.py",
-        "scripts/review-player/review_player.py",
-        "scripts/review-player/tests/test_review_notes.py",
-        "tests/review-characterization.test.ts",
-        "tests/review-image.test.ts",
-        "tests/review.test.ts"
-      ],
-      "packages": [
-        "?",
-        "packages/cli",
-        "packages/core",
-        "scripts/review-player"
-      ],
-      "layers": [
-        "cli",
-        "core",
-        "scripts",
-        "tests"
-      ],
-      "score": 22,
-      "reasons": [
-        "4 layers: cli, core, scripts, tests",
-        "4 packages",
-        "10 files"
-      ],
-      "adopted": true,
-      "adoptedAt": "2026-11-22"
-    },
     {
       "name": "timing",
       "terms": [
@@ -464,6 +400,40 @@
         "2 packages",
         "7 files"
       ]
+    },
+    {
+      "name": "review",
+      "terms": [
+        "characterization",
+        "image",
+        "review"
+      ],
+      "tables": [],
+      "files": [
+        "packages/cli/src/board/review.js",
+        "packages/cli/src/review-image.ts",
+        "packages/core/src/review.ts",
+        "tests/review-characterization.test.ts",
+        "tests/review-image.test.ts"
+      ],
+      "packages": [
+        "?",
+        "packages/cli",
+        "packages/core"
+      ],
+      "layers": [
+        "cli",
+        "core",
+        "tests"
+      ],
+      "score": 17,
+      "reasons": [
+        "3 layers: cli, core, tests",
+        "3 packages",
+        "5 files"
+      ],
+      "adopted": true,
+      "adoptedAt": "2026-11-22"
     },
     {
       "name": "media",

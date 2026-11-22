@@ -28,7 +28,6 @@ import { writeContactSheet } from './contact-sheet.js';
 import { renderProject } from './render.js';
 import { renderThumbnail } from './thumbnail.js';
 import { cutShort, probeVideo } from './short.js';
-import { openReview } from './review.js';
 import { publishProject, type PlatformChoice } from './publish.js';
 import { publishAuth, saveEnvValue } from './publish-auth.js';
 import { writeUploadText } from './upload-text.js';
@@ -286,18 +285,6 @@ program
   .action((project: string | undefined, options: { from: string; to: string; name: string }) =>
     run(async () => {
       await cutShort({ projectDir: projectDirFromArg(project), ...options });
-    }),
-  );
-
-program
-  .command('review [project]')
-  .description('Open a render in the review player and write frame-accurate notes to review/notes/<video>.json.')
-  .option('--format <id>', 'Format of the render to review (default: master); the newer of preview and full render wins')
-  .option('--video <path>', 'Review this file instead, e.g. a Short')
-  .option('--frame <n>', 'Start at this frame', (value) => Number(value))
-  .action((project: string | undefined, options: { format?: string; video?: string; frame?: number }) =>
-    run(async () => {
-      await openReview({ projectDir: projectDirFromArg(project), ...options });
     }),
   );
 

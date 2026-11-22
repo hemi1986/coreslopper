@@ -219,7 +219,7 @@ export async function editNote(projectDir: string, video: unknown, change: NoteC
         file.notes[index] = { ...rest, ...placed(seconds, end, render.fps), text: change.text === undefined ? note.text : checkText(change.text) };
       }
     }
-    // Notes of the desktop player have no id; give each one so the board can address it.
+    // Notes from before the board gave ids (the retired desktop player) have none; give each one so the board can address it.
     for (const note of file.notes) note.id ??= `n${randomBytes(4).toString('hex')}`;
     file.notes.sort((a, b) => a.frame - b.frame);
     await writeTextAtomic(notesPath(projectDir, render.name), `${JSON.stringify(ReviewNotesSchema.parse(file), null, 2)}\n`);
