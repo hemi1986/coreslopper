@@ -1,9 +1,10 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, statSync } from 'node:fs';
 import { mkdir, mkdtemp, readdir, rename, rm } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { stringify } from 'yaml';
 import {
+  LIBRARY_SOUND_ENTRY,
   LIBRARY_SOUND_FILE,
   LibrarySoundSchema,
   ValidationError,
@@ -25,19 +26,25 @@ const ID = /^[a-z0-9][a-z0-9_-]*$/;
 
 export const soundLibraryRoot = (root: string) => join(root, 'library', 'sounds');
 export const soundDir = (root: string, id: string) => join(soundLibraryRoot(root), checkId(id));
-const soundFile = (root: string, id: string) => join(soundDir(root, id), 'sound.yaml');
+const soundFile = (root: string, id: string) => join(soundDir(root, id), LIBRARY_SOUND_ENTRY);
+/** Integrated loudness needs 400 ms; a shorter sound is measured looped to at least this many seconds. */
+const LOUDNESS_WINDOW = 3;
 
 function checkId(id: unknown): string {
   if (typeof id !== 'string' || !ID.test(id) || id.length > 80) throw new ValidationError(`not a library sound id: ${String(id)}`);
   return id;
 }
 
+export type SoundRefusal = 'id-taken' | 'duplicate' | 'not-audio' | 'silent' | 'outside' | 'invalid';
+
 /** EVT-LibrarySoundRefused: why a sound did not go into the library, and the entry it collided with. */
 export class SoundRefused extends ValidationError {
   constructor(
     message: string,
-    readonly reason: 'id-taken' | 'duplicate' | 'not-audio' | 'outside' | 'invalid',
+    readonly reason: SoundRefusal,
     readonly existing?: string,
+    /** The id the refused sound would have had, once it is known. */
+    readonly sound?: string,
   ) {
     super(message);
     this.name = 'SoundRefused';
@@ -55,15 +62,16 @@ async function writeSound(file: string, sound: LibrarySound): Promise<void> {
   await writeTextAtomic(file, header + stringify(LibrarySoundSchema.parse(sound)));
 }
 
-/** Every readable entry's id and file hash; a broken entry is skipped here and reported by `sound check`. */
-async function storedHashes(root: string): Promise<{ id: string; hash: string }[]> {
+/** Every readable entry's id and hashes; a broken entry is skipped here and reported by `sound check`. */
+async function storedHashes(root: string): Promise<{ id: string; hashes: string[] }[]> {
   const dir = soundLibraryRoot(root);
   if (!existsSync(dir)) return [];
-  const entries: { id: string; hash: string }[] = [];
+  const entries: { id: string; hashes: string[] }[] = [];
   for (const name of await readdir(dir)) {
     if (!ID.test(name) || !existsSync(soundFile(root, name))) continue;
     try {
-      entries.push({ id: name, hash: (await loadLibrarySound(root, name)).hash });
+      const sound = await loadLibrarySound(root, name);
+      entries.push({ id: name, hashes: [sound.hash, ...(sound.original_hash ? [sound.original_hash] : [])] });
     } catch {
       // not this command's business
     }
@@ -108,7 +116,9 @@ function parseTrim(value: unknown): { start: number; end: number } | undefined {
   if (value === undefined || value === null || value === '') return undefined;
   if (typeof value === 'object') {
     const { start, end } = value as { start?: unknown; end?: unknown };
-    return { start: seconds(start, 'trim start') ?? 0, end: seconds(end, 'trim end')! };
+    const to = seconds(end, 'trim end');
+    if (to === undefined) throw new SoundRefused('trim needs an end in seconds', 'invalid');
+    return { start: seconds(start, 'trim start') ?? 0, end: to };
   }
   const match = /^\s*(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s*$/.exec(String(value));
   if (!match) throw new SoundRefused(`trim must be <start>-<end> in seconds, like 0.1-1.2; got ${String(value)}`, 'invalid');
@@ -134,7 +144,7 @@ function slugOf(title: string): string {
 function convertToWav(source: string, target: string): void {
   const result = spawnSync(
     resolveBinary('ffmpeg'),
-    ['-y', '-v', 'error', '-i', source, '-vn', '-map', '0:a:0', '-map_metadata', '-1', '-fflags', '+bitexact', '-flags:a', '+bitexact', '-c:a', 'pcm_s16le', '-ar', '48000', target],
+    ['-y', '-v', 'error', '-protocol_whitelist', 'file', '-i', `file:${resolve(source)}`, '-vn', '-map', '0:a:0', '-map_metadata', '-1', '-fflags', '+bitexact', '-flags:a', '+bitexact', '-c:a', 'pcm_s16le', '-ar', '48000', target],
     { encoding: 'utf8' },
   );
   if (result.status !== 0 || !existsSync(target)) {
@@ -153,7 +163,8 @@ export async function addLibrarySound(root: string, input: NewLibrarySound, now 
   const title = text(input.title, 'title', 200, true)!;
   const useWhen = text(input.useWhen, 'use when', 1000, true)!;
   const id = input.id !== undefined && input.id !== '' ? checkId(input.id) : slugOf(title);
-  if (existsSync(soundDir(root, id))) throw new SoundRefused(`the id "${id}" is taken; choose another with --id`, 'id-taken', id);
+  const taken = () => new SoundRefused(`the id "${id}" is taken; choose another with --id`, 'id-taken', id, id);
+  if (existsSync(soundDir(root, id))) throw taken();
   if (/^[a-z][a-z0-9+.-]*:\/\//i.test(input.file)) throw new SoundRefused('sound add takes a local file, not a URL; download it first', 'invalid');
   if (!existsSync(input.file) || !statSync(input.file).isFile()) throw new SoundRefused(`missing file: ${input.file}`, 'invalid');
   const fields = {
@@ -172,12 +183,14 @@ export async function addLibrarySound(root: string, input: NewLibrarySound, now 
     convertToWav(input.file, wav);
     const length = Math.round(probeDuration(wav) * 1000) / 1000;
     const problems = librarySoundTimeProblems({ length, cue: fields.cue, trim: fields.trim });
-    if (problems.length) throw new SoundRefused(problems.map((problem) => problem.message).join('; '), 'outside');
+    if (problems.length) throw new SoundRefused(problems.map((problem) => problem.message).join('; '), 'outside', undefined, id);
     const hash = await hashFileStream(wav);
-    const same = (await storedHashes(root)).find((entry) => entry.hash === hash);
-    if (same) throw new SoundRefused(`this file is already stored as "${same.id}"`, 'duplicate', same.id);
-    const loudness = Math.round(measureLoudness(wav).lufs * 10) / 10;
-    if (!Number.isFinite(loudness)) throw new SoundRefused(`${input.file} is silent; its loudness cannot be measured`, 'not-audio');
+    const originalHash = await hashFileStream(input.file);
+    const same = (await storedHashes(root)).find((entry) => entry.hashes.includes(hash) || entry.hashes.includes(originalHash));
+    if (same) throw new SoundRefused(`this file is already stored as "${same.id}"`, 'duplicate', same.id, id);
+    const loops = length < LOUDNESS_WINDOW ? Math.ceil(LOUDNESS_WINDOW / length) - 1 : 0;
+    const loudness = Math.round(measureLoudness(wav, loops).lufs * 10) / 10;
+    if (!Number.isFinite(loudness)) throw new SoundRefused(`${input.file} is silent; its loudness cannot be measured`, 'silent', undefined, id);
 
     const sound = LibrarySoundSchema.parse({
       version: 1,
@@ -193,10 +206,17 @@ export async function addLibrarySound(root: string, input: NewLibrarySound, now 
       licence: fields.licence,
       ...(fields.credit ? { credit: fields.credit } : {}),
       hash,
+      original_hash: originalHash,
       added: now.toISOString(),
     });
-    await writeSound(join(incoming, 'sound.yaml'), sound);
-    await rename(incoming, soundDir(root, id));
+    await writeSound(join(incoming, LIBRARY_SOUND_ENTRY), sound);
+    try {
+      await rename(incoming, soundDir(root, id));
+    } catch (error) {
+      // another add took the id in the meantime
+      if (existsSync(soundDir(root, id))) throw taken();
+      throw error;
+    }
     return sound;
   } finally {
     await rm(incoming, { recursive: true, force: true });

@@ -1461,6 +1461,8 @@ export const LibraryCharacterSchema = z
 
 /** The one audio file of a library sound, next to its `sound.yaml`. */
 export const LIBRARY_SOUND_FILE = 'sound.wav';
+/** The entry file of a library sound. */
+export const LIBRARY_SOUND_ENTRY = 'sound.yaml';
 
 const SecondsSchema = z.number().finite().nonnegative();
 
@@ -1490,8 +1492,10 @@ export const LibrarySoundSchema = z
     licence: z.string().trim().min(1).default('unknown'),
     /** The credit text a licence that asks for attribution needs (HS-265). */
     credit: z.string().min(1).optional(),
-    /** sha256 of `sound.wav`: one sound, one entry. */
+    /** sha256 of `sound.wav`: one sound, one entry; a take copied from it records this hash. */
     hash: z.string().regex(/^[a-f0-9]{64}$/),
+    /** sha256 of the file as the user added it, so the same file is found again whatever ffmpeg build converts it. */
+    original_hash: z.string().regex(/^[a-f0-9]{64}$/).optional(),
     added: z.string().min(1),
   })
   .superRefine((sound, ctx) => {
