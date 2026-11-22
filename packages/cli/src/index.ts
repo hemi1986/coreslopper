@@ -121,6 +121,7 @@ program
   .option('--image-provider <provider>', 'mock | fal | higgsfield | topview | comfyui', 'mock')
   .option('--video-provider <provider>', 'mock | fal | higgsfield | topview | comfyui', 'mock')
   .option('--audio-provider <provider>', 'mock | comfyui', 'mock')
+  .option('--lipsync-provider <provider>', 'mock | fal | higgsfield | topview | comfyui (default: the video provider; fal for topview)')
   .action(
     (
       slug: string,
@@ -132,6 +133,7 @@ program
         imageProvider: string;
         videoProvider: string;
         audioProvider: string;
+        lipsyncProvider?: string;
       },
     ) =>
       run(async () => {
@@ -148,6 +150,7 @@ program
             image: validateChoice(options.imageProvider, visual, 'image provider'),
             video: validateChoice(options.videoProvider, visual, 'video provider'),
             audio: validateChoice(options.audioProvider, ['mock', 'comfyui'] as const, 'audio provider'),
+            lipsync: options.lipsyncProvider ? validateChoice(options.lipsyncProvider, visual, 'lip-sync provider') : undefined,
           },
         });
       }),
@@ -528,6 +531,7 @@ program
   .option('--visual <provider>', 'mock | fal | higgsfield | topview', 'mock')
   .option('--image-provider <provider>', 'mock | fal | higgsfield | topview')
   .option('--video-provider <provider>', 'mock | fal | higgsfield | topview | comfyui')
+  .option('--lipsync-provider <provider>', 'mock | fal | higgsfield | topview | comfyui (default: the video provider; fal for topview)')
   .action(
     (
       slug: string,
@@ -538,6 +542,7 @@ program
         visual: string;
         imageProvider?: string;
         videoProvider?: string;
+        lipsyncProvider?: string;
         kind: string;
         series?: string;
         episode?: number;
@@ -560,6 +565,9 @@ program
           brand: options.brand,
           imageProvider,
           videoProvider,
+          lipsyncProvider: options.lipsyncProvider
+            ? validateChoice(options.lipsyncProvider, [...visuals, 'comfyui'] as const, 'lip-sync provider')
+            : undefined,
           kind,
           series: options.series,
           episode: options.episode,

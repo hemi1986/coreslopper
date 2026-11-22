@@ -38,8 +38,9 @@ export const ProvidersSchema = z
     video: VideoProviderKindSchema.default('mock'),
     /**
      * Lip-sync can use a different provider from the rest of the video.
-     * Defaults to `video`, or to `fal` when `video` is `comfyui` or `topview`
-     * (Topview lip-sync needs its separate OpenAPI credentials, so it is opt-in).
+     * Defaults to `video`, or to `fal` when `video` is `topview` (Topview lip-sync
+     * needs its separate OpenAPI credentials, so it is opt-in). `new`, `new-series`,
+     * and the board wizard write it explicitly.
      */
     lipsync: LipSyncProviderKindSchema.optional(),
     /** `audio.*` roles (stingers, SFX, voices, extra music; never the song itself). Defaults to `comfyui`. */

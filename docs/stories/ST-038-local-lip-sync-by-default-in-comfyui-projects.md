@@ -8,7 +8,7 @@ size: null
 risk: null
 depends_on: []
 labels: [feature:local-lipsync]
-status: ready
+status: done
 ---
 
 ## Task
@@ -23,11 +23,11 @@ Decided by the user (2026-11-22): `comfyui` video means `comfyui` lip-sync. Topv
 Avatar 4 needs separate OpenAPI credentials.
 
 ## Acceptance Criteria
-- [ ] A new ADR (`proposed`) records the new default and supersedes the lip-sync part of ADR 0014/0015; the accepted ADRs stay unedited
-- [ ] `providerForRole(…, 'video.lipsync')` returns `comfyui` for `providers.video: comfyui` without `providers.lipsync`; Topview still returns `fal`; an explicit `providers.lipsync` still wins
-- [ ] `new`, `new-series` and the board wizard write `providers.lipsync` explicitly (the resolved default unless the user chose one); an episode copies `providers.lipsync` from its `series.yaml`
-- [ ] `docs/pipeline.md`, `docs/architecture.md`, `docs/providers.md`, the `new-video` skill and the README state the new default
-- [ ] Tests cover the routing and the written provider; `npm test` and `npm run typecheck` are green
+- [x] A new ADR (`proposed`) records the new default and supersedes the lip-sync part of ADR 0014/0015; the accepted ADRs stay unedited
+- [x] `providerForRole(…, 'video.lipsync')` returns `comfyui` for `providers.video: comfyui` without `providers.lipsync`; Topview still returns `fal`; an explicit `providers.lipsync` still wins
+- [x] `new`, `new-series` and the board wizard write `providers.lipsync` explicitly (the resolved default unless the user chose one); an episode copies `providers.lipsync` from its `series.yaml`
+- [x] `docs/pipeline.md`, `docs/architecture.md`, `docs/providers.md`, the `new-video` skill and the README state the new default
+- [x] Tests cover the routing and the written provider; `npm test` and `npm run typecheck` are green
 
 ## Out of Scope
 - Changing the lip-sync provider of existing projects: they keep fal until the user sets `providers.lipsync: comfyui`

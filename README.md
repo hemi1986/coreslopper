@@ -59,7 +59,7 @@ The `new-video` skill walks you through setup:
    WAV goes straight in; `song.mp3`, `vocals.flac`, and other formats with the same name are converted. Export both from the same session so they line up. The stem is optional, but it makes the lyric timing much more accurate. When you confirm, it runs `npm run cli -- import-song` to check the files and record them in `song.json`.
 4. It grills you about the video and writes `brief.md` and `treatment.md` with you.
 
-Higgsfield has no lip-sync yet. For lip-sync shots, add a `FAL_KEY` to `.env` and set `lipsync: fal` in `projects/<slug>/project.yaml` ([details](docs/providers.md)).
+Lip-sync runs on the video provider: fal.ai OmniHuman, Higgsfield Speak, or locally in ComfyUI for a `comfyui` project. A Topview project lip-syncs on fal.ai. `new` writes the choice to `providers.lipsync` in `projects/<slug>/project.yaml`; change it there, for example to `fal` with a `FAL_KEY` in `.env` ([details](docs/providers.md)).
 
 **Run the pipeline.** At the end, `new-video` offers to start it, or run it yourself:
 

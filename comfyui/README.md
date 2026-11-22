@@ -79,7 +79,7 @@ In `projects/<slug>/project.yaml`:
 providers:
   image: comfyui      # qwen stills and edits
   video: comfyui      # LTX clips
-  lipsync: comfyui    # LTX FLF2V lip-sync; defaults to fal when video is comfyui
+  lipsync: comfyui    # Pika H3 lip-sync (LTX FLF2V as fallback); the default when video is comfyui
   # audio: comfyui    # audio.* roles; comfyui is the default
 ```
 

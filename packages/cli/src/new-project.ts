@@ -8,6 +8,7 @@ import {
   SeriesSchema,
   ValidationError,
   createInitialState,
+  defaultLipSyncProvider,
   isScriptedKind,
   loadDefaults,
   projectTemplate,
@@ -21,6 +22,7 @@ import {
   type Series,
   type ImageProviderKind,
   type VideoProviderKind,
+  type LipSyncProviderKind,
 } from '@coreslopper/core';
 import { stringify } from 'yaml';
 import { linkProjectMedia, mediaDirFor } from './media-dir.js';
@@ -33,6 +35,8 @@ export interface NewProjectOptions {
   brand?: string;
   imageProvider?: ImageProviderKind;
   videoProvider?: VideoProviderKind;
+  /** Defaults to the video provider's lip-sync default (`defaultLipSyncProvider`); written to `project.yaml`. */
+  lipsyncProvider?: LipSyncProviderKind;
   /** Defaults to `music-video`. An episode takes formats, providers, and brand from its series. */
   kind?: ProjectKind;
   /** Episode only: the series slug (`projects/<slug>/series.yaml` must exist). */
@@ -138,6 +142,7 @@ export async function createProject(options: NewProjectOptions): Promise<string>
       : {
           image: options.imageProvider ?? 'mock',
           video: options.videoProvider ?? 'mock',
+          lipsync: options.lipsyncProvider ?? defaultLipSyncProvider(options.videoProvider ?? 'mock'),
         },
     brand: series ? series.brand : options.brand ?? 'example',
     models: {},
@@ -196,7 +201,7 @@ export async function createProject(options: NewProjectOptions): Promise<string>
   }
 
   console.log(`Created project ${config.title} (${slug}) at ${projectDir}`);
-  console.log(`Budget: $${config.budget_usd.toFixed(2)} · providers: image=${config.providers.image}, video=${config.providers.video}`);
+  console.log(`Budget: $${config.budget_usd.toFixed(2)} · providers: image=${config.providers.image}, video=${config.providers.video}, lipsync=${config.providers.lipsync ?? defaultLipSyncProvider(config.providers.video)}`);
   if (series) {
     console.log(`Series: ${series.title} (${series.slug}), episode ${config.episode}; formats, providers, and brand copied from series.yaml.`);
     console.log(`Next: write script.yaml (scenes and script lines) for episode ${config.episode}.`);
