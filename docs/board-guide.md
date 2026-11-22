@@ -28,7 +28,7 @@ The board does not refresh by itself. Press **↻ Refresh** at the top of the na
 - **Running**: Claude Code or a render is working on it.
 - The coloured strip shows the stages. Below it are the current stage and the budget.
 
-The navigation on the left lists every project and series. A released project folds into **Released** at the end.
+The navigation on the left lists every project and series. A finished project folds into **Finished** at the end: a released one, and an internal project (**Done – not released publicly**) once every stage is done.
 
 ## Start a music video
 

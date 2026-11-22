@@ -14,7 +14,7 @@ Run the autonomous pipeline for one project: a music video or an episode of a se
 2. Run `npm run cli -- status projects/<slug>`. Read the project title, the `Kind:` line, the stage table, budget, and the `Next:` line. The kind decides the stage list; `status` already walks the right one.
 3. If `--dry-run`, stop after printing the kind, the next stage, its skills, and the remaining budget.
 4. If `status` prints `Review:` lines, answer those review rounds first (see "Review rounds" below), then run `status` again.
-5. If the next stage is missing because everything is done: when `status` prints a `Release:` line, report success and stop. Without it the release folder is missing, and it is qa-export's output: run `npm run cli -- stage-reset projects/<slug> qa-export` and continue with the stage loop.
+5. If the next stage is missing because everything is done: when `status` prints a `Release:` line (an internal project's `Release: none · distribution: internal` included), report success and stop. Without it the release folder is missing, and it is qa-export's output: run `npm run cli -- stage-reset projects/<slug> qa-export` and continue with the stage loop.
 6. If the `Next:` line says `interactive`, stop: the stage needs the user. Tell them to run the setup skill of the kind, which resumes where the project stands: `/new-video <slug>` for a music video (`setup`, `brief`, `treatment`), `/new-episode <slug>` for an episode (`setup`, `script`), `/new-meme <slug>` for a meme (`setup`, `script`). The `Next:` line names the command. Never dispatch an interactive stage to a stage runner.
 
 ## Review rounds

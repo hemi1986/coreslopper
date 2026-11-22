@@ -6,7 +6,7 @@ import { renderMarkdown } from './markdown.js';
 addStrings({
   de: {
     production: 'Produktion', projects: 'Projekte', series: 'Serien', noWork: 'Noch kein Projekt und keine Serie im Workspace.',
-    groupYou: 'Du bist dran', groupRunning: 'Läuft', groupReleased: 'Freigegeben', groupBroken: 'Nicht lesbar',
+    groupYou: 'Du bist dran', groupRunning: 'Läuft', groupReleased: 'Freigegeben', groupInternal: 'Fertig – nicht öffentlich', groupBroken: 'Nicht lesbar',
     phases: { setup: 'Setup', ready: 'Bereit', running: 'Läuft', failed: 'Fehlgeschlagen', done: 'Fertig' },
     kindVideo: 'Musikvideo', kindMeme: 'Meme', kindEpisode: function (s, n) { return 'Episode ' + n + ' · ' + s; },
     budget: 'Budget', spent: 'ausgegeben', reserved: 'reserviert', since: 'seit', stage: 'Stage', status: 'Status', attempts: 'Versuche', when: 'Zeit', error: 'Fehler',
@@ -19,7 +19,7 @@ addStrings({
       retry: function (s) { return s + ' ist fehlgeschlagen. Erneut starten:'; },
       review: 'Review-Runde an den Agenten gesendet. Abarbeiten lassen:',
       running: function (s) { return s + ' läuft gerade. Nichts zu tun.'; },
-      release: 'Fertig. Weiter im Release-Tab.', 'release-missing': 'Alle Stages fertig, aber der Release-Ordner fehlt. qa-export neu bauen lassen:', released: 'Release freigegeben: der Autopilot postet.',
+      release: 'Fertig. Weiter im Release-Tab.', 'release-missing': 'Alle Stages fertig, aber der Release-Ordner fehlt. qa-export neu bauen lassen:', released: 'Release freigegeben: der Autopilot postet.', 'internal-done': 'Fertig – nicht öffentlich.',
       canon: 'Canon fertigstellen:', episode: 'Nächste geplante Episode anlegen:', 'series-done': 'Alle geplanten Episoden sind angelegt.'
     },
     drafts: function (n) { return n + ' Notiz(en) noch nicht an den Agenten gesendet'; }, wizard: 'oder im Assistenten',
@@ -40,7 +40,7 @@ addStrings({
   },
   en: {
     production: 'Production', projects: 'Projects', series: 'Series', noWork: 'No project or series in this workspace yet.',
-    groupYou: 'Your turn', groupRunning: 'Running', groupReleased: 'Approved for release', groupBroken: 'Unreadable',
+    groupYou: 'Your turn', groupRunning: 'Running', groupReleased: 'Approved for release', groupInternal: 'Done – not released publicly', groupBroken: 'Unreadable',
     phases: { setup: 'Setup', ready: 'Ready', running: 'Running', failed: 'Failed', done: 'Done' },
     kindVideo: 'Music video', kindMeme: 'Meme', kindEpisode: function (s, n) { return 'Episode ' + n + ' · ' + s; },
     budget: 'Budget', spent: 'spent', reserved: 'reserved', since: 'for', stage: 'Stage', status: 'Status', attempts: 'Attempts', when: 'Time', error: 'Error',
@@ -53,7 +53,7 @@ addStrings({
       retry: function (s) { return s + ' failed. Run it again:'; },
       review: 'A review round is waiting for the agent. Let it work through it:',
       running: function (s) { return s + ' is running. Nothing to do.'; },
-      release: 'Done. Continue in the release tab.', 'release-missing': 'Every stage is done, but the release folder is missing. Let qa-export build it again:', released: 'Release approved: the autopilot posts.',
+      release: 'Done. Continue in the release tab.', 'release-missing': 'Every stage is done, but the release folder is missing. Let qa-export build it again:', released: 'Release approved: the autopilot posts.', 'internal-done': 'Done – not released publicly.',
       canon: 'Finish the canon:', episode: 'Create the next planned episode:', 'series-done': 'Every planned episode exists.'
     },
     drafts: function (n) { return n + ' note(s) not sent to the agent yet'; }, wizard: 'or in the wizard',
@@ -198,6 +198,7 @@ function renderOverview(data) {
     group(t('groupRunning'), ok.filter(function (p) { return p.next.reason === 'running'; }).map(projectCard)),
     group(t('series'), data.series.map(seriesCard)),
     group(t('groupReleased'), ok.filter(function (p) { return p.next.reason === 'released'; }).map(projectCard)),
+    group(t('groupInternal'), ok.filter(function (p) { return p.next.reason === 'internal-done'; }).map(projectCard)),
     group(t('groupBroken'), data.projects.filter(function (p) { return p.error; }).map(projectCard))
   ].forEach(function (node) { if (node) main.appendChild(node); });
   if (activity.events.length) {

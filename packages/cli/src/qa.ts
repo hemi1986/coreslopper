@@ -11,6 +11,7 @@ import {
   isSubtitledLine,
   loadProject,
   projectAudioPath,
+  releasedPublicly,
   repoRoot,
   scriptLines,
   writeTextAtomic,
@@ -330,6 +331,23 @@ function episodeChecks(project: Awaited<ReturnType<typeof loadProject>>, duratio
   return checks;
 }
 
+/** The checks of a public release: thumbnails, Shorts, upload text and data, and the release package. */
+async function releasePackageChecks(paths: { root: string; renders: string; review: string }): Promise<{ checks: Check[]; thumbnails: string[]; shorts: string[] }> {
+  const thumbnails = await checkThumbnails(paths.renders, paths.root);
+  const shorts = await checkShorts(paths.renders, paths.root);
+  return {
+    checks: [
+      thumbnails.check,
+      ...shorts.checks,
+      await checkUploadText(paths.review, paths.root, shorts.names),
+      await checkUploadData(paths.root, shorts.names),
+      ...(await releaseChecks(paths.root)),
+    ],
+    thumbnails: thumbnails.files,
+    shorts: shorts.files,
+  };
+}
+
 export async function runQa(options: QaOptions): Promise<string> {
   const { project, resolved } = await validateProject(options.projectDir);
   const checks: Check[] = [];
@@ -372,13 +390,16 @@ export async function runQa(options: QaOptions): Promise<string> {
     });
   }
 
-  const thumbnails = await checkThumbnails(project.paths.renders, project.paths.root);
-  checks.push(thumbnails.check);
-  const shorts = await checkShorts(project.paths.renders, project.paths.root);
-  checks.push(...shorts.checks);
-  checks.push(await checkUploadText(project.paths.review, project.paths.root, shorts.names));
-  checks.push(await checkUploadData(project.paths.root, shorts.names));
-  checks.push(...(await releaseChecks(project.paths.root)));
+  // An internal project is never released publicly: no thumbnails, Shorts,
+  // upload text, or release package to check, so READY rests on the renders.
+  const release = releasedPublicly(project.config)
+    ? await releasePackageChecks(project.paths)
+    : {
+        checks: [{ name: 'Release package', result: 'N/A', evidence: 'distribution: internal; not released publicly' } satisfies Check],
+        thumbnails: [],
+        shorts: [],
+      };
+  checks.push(...release.checks);
 
   if (options.determinismFrame !== undefined) {
     const { props } = await buildVideoProps({ projectDir: options.projectDir });
@@ -432,8 +453,8 @@ export async function runQa(options: QaOptions): Promise<string> {
     '',
     `READY: ${ready ? 'yes' : 'no'}${todos ? ` · ${todos} TODO(s) for the user, see renders/release/README.md` : ''}`,
     '',
-    ...(thumbnails.files.length ? ['## Thumbnails', '', ...thumbnails.files.map((file) => `- \`${file}\``), ''] : []),
-    ...(shorts.files.length ? ['## Shorts', '', ...shorts.files.map((file) => `- \`${file}\``), ''] : []),
+    ...(release.thumbnails.length ? ['## Thumbnails', '', ...release.thumbnails.map((file) => `- \`${file}\``), ''] : []),
+    ...(release.shorts.length ? ['## Shorts', '', ...release.shorts.map((file) => `- \`${file}\``), ''] : []),
     'Visual checks (sync, readability, character consistency) are performed by the `qa-checker` agent using stills and clip frames.',
     '',
   ].join('\n');

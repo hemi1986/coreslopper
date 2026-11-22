@@ -4,6 +4,7 @@ import {
   formatUsd,
   loadProject,
   nextStage,
+  releasedPublicly,
   remainingBudget,
   setupSkill,
   stageDefinition,
@@ -47,7 +48,9 @@ export async function printStatus(projectDir: string): Promise<void> {
   const upload = join(loaded.paths.review, 'upload.md');
   if (existsSync(upload)) console.log(`Upload text: ${relative(loaded.paths.root, upload)}`);
   const releaseManifest = join(loaded.paths.renders, 'release', 'manifest.json');
-  if (existsSync(releaseManifest)) {
+  // An internal project has no release folder and is finished after qa-export (/video-next reads this line).
+  if (!releasedPublicly(config)) console.log('Release: none · distribution: internal, not released publicly');
+  else if (existsSync(releaseManifest)) {
     try {
       const manifest = JSON.parse(readFileSync(releaseManifest, 'utf8')) as { files?: unknown[]; todos?: unknown[] };
       console.log(`Release: renders/release/ · ${manifest.files?.length ?? 0} files · ${manifest.todos?.length ?? 0} TODO(s)`);

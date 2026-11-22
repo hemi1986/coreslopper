@@ -122,6 +122,7 @@ program
   .option('--video-provider <provider>', 'mock | fal | higgsfield | topview | comfyui', 'mock')
   .option('--audio-provider <provider>', 'mock | comfyui', 'mock')
   .option('--lipsync-provider <provider>', 'mock | fal | higgsfield | topview | comfyui (default: the video provider; fal for topview)')
+  .option('--distribution <distribution>', 'public | internal (internal: never released publicly, no release package; default: public, nothing written)')
   .action(
     (
       slug: string,
@@ -546,6 +547,7 @@ program
         kind: string;
         series?: string;
         episode?: number;
+        distribution?: string;
       },
     ) =>
       run(async () => {
@@ -571,6 +573,9 @@ program
           kind,
           series: options.series,
           episode: options.episode,
+          distribution: options.distribution
+            ? validateChoice(options.distribution, ['public', 'internal'] as const, 'distribution')
+            : undefined,
         });
       }),
   );

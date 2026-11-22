@@ -39,12 +39,13 @@ function state(kind: 'music-video' | 'episode' = 'music-video'): State {
 }
 
 const done = (s: State, ...ids: string[]) => ids.reduce((acc, id) => setStageDone(acc, id, []), s);
-const facts = (s: State, extra: { hasRelease?: boolean; approved?: boolean } = {}) => ({
+const facts = (s: State, extra: { hasRelease?: boolean; approved?: boolean; internal?: boolean } = {}) => ({
   slug: 'neon',
   kind: s.kind,
   stages: stageViews(s),
   hasRelease: extra.hasRelease ?? false,
   approved: extra.approved,
+  internal: extra.internal,
 });
 
 describe('production next action', () => {
@@ -72,6 +73,14 @@ describe('production next action', () => {
     expect(projectNextAction(facts(all))).toMatchObject({ command: '/video-next neon', reason: 'release-missing', stage: 'qa-export' });
     expect(projectNextAction(facts(all, { hasRelease: true }))).toEqual({ where: 'board', reason: 'release' });
     expect(projectNextAction(facts(all, { hasRelease: true, approved: true }))).toEqual({ where: 'none', reason: 'released' });
+  });
+
+  it('ends an internal project once every stage is done, with no release step', () => {
+    const all = done(state(), ...stageViews(state()).map((stage) => stage.id));
+    expect(projectNextAction(facts(all, { internal: true }))).toEqual({ where: 'none', reason: 'internal-done' });
+    expect(projectNextAction(facts(all, { internal: true, hasRelease: true }))).toEqual({ where: 'none', reason: 'internal-done' });
+    const open = done(state(), 'setup', 'brief', 'treatment');
+    expect(projectNextAction(facts(open, { internal: true }))).toMatchObject({ command: '/video-next neon', reason: 'pipeline' });
   });
 
   it('finishes a series canon before its episodes', () => {
@@ -103,6 +112,20 @@ async function request(handler: ReturnType<typeof boardHandler>, url: string) {
 }
 
 describe('production view', () => {
+  it('shows a finished internal project as done, with no release tab even beside an old release folder', async () => {
+    const ws = await workspace();
+    const dir = await createProject({ root: ws, slug: 'teaser', budget: 25, distribution: 'internal' });
+    const project = await loadProject(dir);
+    expect(project.config.distribution).toBe('internal');
+    await writeFile(project.paths.state, JSON.stringify(done(project.state, ...stageViews(project.state).map((stage) => stage.id))));
+    await mkdir(join(dir, 'renders', 'release'), { recursive: true });
+    await writeFile(join(dir, 'renders', 'release', 'manifest.json'), '{}');
+    const { projects } = await productionOverview(ws);
+    expect(projects).toEqual([expect.objectContaining({ slug: 'teaser', phase: 'done', internal: true, hasRelease: false, next: { where: 'none', reason: 'internal-done' } })]);
+    const publicDir = await createProject({ root: ws, slug: 'public', budget: 25 });
+    expect((await loadProject(publicDir)).config).not.toHaveProperty('distribution');
+  });
+
   it('lists every project and series with stages, budget, queue, reviews, and renders', async () => {
     const ws = await workspace();
     const dir = await createProject({ root: ws, slug: 'neon', budget: 25, title: 'Neon Rain' });

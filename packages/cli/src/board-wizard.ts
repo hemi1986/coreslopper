@@ -218,6 +218,8 @@ export interface NewVideoInput {
   language: unknown;
   rights: unknown;
   license: unknown;
+  /** `true`: never released publicly (`distribution: internal`). */
+  internal?: unknown;
 }
 
 const IMAGE_PROVIDERS = ['mock', 'fal', 'higgsfield', 'topview', 'comfyui'] as const;
@@ -239,6 +241,13 @@ function budget(value: unknown): number {
   return number;
 }
 
+/** The wizard's "not released publicly" box: `internal`, or nothing written. */
+function distribution(internal: unknown): { distribution?: 'internal' } {
+  if (internal === undefined || internal === false) return {};
+  if (internal === true) return { distribution: 'internal' };
+  throw new ValidationError('internal is true or false');
+}
+
 function slugOf(value: unknown): string {
   const slug = required(value, 'slug', 80);
   if (!SLUG.test(slug)) throw new ValidationError('the slug takes lowercase letters, digits, and dashes');
@@ -256,6 +265,7 @@ export async function createVideoProject(root: string, input: NewVideoInput): Pr
     budget: budget(input.budget),
     imageProvider: choice(input.imageProvider, IMAGE_PROVIDERS, 'image provider') as ImageProviderKind,
     videoProvider: choice(input.videoProvider, VIDEO_PROVIDERS, 'video provider') as VideoProviderKind,
+    ...distribution(input.internal),
   });
   await writeJsonAtomic(join(dir, 'song.json'), {
     title: required(input.title, 'title'),
@@ -384,6 +394,8 @@ export interface NewEpisodeInput {
   episode: unknown;
   slug: unknown;
   budget: unknown;
+  /** `true`: never released publicly (`distribution: internal`). */
+  internal?: unknown;
 }
 
 /** `new --kind episode`, then `setup` done: `/new-episode <slug>` starts with the script. */
@@ -391,7 +403,7 @@ export async function createEpisode(root: string, input: NewEpisodeInput): Promi
   const series = slugOf(input.series);
   const episode = typeof input.episode === 'string' ? Number(input.episode) : input.episode;
   if (typeof episode !== 'number' || !Number.isInteger(episode) || episode < 1) throw new ValidationError('the episode number is a whole number from 1');
-  const dir = await createProject({ root, slug: slugOf(input.slug), kind: 'episode', series, episode, budget: budget(input.budget) });
+  const dir = await createProject({ root, slug: slugOf(input.slug), kind: 'episode', series, episode, budget: budget(input.budget), ...distribution(input.internal) });
   await finishSetup(dir);
   return dir;
 }

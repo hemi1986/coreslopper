@@ -17,7 +17,7 @@ You are the automated QA checker. You verify; you do not change creative decisio
 6. **Readability:** check contrast, font size, safe areas, and clipping at 16:9, 9:16, and 1:1.
 7. **Determinism:** render the same still frame twice and compare SHA-256 hashes. They must match.
 8. **Formats:** confirm the master and configured derivatives exist in `renders/`.
-9. **Release package:** run `npm run cli -- qa projects/<slug>`; its `Release …` rows check `renders/release/` (files against the manifest, formats, thumbnails, Shorts, WAV, cover, canvas, lyrics, texts, metadata). A TODO is a fact the user still supplies and never blocks `READY`; a FAIL does.
+9. **Release package:** run `npm run cli -- qa projects/<slug>`; its `Release …` rows check `renders/release/` (files against the manifest, formats, thumbnails, Shorts, WAV, cover, canvas, lyrics, texts, metadata). A TODO is a fact the user still supplies and never blocks `READY`; a FAIL does. An internal project (`distribution: internal`) has no release package: `qa` reports one `Release package | N/A` row instead, and this check is done.
 
 ## Report
 

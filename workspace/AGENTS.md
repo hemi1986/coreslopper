@@ -123,6 +123,8 @@ Partly built ([ADR 0051](docs/adr/0051-memes-and-the-sound-library.md), proposed
 
 From `audio-analysis` (or `voice-track`) on, no stage waits for a human. A stage can stop the pipeline only on a hard stop: budget exceeded, missing credentials, or a validation/QA failure that cannot be fixed after its retries.
 
+A project with `distribution: internal` in `project.yaml` (`new <slug> --distribution internal`, or the wizard's "internal only" box) is never released publicly – a teaser sent by mail or chat. Its `qa-export` stops after the renders: no thumbnails, Shorts, upload texts, or release package; `qa` skips those checks, and the board shows the project as "Done – not released publicly". Without the option nothing is written and the project is public. To release it later, edit `distribution` and run `qa-export` again.
+
 Publishing is not a stage. After `qa-export` the user approves the release on the release board, and the release autopilot (`release-run`, on a timer) posts each calendar event a platform API can post at its time; the rest stays on the board for the user ([ADR 0029](docs/adr/0029-release-autopilot.md)). `publish` uploads YouTube videos as private and TikTok videos as inbox drafts by hand ([ADR 0023](docs/adr/0023-publish-command.md), [docs/publishing.md](docs/publishing.md)). Agents and stage runners never approve a release, run `release-run` or `watch`, or install the timer.
 
 ## Context discipline
@@ -159,7 +161,7 @@ npm run schema
 | `npm run cli -- thumbnail <project> --still <file> --text "<a\|b>" --out <file>` | Compose a 1280x720 JPEG thumbnail with the brand fonts and palette; `--format 9x16` for a 1080x1920 Short thumbnail, `--format 1x1` for the 3000x3000 streaming cover (artist and title only); `--tag`, `--layout left\|right\|bottom`, `--accent <role>`, `--focus x,y`. |
 | `npm run cli -- short <project> --from <anchor\|s> --to <anchor\|s> --name <stem>` | Cut a Short (at most 60 s) from `renders/9x16.mp4` into `renders/shorts/<stem>-9x16.mp4`; anchors like `section:chorus_1:end-0.5`. |
 | `npm run cli -- media-link <project> [--move]` | Move `assets/` and `renders/` to `CORESLOPPER_MEDIA_DIR` and symlink them. |
-| `npm run cli -- new <slug> --budget <usd>` | Create a project from the template. |
+| `npm run cli -- new <slug> --budget <usd> [--distribution internal]` | Create a project from the template; `internal`: never released publicly. |
 | `npm run cli -- new <slug> --kind episode --series <s> --episode <n> --budget <usd>` | Create an episode of a series. |
 | `npm run cli -- voice-track <project> [--dry-run]` | Episode: generate missing or stale takes and scene ambience. |
 | `npm run cli -- import-takes <project> [--lines <ids>]` | Episode: register recordings in `audio/lines/` as takes. |
