@@ -20,3 +20,10 @@ What holds: the invariants are enforced in the command function, not only at the
 
 Verdict: ready to merge
 Most important finding: #1. Changing or clearing only the trim keeps the cue's number, so the moment the sound lands moves without a warning. The developer should pick the intended meaning before ST-011 builds takes on it.
+
+## Resolution (main session)
+
+- #1: the user chose (b) – a trim changed without a new cue keeps the moment the sound lands in the file; a moment before the new trim is refused. Recorded in the story's Context, tested.
+- #2, #3, #4, #7, #8: fixed (stored entry asserted, CLI test, one refusal message per empty field, one schema parse, a no-op edit writes nothing).
+- #5 (shared field parsing for add and edit), #6 (sound id on parse refusals): skipped – the helpers are already shared and the CLI names the id; a merged parser can come with ST-005's hook validation.
+- #9 (no lock): skipped – the library belongs to one user; out of scope for this story.

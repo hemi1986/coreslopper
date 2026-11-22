@@ -774,7 +774,7 @@ sound
   .option('--use-when <text>', 'What it is typically used for')
   .option('--tags <list>', 'Comma-separated words for finding the sound (replaces the tags)')
   .option('--cue <seconds>', 'Where the sound lands, in seconds from its (trimmed) start')
-  .option('--trim <a-b>', 'The part to use, in seconds: 0.1-1.2')
+  .option('--trim <a-b>', 'The part to use, in seconds: 0.1-1.2; without --cue the cue keeps its moment in the file')
   .option('--source <url>', 'Where the sound came from')
   .option('--licence <licence>', 'Its licence (empty: unknown)')
   .option('--credit <text>', 'The credit text its licence asks for')

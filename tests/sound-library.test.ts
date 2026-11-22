@@ -197,6 +197,17 @@ describe.skipIf(!hasFfmpeg())('sound edit', () => {
     for (const field of ['trim', 'cue', 'source', 'credit']) expect(stored).not.toHaveProperty(field);
   });
 
+  it('keeps the moment the cue lands when only the trim changes', async () => {
+    const root = await vineBoom('0.5-1.4');
+    await updateLibrarySound(root, 'vine-boom', { cue: 0.2 });
+
+    expect((await updateLibrarySound(root, 'vine-boom', { trim: '' })).sound.cue).toBeCloseTo(0.7, 3);
+    expect((await updateLibrarySound(root, 'vine-boom', { trim: '0.3-1.2' })).sound.cue).toBeCloseTo(0.4, 3);
+    expect((await updateLibrarySound(root, 'vine-boom', { trim: '0.1-1.2', cue: 0.1 })).sound.cue).toBe(0.1);
+    await expect(updateLibrarySound(root, 'vine-boom', { trim: '0.5-1.4' })).rejects.toMatchObject({ reason: 'outside' });
+    expect(await loadLibrarySound(root, 'vine-boom')).toMatchObject({ trim: { start: 0.1, end: 1.2 }, cue: 0.1 });
+  });
+
   it('writes nothing for an edit that changes nothing', async () => {
     const root = await vineBoom();
     const entry = join(soundDir(root, 'vine-boom'), 'sound.yaml');

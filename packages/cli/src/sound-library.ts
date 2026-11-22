@@ -268,6 +268,12 @@ export async function updateLibrarySound(root: string, id: string, changes: Libr
     licence: optional(changes.licence, current.licence, (value) => text(value, 'licence', 200)) ?? 'unknown',
     credit: optional(changes.credit, current.credit, (value) => text(value, 'credit', 1000)),
   };
+  // The cue counts from the trim's start: a new trim without a new cue keeps the moment the sound lands in the file.
+  if (changes.trim !== undefined && changes.cue === undefined && current.cue !== undefined) {
+    const cue = Math.round((current.cue + (current.trim?.start ?? 0) - (next.trim?.start ?? 0)) * 1000) / 1000;
+    if (cue < 0) throw new SoundRefused(`the cue lands at ${current.cue + (current.trim?.start ?? 0)} s of the file, before the trim; give a new --cue`, 'outside', undefined, id);
+    next.cue = cue;
+  }
   const problems = librarySoundTimeProblems({ length: current.length, cue: next.cue, trim: next.trim });
   if (problems.length) throw new SoundRefused(problems.map((problem) => problem.message).join('; '), 'outside', undefined, id);
 
