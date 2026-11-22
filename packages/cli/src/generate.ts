@@ -189,8 +189,16 @@ const VIDEO_OPERATIONS = new Set(['textToVideo', 'imageToVideo', 'firstLastFrame
 /** First and last frame of a Pika FL2VA clip may differ in aspect by at most this share (rounding to even sizes). */
 const FL2VA_ASPECT_TOLERANCE = 0.01;
 
-/** Reference-to-video aspect by project kind: music videos are 16:9, episodes 9:16. */
-const REF2VA_ASPECT = { 'music-video': { label: '16:9', ratio: 16 / 9 }, episode: { label: '9:16', ratio: 9 / 16 } } as const;
+/** Aspects the Pika H3 graphs render; the project's master format picks one. */
+const REF2VA_ASPECTS = [
+  { label: '16:9', ratio: 16 / 9 },
+  { label: '9:16', ratio: 9 / 16 },
+] as const;
+
+/** The Pika aspect that matches a size, if any (2 % tolerance for rounding). */
+function ref2vaAspect(width: number, height: number): (typeof REF2VA_ASPECTS)[number] | undefined {
+  return REF2VA_ASPECTS.find((aspect) => Math.abs(width / height - aspect.ratio) / aspect.ratio <= 0.02);
+}
 
 export const BatchSchema = z.array(BatchItemSchema).min(1);
 
@@ -439,12 +447,18 @@ function resolveItem(
   if (item.operation === 'referenceToVideo' || pikaLipSync) {
     checkFlexPrompt(item.prompt, references.length);
     if (config.kind) {
-      const want = REF2VA_ASPECT[config.kind];
-      const { width, height } = { width: item.width ?? config.formats.master.width, height: item.height ?? config.formats.master.height };
-      if (Math.abs(width / height - want.ratio) / want.ratio > 0.02) {
+      const what = pikaLipSync ? 'Pika lip-sync' : 'referenceToVideo';
+      const master = config.formats.master;
+      const want = ref2vaAspect(master.width, master.height);
+      if (!want) {
         throw new ValidationError(
-          `${pikaLipSync ? 'Pika lip-sync' : 'referenceToVideo'} renders ${want.label} for ${config.kind === 'episode' ? 'an episode' : 'a music video'}, but the item asks for ${width}x${height}. ` +
-            `Drop width/height or fix formats.master.`,
+          `${what} renders ${REF2VA_ASPECTS.map((aspect) => aspect.label).join(' or ')}, but formats.master is ${master.width}x${master.height}.`,
+        );
+      }
+      const { width, height } = { width: item.width ?? master.width, height: item.height ?? master.height };
+      if (ref2vaAspect(width, height) !== want) {
+        throw new ValidationError(
+          `${what} renders the master format's ${want.label}, but the item asks for ${width}x${height}. Drop width/height or fix formats.master.`,
         );
       }
     }

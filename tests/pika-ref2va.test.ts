@@ -349,11 +349,20 @@ describe('referenceToVideo batch items', () => {
     expect(entry?.resolved.params).toMatchObject({ megapixels: 0.98, max_references: 4 });
   });
 
-  it('takes the aspect from the project kind', async () => {
+  it('takes the aspect from the master format, not the project kind', async () => {
     const batch = BatchSchema.parse([item]);
-    await expect(runBatch(target('episode'), batch, { dryRun: true, log: false })).rejects.toThrow(/renders 9:16 for an episode/);
+    // A 16:9 episode and a 9:16 episode both render in their master aspect.
+    await expect(runBatch(target('episode'), batch, { dryRun: true, log: false })).resolves.toHaveLength(1);
     const vertical = target('episode', { id: '9x16', width: 1080, height: 1920 });
     await expect(runBatch(vertical, batch, { dryRun: true, log: false })).resolves.toHaveLength(1);
+    const square = target('music-video', { id: '1x1', width: 1080, height: 1080 });
+    await expect(runBatch(square, batch, { dryRun: true, log: false })).rejects.toThrow(
+      /renders 16:9 or 9:16, but formats.master is 1080x1080/,
+    );
+    const portraitItem = BatchSchema.parse([{ ...item, width: 1080, height: 1920 }]);
+    await expect(runBatch(target('episode'), portraitItem, { dryRun: true, log: false })).rejects.toThrow(
+      /renders the master format's 16:9, but the item asks for 1080x1920/,
+    );
   });
 
   it('rejects audio, too many images, both prompt kinds, and a prompt that misses a picture', async () => {
