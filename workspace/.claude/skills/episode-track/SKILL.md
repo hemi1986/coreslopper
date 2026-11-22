@@ -17,7 +17,7 @@ Stage `episode-track` of an episode project. It is deterministic and uses no spe
 
 ## Process
 
-1. Run `npm run cli -- episode-track projects/<slug>`.
+1. Run `npm run cli -- episode-track projects/<slug>`. After the clips exist, `sfx` takes whose action is on screen are replaced by the clips' own sound with `npm run cli -- clip-audio projects/<slug> --line <id>` (see `ai-clips`); run `episode-track` again after that.
 2. Read the summary: duration, scene and line counts, and the speaker stems written.
 3. Validate: `npm run cli -- validate projects/<slug>`. It checks that the timing matches the script and resolves the storyboard against it.
 4. Mark the stage: `npm run cli -- stage-done <project> episode-track --outputs timing.json,audio/episode.wav`.

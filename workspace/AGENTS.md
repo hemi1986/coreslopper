@@ -150,6 +150,7 @@ npm run schema
 | `npm run cli -- new <slug> --kind episode --series <s> --episode <n> --budget <usd>` | Create an episode of a series. |
 | `npm run cli -- voice-track <project> [--dry-run]` | Episode: generate missing or stale takes and scene ambience. |
 | `npm run cli -- import-takes <project> [--lines <ids>]` | Episode: register recordings in `audio/lines/` as takes. |
+| `npm run cli -- clip-audio <project> --line <id> [--shots <ids>]` | Episode: replace an `sfx` take with the sound of the clips that play during the line (cut at their on-screen position, levelled to -20 LUFS); then `episode-track`. |
 | `npm run cli -- episode-track <project>` | Episode: place takes, write `timing.json`, mix the episode track and speaker stems. |
 | `npm run cli -- subtitles <project>` | Episode: write `renders/<slug>.en.srt`. |
 | `npm run cli -- series-status <series>` | Series canon, budget, planned and created episodes, stages, spend, length. |
@@ -174,12 +175,12 @@ npm run schema
 | `npm run cli -- import-song <project>` | Register `audio/song.wav` and `audio/stems/vocals.wav` in `song.json`; converts other formats. |
 | `npm run cli -- normalize-audio <project> --input <file>` | Normalize audio to −14 LUFS / −1 dBTP. |
 | `npm run cli -- footage <project> --input <file> --name <name>` | Normalize a footage proxy. |
-| `npm run cli -- frame <project> --input <clip> --position last` | Extract a review or chaining frame. |
+| `npm run cli -- frame <project> --input <clip> --position first\|middle\|last` | Extract a review or chaining frame; `--at <seconds>` takes the frame at a time, also from a render. |
 | `npm run cli -- review-image <project\|series> --image <png[,png]>\|--clip <mp4> --shot <id>\|--ref <kind:id>` | Art-director verdict on one image or clip, headless in its own context; `--clip` extracts the first, middle, and last frame itself and measures the first against the keyframe. Prints `{verdict, score, issues, fix_prompt}` and appends to `verdicts.jsonl` (exit 2 on fail). |
 | `npm run cli -- queue add <project> --kind keyframe\|clip [--shots <ids>] [--workflow <w>] [--overrides <file>]` | Queue keyframes or clips built from `storyboard.yaml` (prompt, references, dependencies); `--batch <file>` queues hand-written items with `id` and `out`. |
 | `npm run cli -- queue run\|wait\|status <project>` | Work `assets/queue.json`: generate in order, review each result in the background, requeue failed images with the fix prompt, file approved results at `out`; `wait` blocks until an item needs a fix or the run ended. |
 | `npm run cli -- queue retry\|accept\|drop <project> <id>` | Put an item back (`--prompt`, `--item <file>`, `--provider <p>` for the cloud attempt), approve an attempt by hand, or remove an item. |
-| `npm run cli -- patch <project> --image <png> --box <x,y,w,h> --prompt "<edit>" [--refs <png,…>] [--shot <id>] [--replace]` | Edit one region: crop, `image.edit` through `generate` (cache, manifest, budget), paste back with a soft edge, file as the next attempt. `--series <s>` for a canon image. |
+| `npm run cli -- patch <project> --image <png> --box <x,y,w,h> --prompt "<edit>" [--refs <png,…>] [--shot <id>] [--replace]` | Edit one region: crop (grown to a standard aspect ratio), `image.edit` through `generate` (cache, manifest, budget), paste back with a soft edge and without stretching, file as the next attempt. `--series <s>` for a canon image. |
 | `npm run cli -- sheet <project> --images <png,…> [--box <x,y,w,h>]` | Put images side by side (optionally zoomed into one region) as `assets/review/sheets/<name>.png`. |
 | `npm run cli -- verdicts <project\|series> [--failed]` | Last art-director verdict per shot and reference. |
 | `npm run cli -- probe <file…>` | Size, length, frame rate, and codecs of images, clips, and audio. |

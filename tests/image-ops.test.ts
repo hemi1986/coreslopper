@@ -14,8 +14,9 @@ import {
   parseBox,
   pasteFilter,
   sheetLayout,
+  snapBoxAspect,
 } from '../packages/cli/src/image-ops.ts';
-import { resolveBinary } from '../packages/cli/src/media.ts';
+import { extractFrame, resolveBinary } from '../packages/cli/src/media.ts';
 import { reviewImage } from '../packages/cli/src/review-image.ts';
 
 let ffmpeg: string | undefined;
@@ -100,6 +101,24 @@ describe('edit and sheet geometry', () => {
     expect(pasteFilter({ x: 0, y: 0, width: 1000, height: 1000 }, image, 24)).toContain("a='255'");
   });
 
+  it('grows a box to the nearest standard aspect, centred and inside the image', () => {
+    const image = { width: 928, height: 1632 };
+    // 594x490 (1.21) is nearest to 5:4: the width grows around the old centre.
+    expect(snapBoxAspect({ x: 167, y: 98, width: 594, height: 490 }, image)).toEqual({
+      box: { x: 158, y: 98, width: 612, height: 490 },
+      ratio: '5:4',
+    });
+    // A box at the image edge is shifted inward, not cut.
+    expect(snapBoxAspect({ x: 0, y: 0, width: 300, height: 200 }, image).box).toMatchObject({ x: 0, y: 0, width: 300 });
+    // An exact ratio stays as it is.
+    expect(snapBoxAspect({ x: 10, y: 10, width: 400, height: 400 }, image)).toEqual({ box: { x: 10, y: 10, width: 400, height: 400 }, ratio: '1:1' });
+  });
+
+  it('covers the box with the patch instead of stretching it', () => {
+    const filter = pasteFilter({ x: 10, y: 20, width: 600, height: 480 }, { width: 1000, height: 1000 }, 24);
+    expect(filter).toContain('scale=600:480:force_original_aspect_ratio=increase:flags=lanczos,crop=600:480');
+  });
+
   it('lays tiles out left to right, then the next row', () => {
     const layout = sheetLayout(5, { width: 1080, height: 1920 }, { height: 640, columns: 3 });
     expect(layout).toMatchObject({ cell: { width: 360, height: 640 }, columns: 3, rows: 2 });
@@ -133,6 +152,15 @@ describe.skipIf(!ffmpeg)('with ffmpeg', () => {
     expect(first![2]).toBeLessThan(60);
     expect(last![2]).toBeGreaterThan(200);
     expect(last![0]).toBeLessThan(60);
+  });
+
+  it('extracts the frame at a given time', async () => {
+    const project = demoProject();
+    const clip = fadeClip(join(project, 'assets/fade.mp4'));
+    const frame = await extractFrame(project, clip, 1.9);
+    expect(frame).toMatch(/assets\/frames\/fade-at-1_90\.png$/);
+    expect(pixel(frame, 100, 100)[2]).toBeGreaterThan(200);
+    await expect(extractFrame(project, clip, 5)).rejects.toThrow(/outside the clip/);
   });
 
   it('measures how far an image is from a reference', () => {

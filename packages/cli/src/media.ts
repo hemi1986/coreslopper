@@ -348,7 +348,7 @@ export async function importFootage(
 export async function extractFrame(
   projectDir: string,
   input: string,
-  position: 'first' | 'middle' | 'last',
+  position: 'first' | 'middle' | 'last' | number,
   output?: string,
 ): Promise<string> {
   const ffmpeg = resolveBinary('ffmpeg');
@@ -366,14 +366,21 @@ export async function extractFrame(
   if (!Number.isFinite(duration) || duration <= 0) {
     throw new ValidationError(`Could not read the duration of ${source}.`);
   }
-  const timestamp = position === 'first' ? 0.05 : position === 'middle' ? duration / 2 : Math.max(0, duration - 0.05);
+  if (typeof position === 'number' && (position < 0 || position > duration)) {
+    throw new ValidationError(`--at ${position} is outside the clip (0-${duration.toFixed(2)} s).`);
+  }
+  const timestamp =
+    typeof position === 'number'
+      ? Math.min(position, Math.max(0, duration - 0.05))
+      : position === 'first' ? 0.05 : position === 'middle' ? duration / 2 : Math.max(0, duration - 0.05);
+  const label = typeof position === 'number' ? `at-${position.toFixed(2).replace('.', '_')}` : position;
   const destination = output
     ? resolve(output)
-    : resolve(project.paths.assets, 'frames', `${basename(source, extname(source))}-${position}.png`);
+    : resolve(project.paths.assets, 'frames', `${basename(source, extname(source))}-${label}.png`);
   await ensureDir(dirname(destination));
   execFileSync(
     ffmpeg,
-    ['-y', '-ss', timestamp.toFixed(3), '-i', source, '-frames:v', '1', destination],
+    ['-y', '-v', 'error', '-threads', '6', '-ss', timestamp.toFixed(3), '-i', source, '-frames:v', '1', '-update', '1', destination],
     { stdio: 'inherit' },
   );
   console.log(`Frame written to ${destination}`);

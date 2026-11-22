@@ -48,7 +48,8 @@ Track, Episode Track, Speaker Stem, Subtitles – all in `docs/glossary.md`. A s
   sibling series folder.
 - The script's rules are pure functions in `packages/core/src/episode.ts` (`validateScript`, the TTS rule,
   `takeSource`, `placeLines`, subtitle cues). The hook validates every edit of `script.yaml`.
-- `takes.json` is written by `voice-track` and `import-takes` (`media.ts`); `takes.ts` decides take status and
+- `takes.json` is written by `voice-track`, `import-takes` (`media.ts`) and `clip-audio` (an sfx take cut from the
+  clips under its line, registered through `import-takes`); `takes.ts` decides take status and
   what blocks. `episode-track` writes the timing, the mix and the speaker stems together from the effective
   timing.
 
