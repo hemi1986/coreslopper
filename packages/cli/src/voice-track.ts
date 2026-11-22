@@ -1,11 +1,14 @@
+import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import {
   ValidationError,
   ambienceSource,
   ensureDir,
+  expectedTakeSource,
   hashFile,
   isAudibleLine,
   isSpokenLine,
+  librarySoundTakeSource,
   loadModelsConfig,
   loadProject,
   placeLines,
@@ -14,6 +17,7 @@ import {
   scriptLines,
   takeSource,
   validateScript,
+  type LibrarySound,
   type ScriptLine,
   type Take,
 } from '@coreslopper/core';
@@ -30,7 +34,7 @@ import {
   textHash,
   type EpisodeProject,
 } from './takes.js';
-import { scriptCanon } from './script-canon.js';
+import { librarySoundWav, projectLibrarySounds, scriptCanon } from './script-canon.js';
 
 export interface VoiceTrackOptions {
   dryRun?: boolean;
@@ -67,11 +71,6 @@ function lineItem(project: EpisodeProject, line: ScriptLine): BatchItem {
       params: { transcript: speaker.voice.transcript },
     };
   }
-  if (line.kind === 'sfx' && line.sound !== undefined) {
-    throw new ValidationError(
-      `Line "${line.id}" names the library sound "${line.sound}"; the voice track does not copy library sounds yet. Put the sound at audio/lines/${line.id}.wav and run import-takes.`,
-    );
-  }
   if (line.kind === 'sfx' && line.prompt !== undefined) {
     return {
       operation: 'generateAudio',
@@ -97,6 +96,20 @@ async function registerGenerated(source: string, destination: string, hash: stri
   };
 }
 
+/** EVT-LibrarySoundTaken: copy the trimmed library sound to its take path as 48 kHz mono WAV, without cost. */
+async function takeLibrarySound(project: EpisodeProject, sound: LibrarySound, destination: string, hash: string): Promise<Take> {
+  const file = librarySoundWav(project.paths.root, sound.id);
+  if (!existsSync(file)) throw new ValidationError(`The library sound "${sound.id}" has no audio file (${file}). Add it again with sound add.`);
+  await ensureDir(join(destination, '..'));
+  convertAudio(file, destination, 1, sound.trim);
+  return {
+    source: librarySoundTakeSource(sound.id),
+    duration: Number(probeDuration(destination).toFixed(3)),
+    text_hash: hash,
+    file_hash: await hashFile(destination),
+  };
+}
+
 /**
  * Produce a take for every audible script line without a current one (speech
  * through `audio.voice`, effects through `audio.sfx`), then an ambience for
@@ -104,18 +117,22 @@ async function registerGenerated(source: string, destination: string, hash: stri
  */
 export async function voiceTrack(projectDir: string, options: VoiceTrackOptions = {}): Promise<void> {
   const project = requireEpisode(await loadProject(projectDir), 'voice-track');
-  validateScript(project.script, await scriptCanon(project, project.script));
+  const library = await projectLibrarySounds(project);
+  validateScript(project.script, await scriptCanon(project, project.script, library));
   const takes = loadTakes(project);
   const blocked: string[] = [];
 
   // 1. Script lines.
   const pending: Array<{ line: ScriptLine; hash: string; item: BatchItem }> = [];
+  const copies: Array<{ line: ScriptLine; hash: string; sound: LibrarySound }> = [];
   let current = 0;
   const sfxMax = await roleMaxDuration(project, 'audio.sfx');
   for (const { line } of scriptLines(project.script)) {
     if (!isAudibleLine(line)) continue;
-    const hash = textHash(takeSource(line));
     const take = takes.takes[line.id];
+    const source = expectedTakeSource(line, take, library);
+    // The line's own copy of a library sound that is gone keeps what it was made from (HS-260).
+    const hash = source ? textHash(source) : take?.text_hash ?? '';
     const status = await takeStatus(take, lineTakePath(project, line.id), hash);
     const reason = blockingReason(status, take, `Line "${line.id}"`);
     if (reason) {
@@ -123,7 +140,18 @@ export async function voiceTrack(projectDir: string, options: VoiceTrackOptions 
       continue;
     }
     if (status === 'current') {
+      if (line.kind === 'sfx' && line.sound !== undefined && !library[line.sound]) {
+        console.warn(`! Line "${line.id}": the library sound "${line.sound}" is no longer in the library; its take stays.`);
+      }
       current += 1;
+      continue;
+    }
+    if (line.kind === 'sfx' && line.sound !== undefined) {
+      const sound = library[line.sound];
+      // validateScript stops a gone sound unless every line naming it still has its take.
+      if (!sound) throw new ValidationError(`Line "${line.id}": the library sound "${line.sound}" is not in the library.`);
+      // What the copy is made from is the sound now, whatever the take it replaces was made from.
+      copies.push({ line, hash: textHash(takeSource(line, sound)), sound });
       continue;
     }
     if (line.kind === 'sfx' && line.duration !== undefined && sfxMax !== undefined && line.duration > sfxMax) {
@@ -138,7 +166,11 @@ export async function voiceTrack(projectDir: string, options: VoiceTrackOptions 
   }
   if (blocked.length > 0) throw new ValidationError('voice-track cannot continue', blocked);
 
-  console.log(`Takes: ${current} current, ${pending.length} to generate.`);
+  console.log(`Takes: ${current} current, ${copies.length} to copy from the sound library, ${pending.length} to generate.`);
+  if (!options.dryRun && copies.length > 0) {
+    for (const { line, hash, sound } of copies) takes.takes[line.id] = await takeLibrarySound(project, sound, lineTakePath(project, line.id), hash);
+    await saveTakes(project, takes);
+  }
   if (pending.length > 0) {
     const results = await runBatch(projectTarget(project), pending.map((entry) => entry.item), { dryRun: options.dryRun });
     if (!options.dryRun) {

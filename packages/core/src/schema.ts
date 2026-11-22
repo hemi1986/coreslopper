@@ -695,8 +695,14 @@ export const SeriesStateSchema = z.object({
   updatedAt: z.string().min(1),
 });
 
+/** The source of a take copied from the sound library: `library:<sound id>` (POL-TakeChosenLibrarySounds). */
+export function librarySoundTakeSource(id: string): `library:${string}` {
+  return `library:${id}`;
+}
+
 export const TakeSchema = z.object({
-  source: z.enum(['generated', 'imported']),
+  /** Generated, imported by the user, or copied from a library sound (`library:<id>`). */
+  source: z.union([z.enum(['generated', 'imported']), z.string().regex(/^library:[a-z0-9][a-z0-9_-]*$/) as z.ZodType<`library:${string}`>]),
   duration: z.number().positive(),
   /** Hash of the text or prompt the take was made from; a different hash makes the take stale. */
   text_hash: z.string().min(1),

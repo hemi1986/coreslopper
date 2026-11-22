@@ -223,14 +223,15 @@ export interface ImportSongOptions {
 }
 
 /** Convert an audio file to a 48 kHz WAV with the given channel count. */
-export function convertAudio(source: string, destination: string, channels: 1 | 2): void {
+export function convertAudio(source: string, destination: string, channels: 1 | 2, trim?: { start: number; end: number }): void {
   if (resolve(source) === resolve(destination)) {
     throw new ValidationError(`Cannot convert ${source} onto itself.`);
   }
   const ffmpeg = resolveBinary('ffmpeg');
+  const window = trim ? ['-ss', trim.start.toFixed(6), '-t', (trim.end - trim.start).toFixed(6)] : [];
   execFileSync(
     ffmpeg,
-    ['-y', '-loglevel', 'error', '-i', source, '-ar', '48000', '-ac', String(channels), '-c:a', 'pcm_s16le', '-bitexact', destination],
+    ['-y', '-loglevel', 'error', '-i', source, ...window, '-ar', '48000', '-ac', String(channels), '-c:a', 'pcm_s16le', '-bitexact', destination],
     { stdio: 'inherit' },
   );
 }

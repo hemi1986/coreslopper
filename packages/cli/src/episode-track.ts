@@ -14,9 +14,10 @@ import {
   placeLines,
   rmsEnvelope,
   scriptLines,
-  takeSource,
+  expectedTakeSource,
   validateScript,
   writeJsonAtomic,
+  type LibrarySound,
   type Timing,
 } from '@coreslopper/core';
 import { probeDuration, resolveBinary } from './media.js';
@@ -30,7 +31,7 @@ import {
   textHash,
   type EpisodeProject,
 } from './takes.js';
-import { scriptCanon } from './script-canon.js';
+import { projectLibrarySounds, scriptCanon } from './script-canon.js';
 
 const SAMPLE_RATE = 48_000;
 /** Energy frames like the music-video analysis: 512-sample hop, 2048-sample window. */
@@ -170,7 +171,7 @@ function decodeMono(file: string): Float32Array {
 }
 
 /** Every audible line and every ambience must have a current take; returns the probed take lengths. */
-async function checkTakes(project: EpisodeProject): Promise<Record<string, number>> {
+async function checkTakes(project: EpisodeProject, library: Record<string, LibrarySound>): Promise<Record<string, number>> {
   const takes = loadTakes(project);
   const issues: string[] = [];
   const durations: Record<string, number> = {};
@@ -178,7 +179,8 @@ async function checkTakes(project: EpisodeProject): Promise<Record<string, numbe
     if (!isAudibleLine(line)) continue;
     const file = lineTakePath(project, line.id);
     const take = takes.takes[line.id];
-    const status = await takeStatus(take, file, textHash(takeSource(line)));
+    const source = expectedTakeSource(line, take, library);
+    const status = await takeStatus(take, file, source ? textHash(source) : take?.text_hash ?? '');
     if (status === 'current') durations[line.id] = probeDuration(file);
     else issues.push(blockingReason(status, take, `Line "${line.id}"`) ?? `Line "${line.id}": take is ${status}; run voice-track.`);
   }
@@ -204,8 +206,9 @@ async function checkTakes(project: EpisodeProject): Promise<Record<string, numbe
  */
 export async function episodeTrack(projectDir: string): Promise<Timing> {
   const project = requireEpisode(await loadProject(projectDir), 'episode-track');
-  validateScript(project.script, await scriptCanon(project, project.script));
-  const durations = await checkTakes(project);
+  const library = await projectLibrarySounds(project);
+  validateScript(project.script, await scriptCanon(project, project.script, library));
+  const durations = await checkTakes(project, library);
   const placement = placeLines(project.script, durations);
 
   const base: Timing = {
