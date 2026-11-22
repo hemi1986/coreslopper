@@ -12,7 +12,7 @@ risk: null
 events: [EVT-TakeGenerated, EVT-AmbienceGenerated, EVT-VoiceTrackStopped, EVT-LibrarySoundTaken]
 depends_on: [ST-009]
 labels: [feature:meme]
-status: in-progress
+status: done
 ---
 
 ## Story
