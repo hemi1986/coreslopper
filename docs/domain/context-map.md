@@ -18,7 +18,7 @@ flowchart LR
   Sounds[BC-SoundLibrary]
   Timing[BC-Timing]
   Bibles[BC-Bibles]
-  CharLib[BC-CharacterLibrary]
+  Library[BC-Library]
   Storyboard[BC-Storyboard]
   Queue[BC-GenerationQueue]
   Generation[BC-Generation]
@@ -35,8 +35,8 @@ flowchart LR
   Sounds -->|Customer/Supplier: copied as a take, by id and hash| Scripted
   Scripted -->|Published Language: timing.json, line:id:cue anchors| Timing
   Scripted -->|Customer/Supplier: takes through runBatch| Generation
-  CharLib -->|Customer/Supplier: copies on character use| Bibles
-  Bibles -->|Customer/Supplier: finished characters on import| CharLib
+  Library -->|Customer/Supplier: copies on character use and set use| Bibles
+  Bibles -->|Customer/Supplier: finished characters and sets on import| Library
   Timing -->|Published Language: effective timing| Storyboard
   Bibles -->|Conformist: continuity references| Storyboard
   Storyboard -->|Customer/Supplier: shots to queue| Queue
@@ -116,11 +116,14 @@ Core terms: Style Bible, Character Bible, Set Bible, Plate, Prop Reference, Char
 Owner role: the agent in style-character (for a meme from pitch and script, inventing characters when none were
 chosen); the user owns the user references.
 
-### BC-CharacterLibrary – Character library
-Purpose: the workspace's reusable characters; takes finished characters in and copies identity and chosen states
-into a music video, a meme or a series canon. The two contexts exchange copies only (ADR 0043).
-Core terms: Character Library, Library Character, Character Use.
-Owner role: the user.
+### BC-Library – Library
+Purpose: the workspace's reusable characters and sets; takes finished characters and sets in and copies a
+character's identity with its chosen states, or a set with its references and every plate, into a music video, a
+meme or a series canon. The library and the bibles exchange copies only (ADR 0043, ADR 0052).
+Aggregates: `AGG-LibraryCharacter` (as-is), `AGG-LibrarySet` (target, feature `set-library`).
+Core terms: Character Library, Library Character, Character Use, Set Library, Library Set, Set Import, Set Use.
+Owner role: the user. The sound library stays its own context (ADR 0051): its entries are used as takes, not
+copied into a bible.
 
 ### BC-Storyboard – Storyboard
 Purpose: turns treatment or script, effective timing and bibles into an ordered, checked list of shots.

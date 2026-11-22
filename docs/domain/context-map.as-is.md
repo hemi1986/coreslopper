@@ -13,9 +13,9 @@ flowchart LR
   BC-Review -->|notes map to storyboard shots and timing sections| BC-Storyboard
   BC-Pipeline -->|qa-export builds and checks the release package| BC-Release
   BC-Pipeline -->|style-character stage writes the bibles of a music video| BC-Bibles
-  BC-Pipeline -->|style-character done imports characters| BC-CharacterLibrary
-  BC-CharacterLibrary -->|character use copies an identity and chosen states into a bible| BC-Bibles
-  BC-Bibles -->|character import copies characters with files into the library| BC-CharacterLibrary
+  BC-Pipeline -->|style-character done imports characters| BC-Library
+  BC-Library -->|character use copies an identity and chosen states into a bible| BC-Bibles
+  BC-Bibles -->|character import copies characters with files into the library| BC-Library
   BC-Bibles -->|sheets, states, plates and props generated and judged as queue items| BC-GenerationQueue
   BC-Bibles -->|palette roles, typography, grain| BC-Render
   BC-GenerationQueue -->|every attempt is a one-item batch: budget, cache, manifest, spend| BC-Generation
@@ -62,7 +62,7 @@ flowchart LR
   BC-Release -->|announcement, story and feed images composed from the cover's recipe| BC-Render
   BC-Workspace -->|init copies the demo projects; update only adds missing files to projects/| BC-Pipeline
   BC-Workspace -->|migrate-layout moves series canons into projects/; update skips their copies until then| BC-Series
-  BC-Workspace -->|update only adds missing files to library/| BC-CharacterLibrary
+  BC-Workspace -->|update only adds missing files to library/| BC-Library
   BC-Workspace -->|the board container runs board --watch, the watchdog round| BC-Publish
   BC-Workspace -->|provider keys checked and stored in .env| Providers
   BC-Workspace -->|the npx CLI and runtime; the dependencies| NpmRegistry[npm registry - external]
@@ -77,7 +77,7 @@ flowchart LR
   BC-Board -->|the review view; notes and rounds written through board-review| BC-Review
   BC-Board -->|the release view and the calendar; done marks and live URLs through updateStatus, a release refresh after a live URL or an approval| BC-Release
   BC-Board -->|the approval, its withdrawal and the autopilot's marks through release-autopilot; the activity of the watchdog round| BC-Publish
-  BC-Board -->|the library view; entries, files and uses through character-library| BC-CharacterLibrary
+  BC-Board -->|the library view; entries, files and uses through character-library| BC-Library
   BC-Board -->|the wizard; new music videos and episodes, the lyrics and the finished setup stage through board-wizard| BC-Pipeline
   BC-Board -->|the wizard; new series canons through board-wizard| BC-Series
   BC-Board -->|the wizard; the user's references through board-wizard| BC-Bibles
@@ -319,7 +319,7 @@ Boundaries:
 - Render, thumbnails, the voice track and the lip-sync check read the style, the reference voices and the display
   rules. No locks; one stage at a time, the board writes only user references and character use (HS-134).
 
-### BC-CharacterLibrary – Character library
+### BC-Library – Library
 Purpose (as recovered, decided by recommendation HS-123): keeps the workspace's reusable characters across
 productions – takes the characters of finished character bibles in and copies a character's identity, and the
 states the user chooses, into a new music video or series canon (ADR 0034, ADR 0043 proposed).

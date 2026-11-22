@@ -431,6 +431,7 @@ whole. An episode has none of its own; it reads the canon's (`packages/core/src/
 | Attribute | Type | Required | Source |
 |---|---|---|---|
 | Set | id (unique), name, description, prompt anchor, reference frames (Paths) | id, name, description, prompt yes | EVT-SetBibleWritten |
+| Library set | per set: id of the library set it is a copy of | no | EVT-LibrarySetUsed |
 | Plate | per set: id (unique in the set), angle, prompt, reference image (Path) | id, angle yes | EVT-PlateAdded |
 | Prop reference | id (unique), name, description (shape, colour, material, size, attachments), prompt, reference images (Paths) | id, name, description yes | EVT-PropReferenceAdded |
 
@@ -464,6 +465,25 @@ plain names inside the folder, stored once by content (`packages/cli/src/charact
 
 **Derived**: where a library character is used (every `characters.yaml` naming it in `library`) and its cover (the
 sheet, else the first image reference), computed by `listLibrary` on every read.
+
+### AGG-LibrarySet – Library set (target)
+
+`library/sets/<id>/set.yaml` (schema `library-set`, ADR 0052) and its files, plain names inside the folder, stored
+once by content.
+
+| Attribute | Type | Required | Source |
+|---|---|---|---|
+| Id | script id; equals the folder name | yes | EVT-LibrarySetCreated |
+| Name, Description, Prompt | text, as in a set bible | yes | EVT-LibrarySetCreated, EVT-LibrarySetUpdated |
+| References | list of image file names | default empty | EVT-LibrarySetCreated, EVT-LibrarySetExtended, EVT-LibrarySetFileAdded |
+| Plates | list: id (unique in the entry), camera angle, prompt, image file name | id, angle yes | EVT-LibrarySetCreated, EVT-LibrarySetExtended, EVT-LibrarySetFileAdded |
+| Tags | list of text | default empty | EVT-LibrarySetCreated, EVT-LibrarySetUpdated |
+| Origin | `projects/<slug>` or `manual` | yes | EVT-LibrarySetCreated |
+| Added | Timestamp | yes | EVT-LibrarySetCreated |
+| History | list: when, from where, which files and plates | default empty | EVT-LibrarySetExtended |
+
+**Derived**: where a library set is used (every `sets.yaml` naming it in `library`) and its cover (the first plate,
+else the first reference), computed on every read.
 
 ### AGG-Render – Render (as-is)
 
