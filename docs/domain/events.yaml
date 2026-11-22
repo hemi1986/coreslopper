@@ -2322,7 +2322,7 @@ read_models:
     fed_by: [EVT-StageStarted, EVT-StageCompleted, EVT-StageFailed, EVT-StageSkipped, EVT-StageReset]
     used_by: [ACT-User]
     fields: [Where, Command, Reason, Stage]
-    description: "Precedence: a running stage (wait), an open interactive stage (setup skill), open review rounds, an open autonomous stage (/video-next, resume when failed); all stages done without a release folder means reset qa-export, then /video-next; then the release view"
+    description: "Precedence: a running stage (wait), an open interactive stage (setup skill), open review rounds, an open autonomous stage (/video-next, resume when failed); all stages done without a release folder means reset qa-export, then /video-next – /video-next resets it itself, and the board says the release folder is missing (fixed 2026-11-22, G-5); then the release view"
   - id: RM-ProductionView
     name: Production view
     fed_by: [EVT-ProjectCreated, EVT-StageStarted, EVT-StageCompleted, EVT-StageFailed, EVT-StageSkipped, EVT-StageReset, EVT-SpendRecorded]
@@ -2613,7 +2613,7 @@ hotspots:
     question: "When every stage is done but no release exists, the board tells the user to run /video-next for qa-export, while status says done and /video-next stops. What is the next action?"
     refs: [RM-NextAction]
     status: resolved
-    resolution: "The release folder is an output of qa-export, so the next action is: reset qa-export, then /video-next. The board's current advice is a gap. (user, 2026-11-21)"
+    resolution: "The release folder is an output of qa-export, so the next action is: reset qa-export, then /video-next. The board's current advice is a gap. (user, 2026-11-21) Fixed 2026-11-22: /video-next resets qa-export when status prints no Release: line, and the board's next action names the missing release folder."
   - id: HS-14
     question: "The next action puts an open interactive stage before open review rounds; /video-next answers review rounds before it checks for an interactive stage. Which comes first?"
     refs: [RM-NextAction]
