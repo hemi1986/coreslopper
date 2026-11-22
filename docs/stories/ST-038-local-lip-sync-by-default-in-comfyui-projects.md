@@ -8,7 +8,7 @@ size: null
 risk: null
 depends_on: []
 labels: [feature:local-lipsync]
-status: in-progress
+status: done
 ---
 
 ## Task

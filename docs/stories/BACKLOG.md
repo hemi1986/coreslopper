@@ -4,15 +4,9 @@
 
 **Progress: 3 of 21 domain stories done** · scenarios 12 of 71
 
-**39 stories** · In Progress: 1 · Ready: 30 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 8 · Superseded: 0
+**39 stories** · In Progress: 0 · Ready: 30 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 9 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
-
-## In Progress
-
-| ID | Title | Type | Context | Priority | Size | Risk | Depends on |
-|---|---|---|---|---|---|---|---|
-| [ST-038](ST-038-local-lip-sync-by-default-in-comfyui-projects.md) | ComfyUI projects lip-sync locally by default | task | – | must | – | – | – |
 
 ## Ready
 
@@ -61,3 +55,4 @@ Within each section: by priority, then by story ID, with dependencies pulled in 
 | [ST-021](ST-021-wizard-leads-to-the-project.md) | The wizard's last step leads to the new project or series | chore | – | must | – | – | – |
 | [ST-022](ST-022-board-shows-loading-and-busy-buttons.md) | The board shows when it loads and when a button is working | chore | – | must | – | – | – |
 | [ST-035](ST-035-level-speech-takes-in-the-episode-track.md) | The episode track levels speech takes to one loudness | task | – | must | – | – | – |
+| [ST-038](ST-038-local-lip-sync-by-default-in-comfyui-projects.md) | ComfyUI projects lip-sync locally by default | task | – | must | – | – | – |
