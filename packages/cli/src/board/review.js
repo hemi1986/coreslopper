@@ -2,7 +2,7 @@
 // timeline of sections, shots, and notes; notes go to the agent in rounds.
 // Frames: the frame shown at time t is floor(t * fps); seeking to a frame lands
 // on its middle, (frame + 0.5) / fps, so the decoder never shows its neighbour.
-import { addStrings, api, copyButton, el, go, local, post, projectFile, setLang, showError, t, viewTabs } from './lib.js';
+import { addStrings, api, copyButton, el, go, local, pending, post, projectFile, setLang, showError, t, viewTabs } from './lib.js';
 
 addStrings({
   de: {
@@ -146,18 +146,23 @@ function drawTimeline() {
   updateReadout();
 }
 
+// A note sent with Enter has no button to disable, so a second Enter while it is saved sends nothing (ST-022).
+let adding = null;
+
 function addNote() {
+  if (adding) return adding;
   const box = document.getElementById('note-text');
   const text = box.value.trim();
   if (!text) return;
   const start = view.inPoint !== null ? view.inPoint : currentFrame();
   const end = view.inPoint !== null && view.outPoint !== null && view.outPoint > view.inPoint ? view.outPoint : null;
-  post('/api/review/' + encodeURIComponent(view.slug) + '/notes', {
+  adding = post('/api/review/' + encodeURIComponent(view.slug) + '/notes', {
     video: view.video, action: 'add', seconds: (start + 0.5) / fps(), end_seconds: end === null ? null : (end + 0.5) / fps(), text: text
   }).then(function (file) {
     view.data.notes[view.video] = file; box.value = ''; view.inPoint = null; view.outPoint = null;
     drawNotes(); drawTimeline();
-  }).catch(showError);
+  }).catch(showError).finally(function () { adding = null; });
+  return adding;
 }
 
 function changeNote(note, action) {
@@ -167,16 +172,16 @@ function changeNote(note, action) {
     if (text === null || !text.trim()) return;
     payload.text = text;
   }
-  post('/api/review/' + encodeURIComponent(view.slug) + '/notes', payload).then(function (file) {
+  return post('/api/review/' + encodeURIComponent(view.slug) + '/notes', payload).then(function (file) {
     view.data.notes[view.video] = file; drawNotes(); drawTimeline();
   }).catch(showError);
 }
 
 function submit(count) {
   if (!window.confirm(t('confirmSend')(count))) return;
-  post('/api/review/' + encodeURIComponent(view.slug) + '/submit', { video: view.video }).then(function (round) {
+  return post('/api/review/' + encodeURIComponent(view.slug) + '/submit', { video: view.video }).then(function (round) {
     view.justSent = round.round;
-    reload(true);
+    return reload(true);
   }).catch(showError);
 }
 
@@ -213,12 +218,12 @@ function drawNotes() {
       el('div', { class: 'note-text', text: note.text }),
       reply ? el('div', { class: 'note-reply', text: reply.reply }) : null,
       note.round ? null : el('div', { class: 'note-actions' }, [
-        el('button', { class: 'small', text: t('edit'), onclick: function () { changeNote(note, 'update'); } }),
-        el('button', { class: 'small', text: t('remove'), onclick: function () { changeNote(note, 'delete'); } })
+        el('button', { class: 'small', text: t('edit'), onclick: pending(function () { return changeNote(note, 'update'); }) }),
+        el('button', { class: 'small', text: t('remove'), onclick: pending(function () { return changeNote(note, 'delete'); }) })
       ])
     ]));
   });
-  const send = el('button', { class: 'primary', text: drafts.length ? t('send')(drafts.length) : t('nothingToSend'), disabled: drafts.length ? undefined : true, onclick: function () { submit(drafts.length); } });
+  const send = el('button', { class: 'primary', text: drafts.length ? t('send')(drafts.length) : t('nothingToSend'), disabled: drafts.length ? undefined : true, onclick: pending(function () { return submit(drafts.length); }) });
   panel.appendChild(el('p', {}, [send]));
   if (view.justSent) {
     const command = '/video-next ' + view.slug;

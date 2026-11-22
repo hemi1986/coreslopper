@@ -1,6 +1,6 @@
 // The release view: per project and platform the posts with their files,
 // texts, checklists, and autopilot state; and the calendar of all projects.
-import { addStrings, api, copyButton, el, getLang, go, local, media, post, setLang, showError, t, viewTabs, when } from './lib.js';
+import { addStrings, api, copyButton, el, getLang, go, loading, local, media, pending, post, setLang, showError, t, viewTabs, when } from './lib.js';
 
 addStrings({
   de: {
@@ -91,16 +91,16 @@ function renderPilot() {
   if (pilot.approval && pilot.approvalStale) {
     box.appendChild(el('p', { class: 'error', text: t('staleApproval')(pilot.approval.release_date, view.data.releaseDate) }));
     const again = el('button', { class: 'primary', text: t('approveDate')(view.data.releaseDate, view.data.proposed) });
-    again.onclick = function () { if (confirm(t('confirmApprove'))) pilotCall('/approve', { release_date: view.data.releaseDate }); };
-    box.appendChild(el('p', {}, [again, ' ', el('button', { class: 'small', text: t('revoke'), onclick: function () { pilotCall('/revoke'); } })]));
+    again.onclick = pending(function () { if (confirm(t('confirmApprove'))) return pilotCall('/approve', { release_date: view.data.releaseDate }); });
+    box.appendChild(el('p', {}, [again, ' ', el('button', { class: 'small', text: t('revoke'), onclick: pending(function () { return pilotCall('/revoke'); }) })]));
   } else if (pilot.approval) {
     box.appendChild(el('p', { text: t('approved')(local(pilot.approval.at)) }));
     const list = attention(pilot);
     if (list) box.appendChild(list);
-    box.appendChild(el('p', {}, [el('button', { class: 'small', text: t('revoke'), onclick: function () { pilotCall('/revoke'); } })]));
+    box.appendChild(el('p', {}, [el('button', { class: 'small', text: t('revoke'), onclick: pending(function () { return pilotCall('/revoke'); }) })]));
   } else {
     const button = el('button', { class: 'primary', text: view.data.releaseDate ? t('approveDate')(view.data.releaseDate, view.data.proposed) : t('approve'), disabled: pilot.blockers.length ? true : undefined });
-    button.onclick = function () { if (confirm(t('confirmApprove'))) pilotCall('/approve', { release_date: view.data.releaseDate }); };
+    button.onclick = pending(function () { if (confirm(t('confirmApprove'))) return pilotCall('/approve', { release_date: view.data.releaseDate }); });
     box.appendChild(el('p', { text: t('summary')(pilot.automatic, pilot.manual) }));
     // Withdrawn: what went out, or may have, still needs the user.
     const list = attention(pilot);
@@ -127,10 +127,10 @@ function renderAuto(entry) {
   if (a.retryAt) label += ' · ' + t('retryAt') + ' ' + local(a.retryAt);
   if (a.state === 'blocked' && a.block) label += ': ' + t('blocks')[a.block] + (a.block === 'credentials' ? a.platform : '');
   const row = el('div', { class: 'auto' }, [el('span', { class: 'badge ' + cls, text: t('pilot') + ': ' + label })]);
-  const button = function (text, action) { return el('button', { class: 'small', text: text, onclick: function () { pilotCall('/autopilot', { id: entry.id, action: action }); } }); };
+  const button = function (text, action) { return el('button', { class: 'small', text: text, onclick: pending(function () { return pilotCall('/autopilot', { id: entry.id, action: action }); }) }); };
   if (a.state === 'manual') row.appendChild(button(t('giveBack'), 'auto'));
   else if (a.state === 'failed') { row.appendChild(button(t('retry'), 'retry')); row.appendChild(button(t('takeOver'), 'manual')); }
-  else if (a.state === 'stuck') { row.appendChild(el('button', { class: 'small', text: t('isLive'), onclick: function () { setStatus(entry.id, { done: true }).then(function () { reload(); }); } })); row.appendChild(button(t('retry'), 'retry')); }
+  else if (a.state === 'stuck') { row.appendChild(el('button', { class: 'small', text: t('isLive'), onclick: pending(function () { return setStatus(entry.id, { done: true }).then(function () { return reload(); }); }) })); row.appendChild(button(t('retry'), 'retry')); }
   else if (a.state === 'missed') { row.appendChild(button(t('force'), 'force')); row.appendChild(button(t('takeOver'), 'manual')); }
   else if (a.state !== 'done' && a.state !== 'running' && a.state !== 'pending') row.appendChild(button(t('takeOver'), 'manual'));
   if (a.error) row.appendChild(el('span', { class: 'error', text: a.error }));
@@ -232,7 +232,7 @@ export function showCalendar() {
   const main = document.getElementById('main');
   main.innerHTML = '';
   const filter = el('input', { type: 'checkbox', checked: view.openOnly ? true : undefined });
-  filter.onchange = function () { view.openOnly = filter.checked; showCalendar(); };
+  filter.onchange = function () { view.openOnly = filter.checked; loading(showCalendar()); };
   main.appendChild(el('div', { class: 'toolbar' }, [el('h2', { text: t('calendar'), style: 'margin:0;font-size:20px' }), el('label', {}, [filter, ' ', t('open')]), el('a', { href: '/calendar.ics', text: t('ics') })]));
   return api('/api/calendar').then(function (events) {
     const now = Date.now();

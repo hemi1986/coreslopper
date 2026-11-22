@@ -104,9 +104,88 @@ export function showError(error) {
 }
 
 addStrings({
-  de: { failed: 'Fehler', copy: 'Kopieren', copied: 'Kopiert' },
-  en: { failed: 'Error', copy: 'Copy', copied: 'Copied' },
+  de: { failed: 'Fehler', copy: 'Kopieren', copied: 'Kopiert', loading: 'lädt …' },
+  en: { failed: 'Error', copy: 'Copy', copied: 'Copied', loading: 'loading …' },
 });
+
+// Feedback while the board waits for the server (ST-022). The board does not poll (ADR 0049), so a spinner only
+// follows something the person did: opening a view, or a button that sends a request.
+
+/** How long a view may load before its spinner shows, so a fast answer does not flicker. */
+export const LOADING_DELAY = 200;
+let waiting = 0;
+let loadingRound = 0;
+
+/** The page's live region tells a screen reader that the board is loading. */
+function announce(change) {
+  waiting = Math.max(0, waiting + change);
+  const status = document.getElementById('status');
+  if (status) status.textContent = waiting ? t('loading') : '';
+}
+
+function stopLoading(main) {
+  main.classList.remove('loading');
+  Array.prototype.slice.call(main.children).forEach(function (child) { if (child.classList.contains('view-spinner')) child.remove(); });
+}
+
+/**
+ * Show the main area's spinner while a view loads: `work` is the promise of the view's load. The spinner appears
+ * after LOADING_DELAY and hides the old content until the view answers; a newer load replaces an older one.
+ */
+export function loading(work) {
+  const round = ++loadingRound;
+  const main = document.getElementById('main');
+  let shown = false;
+  stopLoading(main);
+  const timer = setTimeout(function () {
+    if (round !== loadingRound) return;
+    shown = true;
+    main.classList.add('loading');
+    main.appendChild(el('div', { class: 'view-spinner', 'aria-hidden': 'true' }, [el('span', { class: 'spinner' })]));
+    announce(1);
+  }, LOADING_DELAY);
+  return Promise.resolve(work).finally(function () {
+    clearTimeout(timer);
+    if (shown) announce(-1);
+    if (round === loadingRound) stopLoading(main);
+  });
+}
+
+/**
+ * The click or submit handler of a button that sends a request. `run(event)` returns the request's promise, or
+ * nothing when it sends none (a declined confirm). While the promise is open the button is disabled and shows a
+ * small spinner beside its label, so a double click sends one request; afterwards it is enabled again, and a
+ * refusal shows where `run` shows it. On a form the handler also stops the page from submitting.
+ * `{ spinner: false }` disables the button without a spinner: an upload shows its percentage instead.
+ */
+export function pending(run, options) {
+  const spinner = !options || options.spinner !== false;
+  return function (event) {
+    const target = event.currentTarget;
+    const form = target.tagName === 'FORM';
+    if (form) event.preventDefault();
+    if (target.hasAttribute('data-pending')) return;
+    const result = run(event);
+    if (!result || typeof result.then !== 'function') return;
+    const button = form ? event.submitter || target.querySelector('button[type="submit"], button:not([type])') : target;
+    target.setAttribute('data-pending', '');
+    let mark = null;
+    if (button) {
+      button.disabled = true;
+      button.setAttribute('aria-busy', 'true');
+      if (spinner) { mark = el('span', { class: 'spinner', 'aria-hidden': 'true' }); button.appendChild(mark); }
+    }
+    announce(1);
+    return Promise.resolve(result).catch(showError).finally(function () {
+      announce(-1);
+      target.removeAttribute('data-pending');
+      if (!button) return;
+      button.disabled = false;
+      button.removeAttribute('aria-busy');
+      if (mark) mark.remove();
+    });
+  };
+}
 
 /** The tabs of a project page: production, review, and release once the project has a release package or calendar. */
 export function viewTabs(slug, active, hasRelease) {

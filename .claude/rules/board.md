@@ -53,8 +53,9 @@ release view only. "Page", "screen" and "sidebar" are not terms; "tab" is only t
   - `markdown.js` renders the markdown subset of the docs and the project documents as DOM nodes, never as HTML;
     `guide.js` shows a page of the workspace's `docs/` with it, and `production.js` a project document
     (`#/p/<slug>/doc/<path>`);
-  - `lib.js` holds the DOM helper, `api`/`post`/`upload`, the string tables (`addStrings`/`t`/`setLang`), dates,
-    and a project's tabs;
+  - `lib.js` holds the DOM helper, `api`/`post`/`upload`, the waiting feedback (`loading` for a view, wrapped once
+    in `app.js` `route`; `pending` for every button or form that sends a request), the string tables
+    (`addStrings`/`t`/`setLang`), dates, and a project's tabs;
   - each view registers its own strings.
 
 ## Boundaries
