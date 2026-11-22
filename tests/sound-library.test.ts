@@ -315,12 +315,13 @@ describe('a hand edit of sound.yaml', () => {
     expect(await refusal(entry)).toMatch(/a library sound needs a title/);
   });
 
-  it('refuses an entry whose sound.wav is missing', async () => {
+  it('ST-005: A missing file is refused', async () => {
     const { entry } = await heldVineBoom();
-
     await rm(join(entry, '..', 'sound.wav'));
 
-    expect(await refusal(entry)).toMatch(/sound\.wav does not exist/);
+    await save(entry, {});
+
+    expect(await refusal(entry)).toMatch(/"?sound\.wav"? does not exist/);
   });
 
   it('refuses a cue outside the sound and an empty use when', async () => {
