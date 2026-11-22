@@ -74,6 +74,15 @@ function pilotCall(path, payload) {
     .catch(showError);
 }
 
+/** The events that need the user, as links to their posts. */
+function attention(pilot) {
+  const events = view.data.calendar.filter(function (e) { const a = pilot.events[e.id]; return a && a.needsUser; });
+  if (!events.length) return null;
+  return el('div', {}, [el('strong', { text: t('attention') }), el('ul', {}, events.map(function (e) {
+    return el('li', {}, [el('a', { href: '#', onclick: function (ev) { ev.preventDefault(); showRelease(view.slug, tabOf(e), e.id); }, text: e.label }), ' — ' + t('states')[pilot.events[e.id].state]]);
+  }))]);
+}
+
 function renderPilot() {
   const pilot = view.data.autopilot;
   if (!pilot) return null;
@@ -86,15 +95,16 @@ function renderPilot() {
     box.appendChild(el('p', {}, [again, ' ', el('button', { class: 'small', text: t('revoke'), onclick: function () { pilotCall('/revoke'); } })]));
   } else if (pilot.approval) {
     box.appendChild(el('p', { text: t('approved')(local(pilot.approval.at)) }));
-    const attention = view.data.calendar.filter(function (e) { const a = pilot.events[e.id]; return a && a.needsUser; });
-    if (attention.length) box.appendChild(el('div', {}, [el('strong', { text: t('attention') }), el('ul', {}, attention.map(function (e) {
-      return el('li', {}, [el('a', { href: '#', onclick: function (ev) { ev.preventDefault(); showRelease(view.slug, tabOf(e), e.id); }, text: e.label }), ' — ' + t('states')[pilot.events[e.id].state]]);
-    }))]));
+    const list = attention(pilot);
+    if (list) box.appendChild(list);
     box.appendChild(el('p', {}, [el('button', { class: 'small', text: t('revoke'), onclick: function () { pilotCall('/revoke'); } })]));
   } else {
     const button = el('button', { class: 'primary', text: view.data.releaseDate ? t('approveDate')(view.data.releaseDate, view.data.proposed) : t('approve'), disabled: pilot.blockers.length ? true : undefined });
     button.onclick = function () { if (confirm(t('confirmApprove'))) pilotCall('/approve', { release_date: view.data.releaseDate }); };
     box.appendChild(el('p', { text: t('summary')(pilot.automatic, pilot.manual) }));
+    // Withdrawn: what went out, or may have, still needs the user.
+    const list = attention(pilot);
+    if (list) box.appendChild(list);
     if (pilot.blockers.length) box.appendChild(el('ul', {}, pilot.blockers.map(function (b) { return el('li', { class: 'error', text: b }); })));
     box.appendChild(el('p', {}, [button]));
   }

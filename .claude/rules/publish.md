@@ -64,12 +64,13 @@ All are in `docs/glossary.md`. A publish upload never goes public; a post does.
 
 ## Typical pitfalls
 
-- A YouTube upload or a TikTok post that may have gone out is retried. `publish` drops the uncertain mark (G-168,
-  medium).
+- An adapter's error after the last byte of a file was sent is uncertain (YouTube's `uploadChunks`, TikTok's last
+  chunk and status polls in direct mode). Keep the mark when wrapping an error: `publishProject` rethrows it with
+  `markUncertain` and writes `uncertain` into `review/publish.json`.
 - `review/publish.json` and `.env` are written without a lock. The container and the computer both write them, and
   X's refresh token is single-use (G-169, medium).
-- After a withdrawal, a running or stuck post shows as "automatic after approval". A scheduled YouTube upload still
-  goes public (G-170, medium).
+- `planEvent` derives running, stuck, pending and done before it checks the approval: a withdrawal stops only what
+  has not gone out. A scheduled YouTube upload still goes public; the board says so.
 - The board container plans in UTC when the release schedule names no time zone (G-167).
 - `TIKTOK_DIRECT_POST` is read as `1/true/yes` for the scopes, but only as `1` by the runner (G-172).
 - `retries` counts failed attempts. Lateness counts from the calendar time, also for the upload a day ahead.

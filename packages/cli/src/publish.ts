@@ -21,6 +21,7 @@ import {
   TikTokPublisher,
   YOUTUBE_QUOTA,
   YouTubePublisher,
+  markUncertain,
   redactSecrets,
   resolveTikTokCredentials,
   resolveYouTubeCredentials,
@@ -221,9 +222,11 @@ export function findPrevious(
   hash: string,
   mock: boolean,
 ): PublishEntry | undefined {
-  return log.entries
-    .filter((entry) => entry.platform === platform && entry.item === item && entry.file_hash === hash && entry.mock === mock && entry.status !== 'failed')
-    .at(-1);
+  const same = log.entries.filter((entry) => entry.platform === platform && entry.item === item && entry.file_hash === hash && entry.mock === mock);
+  // The last attempt may have gone out: it holds until the user checks the platform and forces a new upload.
+  const last = same.at(-1);
+  if (last?.status === 'failed' && last.uncertain) return last;
+  return same.filter((entry) => entry.status !== 'failed').at(-1);
 }
 
 /** YouTube units spent on the current quota day; a failed attempt counts as an insert, to stay on the safe side. */
@@ -361,7 +364,9 @@ export function formatPlan(plan: PublishPlan, title: string, dryRun: boolean): s
     const shape = step.probe ? `${step.probe.width}x${step.probe.height} ${formatDuration(step.probe.duration)}` : 'not probed';
     const what =
       step.action === 'skip'
-        ? `skip    already ${step.previous!.status} ${step.previous!.at}${step.previous!.remote_id ? ` (${step.previous!.remote_id})` : ''}`
+        ? step.previous!.status === 'failed'
+          ? `skip    may have gone out ${step.previous!.at}: check ${step.platform}, then --force to upload again`
+          : `skip    already ${step.previous!.status} ${step.previous!.at}${step.previous!.remote_id ? ` (${step.previous!.remote_id})` : ''}`
         : `upload  ${shape}${step.item.thumbnail ? ' + thumbnail' : ''}`;
     lines.push(`  ${step.platform.padEnd(8)} ${step.item.name.padEnd(14)} ${step.file}`);
     lines.push(`  ${''.padEnd(8)} ${''.padEnd(14)} ${what}`);
@@ -458,13 +463,19 @@ export async function publishProject(options: PublishOptions): Promise<PublishSu
       for (const manual of [...result.manualSteps, ...(related ? [related] : [])]) manualSteps.push(`${step.platform} ${step.item.name}: ${manual}`);
     } catch (error) {
       const message = redactSecrets(error instanceof Error ? error.message : String(error), secrets());
-      const entry: PublishEntry = { ...base, status: 'failed', warnings: [], error: message, at: now().toISOString() };
+      const uncertain = Boolean((error as { uncertain?: boolean }).uncertain);
+      const entry: PublishEntry = { ...base, status: 'failed', warnings: [], error: message, ...(uncertain ? { uncertain } : {}), at: now().toISOString() };
       log.entries.push(entry);
       entries.push(entry);
       await writeJsonAtomic(logPath, PublishLogSchema.parse(log));
       printManualSteps(print, manualSteps);
       if (error instanceof ConfigError) throw new ConfigError(message);
-      throw new Error(`${step.platform} ${step.item.name}: ${message} (logged in review/publish.json; uploads before it are kept)`);
+      const failure = new Error(
+        `${step.platform} ${step.item.name}: ${message} (logged in review/publish.json; uploads before it are kept` +
+          (uncertain ? `; it may have gone out: check ${step.platform} before publishing it again with --force)` : ')'),
+      );
+      // The autopilot reads the mark and asks the user instead of retrying (never twice).
+      throw uncertain ? markUncertain(failure) : failure;
     }
   }
   printManualSteps(print, manualSteps);

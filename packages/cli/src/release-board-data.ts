@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   ReleaseManifestSchema,
+  approvalHolds,
   chaptersFromSections,
   formatId,
   loadChannel,
@@ -728,7 +729,13 @@ export async function boardAutopilot(options: {
   const events: Record<string, BoardAutopilotEvent> = {};
   for (const plan of plans) {
     const failed = plan.last?.status === 'failed' ? plan.last.error : undefined;
-    const steps = [...log.entries].reverse().find((entry) => entry.event === plan.id && entry.manual_steps.length)?.manual_steps ?? [];
+    const logged = [...log.entries].reverse().find((entry) => entry.event === plan.id && entry.manual_steps.length)?.manual_steps ?? [];
+    // Withdrawing the approval does not cancel a scheduled upload: YouTube makes it public at its time.
+    const withdrawn = plan.state === 'pending' && plan.last?.status === 'scheduled' && !(options.calendar && approvalHolds(options.status, options.calendar));
+    const goesPublic = withdrawn
+      ? [`YouTube still makes it public at ${plan.last!.publish_at ?? 'its scheduled time'}: change the visibility in YouTube Studio${plan.last!.remote_id ? ` (https://studio.youtube.com/video/${plan.last!.remote_id}/edit)` : ''} if it should not.`]
+      : [];
+    const steps = [...goesPublic, ...logged];
     events[plan.id] = {
       state: plan.state,
       ...(plan.block ? { block: plan.block } : {}),

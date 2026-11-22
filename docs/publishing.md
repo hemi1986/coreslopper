@@ -21,7 +21,7 @@ Everything else of the release, including the files and texts for Instagram, Spo
 ## What it reads and writes
 
 - **`review/upload.yaml`** — the upload data `qa-export` writes ([schema](../schema/upload.schema.json)): per item the file, title, description, tags, hashtags, thumbnail, language, `made_for_kids` (default `false`), `synthetic_media` (default `true`), and `platforms` (main: `[youtube]`, Shorts: `[youtube, tiktok]`). Shorts carry `related: main`. `npm run cli -- upload-text projects/<slug>` renders `review/upload.md` from it.
-- **`review/publish.json`** — the publish log: one entry per attempt with platform, item, file hash, remote ID, URL, status (`uploaded`, `scheduled`, `draft`, `processing`, `failed`), and time. A file that is already uploaded to a platform is skipped; a new render (new hash) or `--force` uploads again. A failed attempt is retried on the next run.
+- **`review/publish.json`** — the publish log: one entry per attempt with platform, item, file hash, remote ID, URL, status (`uploaded`, `scheduled`, `draft`, `processing`, `failed`), and time. A file that is already uploaded to a platform is skipped; a new render (new hash) or `--force` uploads again. A failed attempt is retried on the next run, unless it may have gone out anyway: when the answer was lost after the last byte of the video was sent, the entry carries `uncertain: true`, and `publish` skips it until you have checked the platform and run it again with `--force`.
 
 ## What happens per platform
 
@@ -139,7 +139,7 @@ Posts that link to the main video (the X release post, LinkedIn) wait until it i
 ### When something goes wrong
 
 - A failed post is tried again after 10, then 20 minutes, up to `retries` times; then it waits for **Try again**.
-- **Never twice:** when a post may have gone out anyway (a lost answer, a server error after sending), it is marked *not sure it is live* and never retried by itself. Check the platform, then mark it **It is live** or **Try again**.
+- **Never twice:** when a post may have gone out anyway (a lost answer, a server error after sending; for a YouTube upload or a TikTok post, any error once the last byte of the video was sent), it is marked *not sure it is live* and never retried by itself. Check the platform, then mark it **It is live** or **Try again**.
 - Missing credentials, an expired token, X without credits, or a broken text wait for you at once.
 - The log is `review/autopilot.json`; the board shows the last error and what is still yours per post.
 

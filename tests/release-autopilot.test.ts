@@ -24,6 +24,7 @@ import {
   type AutopilotDeps,
 } from '../packages/cli/src/release-autopilot.ts';
 import { boardProject } from '../packages/cli/src/release-board-data.ts';
+import { appendAutopilotEntry } from '../packages/cli/src/autopilot-state.ts';
 import { boardHandler } from '../packages/cli/src/release-board.ts';
 import { timerPlan } from '../packages/cli/src/release-timer.ts';
 import { cleanupFixtures, fakeDeps, fixture } from './helpers/release-fixture.ts';
@@ -111,6 +112,16 @@ describe('release autopilot', () => {
     await revokeApproval(t.dir);
     expect((await t.run()).projects[0]!.acted).toEqual([]);
     expect(t.social.get('x')!.calls).toEqual([]);
+  });
+
+  it('tells the user after a withdrawal that a scheduled upload still goes public', async () => {
+    const t = await setup();
+    await approveRelease(t.dir, { root: t.root, now: new Date(t.at('distributor')) });
+    await appendAutopilotEntry(t.dir, { event: 'youtube', status: 'scheduled', remote_id: 'abcdefghijk', publish_at: '2026-12-11T17:00:00.000Z', at: t.clock.now.toISOString() });
+    await revokeApproval(t.dir);
+    const youtube = (await boardProject(t.dir, t.root, { now: t.clock.now })).autopilot.events['youtube']!;
+    expect(youtube).toMatchObject({ state: 'pending', needsUser: true });
+    expect(youtube.manualSteps[0]).toMatch(/still makes it public at 2026-12-11T17:00:00.000Z.*studio\.youtube\.com\/video\/abcdefghijk/);
   });
 
   it('runs a whole release: announcement, uploads ahead, posts after the video is public, the links step', async () => {
@@ -245,6 +256,24 @@ describe('release autopilot', () => {
     await t.run();
     const comments = t.youtube.videoCalls.filter((call) => call.method === 'postComment');
     expect(comments).toEqual([{ method: 'postComment', videoId, text: 'Welcher Moment ist eurer?' }]);
+  });
+
+  it('asks the user after a TikTok post that may have gone out, and never posts it again by itself', async () => {
+    const t = await setup({ env: { TIKTOK_DIRECT_POST: '1' } });
+    await approveRelease(t.dir, { root: t.root, now: new Date(t.at('distributor')) });
+    let calls = 0;
+    Object.defineProperty(t.tiktok, 'publish', {
+      value: () => {
+        calls += 1;
+        return Promise.reject(markUncertain(new PublishError('TikTok status query failed: fetch failed')));
+      },
+    });
+    t.moveTo('short:Z1-intro:tiktok');
+    await t.run();
+    t.moveTo('short:Z1-intro:tiktok', 15);
+    await t.run();
+    expect(calls).toBe(1);
+    expect((await boardProject(t.dir, t.root, { now: t.clock.now })).autopilot.events['short:Z1-intro:tiktok']).toMatchObject({ state: 'stuck', needsUser: true });
   });
 
   it('records a direct TikTok post that is still processing as live, without an inbox step', async () => {

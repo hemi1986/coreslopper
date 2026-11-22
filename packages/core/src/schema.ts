@@ -1152,6 +1152,8 @@ export const PublishEntrySchema = z.object({
   mock: z.boolean().default(false),
   warnings: z.array(z.string()).default([]),
   error: z.string().optional(),
+  /** A failed attempt that may have gone out anyway (a lost answer after the last byte): it is never sent again without `--force`. */
+  uncertain: z.boolean().optional(),
   /** YouTube API quota units the attempt spent. */
   quota_units: z.number().int().nonnegative().optional(),
   at: z.string().min(1),

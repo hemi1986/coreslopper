@@ -501,13 +501,13 @@ aggregates:
       - An event's autopilot state is derived, never stored – from the release status, the log since the user's last retry, the settings, the readiness and the clock (the code does this, autopilot.ts:151-211)
       - A done mark and a take-over win over every other state; nothing else is claimed for a release whose approval does not hold for the calendar's day (the code does this, autopilot.ts:160-170; tests/publish-characterization.test.ts)
       - An event is claimed once – the running entry is appended under the release lock after planning again from fresh files (the code does this, release-autopilot.ts:258-273)
-      - Never twice – a send that may have gone out is stuck and waits for the user, on every platform; it is never tried again by itself (the code does this for X, LinkedIn and Instagram, packages/providers/src/publish/http.ts:79-83; decided 2026-11-22 for YouTube uploads and TikTok, HS-187 – gap register)
+      - Never twice – a send that may have gone out is stuck and waits for the user, on every platform; it is never tried again by itself (the code does this – X, LinkedIn and Instagram through markUncertain in packages/providers/src/publish/http.ts; a YouTube upload and a TikTok direct post after the last byte of the file, and publishProject keeps the mark in review/publish.json – HS-187, fixed 2026-11-22)
       - A plain failure is tried again after attempts × 10 minutes until retries failed attempts; a configuration or validation failure waits for the user at once (the code does this, autopilot.ts:186-188,205-209; release-autopilot.ts:362-368; tests/publish-characterization.test.ts)
       - A post more than late_hours past its calendar time with no attempt is missed, also a YouTube upload that was due a day earlier; only the user's Post now sends it (the code does this, autopilot.ts:192-196; tests/publish-characterization.test.ts)
       - A post that links to the main video waits until the main video is done with its live URL (the code does this, autopilot.ts:198-200)
       - A running attempt older than an hour is stuck (the code does this, autopilot.ts:175-178)
       - Try again and Post now are accepted only for an event of the calendar, in a state the board offers them for (decided 2026-11-22, HS-193; any id in any state – gap register)
-      - What may still go out or may be live is shown also when the approval no longer holds (decided 2026-11-22, HS-190; a running or stuck attempt shows as unapproved – gap register)
+      - What may still go out or may be live is shown also when the approval no longer holds (decided 2026-11-22, HS-190; the code does this – planEvent derives running, stuck, pending and done before the approval, and the board names a scheduled upload that still goes public)
   - id: AGG-AutopilotRound
     name: Autopilot round
     context: BC-Publish
@@ -3484,7 +3484,7 @@ hotspots:
     question: "Never twice holds for X, LinkedIn and Instagram, which mark a send that may have gone out as uncertain. The YouTube upload and TikTok never mark it, the publish command drops the flag when it rethrows, and TikTok's init and status calls are retried five times – a direct TikTok post could go out twice. Rule?"
     refs: [AGG-AutopilotLog]
     status: resolved
-    resolution: "Never twice on every platform: a send that may have gone out is stuck and waits for the user; the publish command keeps the flag. Gap, medium – the user wants every platform automated, TikTok's direct mode included (user, 2026-11-22) (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+    resolution: "Never twice on every platform: a send that may have gone out is stuck and waits for the user; the publish command keeps the flag. Gap, medium – the user wants every platform automated, TikTok's direct mode included (user, 2026-11-22) (recommendation, not reviewed by the user – delegated, 2026-11-22) Fixed 2026-11-22 (G-168): a retried TikTok init or status query cannot post twice, because a publish ID without its file never goes live; the risk is an error after the last chunk, which is now uncertain, as is a YouTube error after the last byte."
   - id: HS-188
     question: "TikTok's direct mode has two switches: autopilot.tiktok_direct in the release schedule, and TIKTOK_DIRECT_POST in .env, read as 1/true/yes for the scopes but only as '1' by the runner. docs/publishing.md says the env value affects publish, which never passes the mode. Rule?"
     refs: [CMD-PostCalendarEvent]

@@ -252,6 +252,31 @@ describe('TikTok Direct Post', () => {
     );
   });
 
+  it('marks an error after the last chunk as uncertain, but not TikTok\'s own failure', async () => {
+    const video = await bytesFile(4000);
+    const fake = tiktokFake({});
+    // The file arrived, then every status query fails: the post may be live.
+    const lost: FetchLike = async (url, init) => (url.endsWith('/status/fetch/') ? Promise.reject(new TypeError('fetch failed')) : fake.fetchImpl(url, init));
+    const error = await new TikTokPublisher({ ...credentials, fetchImpl: lost, sleep: noSleep, mode: 'direct' })
+      .publish({ item: item(video) })
+      .then((): Error & { uncertain?: boolean } => new Error('no error'), (caught: unknown) => caught as Error & { uncertain?: boolean });
+    expect(error.uncertain).toBe(true);
+
+    // The last chunk's answer is lost: uncertain too.
+    const chunkLost: FetchLike = async (url, init) => (url.startsWith('https://upload.tiktok') ? new Response('busy', { status: 503 }) : fake.fetchImpl(url, init));
+    const chunkError = await new TikTokPublisher({ ...credentials, fetchImpl: chunkLost, sleep: noSleep, mode: 'direct' })
+      .publish({ item: item(video) })
+      .then((): Error & { uncertain?: boolean } => new Error('no error'), (caught: unknown) => caught as Error & { uncertain?: boolean });
+    expect(chunkError.uncertain).toBe(true);
+
+    // TikTok says FAILED: nothing is live, the autopilot may retry.
+    const failed = await new TikTokPublisher({ ...credentials, fetchImpl: tiktokFake({ finalStatus: 'FAILED' }).fetchImpl, sleep: noSleep, mode: 'direct' })
+      .publish({ item: item(video) })
+      .then((): Error & { uncertain?: boolean } => new Error('no error'), (caught: unknown) => caught as Error & { uncertain?: boolean });
+    expect(failed.message).toMatch(/file_format_check_failed/);
+    expect(failed.uncertain).toBeFalsy();
+  });
+
   it('keeps the inbox path as the default', async () => {
     const video = await bytesFile(4000);
     const calls: string[] = [];

@@ -116,6 +116,26 @@ describe('autopilot plan', () => {
     expect(plan('2026-12-11T19:10:00Z', approved, log, { premiere: false }).get('youtube')!.needsUser).toBe(false);
   });
 
+  it('shows what went out, or may have, after the approval is withdrawn', () => {
+    const withdrawn: ReleaseStatus = { version: 1, items: {} };
+    const log: AutopilotLog = {
+      version: 1,
+      entries: [
+        entry('youtube', 'scheduled', '2026-12-10T17:01:00Z', { remote_id: 'abcdefghijk', publish_at: '2026-12-11T17:00:00Z' }),
+        entry('short:N1-hook:instagram', 'running', '2026-12-11T19:00:00Z'),
+        entry('short:N1-hook:x', 'failed', '2026-12-11T19:00:00Z', { error: 'HTTP 502', uncertain: true }),
+        entry('announce:x', 'failed', '2026-12-04T17:00:00Z', { error: 'HTTP 500' }),
+      ],
+    };
+    const states = plan('2026-12-11T20:30:00Z', withdrawn, log, { premiere: false });
+    // The scheduled upload still goes public: the user changes it in Studio if it should not.
+    expect(states.get('youtube')!).toMatchObject({ state: 'pending', needsUser: true });
+    expect(states.get('short:N1-hook:instagram')!).toMatchObject({ state: 'stuck', needsUser: true });
+    expect(states.get('short:N1-hook:x')!).toMatchObject({ state: 'stuck', needsUser: true });
+    // A certain failure has not gone out: it waits for a new approval.
+    expect(states.get('announce:x')!.state).toBe('unapproved');
+  });
+
   it('retries with a back-off, then waits for the user; a retry starts over', () => {
     const failed = (count: number): AutopilotLog => ({
       version: 1,
