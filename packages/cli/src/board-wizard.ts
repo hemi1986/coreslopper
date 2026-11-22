@@ -350,10 +350,16 @@ export async function videoWizardState(projectDir: string): Promise<VideoWizardS
   };
 }
 
-/** Mark `setup` done once the lyrics and the song are in: then `/new-video <slug>` starts with the brief. */
+/**
+ * Mark `setup` done: a music video once the lyrics and the song are in, so `/new-video <slug>` starts with the
+ * brief; a meme once its pitch holds the idea, so `/new-meme <slug>` starts with the script.
+ */
 export async function finishSetup(projectDir: string): Promise<void> {
   const project = await loadProject(projectDir);
-  if (project.config.kind !== 'episode') {
+  if (project.config.kind === 'meme') {
+    const pitch = await readFile(join(projectDir, 'pitch.md'), 'utf8').catch(() => '');
+    if (!pitch.trim()) throw new ValidationError('still missing: the idea in pitch.md');
+  } else if (project.config.kind !== 'episode') {
     const state = await videoWizardState(projectDir);
     if (state.missing.length) throw new ValidationError(`still missing: ${state.missing.join(', ')}`);
   }
@@ -405,6 +411,76 @@ export async function createEpisode(root: string, input: NewEpisodeInput): Promi
   if (typeof episode !== 'number' || !Number.isInteger(episode) || episode < 1) throw new ValidationError('the episode number is a whole number from 1');
   const dir = await createProject({ root, slug: slugOf(input.slug), kind: 'episode', series, episode, budget: budget(input.budget), ...distribution(input.internal) });
   await finishSetup(dir);
+  return dir;
+}
+
+// ---------------------------------------------------------------------- meme
+
+export interface NewMemeInput {
+  slug: unknown;
+  title: unknown;
+  /** Defaults to `MEME_DEFAULT_BUDGET_USD`. */
+  budget?: unknown;
+  imageProvider: unknown;
+  videoProvider: unknown;
+  /** Required: what the meme is about, in the user's words. */
+  idea: unknown;
+  setting?: unknown;
+  /** Library character ids to copy in; none is valid. */
+  characters?: unknown;
+  /** `true`: never released publicly (`distribution: internal`). */
+  internal?: unknown;
+}
+
+export const MEME_DEFAULT_BUDGET_USD = 10;
+
+/** pitch.md: the idea and the setting in the user's words, where the grilling starts (ADR 0051). */
+export function memePitch(idea: string, setting?: string): string {
+  return ['# Pitch', '', '## Idea', '', idea, ...(setting ? ['', '## Setting', '', setting] : []), ''].join('\n');
+}
+
+function characterIds(value: unknown): string[] {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value) || value.some((id) => typeof id !== 'string' || !SLUG.test(id))) {
+    throw new ValidationError('characters is a list of library character ids');
+  }
+  return [...new Set(value as string[])];
+}
+
+/**
+ * CMD-CreateMeme: a project of kind meme in its one 9:16 format, `pitch.md` from the idea and the setting, the
+ * chosen library characters copied in through `useCharacter`, and `setup` done, so `/new-meme <slug>` starts
+ * with the script. Every check runs before the folder exists; a later failure removes the folder again.
+ */
+export async function createMeme(root: string, input: NewMemeInput): Promise<string> {
+  const idea = typeof input.idea === 'string' ? input.idea.trim() : '';
+  if (!idea) throw new ValidationError('the meme needs an idea');
+  if (idea.length > 2000) throw new ValidationError('the idea is longer than 2000 characters');
+  const setting = optionalText(input.setting, 'setting');
+  const slug = slugOf(input.slug);
+  if (existsSync(join(root, 'projects', slug))) throw new ValidationError(`the slug "${slug}" is taken`);
+  const characters = characterIds(input.characters);
+  const { loadLibraryCharacter, useCharacter } = await import('./character-library.js');
+  for (const id of characters) await loadLibraryCharacter(root, id);
+
+  const dir = await createProject({
+    root,
+    slug,
+    kind: 'meme',
+    title: required(input.title, 'title'),
+    budget: input.budget === undefined || input.budget === '' ? MEME_DEFAULT_BUDGET_USD : budget(input.budget),
+    imageProvider: choice(input.imageProvider, IMAGE_PROVIDERS, 'image provider') as ImageProviderKind,
+    videoProvider: choice(input.videoProvider, VIDEO_PROVIDERS, 'video provider') as VideoProviderKind,
+    ...distribution(input.internal),
+  });
+  try {
+    await writeTextAtomic(join(dir, 'pitch.md'), memePitch(idea, setting));
+    for (const id of characters) await useCharacter(root, dir, id);
+    await finishSetup(dir);
+  } catch (error) {
+    await rm(dir, { recursive: true, force: true });
+    throw error;
+  }
   return dir;
 }
 
