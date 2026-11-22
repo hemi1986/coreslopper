@@ -17,6 +17,7 @@ flowchart LR
         CMD_SkipStage["Skip stage"]:::cmd
         CMD_ResetStage["Reset stage"]:::cmd
         CMD_RecordSpend["Record spend"]:::cmd
+        CMD_CreateMeme["Create a meme"]:::cmd
         EVT_ProjectCreated["⭐ Project created"]:::evt
         EVT_StageStarted["Stage started"]:::evt
         EVT_StageCompleted["Stage completed"]:::evt
@@ -25,6 +26,8 @@ flowchart LR
         EVT_StageReset["Stage reset"]:::evt
         EVT_SpendRecorded["Spend recorded"]:::evt
         EVT_ProjectCompleted["⭐ Project completed"]:::evt
+        EVT_MemeCreated["⭐ Meme created"]:::evt
+        EVT_MemeRefused["Meme refused"]:::evt
     end
     subgraph BC_Review["Review"]
         CMD_AddReviewNote["Add review note"]:::cmd
@@ -84,6 +87,7 @@ flowchart LR
     CMD_OpenBoardView["Open a board view"]:::cmd
     CMD_RefreshBoard["Refresh the board"]:::cmd
     CMD_OpenBoardFile["Open a file on the board"]:::cmd
+    CMD_CheckSoundLibrary["Check the sound library"]:::cmd
     subgraph BC_Timing["Timing"]
         CMD_WriteLyrics["Write lyrics"]:::cmd
         CMD_AnalyzeSong["Analyze song"]:::cmd
@@ -122,18 +126,22 @@ flowchart LR
         CMD_RecordCanonSpend["Record canon spend"]:::cmd
         CMD_CreateSeries["Create a series"]:::cmd
         CMD_CreateEpisode["Create an episode"]:::cmd
+        EVT_SeriesCreated["Series created"]:::evt
+        EVT_EpisodeCreated["⭐ Episode created"]:::evt
+        EVT_EpisodeRefused["Episode refused"]:::evt
+        EVT_CanonSpendRecorded["Canon spend recorded"]:::evt
+    end
+    subgraph BC_ScriptedAudio["Scripted audio"]
         CMD_WriteScript["Write the script"]:::cmd
         CMD_ReviseScript["Revise the script"]:::cmd
         CMD_ValidateScript["Validate the script"]:::cmd
         CMD_GenerateTakes["Generate the takes"]:::cmd
         CMD_ImportTakes["Import takes"]:::cmd
+        CMD_TakeSoundFromClips["Take an effect's sound from its clips"]:::cmd
         CMD_BuildEpisodeTrack["Build the episode track"]:::cmd
         CMD_WriteSubtitles["Write subtitles"]:::cmd
         CMD_CutLipSyncAudio["Cut lip-sync audio"]:::cmd
-        EVT_SeriesCreated["Series created"]:::evt
-        EVT_EpisodeCreated["⭐ Episode created"]:::evt
-        EVT_EpisodeRefused["Episode refused"]:::evt
-        EVT_CanonSpendRecorded["Canon spend recorded"]:::evt
+        CMD_WriteMemeScript["Write a meme's script"]:::cmd
         EVT_ScriptWritten["Script written"]:::evt
         EVT_ScriptRevised["Script revised"]:::evt
         EVT_ScriptValidated["Script validated"]:::evt
@@ -144,6 +152,7 @@ flowchart LR
         EVT_EpisodeTrackBuilt["⭐ Episode track built"]:::evt
         EVT_SubtitlesWritten["Subtitles written"]:::evt
         EVT_LipSyncAudioCut["Lip-sync audio cut"]:::evt
+        EVT_LibrarySoundTaken["Library sound taken"]:::evt
     end
     subgraph BC_Bibles["Bibles"]
         CMD_WriteStyleBible["Write the style bible"]:::cmd
@@ -283,6 +292,18 @@ flowchart LR
         EVT_BenchResultRated["Bench result rated"]:::evt
         EVT_RatingsExported["Ratings exported"]:::evt
     end
+    subgraph BC_SoundLibrary["Sound library"]
+        CMD_AddLibrarySound["Add a library sound"]:::cmd
+        CMD_UpdateLibrarySound["Update a library sound"]:::cmd
+        CMD_RemoveLibrarySound["Remove a library sound"]:::cmd
+        CMD_ValidateLibrarySound["Validate a library sound"]:::cmd
+        EVT_LibrarySoundAdded["⭐ Library sound added"]:::evt
+        EVT_LibrarySoundRefused["Library sound refused"]:::evt
+        EVT_LibrarySoundUpdated["Library sound updated"]:::evt
+        EVT_LibrarySoundRemeasured["Library sound remeasured"]:::evt
+        EVT_LibrarySoundRemoved["Library sound removed"]:::evt
+        EVT_SoundLibraryChecked["Sound library checked"]:::evt
+    end
     subgraph BC_Board["Board"]
         EVT_BoardStarted["Board started"]:::evt
         EVT_BoardViewOpened["Board view opened"]:::evt
@@ -336,6 +357,8 @@ flowchart LR
     POL_InstallAfterUpdate{{"An update that changed something installs the dependencies"}}:::pol
     POL_ScoreEveryBenchCase{{"Every bench case of a run gets scored"}}:::pol
     POL_ReportAfterBenchRun{{"A bench run ends with its report"}}:::pol
+    POL_ValidateEverySoundEntryEdit{{"Every sound entry edit is validated"}}:::pol
+    POL_TakeChosenLibrarySounds{{"A sound line with a library sound gets its take from the library"}}:::pol
     RM_Status[("Status")]:::rm
     RM_NextAction[("Next action")]:::rm
     RM_ProductionView[("Production view")]:::rm
@@ -376,6 +399,7 @@ flowchart LR
     RM_ModelRecommendation[("Model recommendation")]:::rm
     RM_BoardNavigation[("Board navigation")]:::rm
     RM_BoardActivity[("Board activity")]:::rm
+    RM_SoundLibrary[("Sound library")]:::rm
     ACT_SetupSkill --> CMD_CreateProject
     CMD_CreateProject --> EVT_ProjectCreated
     ACT_Orchestrator --> CMD_StartStage
@@ -476,8 +500,11 @@ flowchart LR
     CMD_GenerateTakes --> EVT_TakeGenerated
     CMD_GenerateTakes --> EVT_AmbienceGenerated
     CMD_GenerateTakes --> EVT_VoiceTrackStopped
+    CMD_GenerateTakes --> EVT_LibrarySoundTaken
     ACT_User --> CMD_ImportTakes
     CMD_ImportTakes --> EVT_TakeImported
+    ACT_StageRunner --> CMD_TakeSoundFromClips
+    CMD_TakeSoundFromClips --> EVT_TakeImported
     ACT_StageRunner --> CMD_BuildEpisodeTrack
     CMD_BuildEpisodeTrack --> EVT_EpisodeTrackBuilt
     ACT_StageRunner --> CMD_WriteSubtitles
@@ -641,6 +668,25 @@ flowchart LR
     ACT_User --> CMD_OpenBoardFile
     CMD_OpenBoardFile --> EVT_BoardFileServed
     CMD_OpenBoardFile --> EVT_BoardFileRefused
+    ACT_BoardWizard --> CMD_CreateMeme
+    CMD_CreateMeme --> EVT_MemeCreated
+    CMD_CreateMeme --> EVT_MemeRefused
+    CMD_CreateMeme --> EVT_LibraryCharacterUsed
+    ACT_User --> CMD_AddLibrarySound
+    CMD_AddLibrarySound --> EVT_LibrarySoundAdded
+    CMD_AddLibrarySound --> EVT_LibrarySoundRefused
+    ACT_User --> CMD_UpdateLibrarySound
+    CMD_UpdateLibrarySound --> EVT_LibrarySoundUpdated
+    ACT_User --> CMD_RemoveLibrarySound
+    CMD_RemoveLibrarySound --> EVT_LibrarySoundRemoved
+    ACT_User --> CMD_CheckSoundLibrary
+    CMD_CheckSoundLibrary --> EVT_SoundLibraryChecked
+    CMD_CheckSoundLibrary --> EVT_LibrarySoundRemeasured
+    ACT_StageRunner --> CMD_ValidateLibrarySound
+    CMD_ValidateLibrarySound --> EVT_LibrarySoundUpdated
+    CMD_ValidateLibrarySound --> EVT_LibrarySoundRefused
+    ACT_SetupSkill --> CMD_WriteMemeScript
+    CMD_WriteMemeScript --> EVT_ScriptWritten
     EVT_StageCompleted --> POL_RunNextStage
     EVT_StageSkipped --> POL_RunNextStage
     POL_RunNextStage --> CMD_StartStage
@@ -691,6 +737,12 @@ flowchart LR
     EVT_BenchResultFailed --> POL_ReportAfterBenchRun
     EVT_BenchResultSkipped --> POL_ReportAfterBenchRun
     POL_ReportAfterBenchRun --> CMD_BuildBenchReport
+    EVT_LibrarySoundUpdated --> POL_ValidateEverySoundEntryEdit
+    POL_ValidateEverySoundEntryEdit --> CMD_ValidateLibrarySound
+    EVT_ScriptWritten --> POL_TakeChosenLibrarySounds
+    EVT_LibrarySoundUpdated --> POL_TakeChosenLibrarySounds
+    EVT_LibrarySoundRemeasured --> POL_TakeChosenLibrarySounds
+    POL_TakeChosenLibrarySounds --> CMD_GenerateTakes
     EVT_StageStarted -.-> RM_Status
     EVT_StageCompleted -.-> RM_Status
     EVT_StageFailed -.-> RM_Status
@@ -896,6 +948,12 @@ flowchart LR
     EVT_StageCompleted -.-> RM_BoardActivity
     EVT_StageFailed -.-> RM_BoardActivity
     RM_BoardActivity -.-> ACT_User
+    EVT_LibrarySoundAdded -.-> RM_SoundLibrary
+    EVT_LibrarySoundUpdated -.-> RM_SoundLibrary
+    EVT_LibrarySoundRemeasured -.-> RM_SoundLibrary
+    EVT_LibrarySoundRemoved -.-> RM_SoundLibrary
+    RM_SoundLibrary -.-> ACT_User
+    RM_SoundLibrary -.-> ACT_SetupSkill
     classDef evt fill:#a3391f,stroke:#e65100,color:#fff
     classDef cmd fill:#64b5f6,stroke:#0d47a1,color:#000
     classDef pol fill:#ce93d8,stroke:#4a148c,color:#000
@@ -1587,17 +1645,90 @@ flowchart LR
     classDef hs fill:#e57373,stroke:#b71c1c,color:#fff
 ```
 
+### From the pitch in the wizard to a meme's track
+
+```mermaid
+flowchart LR
+    ACT_BoardWizard(["Board wizard"]):::act
+    CMD_CreateMeme["Create a meme"]:::cmd
+    EVT_MemeCreated["⭐ Meme created"]:::evt
+    ACT_SetupSkill(["Setup skill"]):::act
+    RM_SoundLibrary[("Sound library")]:::rm
+    CMD_WriteMemeScript["Write a meme's script"]:::cmd
+    EVT_ScriptWritten["Script written"]:::evt
+    POL_TakeChosenLibrarySounds{{"A sound line with a library sound gets its take from the library"}}:::pol
+    ACT_StageRunner(["Stage runner"]):::act
+    CMD_GenerateTakes["Generate the takes"]:::cmd
+    EVT_LibrarySoundTaken["Library sound taken"]:::evt
+    CMD_BuildEpisodeTrack["Build the episode track"]:::cmd
+    EVT_EpisodeTrackBuilt["⭐ Episode track built"]:::evt
+    ACT_BoardWizard --> CMD_CreateMeme
+    CMD_CreateMeme --> EVT_MemeCreated
+    EVT_MemeCreated --> ACT_SetupSkill
+    ACT_SetupSkill --> RM_SoundLibrary
+    RM_SoundLibrary --> CMD_WriteMemeScript
+    CMD_WriteMemeScript --> EVT_ScriptWritten
+    EVT_ScriptWritten --> POL_TakeChosenLibrarySounds
+    POL_TakeChosenLibrarySounds --> ACT_StageRunner
+    ACT_StageRunner --> CMD_GenerateTakes
+    CMD_GenerateTakes --> EVT_LibrarySoundTaken
+    EVT_LibrarySoundTaken --> CMD_BuildEpisodeTrack
+    CMD_BuildEpisodeTrack --> EVT_EpisodeTrackBuilt
+    classDef evt fill:#a3391f,stroke:#e65100,color:#fff
+    classDef cmd fill:#64b5f6,stroke:#0d47a1,color:#000
+    classDef pol fill:#ce93d8,stroke:#4a148c,color:#000
+    classDef rm fill:#81c784,stroke:#1b5e20,color:#000
+    classDef act fill:#a3751f,stroke:#f57f17,color:#000
+    classDef ext fill:#f48fb1,stroke:#880e4f,color:#000
+    classDef agg fill:#ffe082,stroke:#ff6f00,color:#000
+    classDef hs fill:#e57373,stroke:#b71c1c,color:#fff
+```
+
+### From a sound file to a library sound the meme skill can pick
+
+```mermaid
+flowchart LR
+    ACT_User(["User"]):::act
+    CMD_AddLibrarySound["Add a library sound"]:::cmd
+    EVT_LibrarySoundAdded["⭐ Library sound added"]:::evt
+    CMD_UpdateLibrarySound["Update a library sound"]:::cmd
+    EVT_LibrarySoundUpdated["Library sound updated"]:::evt
+    POL_ValidateEverySoundEntryEdit{{"Every sound entry edit is validated"}}:::pol
+    CMD_ValidateLibrarySound["Validate a library sound"]:::cmd
+    CMD_CheckSoundLibrary["Check the sound library"]:::cmd
+    EVT_SoundLibraryChecked["Sound library checked"]:::evt
+    RM_SoundLibrary[("Sound library")]:::rm
+    ACT_User --> CMD_AddLibrarySound
+    CMD_AddLibrarySound --> EVT_LibrarySoundAdded
+    EVT_LibrarySoundAdded --> CMD_UpdateLibrarySound
+    CMD_UpdateLibrarySound --> EVT_LibrarySoundUpdated
+    EVT_LibrarySoundUpdated --> POL_ValidateEverySoundEntryEdit
+    POL_ValidateEverySoundEntryEdit --> CMD_ValidateLibrarySound
+    CMD_ValidateLibrarySound --> CMD_CheckSoundLibrary
+    CMD_CheckSoundLibrary --> EVT_SoundLibraryChecked
+    EVT_SoundLibraryChecked --> RM_SoundLibrary
+    classDef evt fill:#a3391f,stroke:#e65100,color:#fff
+    classDef cmd fill:#64b5f6,stroke:#0d47a1,color:#000
+    classDef pol fill:#ce93d8,stroke:#4a148c,color:#000
+    classDef rm fill:#81c784,stroke:#1b5e20,color:#000
+    classDef act fill:#a3751f,stroke:#f57f17,color:#000
+    classDef ext fill:#f48fb1,stroke:#880e4f,color:#000
+    classDef agg fill:#ffe082,stroke:#ff6f00,color:#000
+    classDef hs fill:#e57373,stroke:#b71c1c,color:#fff
+```
+
 ## Bounded Contexts & Aggregates
 
 | Context | Purpose | Aggregates | Events |
 |---|---|---|---|
-| Pipeline (`BC-Pipeline`) | Drives one project from setup to qa-export through the stages of its project kind and keeps its budget | Project | Project created, Stage started, Stage completed, Stage failed, Stage skipped, Stage reset, Spend recorded, Project completed |
+| Pipeline (`BC-Pipeline`) | Drives one project from setup to qa-export through the stages of its project kind and keeps its budget | Project | Project created, Stage started, Stage completed, Stage failed, Stage skipped, Stage reset, Spend recorded, Project completed, Meme created, Meme refused |
 | Review (`BC-Review`) | The user's frame-accurate notes on renders, sent to the agent in rounds and answered note by note | Project review | Review note added, Review note changed, Review note deleted, Review round sent, Review round answered |
 | Generation queue (`BC-GenerationQueue`) | Gets every generated image and clip of a project approved before anything derives from it – generate an attempt, give it a verdict, requeue it with the fix prompt, or file it | Generation queue | Queue item added, Queue item replaced, Attempt generated, Attempt generation failed, Verdict given, Attempt filed, Queue item requeued, Queue item needs a fix, Attempt accepted, Queue item dropped, Region patched, Queue run stopped |
 | Timing (`BC-Timing`) | Turns the user's song and lyrics into a measured timing, merges the user's timing overrides into the effective timing, and resolves symbolic anchors to seconds for every later stage | Project timing, Lyrics | Song imported, Song loudness normalized, Lyrics written, Song analyzed, Lead stem separated, Timing overridden |
 | Storyboard (`BC-Storyboard`) | Turns the treatment or script, the effective timing and the bibles into an ordered list of shots that covers the song or episode track, checks every shot's source, continuity references and limits, and hands resolved shots to the queue, render, QA and review | Storyboard | Storyboard written, Storyboard revised, Storyboard validated, Contact sheet written |
 | Generation (`BC-Generation`) | Turns the items of a generation batch into provider calls for a model role – each refused up front when the batch does not fit the budget, served from the generation cache when the same request ran before, recorded in the manifest, and billed to the project budget at its planned cost | Cached generation, Model roles | Generation batch refused, Generation completed, Generation reused from the cache, Generation failed, Clip restored, Generation filed, Model roles changed, ComfyUI restarted |
-| Series (`BC-Series`) | Keeps a series' umbrella budget and episode plan and creates its episodes, and turns an episode's script into takes, an episode track with speaker stems, subtitles and lip-sync audio – the episode's replacement for the song | Series, Script, Take registry, Episode track | Series created, Episode created, Episode refused, Canon spend recorded, Script written, Script revised, Script validated, Take generated, Ambience generated, Take imported, Voice track stopped, Episode track built, Subtitles written, Lip-sync audio cut |
+| Series (`BC-Series`) | Keeps a series' umbrella budget and episode plan and creates its episodes with the series' formats, providers and brand | Series | Series created, Episode created, Episode refused, Canon spend recorded |
+| Scripted audio (`BC-ScriptedAudio`) | Turns the script of an episode or a meme into takes – generated, imported, taken from clips or copied from the sound library – and the takes into an episode track with speaker stems, subtitles and lip-sync audio, the scripted project's replacement for the song (HS-258; documentation only, the code stays where it is) | Script, Take registry, Episode track | Script written, Script revised, Script validated, Take generated, Ambience generated, Take imported, Voice track stopped, Episode track built, Subtitles written, Lip-sync audio cut, Library sound taken |
 | Bibles (`BC-Bibles`) | Holds what a production must look and sound like before any shot is generated – the style bible, the character bible with its character states, the set bible with plates and prop references, and the user references – per music video, or once per series canon that every episode reads and may only add to | Style bible, Character bible, Set bible, User references | Style bible written, Character bible written, Character state added, Set bible written, Plate added, Prop reference added, User reference added, User reference updated, User reference removed, Library character used |
 | Character library (`BC-CharacterLibrary`) | Keeps the workspace's reusable characters across productions – takes the characters of finished character bibles in and copies a character's identity, and the states the user chooses, into a new music video or series canon | Library character | Library character created, Library character extended, Library character updated, Library file added, Library file removed, Library character deleted, Library character use refused |
 | Render (`BC-Render`) | Turns a validated project into its videos and images – a render per format from one composition, previews for checks, Shorts cut from the 9:16 render, and composed images (thumbnails, covers, feed images) from a generated image and the style bible – and keeps a project's media in the media directory | Render, Short, Composed image | Preview rendered, Passage rendered, Format rendered, Still rendered, Render failed, Short cut, Short refused, Image composed, Image composition refused, Project media linked, Determinism checked |
@@ -1606,6 +1737,7 @@ flowchart LR
 | Workspace (`BC-Workspace`) | Gives the user a private, self-contained workspace and keeps it current – init and its onboarding copy the runtime snapshot, store the provider keys and record the baseline; update merges a newer runtime against the baseline without losing the user's own edits; doctor checks the workspace, tools and keys; migrate-layout moves an old layout; the board container runs the board and its watchdog. Upstream, the runtime build decides what ships | Workspace marker, Runtime snapshot | Workspace created, Provider key stored, Tool installed, Dependencies installed, Workspace updated, Conflict copy written, Layout migrated, Runtime built, Board container started |
 | Model bench (`BC-Bench`) | Replays fixed scenes from past projects – the bench cases – on several bench targets before a model, workflow, server or provider switch, measures every result mechanically, has the art director score it against the case's rubric and the user rate it, and ends with a recommendation per operation; it has its own budget and never produces project assets | Bench case, Bench run, Bench budget | Bench case added, Bench target added, Bench fixtures imported, Bench run planned, Bench run refused over budget, Bench result recorded, Bench result refused, Bench result failed, Bench result skipped, Bench spend recorded, Bench case scored, Bench report built, Bench result rated, Ratings exported |
 | Board (`BC-Board`) | The workspace's local page that hosts the views of the other contexts – production, review, release, the release calendar, the character library and the wizard – behind one navigation; it starts the server, routes, serves the page and the whitelisted files, guards every write and chooses the language, and owns no state of its own – every write goes to the module of the context that owns it | – | Board started, Board view opened, Board refreshed, Board file served, Board file refused, Board write refused |
+| Sound library (`BC-SoundLibrary`) | Keeps the workspace's recurring meme sounds – the user adds, describes, corrects and removes library sounds; the meme skill picks from them by what they are used for, and the voice track copies a chosen sound into a meme as a take | Library sound | Library sound added, Library sound refused, Library sound updated, Library sound remeasured, Library sound removed, Sound library checked |
 
 ## Aggregates
 
@@ -1620,9 +1752,9 @@ flowchart LR
 | Cached generation (`AGG-CachedGeneration`) | Generation | as-is | one record per cache key, .cache/generations/<key>/result.json with the provider's files, shared by every project and series of the workspace (packages/providers/src/runner.ts:86-87,167-195; packages/cli/src/generate.ts:711)<br>the key is the SHA-256 of the canonical request – operation, provider, model, prompt, negative prompt, seed, size, duration, params, each reference's path and content hash, the audio hash and start, the workflow fingerprint (runner.ts:53-84; packages/core/src/hash.ts:25-45)<br>runBatch is the one path every generation takes – generate, the queue, region patches, the voice track and the bench (generate.ts:667-672; queue.ts:628; patch.ts:96; voice-track.ts:137,191; bench.ts:577,634,675) |
 | Model roles (`AGG-ModelRoles`) | Generation | as-is | config/models.yaml is parsed whole with ModelsConfigSchema on every batch and estimate (packages/core/src/schema.ts:714-762; packages/cli/src/generate.ts:678)<br>resolveModelRole and providerForRole pick a role's model, params and price for the project's provider in one place (packages/core/src/models.ts:26-98) |
 | Series (`AGG-Series`) | Series | as-is | series.yaml and state.json of projects/<slug>/, loaded together by loadSeries (packages/core/src/project.ts:380-416), created together by new-series (packages/cli/src/new-series.ts:67-104)<br>the uncommitted series budget is computed in one place from the series state and the project.yaml of every episode that names the series (packages/cli/src/series.ts:43-74) and checked by createProject for the CLI and the board wizard (packages/cli/src/new-project.ts:205-216; board-wizard.ts:394)<br>canon generations are booked in the series' own state.json and manifest (packages/cli/src/generate.ts:260-277) |
-| Script (`AGG-Script`) | Series | as-is | script.yaml of an episode, parsed whole with ScriptSchema by loadProject (packages/core/src/project.ts:262; schema.ts:587-657)<br>validateScript checks the whole script against the series canon and throws one error listing every issue (packages/core/src/episode.ts:59-104); the workspace hook runs it on every edit (packages/cli/src/validate-file.ts:134-145) |
-| Take registry (`AGG-TakeRegistry`) | Series | as-is | takes.json of an episode, written whole and sorted by saveTakes (packages/cli/src/takes.ts:51-57); its writers are voice-track and import-takes (packages/cli/src/voice-track.ts:99-200; media.ts:395-460)<br>every take's status follows from its file, the registered file hash and the text hash of its script line (takes.ts:65-87; packages/core/src/episode.ts:139-153) |
-| Episode track (`AGG-EpisodeTrack`) | Series | as-is | episodeTrack places the lines from the take durations and writes timing.json, timing.effective.json, audio/episode.wav and audio/stems/<character>.wav together in one run from the effective timing (packages/cli/src/episode-track.ts:148-253) |
+| Script (`AGG-Script`) | Scripted audio | as-is | script.yaml of an episode, parsed whole with ScriptSchema by loadProject (packages/core/src/project.ts:262; schema.ts:587-657)<br>validateScript checks the whole script against the series canon and throws one error listing every issue (packages/core/src/episode.ts:59-104); the workspace hook runs it on every edit (packages/cli/src/validate-file.ts:134-145) |
+| Take registry (`AGG-TakeRegistry`) | Scripted audio | as-is | takes.json of an episode, written whole and sorted by saveTakes (packages/cli/src/takes.ts:51-57); its writers are voice-track, import-takes and clip-audio (packages/cli/src/voice-track.ts:99-200; media.ts:395-460; clip-audio.ts)<br>every take's status follows from its file, the registered file hash and the text hash of its script line (takes.ts:65-87; packages/core/src/episode.ts:139-153) |
+| Episode track (`AGG-EpisodeTrack`) | Scripted audio | as-is | episodeTrack places the lines from the take durations and writes timing.json, timing.effective.json, audio/episode.wav and audio/stems/<character>.wav together in one run from the effective timing (packages/cli/src/episode-track.ts:148-253) |
 | Style bible (`AGG-StyleBible`) | Bibles | as-is | style.yaml of a music video or series canon, parsed whole with StyleBibleSchema (packages/core/src/schema.ts:373-419) by loadProject (packages/core/src/project.ts:227-250) and by validate-file on every edit (packages/cli/src/validate-file.ts:86-97)<br>an episode's style bible is the canon's (project.ts:89,105-107); new-series writes a starter from the brand kit (packages/cli/src/new-series.ts:48-58) |
 | Character bible (`AGG-CharacterBible`) | Bibles | as-is | characters.yaml of a music video or series canon, parsed whole with CharacterBibleSchema (packages/core/src/schema.ts:436-489); the files lie in characters/<id>/ beside it<br>written by the character-bible and new-series skills, and by character use through the YAML document with a whole-file schema check before an atomic write (packages/cli/src/character-library.ts:452-525) |
 | Set bible (`AGG-SetBible`) | Bibles | as-is | sets.yaml of a music video or series canon, parsed whole with SetBibleSchema (packages/core/src/schema.ts:496-541); plates in sets/<set>/plates/, props in props/<id>/ beside it<br>written by the style-bible skill in style-character (music video) and by new-series (canon); validated by the hook on every edit (packages/cli/src/validate-file.ts:86-97) |
@@ -1643,3 +1775,12 @@ flowchart LR
 | Bench case (`AGG-BenchCase`) | Model bench | as-is | bench/cases/<id>.yaml, one file per case, parsed whole by BenchCaseSchema with its cross-field rules; a case is valid or not loaded (packages/core/src/bench.ts:17-129,245-258) |
 | Bench run (`AGG-BenchRun`) | Model bench | as-is | bench/runs/<id>/run.json, the run's cases, targets, seeds and results keyed by <case>/<target>/<seed index>, loaded once and written whole and atomically after every result (packages/cli/src/bench.ts:127-136,523-539,698-700) |
 | Bench budget (`AGG-BenchBudget`) | Model bench | as-is | bench/state.json, the bench's spend, its total overwritten from bench/bench.yaml budget_usd on every load and saved atomically by the generation funnel's recordSpend (packages/cli/src/bench.ts:268-277,354-360; packages/cli/src/generate.ts:756-759) |
+| Library sound (`AGG-LibrarySound`) | Sound library | target | – |
+
+## Open Hotspots
+
+- **HS-259** – Can a meme use TikTok's trending audio – is there an API, what do TikTok's and the music labels' terms allow, and can such a sound leave TikTok at all? _(refs: BC-SoundLibrary)_
+- **HS-262** – The script's invariant says every scene plays in a set of the canon and every speaker is a character of the canon. A meme has no canon, and its script is written before style-character writes its set bible and the characters it invents. What does a meme's script name as set and speaker when the hook validates it in the script stage – and when is it checked against the bibles? _(refs: AGG-Script, CMD-WriteMemeScript, CMD-ValidateScript)_
+- **HS-263** – A meme gets German subtitles burned in, for German speech. The glossary defines subtitles as the translated text and avoids 'captions'; subtitles are English only today (HS-113, CMD-WriteSubtitles). Is a meme's burned-in text subtitles in the spoken language, and is the subtitle language a project setting or fixed per project kind? _(refs: CMD-WriteSubtitles, AGG-Script)_
+- **HS-264** – A meme lasts at most 30 seconds. The episode track checks an episode's length against the series' episode length (HS-114); a meme has no series. Is the 30 seconds a fixed rule of the project kind or a project limit, and is a longer track refused when it is built or only reported by QA? _(refs: AGG-EpisodeTrack, CMD-WriteMemeScript)_
+- **HS-265** – The release check writes a used library sound's credit text into the platform texts (HS-261), but no event or field of a library sound carries a credit text – only source and licence. Is the credit part of the licence, a field of its own, or written from source and licence? _(refs: AGG-LibrarySound, CMD-CheckRelease)_

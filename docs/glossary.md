@@ -561,11 +561,11 @@ A render for checks and inspection: a whole format at half scale (`renders/previ
 _Avoid_: draft, test render
 
 **Project**:
-One music video or one episode, stored in `projects/<slug>/`, with its own config, state, artifacts, and budget.
+One music video, one episode, or one meme, stored in `projects/<slug>/`, with its own config, state, artifacts, and budget.
 _Avoid_: video, job
 
 **Project Kind**:
-What a project produces: `music-video` or `episode`. It decides the project's stages.
+What a project produces: `music-video`, `episode`, or `meme`. It decides the project's stages.
 _Avoid_: project type, mode
 
 **Template**:
@@ -639,7 +639,7 @@ One installment of a series: a project of kind `episode` with a number, a script
 _Avoid_: part, chapter
 
 **Script**:
-The authoritative text of an episode: its scenes and their script lines, in playing order. It is to an episode what lyrics are to a music video.
+The authoritative text of an episode or a meme: its scenes and their script lines, in playing order. It is to an episode or a meme what lyrics are to a music video.
 _Avoid_: screenplay, treatment, transcript
 
 **Scene**:
@@ -679,11 +679,11 @@ A named look the story puts a character in from some shot on, such as an open ha
 _Avoid_: outfit, variant, pose
 
 **Take**:
-The audio of one audible script line (spoken or sound effect), generated or recorded by the user and registered in the take registry.
+The audio of one audible script line (spoken or sound effect), generated, recorded by the user, or copied from the sound library, and registered in the take registry.
 _Avoid_: clip, recording, segment
 
 **Take Registry**:
-The record of an episode's takes and ambience (`takes.json`): per take its source (generated or imported), length, the hash of what it was made from, and the hash of its file.
+The record of an episode's or a meme's takes and ambience (`takes.json`): per take its source (generated, imported, or a library sound), length, the hash of what it was made from, and the hash of its file.
 _Avoid_: take list, audio index
 
 **Take Status**:
@@ -691,7 +691,7 @@ Whether a take still fits its script line: current, missing, stale (its line cha
 _Avoid_: take state
 
 **Voice Track**:
-The episode stage that makes the takes and ambience: it generates what is missing or stale and keeps every imported take.
+The stage of an episode or a meme that makes the takes and ambience: it generates what is missing or stale and keeps every imported take.
 _Avoid_: speaker stem, episode track
 
 **Ambience**:
@@ -699,7 +699,7 @@ The background sound of a scene, such as room tone or machine hum, laid under it
 _Avoid_: background music, soundscape, atmo
 
 **Episode Track**:
-The finished audio of an episode, mixed from its takes, ambience, and optional music by the effective timing, together with its speaker stems. It takes the place of the song.
+The finished audio of an episode or a meme, mixed from its takes, ambience, and optional music by the effective timing, together with its speaker stems. It takes the place of the song.
 _Avoid_: soundtrack, song, mix, voice track
 
 **Speaker Stem**:
@@ -707,8 +707,32 @@ The episode track reduced to one speaker's takes, at full length; the driving au
 _Avoid_: dialogue stem
 
 **Subtitles**:
-The translated text of the spoken and chat lines, plus on-screen text an sfx line names (a label, a sign), timed by the effective timing. Spoken text is German and subtitles are English today.
+The text of the spoken and chat lines, plus on-screen text an sfx line names (a label, a sign), timed by the effective timing, in the project's subtitle language: English (translated) for an episode, German (as spoken) burned in for a meme, or off.
 _Avoid_: captions, lyrics
+
+## Memes
+
+**Meme**:
+A standalone vertical video of about 15 seconds (at most 30) built on one punchline, made for TikTok, YouTube Shorts, and Instagram Reels: a project of kind `meme`. Its audio is built from a short script like an episode's, its characters come from the character library or its own character bible, and it belongs to no series.
+_Avoid_: meme clip, short, reel, clip
+_UI (de)_: Meme
+_UI (en)_: Meme
+
+**Pitch**:
+The idea and the setting of a meme in the user's words, entered in the board's wizard (`pitch.md`). It is where the grilling starts, not a decision: the script may end up far from it.
+_Avoid_: brief, concept, logline
+
+**Sound Library**:
+The workspace's collection of recurring meme sounds, in `library/sounds/<id>/`, maintained by the user. The agent picks from it when it writes a meme's script; a sound is used as it is, never generated again.
+_Avoid_: sound database, soundboard, SFX folder
+
+**Library Sound**:
+One entry of the sound library: an audio file with its title, what it is typically used for (`use when`), tags, its measured length and loudness, and optionally its cue, a trim, its source, its licence, and the credit text a licence that asks for attribution needs.
+_Avoid_: sample, sound effect (a generated **sfx** line), jingle
+
+**Sound Cue**:
+The moment inside a library sound where it lands, such as the hit of a boom, in seconds from the sound's (trimmed) start. Timing places the sound so its cue sits where the script wants the punch.
+_Avoid_: hit point, sync point, onset (an **Onset** is detected in a song)
 
 ## Model bench
 

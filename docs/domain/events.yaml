@@ -120,7 +120,10 @@ bounded_contexts:
     purpose: Turns the items of a generation batch into provider calls for a model role – each refused up front when the batch does not fit the budget, served from the generation cache when the same request ran before, recorded in the manifest, and billed to the project budget at its planned cost
   - id: BC-Series
     name: Series
-    purpose: Keeps a series' umbrella budget and episode plan and creates its episodes, and turns an episode's script into takes, an episode track with speaker stems, subtitles and lip-sync audio – the episode's replacement for the song
+    purpose: Keeps a series' umbrella budget and episode plan and creates its episodes with the series' formats, providers and brand
+  - id: BC-ScriptedAudio
+    name: Scripted audio
+    purpose: Turns the script of an episode or a meme into takes – generated, imported, taken from clips or copied from the sound library – and the takes into an episode track with speaker stems, subtitles and lip-sync audio, the scripted project's replacement for the song (HS-258; documentation only, the code stays where it is)
   - id: BC-Bibles
     name: Bibles
     purpose: Holds what a production must look and sound like before any shot is generated – the style bible, the character bible with its character states, the set bible with plates and prop references, and the user references – per music video, or once per series canon that every episode reads and may only add to
@@ -149,6 +152,11 @@ bounded_contexts:
   - id: BC-Board
     name: Board
     purpose: The workspace's local page that hosts the views of the other contexts – production, review, release, the release calendar, the character library and the wizard – behind one navigation; it starts the server, routes, serves the page and the whitelisted files, guards every write and chooses the language, and owns no state of its own – every write goes to the module of the context that owns it
+
+  - id: BC-SoundLibrary
+    name: Sound library
+    purpose: Keeps the workspace's recurring meme sounds – the user adds, describes, corrects and removes library sounds; the meme skill picks from them by what they are used for, and the voice track copies a chosen sound into a meme as a take
+
 aggregates:
   - id: AGG-Project
     name: Project
@@ -292,7 +300,7 @@ aggregates:
       - An episode may add files to the canon but never overwrites an existing one (decided 2026-11-22, HS-117; generate lets an episode's out path reach any canon file – gap register; the canon files themselves belong to the character slice)
   - id: AGG-Script
     name: Script
-    context: BC-Series
+    context: BC-ScriptedAudio
     status: as-is
     evidence:
       - script.yaml of an episode, parsed whole with ScriptSchema by loadProject (packages/core/src/project.ts:262; schema.ts:587-657)
@@ -305,7 +313,7 @@ aggregates:
       - Only the agent writes script.yaml, in the script stage and when the user asks for a change (user, 2026-11-22, HS-121)
   - id: AGG-TakeRegistry
     name: Take registry
-    context: BC-Series
+    context: BC-ScriptedAudio
     status: as-is
     evidence:
       - takes.json of an episode, written whole and sorted by saveTakes (packages/cli/src/takes.ts:51-57); its writers are voice-track, import-takes and clip-audio (packages/cli/src/voice-track.ts:99-200; media.ts:395-460; clip-audio.ts)
@@ -319,7 +327,7 @@ aggregates:
       - One recording per script line (the code does this, media.ts:395-460)
   - id: AGG-EpisodeTrack
     name: Episode track
-    context: BC-Series
+    context: BC-ScriptedAudio
     status: as-is
     evidence:
       - episodeTrack places the lines from the take durations and writes timing.json, timing.effective.json, audio/episode.wav and audio/stems/<character>.wav together in one run from the effective timing (packages/cli/src/episode-track.ts:148-253)
@@ -597,6 +605,19 @@ aggregates:
       - A bench run's whole estimate fits the remaining bench budget and its batch cap before the first call (the code does this, bench.ts:600; tests/bench.test.ts:254)
       - One batch cap holds for the whole run and for each of its generations – batch_cap_usd, or the whole remaining bench budget when it is not set (decided 2026-11-22, HS-230; each generation falls back to 30 % – gap register)
       - No bench run loses another's spend, and no charged generation goes unrecorded (decided 2026-11-22, HS-237; state.json has no lock, and spend above the estimate is thrown before it is saved – gap register)
+
+  - id: AGG-LibrarySound
+    name: Library sound
+    context: BC-SoundLibrary
+    status: target
+    invariants:
+      - The entry's id is its folder's name, and its one audio file is a WAV of that folder and exists (user, 2026-11-22, feature meme)
+      - Title and use when are never empty; length and loudness are measured from the file, never typed (user, 2026-11-22)
+      - A cue and a trim lie inside the sound's length, and a cue inside the trim (user, 2026-11-22)
+      - One sound, one entry – the same file content is never stored under a second id (user, 2026-11-22)
+      - The library belongs to the user – update and init never overwrite it; its audio files are gitignored and sound.yaml stays tracked (user, 2026-11-22)
+      - The credit is optional; a licence that asks for attribution without a credit is allowed and becomes a release TODO (user, 2026-11-22, HS-265)
+
 events:
   - id: EVT-ProjectCreated
     name: Project created
@@ -843,7 +864,7 @@ events:
     description: "import-takes registers a recording in audio/lines/ as imported and converts other formats (packages/cli/src/media.ts:395-460)"
   - id: EVT-VoiceTrackStopped
     name: Voice track stopped
-    context: BC-Series
+    context: BC-ScriptedAudio
     data: [Script line, Take status, Reason]
     description: "A replaced, unregistered or stale imported take, a speaker without a reference voice, or an effect longer than the role's maximum; nothing is generated (packages/cli/src/takes.ts:79-87; voice-track.ts:55-60,125-128)"
   - id: EVT-EpisodeTrackBuilt
@@ -853,12 +874,12 @@ events:
     data: [Duration, Scenes, Script lines, Speaker stems, Loudness]
   - id: EVT-SubtitlesWritten
     name: Subtitles written
-    context: BC-Series
+    context: BC-ScriptedAudio
     data: [Cues, Language, File]
     description: "renders/<slug>.en.srt from the script and the effective timing; render --subtitles en burns the same cues in (packages/cli/src/subtitles.ts; render.ts:155-160)"
   - id: EVT-LipSyncAudioCut
     name: Lip-sync audio cut
-    context: BC-Series
+    context: BC-ScriptedAudio
     data: [Character, Start, End, File]
     description: "audio-segment --character cuts a lip-sync shot's audio from the speaker stem into assets/audio-segments/ (packages/cli/src/media.ts:75-136)"
   - id: EVT-StyleBibleWritten
@@ -1327,6 +1348,55 @@ events:
     origin: external
     data: [Method, Path, Host, Origin, Fetch site, Content type, Reason]
     description: "403: a request other than GET without a loopback Host, with an Origin other than the board's, a cross-site Sec-Fetch-Site, or a body that is not JSON – an upload needs an Origin and a raw octet-stream body (release-board.ts:102-126,343-346; tests/release-autopilot.test.ts, board-wizard.test.ts, board-review.test.ts)"
+
+  - id: EVT-MemeCreated
+    name: Meme created
+    aggregate: AGG-Project
+    pivotal: true
+    data: [Slug, Title, Budget, Providers, Pitch, Library characters]
+    description: "The board wizard or new --kind meme: a project of kind meme in the 9:16 master format with its pitch and the library characters the user chose; setup is done (feature meme)"
+  - id: EVT-MemeRefused
+    name: Meme refused
+    context: BC-Pipeline
+    data: [Slug, Reason]
+    description: "Slug taken or invalid, budget under the configured minimum, or an empty idea; no folder is created"
+  - id: EVT-LibrarySoundAdded
+    name: Library sound added
+    aggregate: AGG-LibrarySound
+    pivotal: true
+    data: [Library sound, Title, Use when, Tags, Length, Loudness, Sound cue, Trim, Source, Licence, Credit, File hash]
+    description: "sound add converts the file to WAV into library/sounds/<id>/ and measures length and loudness"
+  - id: EVT-LibrarySoundRefused
+    name: Library sound refused
+    context: BC-SoundLibrary
+    data: [Library sound, Reason, Existing library sound]
+    description: "The id is taken, the file holds the same content as an existing entry, the file is not audio, or a cue or trim lies outside the sound"
+  - id: EVT-LibrarySoundUpdated
+    name: Library sound updated
+    aggregate: AGG-LibrarySound
+    data: [Library sound, Title, Use when, Tags, Sound cue, Trim, Source, Licence, Credit]
+    description: "sound edit, or the user's own edit of sound.yaml that the hook accepted"
+  - id: EVT-LibrarySoundRemeasured
+    name: Library sound remeasured
+    aggregate: AGG-LibrarySound
+    data: [Library sound, Length, Loudness, File hash]
+    description: "sound check found that the user swapped the file and measured it again"
+  - id: EVT-LibrarySoundRemoved
+    name: Library sound removed
+    aggregate: AGG-LibrarySound
+    data: [Library sound]
+    description: "sound remove deletes the entry and its file; memes that used it keep their takes"
+  - id: EVT-SoundLibraryChecked
+    name: Sound library checked
+    context: BC-SoundLibrary
+    data: [Issues]
+    description: "sound check: entries without a file, files without an entry, a cue or trim outside the length"
+  - id: EVT-LibrarySoundTaken
+    name: Library sound taken
+    aggregate: AGG-TakeRegistry
+    data: [Script line, Library sound, Duration, File hash]
+    description: "voice-track copies the trimmed library sound of a sound line into audio/lines/<line-id>.wav as a take of source library:<id>; nothing is generated or billed"
+
 commands:
   - id: CMD-CreateProject
     name: Create project
@@ -1570,6 +1640,8 @@ commands:
     rules:
       - Needs the effective timing, the style and character bibles, and in an episode the script and the series canon; the project kind, slug and budget must match state.json
       - The lip-sync maximum comes from video.lipsync of the project's provider (config/models.yaml)
+      - A line anchor may name the cue of a sound line with a library sound (line:<id>:cue), resolved to the line's start plus the sound cue; a cue anchor on any other line is refused (user, 2026-11-22, feature meme)
+      - A meme has exactly one format, 9:16, and its track lasts at most 30 seconds (user, 2026-11-22)
       - Every consumer that builds from shots – queue items, QA, render, review – reads the validated storyboard (HS-79; the queue and QA read it unvalidated – gap register)
   - id: CMD-WriteContactSheet
     name: Write contact sheet
@@ -1665,7 +1737,7 @@ commands:
     name: Generate the takes
     actor: ACT-StageRunner
     aggregate: AGG-TakeRegistry
-    produces: [EVT-TakeGenerated, EVT-AmbienceGenerated, EVT-VoiceTrackStopped]
+    produces: [EVT-TakeGenerated, EVT-AmbienceGenerated, EVT-VoiceTrackStopped, EVT-LibrarySoundTaken]
     description: "voice-track in the voice-track stage, with --dry-run for the estimate; one runBatch on the episode budget"
     rules:
       - Every blocking take is listed and nothing is generated until all are resolved (voice-track.ts)
@@ -1693,6 +1765,7 @@ commands:
     produces: [EVT-EpisodeTrackBuilt]
     description: "episode-track in the episode-track stage, and again after a script change or a timing override; deterministic, no speech recognition"
     rules:
+      - A meme's track over 30 seconds is refused as a hard stop (user, 2026-11-22, HS-264)
       - An optional audio/music.wav is laid under the whole episode at a fixed gain, ambience at another (episode-track.ts:37-38,224-225)
   - id: CMD-WriteSubtitles
     name: Write subtitles
@@ -1911,6 +1984,8 @@ commands:
     produces: [EVT-ReleasePackageBuilt, EVT-ReleaseRulesBroken, EVT-ReleaseCalendarPlanned]
     description: "release <project> [--no-render] [--canvas-from <time>] [--canvas-seconds <n>] [--replan], in qa-export or by the user; the board runs it without renders and stills after a live URL or an approval (POL-RefreshAfterStatusChange) (packages/cli/src/index.ts:321-334; release.ts:207-447)"
     rules:
+      - A meme's release folder holds its one 9:16 video, a 1080x1920 cover and the texts for TikTok, YouTube Shorts and Instagram Reels; no Shorts, WAV, canvas, lyrics or announcement – no announcement images and no announcement in the release calendar (user, 2026-11-22, feature meme)
+      - Every used library sound that needs a credit gets its credit text into the platform texts (user, 2026-11-22)
       - A missing or stale format is rendered first; with --no-render it is a TODO (the code does this, release.ts:254-261)
       - The song goes into the folder as deliverable WAV (PCM, at least 44.1 kHz, stereo), converted once when it is not; more than 2 s of silence warns (the code does this, packages/cli/src/release-media.ts:108-192)
       - The canvas is a silent 3–8 s loop from the 9:16 render near the first chorus without lyrics on screen, or a TODO (the code does this, packages/core/src/release.ts:130-165)
@@ -1964,6 +2039,7 @@ commands:
     produces: [EVT-ReleaseChecked]
     description: "qa <project> in qa-export, beside the render checks (qa.ts:379-381; release-qa.ts:56)"
     rules:
+      - A used library sound with an unknown licence, or one that needs a credit without its credit text, is a TODO; it never fails the release (user, 2026-11-22, HS-261)
       - A file whose hash differs from the manifest, a format that is not the current render, a bad WAV, cover or canvas, section tags in lyrics.txt, a missing text file, a broken limit, or an unmarked <ID> fails (the code does this, release-qa.ts:80-221)
       - A gap only the user can close is a TODO, in the release checks and in the upload checks alike; WARN is only for advice (decided 2026-11-22, HS-172; Upload text and Upload data use WARN – gap register)
 
@@ -2224,6 +2300,64 @@ commands:
       - The release folder follows the same dot-file rule (decided 2026-11-22, HS-248; /media checks only that the path stays in the folder – gap register)
       - A served file never runs a script, even an SVG or HTML file (the code does this, release-board.ts:129-132; tests/board-production.test.ts)
       - Videos seek through single byte ranges; an unsatisfiable range is 416 (the code does this, release-board.ts:138-148; tests/release-folder.test.ts; tests/board-shell-characterization.test.ts)
+
+  - id: CMD-CreateMeme
+    name: Create a meme
+    actor: ACT-BoardWizard
+    aggregate: AGG-Project
+    produces: [EVT-MemeCreated, EVT-MemeRefused]
+    description: "The board wizard (POST /api/new/meme) or new <slug> --kind meme --idea … [--setting …]: project.yaml of kind meme, pitch.md, setup done; the chosen library characters are copied through CMD-UseLibraryCharacter; the wizard then shows /new-meme <slug>"
+    rules:
+      - The idea is required, the setting optional; both go into pitch.md in the user's words (user, 2026-11-22)
+      - The master format is 9:16 and the only format (user, 2026-11-22)
+      - The budget defaults to 10 USD and is at least the configured minimum (user, 2026-11-22)
+      - Library characters are optional; none is a valid choice and the character bible invents them later (user, 2026-11-22)
+  - id: CMD-AddLibrarySound
+    name: Add a library sound
+    actor: ACT-User
+    aggregate: AGG-LibrarySound
+    produces: [EVT-LibrarySoundAdded, EVT-LibrarySoundRefused]
+    description: "sound add <file> --title --use-when [--tags] [--cue] [--trim] [--source] [--licence] [--id]"
+    rules:
+      - Without --id the id comes from the title; a taken id is refused (user, 2026-11-22)
+      - Every format ffmpeg reads is stored as WAV; the loudness is measured, never normalised into the file (user, 2026-11-22)
+      - The licence is unknown unless the user names one (user, 2026-11-22)
+      - Only a local file; a download URL is out of scope (user, 2026-11-22)
+  - id: CMD-UpdateLibrarySound
+    name: Update a library sound
+    actor: ACT-User
+    aggregate: AGG-LibrarySound
+    produces: [EVT-LibrarySoundUpdated]
+    description: "sound edit <id> --… or the user's own edit of sound.yaml; only the metadata, never the file"
+  - id: CMD-RemoveLibrarySound
+    name: Remove a library sound
+    actor: ACT-User
+    aggregate: AGG-LibrarySound
+    produces: [EVT-LibrarySoundRemoved]
+    description: "sound remove <id>; takes already copied into memes stay"
+  - id: CMD-CheckSoundLibrary
+    name: Check the sound library
+    actor: ACT-User
+    produces: [EVT-SoundLibraryChecked, EVT-LibrarySoundRemeasured]
+    description: "sound check; a file the user swapped is measured again, a file without an entry is reported and never turned into one"
+  - id: CMD-ValidateLibrarySound
+    name: Validate a library sound
+    actor: ACT-StageRunner
+    aggregate: AGG-LibrarySound
+    produces: [EVT-LibrarySoundUpdated, EVT-LibrarySoundRefused]
+    description: "validate-file on every edit of library/sounds/<id>/sound.yaml (the workspace hook); a failing edit is blocked"
+  - id: CMD-WriteMemeScript
+    name: Write a meme's script
+    actor: ACT-SetupSkill
+    aggregate: AGG-Script
+    produces: [EVT-ScriptWritten]
+    description: "The new-meme skill reads pitch.md, the chosen characters and the sound library, grills the user to the punchline and writes script.yaml in the script stage"
+    rules:
+      - A sound line names a library sound (sound) or a prompt to generate one, exactly one of the two; a library sound's length comes from its trim, so the line has no duration (user, 2026-11-22)
+      - Per moment the skill proposes one to three library sounds by use when, tags, length and cue; the user picks; with none fitting it writes a generated sound line and notes it as a candidate for the library (user, 2026-11-22)
+      - The track it implies lasts at most 30 seconds, about 15 as the aim (user, 2026-11-22)
+      - Speakers are characters of the meme's own character bible or the library characters it uses (user, 2026-11-22)
+
 policies:
   - id: POL-RunNextStage
     name: Run the next autonomous stage
@@ -2320,6 +2454,18 @@ policies:
     when: [EVT-BenchResultRecorded, EVT-BenchResultRefused, EVT-BenchResultFailed, EVT-BenchResultSkipped]
     then: [CMD-BuildBenchReport]
     description: "bench run writes index.html after its last generation, and the skill rebuilds it after scoring; a budget error mid-run writes none (bench.ts:703; SKILL.md step 7)"
+
+  - id: POL-ValidateEverySoundEntryEdit
+    name: Every sound entry edit is validated
+    when: [EVT-LibrarySoundUpdated]
+    then: [CMD-ValidateLibrarySound]
+    description: "The workspace hook runs validate-file on every edit of a sound.yaml"
+  - id: POL-TakeChosenLibrarySounds
+    name: A sound line with a library sound gets its take from the library
+    when: [EVT-ScriptWritten, EVT-LibrarySoundUpdated, EVT-LibrarySoundRemeasured]
+    then: [CMD-GenerateTakes]
+    description: "voice-track copies the trimmed library sound as a take instead of generating; a changed trim or file makes the take stale and it is copied again on the next voice-track; a removed sound only warns"
+
 read_models:
   - id: RM-Status
     name: Status
@@ -2557,6 +2703,13 @@ read_models:
     used_by: [ACT-User]
     fields: [Last round, Interval, Stalled projects, Event, Project, At]
     description: "/api/activity: the watchdog's last round and interval, the stalled projects and the latest 50 events of the production scan from .cache/watch/ (release-board.ts:357-364; packages/cli/src/production-watch.ts); the production view shows it under Activity"
+  - id: RM-SoundLibrary
+    name: Sound library
+    fed_by: [EVT-LibrarySoundAdded, EVT-LibrarySoundUpdated, EVT-LibrarySoundRemeasured, EVT-LibrarySoundRemoved]
+    used_by: [ACT-User, ACT-SetupSkill]
+    fields: [Library sound, Title, Use when, Tags, Length, Loudness, Sound cue, Trim, Licence, Used in]
+    description: "sound list [--tag] [--json]; the new-meme skill reads it to propose one to three candidates per moment of the script; used in lists the memes whose takes came from the sound"
+
 hotspots:
   - id: HS-1
     question: "'Production phase' (setup/ready/running/failed/done) is a derived project status, but the glossary lists 'phase' under Avoid for Stage, and 'setup' is both a stage ID and a phase. Which word is the domain term?"
@@ -3839,6 +3992,52 @@ hotspots:
     refs: [BC-Board]
     status: resolved
     resolution: "ADR 0049 (proposed) records the board as a host without state, the manual refresh, a loopback Host for every request, the release folder's dot-file rule, the page's own security policy, the status codes and one route module per view; it amends 0030 (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+
+  - id: HS-257
+    question: "A sound line that runs over the punchline needs a negative pause after it. The script's invariant says lines play strictly one after another and an overlap is refused (ADR 0016). Allow an overlap for sound lines in a meme, or keep the rule?"
+    refs: [AGG-Script, CMD-WriteScript]
+    status: resolved
+    resolution: "Keep the rule (ADR 0016 stands): a sound line starts after the line before it, and a shot lands on the hit through the cue anchor (line:<id>:cue). An overlapping sound is a later story if punch sounds come too late (user, 2026-11-22)"
+  - id: HS-258
+    question: "A meme reuses the script, the take registry and the episode track, which belong to the Series context – but a meme is not part of a series. Does the Series context grow into a context for every scripted project, or do script and track move to their own context?"
+    refs: [BC-Series, AGG-Script, AGG-TakeRegistry, AGG-EpisodeTrack]
+    status: resolved
+    resolution: "A new context, Scripted audio, takes the script, the take registry and the episode track out of Series; Series keeps the series budget, the episode plan and creating episodes. Documentation only, the code stays where it is (user, 2026-11-22; domain-architect draws the cut)"
+  - id: HS-259
+    question: "Can a meme use TikTok's trending audio – is there an API, what do TikTok's and the music labels' terms allow, and can such a sound leave TikTok at all?"
+    refs: [BC-SoundLibrary]
+    status: open
+  - id: HS-260
+    question: "A library sound the user deleted after a meme took it – does the meme stop?"
+    refs: [AGG-TakeRegistry, EVT-LibrarySoundRemoved]
+    status: resolved
+    resolution: "No. The take in the meme stays current and voice-track only warns that its library sound is gone; a changed library sound makes the take stale and it is copied again (user, 2026-11-22)"
+  - id: HS-261
+    question: "Meme sounds are often someone else's material. Who decides whether one may be used?"
+    refs: [AGG-LibrarySound, CMD-CheckRelease]
+    status: resolved
+    resolution: "The user. The licence is optional and unknown by default; the release check turns every used sound with an unknown licence, or one that needs a credit, into a TODO and writes the credit text into the platform texts; it never fails the release (user, 2026-11-22)"
+  - id: HS-262
+    question: "The script's invariant says every scene plays in a set of the canon and every speaker is a character of the canon. A meme has no canon, and its script is written before style-character writes its set bible and the characters it invents. What does a meme's script name as set and speaker when the hook validates it in the script stage – and when is it checked against the bibles?"
+    refs: [AGG-Script, CMD-WriteMemeScript, CMD-ValidateScript]
+    status: resolved
+    resolution: "In the script stage the hook checks speakers and sets of a meme only as valid ids; validate checks them against the character and set bible once style-character is done. No placeholder characters or sets (user, 2026-11-22)"
+  - id: HS-263
+    question: "A meme gets German subtitles burned in, for German speech. The glossary defines subtitles as the translated text and avoids 'captions'; subtitles are English only today (HS-113, CMD-WriteSubtitles). Is a meme's burned-in text subtitles in the spoken language, and is the subtitle language a project setting or fixed per project kind?"
+    refs: [CMD-WriteSubtitles, AGG-Script]
+    status: resolved
+    resolution: "The burned-in text is subtitles in the spoken language. The subtitle language becomes a project setting (de, en, off): de by default for a meme, en stays the default for an episode (user, 2026-11-22)"
+  - id: HS-264
+    question: "A meme lasts at most 30 seconds. The episode track checks an episode's length against the series' episode length (HS-114); a meme has no series. Is the 30 seconds a fixed rule of the project kind or a project limit, and is a longer track refused when it is built or only reported by QA?"
+    refs: [AGG-EpisodeTrack, CMD-WriteMemeScript]
+    status: resolved
+    resolution: "A fixed rule of the project kind. episode-track refuses a meme track over 30 seconds as a hard stop; the script validation checks only the lengths it already knows (pauses, sound lengths); the skill estimates while it writes (user, 2026-11-22)"
+  - id: HS-265
+    question: "The release check writes a used library sound's credit text into the platform texts (HS-261), but no event or field of a library sound carries a credit text – only source and licence. Is the credit part of the licence, a field of its own, or written from source and licence?"
+    refs: [AGG-LibrarySound, CMD-CheckRelease]
+    status: resolved
+    resolution: "A field of its own: an optional credit on the library sound, entered with sound add and sound edit; a licence that asks for attribution without a credit stays a release TODO (user, 2026-11-22)"
+
 flows:
   - id: FLOW-AutonomousStage
     name: One autonomous stage
@@ -3897,3 +4096,9 @@ flows:
   - id: FLOW-BoardSession
     name: From starting the board to a view, a refresh and a file
     sequence: [ACT-User, CMD-StartBoard, EVT-BoardStarted, RM-BoardNavigation, CMD-OpenBoardView, EVT-BoardViewOpened, RM-BoardActivity, CMD-RefreshBoard, EVT-BoardRefreshed, CMD-OpenBoardFile, EVT-BoardFileServed]
+  - id: FLOW-Meme
+    name: From the pitch in the wizard to a meme's track
+    sequence: [ACT-BoardWizard, CMD-CreateMeme, EVT-MemeCreated, ACT-SetupSkill, RM-SoundLibrary, CMD-WriteMemeScript, EVT-ScriptWritten, POL-TakeChosenLibrarySounds, ACT-StageRunner, CMD-GenerateTakes, EVT-LibrarySoundTaken, CMD-BuildEpisodeTrack, EVT-EpisodeTrackBuilt]
+  - id: FLOW-SoundLibrary
+    name: From a sound file to a library sound the meme skill can pick
+    sequence: [ACT-User, CMD-AddLibrarySound, EVT-LibrarySoundAdded, CMD-UpdateLibrarySound, EVT-LibrarySoundUpdated, POL-ValidateEverySoundEntryEdit, CMD-ValidateLibrarySound, CMD-CheckSoundLibrary, EVT-SoundLibraryChecked, RM-SoundLibrary]
