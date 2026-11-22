@@ -20,6 +20,7 @@ budget:
 
 render:
   loudness_lufs: -14
+  speech_lufs: -20
   true_peak_dbtp: -1
   video_bitrate: "12M"
 

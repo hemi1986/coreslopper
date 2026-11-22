@@ -23,13 +23,13 @@ that brings it to one speech loudness. The take files and `takes.json` stay unto
 `audio/music.wav` keep their current level. The finished mix is still levelled to `render.loudness_lufs` afterwards.
 
 ## Acceptance Criteria
-- [ ] `config/defaults.yaml` has `render.speech_lufs` (default -20); `DefaultsSchema` accepts it
-- [ ] `episode-track` mixes every speech take at the gain that brings its measured integrated loudness to `render.speech_lufs`; a silent take (loudness not measurable) is mixed at gain 1
-- [ ] `sfx` takes, ambience, and music keep their gains; the speaker stems use the same speech gains as the mix
-- [ ] The take files and `takes.json` are unchanged after `episode-track`; a take's status stays `current`
-- [ ] `episode-track` prints each speech take's measured loudness and applied gain in one line per take
-- [ ] A test with two speech takes about 8 LU apart shows both within 1 LU of `render.speech_lufs` in the speaker stems; the committed demo timing still rebuilds unchanged
-- [ ] `docs/pipeline.md` (Episodes) and the `episode-track` skill describe the levelling; `npm test` and `npm run typecheck` are green
+- [x] `config/defaults.yaml` has `render.speech_lufs` (default -20); `DefaultsSchema` accepts it
+- [x] `episode-track` mixes every speech take at the gain that brings its measured integrated loudness to `render.speech_lufs`; a silent take (loudness not measurable) is mixed at gain 1
+- [x] `sfx` takes, ambience, and music keep their gains; the speaker stems use the same speech gains as the mix
+- [x] The take files and `takes.json` are unchanged after `episode-track`; a take's status stays `current`
+- [x] `episode-track` prints each speech take's measured loudness and applied gain in one line per take
+- [x] A test with two speech takes about 8 LU apart shows both within 1 LU of `render.speech_lufs` in the speaker stems; the committed demo timing still rebuilds unchanged
+- [x] `docs/pipeline.md` (Episodes) and the `episode-track` skill describe the levelling; `npm test` and `npm run typecheck` are green
 
 ## Out of Scope
 - A per-line gain in `script.yaml` (a line deliberately louder or quieter): a change of the script, so a domain story via `/feature` if it is needed after the levelling

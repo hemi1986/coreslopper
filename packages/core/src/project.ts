@@ -337,6 +337,8 @@ export const DefaultsSchema = z.object({
   }),
   render: z.object({
     loudness_lufs: z.number().default(-14),
+    /** Integrated loudness every episode speech take is mixed at, before the mix is levelled. */
+    speech_lufs: z.number().default(-20),
     true_peak_dbtp: z.number().default(-1),
     video_bitrate: z.string().default('12M'),
   }),

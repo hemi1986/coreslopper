@@ -19,7 +19,7 @@ import { blockingReason, takeStatus } from '../packages/cli/src/takes.ts';
 import { resolveBinary } from '../packages/cli/src/media.ts';
 import { importTakes } from '../packages/cli/src/media.ts';
 import { voiceTrack } from '../packages/cli/src/voice-track.ts';
-import { episodeTrack } from '../packages/cli/src/episode-track.ts';
+import { episodeTrack, measureLoudness } from '../packages/cli/src/episode-track.ts';
 
 const root = process.cwd();
 const episodeDir = join(root, 'projects/demo-episode');
@@ -44,11 +44,11 @@ function hasFfmpeg(): boolean {
 }
 
 /** A 48 kHz mono 16-bit WAV with a 440 Hz tone. */
-function toneWav(seconds: number): Buffer {
+function toneWav(seconds: number, amplitude = 12_000): Buffer {
   const rate = 48_000;
   const frames = Math.round(seconds * rate);
   const data = Buffer.alloc(frames * 2);
-  for (let i = 0; i < frames; i += 1) data.writeInt16LE(Math.round(Math.sin((2 * Math.PI * 440 * i) / rate) * 12_000), i * 2);
+  for (let i = 0; i < frames; i += 1) data.writeInt16LE(Math.round(Math.sin((2 * Math.PI * 440 * i) / rate) * amplitude), i * 2);
   const header = Buffer.alloc(44);
   header.write('RIFF', 0);
   header.writeUInt32LE(36 + data.length, 4);
@@ -216,5 +216,28 @@ describe.skipIf(!hasFfmpeg())('voice-track and episode-track on the mock provide
     await writeFile(scriptPath, stringify(script));
     await expect(voiceTrack(project)).rejects.toThrow(/cannot continue/);
     await expect(episodeTrack(project)).rejects.toThrow(/current take/);
+  });
+
+  it('levels speech takes to one loudness without touching the takes', async () => {
+    const project = await workspace();
+    await voiceTrack(project);
+    // Two voices from different sources, 8 dB apart.
+    await writeFile(join(project, 'audio/lines/l01.wav'), toneWav(2));
+    await writeFile(join(project, 'audio/lines/l05.wav'), toneWav(2, 12_000 * Math.pow(10, -8 / 20)));
+    await importTakes(project, { lines: ['l01', 'l05'] });
+    const takesBefore = await readFile(join(project, 'takes.json'), 'utf8');
+    const filesBefore = await Promise.all(['l01', 'l05'].map((id) => readFile(join(project, `audio/lines/${id}.wav`))));
+    const apart = measureLoudness(join(project, 'audio/lines/l01.wav')).lufs - measureLoudness(join(project, 'audio/lines/l05.wav')).lufs;
+    expect(apart).toBeCloseTo(8, 0);
+
+    await episodeTrack(project);
+    for (const speaker of ['mara', 'building']) {
+      expect(Math.abs(measureLoudness(join(project, `audio/stems/${speaker}.wav`)).lufs - -20)).toBeLessThan(1);
+    }
+    expect(await readFile(join(project, 'takes.json'), 'utf8')).toBe(takesBefore);
+    const filesAfter = await Promise.all(['l01', 'l05'].map((id) => readFile(join(project, `audio/lines/${id}.wav`))));
+    expect(filesAfter).toEqual(filesBefore);
+    const takes = await readJsonFile(join(project, 'takes.json'), TakesSchema);
+    expect(await takeStatus(takes.takes.l01, join(project, 'audio/lines/l01.wav'), takes.takes.l01!.text_hash)).toBe('current');
   });
 });
