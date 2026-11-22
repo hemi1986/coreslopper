@@ -4,15 +4,20 @@
 
 **Progress: 0 of 20 domain stories done** · scenarios 0 of 68
 
-**34 stories** · In Progress: 0 · Ready: 32 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 2 · Superseded: 0
+**34 stories** · In Progress: 1 · Ready: 31 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 2 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
+
+## In Progress
+
+| ID | Title | Type | Context | Priority | Size | Risk | Depends on |
+|---|---|---|---|---|---|---|---|
+| [ST-001](ST-001-add-a-library-sound.md) | Add a library sound | domain | Sound library | must | – | – | – |
 
 ## Ready
 
 | ID | Title | Type | Context | Priority | Size | Risk | Depends on |
 |---|---|---|---|---|---|---|---|
-| [ST-001](ST-001-add-a-library-sound.md) | Add a library sound | domain | Sound library | must | – | – | – |
 | [ST-002](ST-002-edit-a-library-sound.md) | Edit a library sound's description | domain | Sound library | must | – | – | ST-001 |
 | [ST-005](ST-005-validate-hand-edited-sound-entries.md) | Validate a hand-edited sound entry | domain | Sound library | must | – | – | ST-001 |
 | [ST-006](ST-006-list-the-sound-library.md) | List the sound library for the meme skill | task | – | must | – | – | ST-001 |
