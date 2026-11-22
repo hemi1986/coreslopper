@@ -4,15 +4,20 @@
 
 **Progress: 6 of 24 domain stories done** · scenarios 23 of 80
 
-**42 stories** · In Progress: 0 · Ready: 28 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 14 · Superseded: 0
+**42 stories** · In Progress: 1 · Ready: 27 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 14 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
+
+## In Progress
+
+| ID | Title | Type | Context | Priority | Size | Risk | Depends on |
+|---|---|---|---|---|---|---|---|
+| [ST-010](ST-010-the-new-meme-skill.md) | The new-meme skill grills the pitch into a script | task | – | must | – | – | ST-006, ST-008, ST-009 |
 
 ## Ready
 
 | ID | Title | Type | Context | Priority | Size | Risk | Depends on |
 |---|---|---|---|---|---|---|---|
-| [ST-010](ST-010-the-new-meme-skill.md) | The new-meme skill grills the pitch into a script | task | – | must | – | – | ST-006, ST-008, ST-009 |
 | [ST-011](ST-011-take-library-sounds-into-a-meme.md) | The voice track takes library sounds into a meme | domain | Scripted audio | must | – | – | ST-009 |
 | [ST-013](ST-013-style-and-characters-for-a-meme.md) | The style-character stage of a meme | task | – | must | – | – | ST-007, ST-010 |
 | [ST-015](ST-015-a-memes-release-folder.md) | A meme's release folder | domain | Release | must | – | – | ST-007 |
