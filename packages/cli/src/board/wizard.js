@@ -24,7 +24,8 @@ addStrings({
     finish: 'Setup abschließen', missing: function (m) { return 'Es fehlt noch: ' + m; }, setupDone: 'Setup fertig. In Claude Code weiter mit:',
     seriesNext: 'Jetzt in Claude Code den Canon grillen lassen:', episodeNext: 'Episode angelegt. In Claude Code das Skript grillen lassen:',
     series: 'Serie', episode: 'Episode', canonNotReady: 'Der Canon dieser Serie ist noch nicht fertig; eine Episode braucht Figuren und Sets mit Referenzen.',
-    remaining: function (v) { return 'frei im Serienbudget: $' + v; }, warnings: 'Hinweise', uploading: 'lädt hoch …', open: 'öffnen', remove: 'Entfernen', back: 'Zurück'
+    remaining: function (v) { return 'frei im Serienbudget: $' + v; }, warnings: 'Hinweise', uploading: 'lädt hoch …', open: 'öffnen', remove: 'Entfernen', back: 'Zurück',
+    toProject: 'Zum Projekt →', toSeries: 'Zur Serie →'
   },
   en: {
     newTitle: 'Create', newVideo: 'Music video', newVideoSub: 'For a finished song: project data, lyrics, song, references, characters.',
@@ -43,7 +44,8 @@ addStrings({
     finish: 'Finish setup', missing: function (m) { return 'Still missing: ' + m; }, setupDone: 'Setup done. Continue in Claude Code with:',
     seriesNext: 'Now let Claude Code grill the canon:', episodeNext: 'Episode created. Let Claude Code grill the script:',
     series: 'Series', episode: 'Episode', canonNotReady: 'This series’ canon is not complete yet; an episode needs characters and sets with references.',
-    remaining: function (v) { return 'uncommitted in the series budget: $' + v; }, warnings: 'Notes', uploading: 'uploading …', open: 'open', remove: 'Remove', back: 'Back'
+    remaining: function (v) { return 'uncommitted in the series budget: $' + v; }, warnings: 'Notes', uploading: 'uploading …', open: 'open', remove: 'Remove', back: 'Back',
+    toProject: 'Go to the project →', toSeries: 'Go to the series →'
   }
 });
 
@@ -60,9 +62,12 @@ function select(values, labels, selected) {
 function providerSelect(kinds, selected) {
   return select(kinds, kinds.map(function (k) { return k + (k !== 'mock' && options.providers[k] === false ? ' ' + t('noKey') : ''); }), selected);
 }
-function commandBox(text, command) {
-  return el('div', { class: 'next' }, [el('span', { text: text }), el('code', { text: command }), copyButton(command, { copy: t('copy'), copied: t('copied') })]);
+/** The command to type in Claude Code; `link` (the project or series page) is the way out of the wizard. */
+function commandBox(text, command, link) {
+  return el('div', { class: 'next' }, [el('span', { text: text }), el('code', { text: command }), copyButton(command, { copy: t('copy'), copied: t('copied') }), link || null]);
 }
+function projectLink(slug) { return el('a', { href: '#/p/' + slug, text: t('toProject') }); }
+function seriesLink(slug) { return el('a', { href: '#/s/' + slug, text: t('toSeries') }); }
 function step(n, title, done, children) {
   return el('section', { class: 'card step' + (done ? ' done-step' : '') }, [el('h3', { class: 'step-title' }, [el('span', { class: 'step-n', text: done ? '✓' : String(n) }), title])].concat(children));
 }
@@ -211,9 +216,12 @@ function videoSteps(slug) {
     node.appendChild(step(5, t('stepChars'), false, [libraryPicker('project', slug)]));
 
     const finishError = el('p', { class: 'error', text: state.missing.length ? t('missing')(state.missing.map(function (m) { return m === 'lyrics' ? t('stepLyrics') : t('stepSong'); }).join(', ')) : '' });
-    node.appendChild(step(6, t('stepDone'), state.setupDone, state.setupDone ? [commandBox(t('setupDone'), '/new-video ' + slug)] : [
+    node.appendChild(step(6, t('stepDone'), state.setupDone, state.setupDone ? [commandBox(t('setupDone'), '/new-video ' + slug, projectLink(slug))] : [
       finishError,
-      el('button', { class: 'primary', text: t('finish'), disabled: state.missing.length ? true : undefined, onclick: function () { post('/api/new/video/' + encodeURIComponent(slug) + '/finish', {}).then(refresh).catch(function (e) { finishError.textContent = e.message; }); } })
+      el('div', { class: 'form-row' }, [
+        el('button', { class: 'primary', text: t('finish'), disabled: state.missing.length ? true : undefined, onclick: function () { post('/api/new/video/' + encodeURIComponent(slug) + '/finish', {}).then(refresh).catch(function (e) { finishError.textContent = e.message; }); } }),
+        projectLink(slug)
+      ])
     ]));
   }).catch(showError);
 }
@@ -255,7 +263,7 @@ function seriesSteps(slug) {
     node.appendChild(el('div', { style: 'height:12px' }));
     node.appendChild(referencesStep(1, 'series', slug, refs.references, function () { seriesSteps(slug); }));
     node.appendChild(step(2, t('stepChars'), false, [libraryPicker('series', slug)]));
-    node.appendChild(step(3, t('stepDone'), false, [commandBox(t('seriesNext'), '/new-series ' + slug)]));
+    node.appendChild(step(3, t('stepDone'), false, [commandBox(t('seriesNext'), '/new-series ' + slug, seriesLink(slug))]));
   }).catch(showError);
 }
 
@@ -297,7 +305,7 @@ function episodeSteps(slug) {
     const node = main();
     node.appendChild(el('header', { class: 'project' }, [el('h2', { text: slug }), el('span', { class: 'chip', text: t('newEpisode') })]));
     node.appendChild(el('div', { style: 'height:12px' }));
-    node.appendChild(commandBox(t('episodeNext'), '/new-episode ' + slug));
+    node.appendChild(commandBox(t('episodeNext'), '/new-episode ' + slug, projectLink(slug)));
     node.appendChild(el('div', { style: 'height:12px' }));
     node.appendChild(referencesStep(1, 'project', slug, refs.references, function () { episodeSteps(slug); }));
   }).catch(showError);

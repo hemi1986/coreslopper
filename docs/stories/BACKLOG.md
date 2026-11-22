@@ -4,11 +4,11 @@
 
 **Progress: 0 of 0 domain stories done** · scenarios 0 of 0
 
-**1 story** · In Progress: 1 · Ready: 0 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 0 · Superseded: 0
+**1 story** · In Progress: 0 · Ready: 0 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 1 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
 
-## In Progress
+## Done
 
 | ID | Title | Type | Context | Priority | Size | Risk | Depends on |
 |---|---|---|---|---|---|---|---|

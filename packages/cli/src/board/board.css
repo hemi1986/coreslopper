@@ -168,6 +168,7 @@ ul.activity a { color: var(--accent); }
 
 /* Wizard */
 .form .form-row, .step .form-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-start; margin-bottom: 12px; }
+.step .form-row > a { color: var(--accent); align-self: center; font-size: 13px; }
 .form-field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); flex: 1; min-width: 180px; }
 .form-field > span:first-child { font-weight: 600; color: var(--ink); }
 input.text, select.text { padding: 7px 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--ink); font: inherit; }

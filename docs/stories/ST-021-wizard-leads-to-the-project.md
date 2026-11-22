@@ -8,7 +8,7 @@ size: null
 risk: null
 depends_on: []
 labels: [board]
-status: in-progress
+status: done
 ---
 
 ## Task
@@ -37,12 +37,12 @@ Fix:
 - UI texts in German and English, like the other wizard texts.
 
 ## Acceptance Criteria
-- [ ] The music video wizard's step 6 links to `#/p/<slug>`, before and after "Setup abschließen".
-- [ ] The series wizard's last step links to `#/s/<slug>`.
-- [ ] The episode wizard's command box links to `#/p/<slug>`.
-- [ ] After the link, the project or series page shows the same Claude Code command the wizard showed, as long as
+- [x] The music video wizard's step 6 links to `#/p/<slug>`, before and after "Setup abschließen".
+- [x] The series wizard's last step links to `#/s/<slug>`.
+- [x] The episode wizard's command box links to `#/p/<slug>`.
+- [x] After the link, the project or series page shows the same Claude Code command the wizard showed, as long as
       that stage is still open (checked in the sandbox from `npm run dev:workspace` for all three kinds).
-- [ ] The link texts exist in German and English.
+- [x] The link texts exist in German and English.
 
 ## Out of Scope
 - Detecting on the board that the Claude Code command has run and leaving the wizard automatically.
