@@ -85,7 +85,7 @@ The last stage, `qa-export`, builds the release package in `projects/<slug>/rend
 npm run cli -- board                          # http://127.0.0.1:4848
 ```
 
-Its production view shows every project and series in the workspace while they are made: stages, budget, the generation queue, the art director's reviews, renders, and the command to type next in Claude Code. `docker compose up -d` runs the board in a container on any system, with the watchdog that posts approved releases and reports stalled stages and finished renders ([docs/board.md](docs/board.md)).
+Its production view shows every project and series in the workspace while they are made: stages, budget, the generation queue, the art director's reviews, renders, and the command to type next in Claude Code. `docker compose up -d` runs the board in a container on any system, with the watchdog that posts approved releases and reports stalled stages and finished renders ([docs/board.md](docs/board.md)). New to it? The [board guide](docs/board-guide.md) walks through it with screenshots ([Deutsch](docs/board-guide.de.md)).
 
 
 - One tab per platform: which file goes where (with previews), every text with a copy button and a counter against the platform's limit, the settings to check (AI label, related video, cover), and where each post links to.

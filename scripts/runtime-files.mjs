@@ -77,6 +77,8 @@ export const SHIPPED = [
   'docs/adr/',
   'docs/architecture.md',
   'docs/assets/',
+  'docs/board-guide.de.md',
+  'docs/board-guide.md',
   'docs/board.md',
   'docs/glossary.md',
   'docs/mcp.md',

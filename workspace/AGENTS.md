@@ -224,6 +224,7 @@ Use `grilling` before briefs, treatments, and storyboards.
 - `docs/THIRD_PARTY.md` — vendored skills, licenses, fonts, providers.
 - `docs/mcp.md` — optional exploration MCP servers; provider adapters.
 - `docs/board.md` — the board: production view, the watchdog, and the board container.
+- `docs/board-guide.md` — the board tour for a user new to the board, with screenshots (German: `board-guide.de.md`).
 - `docs/publishing.md` — `publish` and the release autopilot: YouTube, TikTok, X, LinkedIn, and Instagram setup, limits, quota.
 - `docs/release-platforms.md` — what each platform takes (fields, limits, links), posting times, legal notes for Germany.
 - `docs/adr/0024-release-folder-manual-distribution.md` — the release folder and the manual distributor upload.
