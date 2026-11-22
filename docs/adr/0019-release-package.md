@@ -31,3 +31,7 @@ Like the thumbnails, this work splits cleanly: picking moments and writing texts
 - `qa-export` needs the 9:16 render, and takes a few minutes longer for three cuts, three more stills, and the text.
 - `qa` reports `READY: yes` with a missing release package (WARN), so an unfinished package never blocks delivery of the master; the skill's completion criteria require it.
 - The upload labels the checker knows are a fixed list; a project in a language outside it writes the labels in English.
+
+## Note — 2026-11-22
+
+[ADR 0024](0024-release-folder-manual-distribution.md) introduced the TODO for a fact only the user can give. `qa` now reports a missing release folder as a TODO (`Release package`), not a WARN; a TODO never blocks `READY` either. [ADR 0045](0045-release-records-and-fixed-release-day.md) (proposed) keeps WARN for advice.

@@ -90,7 +90,7 @@ Done Mark, Live URL, Release Approval, Announcement, Microsite, TODO. All are in
   directory (G-162).
 - There is no lock around the folder, the manifest or the calendar (G-161). Checklist ticks are keyed by position
   (G-163).
-- A new release day drops the times the user moved. That is intended, and ADR 0028's wording is stale.
+- A new release day drops the times the user moved. That is intended (ADR 0045; ADR 0028 carries a dated note).
 
 ## Read next
 

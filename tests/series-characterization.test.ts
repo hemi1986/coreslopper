@@ -20,8 +20,8 @@ import {
 } from '@coreslopper/core';
 import { createProject } from '../packages/cli/src/new-project.ts';
 
-// Characterization tests for the series slice (adopted 2026-11-22, docs/domain/adoption-report.md).
-// They pin what the code does today and the confirmed model keeps, not what the gap register wants.
+// Characterization tests from the adoption of the series slice (2026-11-22).
+// They pin what the code does today and the confirmed model keeps; they do not assert what it should do.
 
 const root = process.cwd();
 const seriesDir = join(root, 'projects/demo-series');

@@ -1,5 +1,5 @@
-// Characterization tests for human review: they pin existing behaviour the domain model confirmed
-// (docs/domain/events.yaml, AGG-ProjectReview), not the behaviour it still wants.
+// Characterization tests from the adoption of the review slice (2026-11-21).
+// They pin the project review's behaviour the domain model confirmed; they do not assert what it should do.
 import { describe, expect, it } from 'vitest';
 import { draftNotes, nextRoundNumber, openRounds, type ReviewNote } from '@coreslopper/core';
 

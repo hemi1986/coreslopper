@@ -509,7 +509,7 @@ function workspaceRootOf(context: Context): string {
   return resolve(context.project.paths.root, '..', '..');
 }
 
-/** Print the plan of every approved release: what is due, waiting, and what needs the user. */
+/** Print the plan of every release with a calendar, approved or not: what is due, waiting, and what needs the user. */
 export async function autopilotOverview(root: string, options: { now?: Date; env?: NodeJS.ProcessEnv; log?: (line: string) => void } = {}): Promise<void> {
   const log = options.log ?? ((line: string) => console.log(line));
   const now = options.now ?? new Date();

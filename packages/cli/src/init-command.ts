@@ -55,8 +55,9 @@ export function printInitSummary(result: InitResult): void {
   if (!result.uvSynced) console.log('  npm run python:sync');
   console.log('  npm run cli -- doctor');
   console.log('  npm run demo:preview');
-  if (result.projectSlug) console.log(`  claude   # then /new-video ${result.projectSlug}`);
-  else console.log('  claude');
+  if (result.projectSlug) console.log(`  claude   # then /new-video ${result.projectSlug}, or /new-series`);
+  else console.log('  claude   # then /new-video or /new-series');
+  console.log('  npm run cli -- board   # production, review, and release');
 }
 
 export async function runInitCommand(targetArg: string | undefined, options: InitCommandOptions): Promise<void> {

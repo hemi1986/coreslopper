@@ -44,8 +44,10 @@ export interface PublishResult {
 }
 
 /**
- * Uploads one item to one platform as a private video or a draft. An adapter
- * never makes a video public; the user does that on the platform.
+ * Uploads one item to YouTube or TikTok: a private or scheduled video, or a
+ * draft. A scheduled video goes public at its time; only TikTok's direct mode,
+ * which the release autopilot uses after TikTok's audit, posts at once.
+ * Instagram, X, and LinkedIn are post adapters (`SocialAdapter`, ADR 0029).
  */
 export interface PublishAdapter {
   readonly platform: PublishPlatform;

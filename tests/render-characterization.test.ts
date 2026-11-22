@@ -7,8 +7,8 @@ import { buildVideoProps, formatConfig, renderArtifactKeys, renderInputsHash } f
 import { readRecipe, recipePath, writeRecipe } from '../packages/cli/src/thumbnail-recipe.ts';
 import { thumbnailProblems } from '../packages/cli/src/thumbnail-files.ts';
 
-// Characterization tests for the render slice (adopted 2026-11-22, docs/domain/adoption-report.md). They pin what
-// the code does today and the decided model keeps, not what the gap register wants.
+// Characterization tests from the adoption of the render slice (2026-11-22).
+// They pin what the code does today and the decided model keeps; they do not assert what it should do.
 
 const demoDir = join(process.cwd(), 'projects/demo');
 

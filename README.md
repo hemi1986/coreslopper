@@ -169,13 +169,15 @@ git add -A && git commit -m "chore: before coreslopper update"
 npx coreslopper@latest update
 ```
 
-Your projects, `.env`, and your own edits to workflow files are kept. If a file you changed also changed upstream, the new version is saved next to it as `<file>.coreslopper-new`. Workspaces created with 0.1.0 need `update --force` once. Details: [docs/onboarding.md](docs/onboarding.md#updating-a-workspace).
+Your projects, `.env`, and your own edits to workflow files are kept. If a file you changed also changed upstream, the new version is saved next to it as `<file>.coreslopper-new`. A workspace created with 0.1.0 has no baseline yet: its first plain `update` writes such a copy for every file that differs and records the baseline, so skip `--force`, which would overwrite your edits. Details: [docs/onboarding.md](docs/onboarding.md#updating-a-workspace).
 
 ## Learn more
 
 | Topic | Document |
 |---|---|
 | Setup flags, credentials, updating, troubleshooting | [docs/onboarding.md](docs/onboarding.md) |
+| The board: production, review, characters, release, the watchdog, and the container | [docs/board.md](docs/board.md) |
+| A tour of the board with screenshots | [docs/board-guide.md](docs/board-guide.md) ([Deutsch](docs/board-guide.de.md)) |
 | What each stage does, and running one by hand | [docs/pipeline.md](docs/pipeline.md) |
 | Series and episodes: stages, takes, re-timing | [docs/pipeline.md#episodes](docs/pipeline.md#episodes), [ADR 0016](docs/adr/0016-episode-projects.md) |
 | fal.ai, Higgsfield, budgets, and model roles | [docs/providers.md](docs/providers.md) |

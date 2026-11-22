@@ -32,3 +32,10 @@ Platforms also differ more than the texts showed: Shorts links are not clickable
 - `release` now also writes `review/calendar.yaml`; a stage runner may run it, since the user owns only `project.yaml` and the overrides.
 - Songs released before the calendar existed need their slots: `release.release_date` in their `project.yaml` or `booked:` entries in the schedule, otherwise a new calendar may propose a Friday they already took.
 - Platform rules change; the notes on the board, the limits, and `docs/release-platforms.md` are the places to update.
+
+## Note — 2026-11-22
+
+[ADR 0045](0045-release-records-and-fixed-release-day.md) (proposed) amends three statements of this ADR, and the code follows it in part:
+- Times in the calendar are kept only while the release day stays. A new release day plans every event again.
+- A proposed release day never collides with another project's calendar. A day the user sets in `release.release_date` wins and is not yet checked against other releases, skip days or the lead time (G-160).
+- The live YouTube URL fills the X and LinkedIn texts on the board and the microsite data. The files in `texts/` keep the placeholder (G-154).

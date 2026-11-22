@@ -761,7 +761,7 @@ export const ModelsConfigSchema = z.object({
   comfyui_locks: z.record(z.string(), ComfyUILockSchema).default({}),
 });
 
-/** Platforms the `publish` command uploads to. Instagram is not one of them yet (ADR 0023). */
+/** Platforms the `publish` command uploads to. Instagram, X, and LinkedIn are posted by the release autopilot's post adapters (ADR 0029). */
 export const PublishPlatformSchema = z.enum(['youtube', 'tiktok']);
 
 const HashtagSchema = z

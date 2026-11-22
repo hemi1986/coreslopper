@@ -25,7 +25,7 @@ Everything else of the release, including the files and texts for Instagram, Spo
 
 ## What happens per platform
 
-**YouTube** (Data API v3, scope `youtube.upload`): a resumable `videos.insert` with title, description plus hashtags, tags, category (10, Music), language, `privacyStatus: private` (or `publishAt` with `--schedule`), `selfDeclaredMadeForKids`, and `containsSyntheticMedia`; then `thumbnails.set`. Shorts are the vertical videos (at most 3 minutes) with the same metadata. Left for you, printed after the run:
+**YouTube** (Data API v3, scopes `youtube.upload` and `youtube.force-ssl`; the second lets the autopilot read a video's status, edit its description, and post a comment): a resumable `videos.insert` with title, description plus hashtags, tags, category (10, Music), language, `privacyStatus: private` (or `publishAt` with `--schedule`), `selfDeclaredMadeForKids`, and `containsSyntheticMedia`; then `thumbnails.set`. Shorts are the vertical videos (at most 3 minutes) with the same metadata. Left for you, printed after the run:
 
 - Set **Related video** of each Short to the main video in YouTube Studio; the API cannot.
 - Set the visibility to public when you are ready.
@@ -99,7 +99,7 @@ Length and aspect ratio need `ffprobe`; without it the dry run warns that they a
 
    The command opens TikTok's consent page, catches the redirect on `localhost:8765`, exchanges the code with PKCE, and writes `TIKTOK_REFRESH_TOKEN` to `.env`. Access tokens last 24 hours; `publish` refreshes them on every run and stores a rotated refresh token itself. The refresh token lasts a year; run `publish-auth tiktok` again after that or when TikTok rejects it.
 
-**Direct posting (after TikTok's audit).** An audited app can post instead of sending drafts: turn on **Direct Post** in the Content Posting API settings, add the scope `video.publish`, and submit the app for the audit. Before the audit TikTok keeps every direct post private (and refuses public accounts with `unaudited_client_can_only_post_to_private_accounts`). Once it passed, set `autopilot.tiktok_direct: true` in `config/release-schedule.yaml` (or `TIKTOK_DIRECT_POST=1` in `.env` for `publish`) and run `publish-auth tiktok` again. A direct post asks TikTok's `creator_info` first, posts only as public to everyone, carries the caption and the AI-generated label (`is_aigc`), and links to the video. The cover and a pinned comment stay in the app: the API has neither.
+**Direct posting (after TikTok's audit).** An audited app can post instead of sending drafts: turn on **Direct Post** in the Content Posting API settings, add the scope `video.publish`, and submit the app for the audit. Before the audit TikTok keeps every direct post private (and refuses public accounts with `unaudited_client_can_only_post_to_private_accounts`). Once it passed, set `autopilot.tiktok_direct: true` in `config/release-schedule.yaml` (`TIKTOK_DIRECT_POST=1` in `.env` does the same for the autopilot) and run `publish-auth tiktok` again. `publish` itself always sends drafts. A direct post asks TikTok's `creator_info` first, posts only as public to everyone, carries the caption and the AI-generated label (`is_aigc`), and links to the video. The cover and a pinned comment stay in the app: the API has neither.
 
 ## Security
 
@@ -125,7 +125,7 @@ npm run cli -- release-run --dry-run    # what is due now; posts nothing
 
 | Calendar event | By the autopilot | Still yours |
 |---|---|---|
-| Main video, Shorts on YouTube | Uploaded `youtube_ahead_hours` (24) before their time: private, or scheduled once `youtube_audited: true`. When the video is public, the pinned comment is posted. | Without the audit: switch it public in Studio at its time. A Premiere is always set in Studio. Pin the comment; set the related video of each Short. |
+| Main video, Shorts on YouTube | Uploaded `youtube_ahead_hours` (24) before their time: private, or scheduled once `youtube_audited: true`. When the main video is public, its pinned comment is posted. | Without the audit: switch it public in Studio at its time. A Premiere is always set in Studio. Pin the comment; set the related video of each Short. |
 | Shorts on TikTok | A draft in the inbox at its time; a public post with `tiktok_direct` after the audit. | Post the draft from the app (cover, sound). |
 | Instagram Reels, feed post, announcement story | Posted at their time with caption, cover frame, and the AI info label. | The release-day story (it needs the link sticker). |
 | X: announcement, release post, Shorts | Posted with the teaser, Short, or image; the release post's reply carries the YouTube link. | — |

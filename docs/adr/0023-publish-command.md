@@ -33,3 +33,9 @@ ADR 0019 had rejected a YAML upload file because the user copied from Markdown. 
 - The user sets up a Google Cloud project and a TikTok developer app once (`docs/publishing.md`). An OAuth app left in Google's Testing mode issues refresh tokens that expire after seven days.
 - The related video of a Short, the TikTok caption, sound, and cover, and the final publish stay manual; `publish` prints them as steps.
 - `review/publish.json` is a project artifact; it holds video IDs, never tokens.
+
+## Note — 2026-11-22
+
+[ADR 0029](0029-release-autopilot.md) and [ADR 0046](0046-publishing-records-and-never-twice.md) (proposed) overtook two statements of this ADR:
+- `publish` still uploads private videos, scheduled videos and drafts, but two paths now go public without a click on the platform. A YouTube video uploaded with `publishAt` goes public at its time: through `--schedule`, or through the release autopilot once `youtube_audited: true`. After TikTok's audit, the autopilot posts TikTok directly with `tiktok_direct`. Each path starts from the user: a `--schedule` they pass, or their release approval.
+- Instagram came through a second interface, not this one: the release autopilot's post adapters (`SocialAdapter` in `packages/providers/src/publish/social.ts`) post to Instagram, X and LinkedIn. `PublishPlatformSchema` holds only YouTube and TikTok.

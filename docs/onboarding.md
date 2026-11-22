@@ -175,16 +175,16 @@ npx coreslopper@latest update
 | changed | unchanged | kept |
 | changed | changed | kept; new version written as `<file>.coreslopper-new` |
 | changed | removed | kept |
-| deleted | any | stays deleted |
+| deleted | any | stays deleted (except `package-lock.json`) |
 
-Merge each `.coreslopper-new` file into the original and delete it. `--force` overwrites changed files instead.
+Merge each `.coreslopper-new` file into the original and delete it. `--force` writes the upstream version over a file changed on both sides instead; a file only you changed is kept even then.
 
-`projects/`, `library/`, and the model bench's `bench/bench.yaml`, `bench/targets.yaml` and `bench/cases/` belong to you: `update` adds new upstream files there but never overwrites or deletes anything. `.env`, `.mcp.json` (if you added one), and `GETTING_STARTED.md` are never touched. `package-lock.json` always follows upstream. Afterwards `update` runs `npm install` and `uv sync`; pass `--no-install` to skip them.
+`projects/`, the old `series/` folder (until `migrate-layout` moved it), `library/`, and the model bench's `bench/bench.yaml`, `bench/targets.yaml` and `bench/cases/` belong to you: `update` adds new upstream files there but never overwrites or deletes anything. `.env`, `.mcp.json` (if you added one), and `GETTING_STARTED.md` are never touched. `package-lock.json` always follows upstream and comes back when you delete it. When `update` changed a file, it runs `npm install` and `uv sync` afterwards; pass `--no-install` to skip them.
 
 | Flag | Effect |
 |---|---|
 | `--dry-run` | List the changes without writing anything. |
-| `--force` | Overwrite locally changed files; also allows a downgrade. |
+| `--force` | Overwrite files changed on both sides (every changed file without a baseline); also allows a downgrade. |
 | `--no-install` | Skip `npm install` and `uv sync`. |
 
 **Series moved into `projects/`.** Since [ADR 0035](adr/0035-series-in-projects.md) a series canon is a folder in `projects/` like every other production. A workspace with series in `series/` keeps working only after one move: commit, then
@@ -196,7 +196,7 @@ npm run cli -- migrate-layout
 
 It moves each `series/<slug>/` to `projects/<slug>/`, rewrites the paths of episodes and other projects that point into it (`../../series/<slug>/` becomes `../<slug>/`), and stops without a change when a slug exists in both places. `update` and `doctor` remind you until it ran.
 
-Workspaces created before `update` existed have no baseline, so every file that differs from upstream counts as a conflict. Commit, then run `npx coreslopper@latest update --force` once; it records the baseline for later updates.
+Workspaces created before `update` existed have no baseline, so every file that differs from upstream counts as a conflict once. Commit, then run a plain `npx coreslopper@latest update`: it writes a `.coreslopper-new` copy for each of these files and records the baseline, so later updates merge normally. Merge the copies you want and delete them. `--force` would overwrite your local edits instead.
 
 ## Troubleshooting
 

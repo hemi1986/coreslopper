@@ -345,13 +345,16 @@ function printNextSteps(target: string, result: InitResult, options: OnboardOpti
     '',
     'In Claude Code:',
     ...(project ? [`  /new-video ${project}    lyrics, song import, brief`] : ['  /new-video']),
+    '  /new-series    a series canon; then /new-episode',
+    '',
+    'The board (production, review, release): npm run cli -- board',
     ...(publishAuth.length ? ['', 'Publishing (once, opens the browser):', ...publishAuth.map((command) => `  ${command}`)] : []),
   ];
   outro(lines.join('\n'));
 }
 
 export async function onboard(options: OnboardOptions = {}): Promise<InitResult> {
-  intro('coreslopper — from brief to finished music video');
+  intro('coreslopper — music videos and series episodes, from brief to render');
 
   const target = await chooseTarget(options);
   await ensureTargetIsUsable(target, options.force);
