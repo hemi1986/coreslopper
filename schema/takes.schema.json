@@ -19,10 +19,18 @@
         "type": "object",
         "properties": {
           "source": {
-            "type": "string",
-            "enum": [
-              "generated",
-              "imported"
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "generated",
+                  "imported"
+                ]
+              },
+              {
+                "type": "string",
+                "pattern": "^library:[a-z0-9][a-z0-9_-]*$"
+              }
             ]
           },
           "duration": {
@@ -57,10 +65,18 @@
         "type": "object",
         "properties": {
           "source": {
-            "type": "string",
-            "enum": [
-              "generated",
-              "imported"
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "generated",
+                  "imported"
+                ]
+              },
+              {
+                "type": "string",
+                "pattern": "^library:[a-z0-9][a-z0-9_-]*$"
+              }
             ]
           },
           "duration": {

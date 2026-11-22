@@ -202,13 +202,31 @@ export function isAudibleLine(line: ScriptLine): boolean {
 }
 
 /**
+ * What a line's take is checked against (AGG-TakeRegistry): an imported take
+ * against its line, a sound line's other take against the library sound's file
+ * and trim (POL-TakeChosenLibrarySounds). `undefined` means the take keeps what
+ * it was made from: its library sound is gone, which only warns (HS-260).
+ */
+export function expectedTakeSource(
+  line: ScriptLine,
+  take: { source: string } | undefined,
+  sounds: Record<string, { hash: string; trim?: { start: number; end: number } }>,
+): Record<string, unknown> | undefined {
+  if (line.kind !== 'sfx' || line.sound === undefined || take?.source === 'imported') return takeSource(line);
+  const sound = sounds[line.sound];
+  return sound ? takeSource(line, sound) : undefined;
+}
+
+/**
  * What a take is made from. Its canonical hash is the take's text hash: a
  * different text, speaker, prompt, or effect length makes the take stale.
  */
-export function takeSource(line: ScriptLine): Record<string, unknown> {
+export function takeSource(line: ScriptLine, sound?: { hash: string; trim?: { start: number; end: number } }): Record<string, unknown> {
   if (isSpokenLine(line)) return { kind: line.kind, speaker: line.speaker, text: line.text_de };
-  // A library sound's take is a copy; what it is made from is the sound (ST-011 adds its file and trim).
-  if (line.kind === 'sfx' && line.sound !== undefined) return { kind: 'sfx', sound: line.sound };
+  // A library sound's take is a copy of the sound's file, trimmed: both are what it is made from (Q14).
+  if (line.kind === 'sfx' && line.sound !== undefined) {
+    return sound ? { kind: 'sfx', sound: line.sound, file: sound.hash, trim: sound.trim ?? null } : { kind: 'sfx', sound: line.sound };
+  }
   if (line.kind === 'sfx') return { kind: 'sfx', prompt: line.prompt, duration: line.duration };
   throw new ValidationError(`Script line "${line.id}" (${line.kind}) has no take.`);
 }
