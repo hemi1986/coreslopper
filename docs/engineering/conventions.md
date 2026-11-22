@@ -95,6 +95,9 @@ state in memory), one core transition (`setStageRunning`, `setStageDone`, `setSt
   `scripts/audio-analysis/analyze.py` through `uv run` (ADR 0008). The contract between Python and TypeScript is
   the JSON Schema generated from Zod (`npm run schema`, `schema/timing.schema.json`); the Python side writes the
   file, the TypeScript side merges and checks it. Python writes `timing.json` with a plain write, not atomically.
+  The exception is `pose-extract`: a stage runner may only call CLI commands, so the command runs
+  `scripts/pose/extract.py` through `uv run --extra engine` and checks the written track with `PoseTrackSchema`
+  (ADR 0054). Python writes the track atomically (temp file plus rename).
 - `loadProject` merges `timing.json` with `timing.overrides.json` and checks the result on every load
   (`project.ts:237-241`), so every command sees the effective timing and a broken timing breaks every command
   (gap G-54). `validate` writes the snapshot `timing.effective.json` for agents and scripts.
@@ -216,6 +219,8 @@ directory. `tests/helpers/release-fixture.ts` builds release projects.
 | Headless agent | `reviewImage(dir, { runner })` with a fake runner returning the JSON | unit | `tests/review-image.test.ts` |
 | Python helper | the helper's functions | unit (pytest, `npm run python:test`) | `scripts/audio-analysis/tests/test_timing_core.py` |
 | Song analysis | `analyze.py --no-separate --skip-asr --schema …` on a fixture project; no model loads | integration (pytest) | `scripts/audio-analysis/tests/test_analyze_integration.py` |
+| Pose track rule | tracking, gap filling, smoothing, cuts and quality in `scripts/pose/pose_core.py` on synthetic arrays, no models; the schema contract against `schema/pose-track.schema.json` | unit (pytest) | `scripts/pose/tests/test_pose_core.py` |
+| Pose track command and sampling | `poseExtract(dir, options, { runExtractor, root, log })` with a fake extractor that writes a track; `samplePoseTrack`, `relativePose`, `poseBoneAngles` on an inline track | integration, unit | `tests/pose-track.test.ts` |
 | Timing rule | `mergeTiming`, `assertTiming`, `resolveAnchor` on an inline `Timing` | unit | `tests/timing.test.ts`, `tests/timing-characterization.test.ts` |
 | Storyboard rule | `resolveStoryboard` on an inline `Storyboard`, `Timing`, style and character bible | unit | `tests/storyboard-characterization.test.ts`, `tests/continuity.test.ts` |
 | Generation runner | `GenerationRunner` with `MockProvider` (or a stub provider), a temp cache dir and manifest | unit | `tests/providers.test.ts`, `tests/generation-characterization.test.ts` |

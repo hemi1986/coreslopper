@@ -203,7 +203,7 @@ export const renderLimits = () => ({
   segmentSeconds: envInt('CORESLOPPER_SEGMENT_SECONDS', 60),
 });
 
-const STAGED_FILE = /\.(png|jpe?g|webp|avif|gif|svg|mp4|webm|mov|mkv|wav|mp3|m4a|aac|ogg|flac|ttf|otf|woff2?)$/i;
+const STAGED_FILE = /\.(png|jpe?g|webp|avif|gif|svg|mp4|webm|mov|mkv|wav|mp3|m4a|aac|ogg|flac|ttf|otf|woff2?|json)$/i;
 
 /**
  * Build a minimal public directory that exposes only the folders of the files

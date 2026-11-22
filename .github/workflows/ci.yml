@@ -46,6 +46,12 @@ jobs:
           uv sync --group dev
           uv run pytest -q
 
+      - name: Python tests (pose)
+        working-directory: scripts/pose
+        run: |
+          uv sync --group dev
+          uv run pytest -q
+
       - name: Generate demo audio
         run: npm run demo:audio
 

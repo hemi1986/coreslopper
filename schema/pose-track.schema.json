@@ -1,0 +1,327 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "number",
+      "const": 1
+    },
+    "source": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "string",
+          "minLength": 1
+        },
+        "from": {
+          "type": "number",
+          "minimum": 0
+        },
+        "to": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "fps": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "width": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "height": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "aspect": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      },
+      "required": [
+        "file",
+        "from",
+        "to",
+        "fps",
+        "width",
+        "height",
+        "aspect"
+      ]
+    },
+    "engine": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mode": {
+          "type": "string"
+        },
+        "detector": {
+          "type": "string"
+        },
+        "pose": {
+          "type": "string"
+        },
+        "device": {
+          "type": "string"
+        },
+        "upscale": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": {}
+    },
+    "person": {
+      "type": "string",
+      "minLength": 1
+    },
+    "smoothing": {
+      "type": "object",
+      "properties": {
+        "filter": {
+          "type": "string",
+          "const": "one-euro"
+        },
+        "minCutoff": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "beta": {
+          "type": "number",
+          "minimum": 0
+        },
+        "dCutoff": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "zeroPhase": {
+          "type": "boolean"
+        },
+        "maxGap": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "filter",
+        "minCutoff",
+        "beta",
+        "dCutoff",
+        "maxGap"
+      ],
+      "additionalProperties": {}
+    },
+    "keypoints": {
+      "minItems": 17,
+      "maxItems": 17,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "nose",
+          "left_eye",
+          "right_eye",
+          "left_ear",
+          "right_ear",
+          "left_shoulder",
+          "right_shoulder",
+          "left_elbow",
+          "right_elbow",
+          "left_wrist",
+          "right_wrist",
+          "left_hip",
+          "right_hip",
+          "left_knee",
+          "right_knee",
+          "left_ankle",
+          "right_ankle"
+        ]
+      }
+    },
+    "frames": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "t": {
+            "type": "number",
+            "minimum": 0
+          },
+          "k": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "prefixItems": [
+                    {
+                      "type": "number",
+                      "minimum": -1,
+                      "maximum": 2
+                    },
+                    {
+                      "type": "number",
+                      "minimum": -1,
+                      "maximum": 2
+                    },
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    }
+                  ],
+                  "items": false,
+                  "minItems": 3,
+                  "maxItems": 3
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "interpolated": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "t",
+          "k"
+        ]
+      }
+    },
+    "quality": {
+      "type": "object",
+      "properties": {
+        "frames": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "detected": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "interpolated": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "missing": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "detectionRate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "meanConfidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "limbs": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "number"
+          }
+        },
+        "jitterRaw": {
+          "type": "number",
+          "minimum": 0
+        },
+        "jitter": {
+          "type": "number",
+          "minimum": 0
+        },
+        "peopleMax": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "severalPeople": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "cuts": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "gaps": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "items": false,
+            "minItems": 2,
+            "maxItems": 2
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "seconds": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "frames",
+        "detected",
+        "interpolated",
+        "missing",
+        "detectionRate",
+        "meanConfidence",
+        "limbs",
+        "jitterRaw",
+        "jitter",
+        "peopleMax",
+        "severalPeople",
+        "cuts",
+        "gaps",
+        "warnings"
+      ],
+      "additionalProperties": {}
+    }
+  },
+  "required": [
+    "version",
+    "source",
+    "engine",
+    "person",
+    "smoothing",
+    "keypoints",
+    "frames",
+    "quality"
+  ]
+}

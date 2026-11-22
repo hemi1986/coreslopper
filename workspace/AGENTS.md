@@ -70,7 +70,7 @@ packages/
   remotion/        MusicVideo composition, motion components, effects, 3D
 library/           The workspace character library: characters/<id>/character.yaml (media gitignored)
 schema/            Generated JSON Schema for cross-language validation
-scripts/           Audio analysis (Python/uv), fixture generators
+scripts/           Audio analysis and pose extraction (Python/uv), fixture generators
 templates/project/ Project template used by the new-video skill
 templates/episode/ Episode template used by the new-episode skill
 templates/meme/    Meme template: project.yaml (kind meme, 9:16) and an empty pitch.md
@@ -191,6 +191,7 @@ npm run schema
 | `npm run cli -- normalize-audio <project> --input <file>` | Normalize audio to −14 LUFS / −1 dBTP. |
 | `npm run cli -- footage <project> --input <file> --name <name>` | Normalize a footage proxy. |
 | `npm run cli -- frame <project> --input <clip> --position first\|middle\|last` | Extract a review or chaining frame; `--at <seconds>` takes the frame at a time, also from a render. |
+| `npm run cli -- pose-extract <project> --input <clip> --name <id> [--from <s\|m:ss>] [--to <s\|m:ss>] [--person largest\|center\|<n>] [--preview]` | Pose track of one person in a reference clip into `assets/poses/<id>.json` (COCO-17 keypoints, normalized, with confidence) and a quality report; `--preview` adds `<id>.preview.mp4` for review. A motion source only. |
 | `npm run cli -- review-image <project\|series> --image <png[,png]>\|--clip <mp4> --shot <id>\|--ref <kind:id>` | Art-director verdict on one image or clip, headless in its own context; `--clip` extracts the first, middle, and last frame itself and measures the first against the keyframe. Prints `{verdict, score, issues, fix_prompt}` and appends to `verdicts.jsonl` (exit 2 on fail). |
 | `npm run cli -- queue add <project> --kind keyframe\|clip [--shots <ids>] [--workflow <w>] [--overrides <file>]` | Queue keyframes or clips built from `storyboard.yaml` (prompt, references, dependencies); `--batch <file>` queues hand-written items with `id` and `out`. |
 | `npm run cli -- queue run\|wait\|status <project>` | Work `assets/queue.json`: generate in order, review each result in the background, requeue failed images with the fix prompt, file approved results at `out`; `wait` blocks until an item needs a fix or the run ended. |

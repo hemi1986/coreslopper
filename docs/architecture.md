@@ -54,6 +54,7 @@ state.json
 assets/manifest.jsonl
 assets/references/  user-provided moodboards and reference images, gitignored
 assets/footage/     normalized real footage, gitignored
+assets/poses/       pose tracks from reference clips (pose-extract) and their review previews, gitignored
 audio/              the user's song.wav and stems/vocals.wav, gitignored
 characters/<id>/    character sheets and refs, gitignored (copies of library characters too)
 renders/            gitignored
@@ -113,6 +114,8 @@ The main orchestrator never reads raw images, audio, or full transcripts. It rea
 ## Schemas
 
 Zod is the source of truth in `packages/core/src/schema.ts`. `npm run schema` generates JSON Schema into `schema/` with `io: input`. Python validates `timing.json` against the generated schema. This gives one contract for TypeScript and Python without duplicating definitions.
+
+Pose tracks follow the same contract: `PoseTrackSchema` (`packages/core/src/pose.ts`, `schema/pose-track.schema.json`) describes what `scripts/pose/extract.py` writes; `pose-extract` runs it through `uv run --extra engine` and checks the file with Zod. The sampling helpers in the same module are browser-safe, so Remotion components retarget a track at render time ([ADR 0054](adr/0054-pose-tracks-from-reference-clips.md)).
 
 The storyboard schema is stricter than YAML: it defines shot IDs, anchors, sources, transitions, refs, prompts, layers, and chaining. Semantic validation in `packages/core/src/timing.ts` checks:
 

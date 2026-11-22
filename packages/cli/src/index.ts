@@ -58,6 +58,7 @@ import {
 } from './queue.js';
 import { importFootage, importSong, importTakes, normalizeAudio, extractFrame, extractAudioSegment } from './media.js';
 import { parseMuteSpans } from './lipsync-audio.js';
+import { POSE_MODES, poseExtract } from './pose-extract.js';
 import { voiceTrack } from './voice-track.js';
 import { episodeTrack } from './episode-track.js';
 import { writeSubtitles } from './subtitles.js';
@@ -1178,6 +1179,38 @@ program
         options.out,
       );
     }),
+  );
+
+program
+  .command('pose-extract [project]')
+  .description('Pose track of one person in a reference clip: COCO-17 keypoints per frame into assets/poses/<name>.json, with a quality report. A motion source only; no frame or sound of the clip is kept.')
+  .requiredOption('--input <clip>', 'Reference clip')
+  .requiredOption('--name <id>', 'Track id (lowercase, dashes): assets/poses/<id>.json')
+  .option('--from <time>', 'Window start in clip seconds or m:ss')
+  .option('--to <time>', 'Window end in clip seconds or m:ss')
+  .option('--person <rule>', 'Which person: largest, center, or n (the n-th from the left, from 1)', 'largest')
+  .option('--preview', 'Also write assets/poses/<id>.preview.mp4: the skeleton over the clip beside the skeleton alone, for review only')
+  .option('--mode <mode>', 'Model size: lightweight | balanced | performance', 'balanced')
+  .option('--device <device>', 'onnxruntime device: cpu, or cuda with onnxruntime-gpu installed', 'cpu')
+  .option('--out <path>', 'Write the track here instead (the preview goes beside it)')
+  .action(
+    (
+      project: string | undefined,
+      options: { input: string; name: string; from?: string; to?: string; person: string; preview?: boolean; mode: string; device: string; out?: string },
+    ) =>
+      run(async () => {
+        await poseExtract(projectDirFromArg(project), {
+          input: options.input,
+          name: options.name,
+          from: options.from,
+          to: options.to,
+          person: options.person,
+          preview: options.preview,
+          mode: validateChoice(options.mode, POSE_MODES, 'mode'),
+          device: options.device,
+          out: options.out,
+        });
+      }),
   );
 
 program

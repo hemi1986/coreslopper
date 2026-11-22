@@ -33,6 +33,21 @@ license: MIT
 6. Set `asset` on the footage shot or the footage layer. Re-run `npm run cli -- validate projects/<slug>`.
 7. Check the first, middle, and last frame of the shot in the render; the clip must not fight the song's cut points.
 
+## Pose tracks
+
+A reference clip can also be a **motion source** only: a cut-out figure moves like the person in it, and no frame or sound of the clip reaches the video. Then do not import the clip as footage; extract a pose track:
+
+```bash
+npm run cli -- pose-extract projects/<slug> --input assets/references/<clip>.mp4 --name <id> \
+  --from 0:12 --to 0:26 --person largest --preview
+```
+
+1. Pick one continuous shot of the source per track (`--from`/`--to`, seconds or m:ss). The report lists camera cuts; a cut inside the window makes the figure jump.
+2. `--person` picks who: `largest` (default), `center`, or `n`, the n-th person from the left. The report warns when several people are in frame or the person was re-acquired.
+3. Read the report: detection rate (aim for 90 % or more), mean confidence per limb (a limb under 0.35 is out of frame or hidden; the rig should hold it still), gaps, jitter before and after smoothing.
+4. Look at `assets/poses/<id>.preview.mp4`, the skeleton over the source beside the skeleton alone, at three moments or more (`npm run cli -- frame projects/<slug> --input <preview> --at <s>`): the skeleton must follow the arms and legs. The preview is for review only; never put it or the source clip in a shot.
+5. The track lands in `assets/poses/<id>.json`; the motion component that plays it samples it as in the `remotion-motion` skill.
+
 ## Completion criteria
 
 - The proxy is 1080p/30 fps, yuv420p, silent, and playable.

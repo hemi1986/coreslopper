@@ -1,0 +1,23 @@
+[project]
+name = "coreslopper-pose"
+version = "0.1.0"
+description = "Pose tracks for coreslopper: COCO-17 keypoints of one person in a reference clip (RTMPose via rtmlib)."
+requires-python = ">=3.12"
+dependencies = [
+  "numpy>=2.0",
+]
+
+[project.optional-dependencies]
+# The detector and pose models. `pose-extract` runs with this extra; the unit tests do not need it.
+engine = [
+  "onnxruntime>=1.20",
+  "opencv-python>=4.10",
+  "rtmlib>=0.0.15",
+]
+
+[dependency-groups]
+dev = ["jsonschema>=4.23", "pytest>=8.3"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
