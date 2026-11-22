@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed — 2026-11-22. The user decided it on 2026-11-22: review happens only in the board from now on.
+Accepted — 2026-11-22. Review happens only in the board from now on.
 Supersedes [ADR 0022](0022-review-player.md); amends [ADR 0032](0032-web-review-rounds.md).
 
 ## Context
