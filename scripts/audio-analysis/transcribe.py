@@ -12,6 +12,18 @@ import argparse
 import json
 import sys
 
+# faster-whisper's own decoder calls PyAV with `metadata_errors`, which PyAV 19
+# removed (TypeError). Decoding with librosa, a base dependency, avoids PyAV.
+SAMPLE_RATE = 16_000
+
+
+def load_speech(path: str):
+    """Mono float32 samples at the 16 kHz faster-whisper expects."""
+    import librosa
+
+    audio, _sr = librosa.load(path, sr=SAMPLE_RATE, mono=True)
+    return audio.astype("float32")
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -24,7 +36,7 @@ def main() -> int:
     from faster_whisper import WhisperModel  # imported late: optional dependency
 
     model = WhisperModel(args.model, device=args.device, compute_type="default")
-    segments, _info = model.transcribe(args.audio, language=args.language, vad_filter=True)
+    segments, _info = model.transcribe(load_speech(args.audio), language=args.language, vad_filter=True)
     text = " ".join(segment.text.strip() for segment in segments).strip()
     json.dump({"text": text}, sys.stdout, ensure_ascii=False)
     sys.stdout.write("\n")
