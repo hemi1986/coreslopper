@@ -73,6 +73,7 @@ schema/            Generated JSON Schema for cross-language validation
 scripts/           Audio analysis (Python/uv), fixture generators
 templates/project/ Project template used by the new-video skill
 templates/episode/ Episode template used by the new-episode skill
+templates/meme/    Meme template: project.yaml (kind meme, 9:16) and an empty pitch.md
 templates/series/  Series canon template used by the new-series skill
 templates/channel/ Optional config/channel.yaml (links, footer, hashtag sets) and config/release-schedule.yaml templates
 brand/example/     Neutral synthwave/cyberpunk brand kit with OFL fonts
@@ -110,14 +111,14 @@ A project with `kind: episode` is one episode of a series ([ADR 0016](docs/adr/0
 
 ### Memes
 
-Planned, not built yet ([ADR 0051](docs/adr/0051-memes-and-the-sound-library.md), proposed): no `meme` kind, `new-meme` skill, or `sound` command exists in this workspace today. A project with `kind: meme` is a standalone 9:16 video of about 15 seconds (at most 30) with German speech and German subtitles burned in. The board's wizard writes the user's idea and setting to `pitch.md`, the starting point of the grilling; `new-meme` grills from it to the punchline. A sound line names a library sound from the workspace's sound library (`library/sounds/<id>/`) or a prompt; `voice-track` copies a library sound into the meme as a take.
+Partly built ([ADR 0051](docs/adr/0051-memes-and-the-sound-library.md), proposed): the `meme` kind with its stages, `new <slug> --kind meme` (from `templates/meme/`), and the `sound` command exist; the `new-meme` skill, the wizard's pitch, and the meme's script, subtitle, and release rules do not yet. `status` and the board already name `/new-meme <slug>` while an interactive stage is open. A project with `kind: meme` is a standalone 9:16 video of about 15 seconds (at most 30) with German speech and German subtitles burned in. The board's wizard writes the user's idea and setting to `pitch.md`, the starting point of the grilling; `new-meme` grills from it to the punchline. A sound line names a library sound from the workspace's sound library (`library/sounds/<id>/`) or a prompt; `voice-track` copies a library sound into the meme as a take.
 
 | # | Stage ID | Skill(s) | Output |
 |---|---|---|---|
-| 1 | `setup` ✋ | board wizard | `project.yaml`, `pitch.md`, chosen library characters, user references |
+| 1 | `setup` ✋ | board wizard, `new-meme` | `project.yaml` (kind `meme`, the one 9:16 format), `pitch.md`, chosen library characters, user references |
 | 2 | `script` ✋ | `grilling`, `new-meme` | `script.yaml` |
 | 3 | `style-character` | `style-bible`, `character-bible` | style and set bible from pitch and script; invented characters into the library |
-| 4–5 | `voice-track`, `episode-track` | as for episodes | takes (generated or copied from the sound library), `timing.json`, `audio/episode.wav` |
+| 4–5 | `voice-track`, `episode-track` | as for episodes | takes (generated or copied from the sound library), `timing.json`, `audio/episode.wav`; a track over 30 seconds is a hard stop |
 | 6–9 | `storyboard`, `assets`, `assembly`, `qa-export` | as above | one 9:16 video, a 1080x1920 cover, TikTok, Shorts, and Reels texts |
 
 From `audio-analysis` (or `voice-track`) on, no stage waits for a human. A stage can stop the pipeline only on a hard stop: budget exceeded, missing credentials, or a validation/QA failure that cannot be fixed after its retries.

@@ -16,7 +16,7 @@ The wizard installs dependencies and stores optional `FAL_KEY` and Higgsfield cr
 
 ## Stage IDs
 
-`setup`, `brief`, `treatment`, `audio-analysis`, `style-character`, `storyboard`, `assets`, `assembly`, `qa-export`. An episode has its own list; see [Episodes](#episodes).
+`setup`, `brief`, `treatment`, `audio-analysis`, `style-character`, `storyboard`, `assets`, `assembly`, `qa-export`. An episode and a meme have their own lists; see [Episodes](#episodes) and [Memes](#memes).
 
 The first three are **interactive**: the `new-video` skill runs them in the main session with the user. `/video-next` refuses to start while one of them is open and points back to `/new-video <slug>`. Every later stage runs autonomously in a fresh `stage-runner`.
 
@@ -278,6 +278,14 @@ npm run cli -- episode-track projects/demo-episode
 npm run cli -- render projects/demo-episode
 ```
 
+## Memes
+
+A meme is a project with `kind: meme` (see [ADR 0051](adr/0051-memes-and-the-sound-library.md), proposed): a standalone 9:16 video of at most 30 seconds with no song and no series. Its stages:
+
+`setup` ✋, `script` ✋, `style-character`, `voice-track`, `episode-track`, `storyboard`, `assets`, `assembly`, `qa-export`.
+
+`new <slug> --kind meme --budget <usd>` creates it from `templates/meme/`: the kind and the one 9:16 format from the template's `project.yaml`, and an empty `pitch.md`. The two interactive stages belong to `/new-meme <slug>` (planned): `status` and the board's production view name it while one is open, and `/video-next` refuses to start. Unlike an episode, a meme has a `style-character` stage after the script: its style, set, and character bible are its own, in the project folder. Its audio is built like an episode's, and `episode-track` refuses a track longer than 30 seconds as a hard stop, before it writes the timing or mixes anything: shorten the script, then run `voice-track` and `episode-track` again.
+
 ## Hard stops and resume
 
 A stage stops when:
@@ -285,6 +293,7 @@ A stage stops when:
 - the next batch exceeds the budget or `batch_cap_usd`;
 - the configured provider is missing credentials;
 - validation fails after the stage's retries;
+- a meme's episode track lasts longer than 30 seconds;
 - a script would overwrite `timing.overrides.json` or `project.yaml`.
 
 After fixing the cause, re-run `/video-next <slug>` or the specific stage with `--stage <stage>`. The state machine skips completed stages and resumes the failed one. To deliberately re-run a completed stage after changing an input, reset it first:

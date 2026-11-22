@@ -585,7 +585,7 @@ What a project produces: `music-video`, `episode`, or `meme`. It decides the pro
 _Avoid_: project type, mode
 
 **Template**:
-The skeleton copied by `npm run cli -- new` (called from the `new-video` skill) into a new project.
+The skeleton copied by `npm run cli -- new` (called from the setup skill) into a new project, one per project kind: `templates/project/` for a music video, `templates/episode/`, and `templates/meme/` (with the meme's `project.yaml` and an empty `pitch.md`).
 _Avoid_: boilerplate
 
 **Media Directory**:
@@ -729,7 +729,7 @@ _Avoid_: captions, lyrics
 ## Memes
 
 **Meme**:
-A standalone vertical video of about 15 seconds (at most 30) built on one punchline, made for TikTok, YouTube Shorts, and Instagram Reels: a project of kind `meme`. Its audio is built from a short script like an episode's, its characters come from the character library or its own character bible, and it belongs to no series.
+A standalone vertical video of about 15 seconds (at most 30) built on one punchline, made for TikTok, YouTube Shorts, and Instagram Reels: a project of kind `meme`. Its audio is built from a short script like an episode's, its characters come from the character library or its own character bible, and it belongs to no series. Its stages are `setup` ✋, `script` ✋, `style-character`, `voice-track`, `episode-track`, `storyboard`, `assets`, `assembly`, `qa-export`; `episode-track` refuses a track over 30 seconds as a hard stop.
 _Avoid_: meme clip, short, reel, clip
 _UI (de)_: Meme
 _UI (en)_: Meme

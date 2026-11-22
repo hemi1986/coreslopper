@@ -2,6 +2,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  MEME_MAX_SECONDS,
   ValidationError,
   ambienceSource,
   ensureDir,
@@ -200,6 +201,12 @@ export async function episodeTrack(projectDir: string): Promise<Timing> {
     meta: { generator: 'episode-track' },
   };
   const effective = mergeTiming(base, project.overrides);
+  // A meme lasts at most 30 seconds: a hard stop before anything is mixed (HS-264).
+  if (project.config.kind === 'meme' && effective.audio.duration > MEME_MAX_SECONDS + 1e-9) {
+    throw new ValidationError(
+      `The meme's track lasts ${effective.audio.duration.toFixed(3)} s; a meme lasts at most ${MEME_MAX_SECONDS} s. Shorten the script, then run voice-track and episode-track again.`,
+    );
+  }
 
   // Inputs from the effective timing.
   const lineInputs: Array<MixInput & { speaker?: string }> = [];

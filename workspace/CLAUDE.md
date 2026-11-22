@@ -8,7 +8,7 @@
 - `/new-video [slug]` — skill that creates a project for an existing song (or resumes one): asks for project data and lyrics, imports the song and vocal stem, then grills the user into the brief and treatment. Runs in the main session, not in a stage runner.
 - `/new-series [slug]` — skill that creates a series canon (bible, characters, sets, episode plan, references) through the series budget. Runs in the main session.
 - `/new-episode [slug]` — skill that creates an episode of a series (or resumes one) and grills the user into `script.yaml`. Runs in the main session.
-- `/video-next <slug>` — run all open autonomous stages of a music video (from `audio-analysis` on) or an episode (from `voice-track` on); the kind comes from `status`. Add `--stage <stage>` to run one stage, or `--dry-run` to inspect the next stage.
+- `/video-next <slug>` — run all open autonomous stages of a music video (from `audio-analysis` on), an episode (from `voice-track` on), or a meme (from `style-character` on); the kind comes from `status`. Add `--stage <stage>` to run one stage, or `--dry-run` to inspect the next stage.
 - `/video-status [slug]` — read-only stage and budget report.
 - `/model-bench` — skill that compares models, workflows, or ComfyUI servers on the bench cases in `bench/` and scores them with `art-director` agents.
 - Review: the user watches renders in the board's review view and sends notes to the agent as review rounds (`review/rounds/<NNN>.json`; `status` prints a `Review:` line per open round). `/video-next` answers open rounds first, through the "Review rounds" section of `assembly-render`.

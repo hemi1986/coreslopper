@@ -16,7 +16,8 @@
       "type": "string",
       "enum": [
         "music-video",
-        "episode"
+        "episode",
+        "meme"
       ]
     },
     "series": {

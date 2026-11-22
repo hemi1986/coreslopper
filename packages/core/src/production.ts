@@ -67,7 +67,9 @@ export function stageViews(state: State): StageView[] {
 
 /** The skill that runs a project's interactive stages. */
 export function setupSkill(kind: ProjectKind | undefined): string {
-  return kind === 'episode' ? 'new-episode' : 'new-video';
+  if (kind === 'episode') return 'new-episode';
+  if (kind === 'meme') return 'new-meme';
+  return 'new-video';
 }
 
 export interface ProductionFacts {

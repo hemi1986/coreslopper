@@ -15,7 +15,7 @@ Run the autonomous pipeline for one project: a music video or an episode of a se
 3. If `--dry-run`, stop after printing the kind, the next stage, its skills, and the remaining budget.
 4. If `status` prints `Review:` lines, answer those review rounds first (see "Review rounds" below), then run `status` again.
 5. If the next stage is missing because everything is done: when `status` prints a `Release:` line, report success and stop. Without it the release folder is missing, and it is qa-export's output: run `npm run cli -- stage-reset projects/<slug> qa-export` and continue with the stage loop.
-6. If the `Next:` line says `interactive`, stop: the stage needs the user. Tell them to run the setup skill of the kind, which resumes where the project stands: `/new-video <slug>` for a music video (`setup`, `brief`, `treatment`), `/new-episode <slug>` for an episode (`setup`, `script`). Never dispatch an interactive stage to a stage runner.
+6. If the `Next:` line says `interactive`, stop: the stage needs the user. Tell them to run the setup skill of the kind, which resumes where the project stands: `/new-video <slug>` for a music video (`setup`, `brief`, `treatment`), `/new-episode <slug>` for an episode (`setup`, `script`), `/new-meme <slug>` for a meme (`setup`, `script`). The `Next:` line names the command. Never dispatch an interactive stage to a stage runner.
 
 ## Review rounds
 
@@ -34,7 +34,8 @@ Repeat until the project is done or a hard stop occurs:
 
 1. Determine the next stage and its skills from the `Next:` line of `status`. The autonomous stage IDs are:
    - music video: `audio-analysis`, `style-character`, `storyboard`, `assets`, `assembly`, `qa-export`;
-   - episode: `voice-track`, `episode-track`, `storyboard`, `assets`, `assembly`, `qa-export`. An episode has no style stage: its style, characters, and sets are the series canon in `projects/<series>/`, which a stage runner reads and never writes.
+   - episode: `voice-track`, `episode-track`, `storyboard`, `assets`, `assembly`, `qa-export`. An episode has no style stage: its style, characters, and sets are the series canon in `projects/<series>/`, which a stage runner reads and never writes;
+   - meme: `style-character`, `voice-track`, `episode-track`, `storyboard`, `assets`, `assembly`, `qa-export`. Its bibles are its own, written in `style-character` after the script; an episode track over 30 seconds is a hard stop.
 2. Mark it running: `npm run cli -- stage-start projects/<slug> <stage>`.
 3. Dispatch **one** `stage-runner` subagent with a fresh context. The prompt must include:
    - the project path,

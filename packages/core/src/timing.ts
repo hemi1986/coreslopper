@@ -5,6 +5,7 @@ import {
   type Script,
   type SetBible,
   type Section,
+  type ProjectKind,
   type Shot,
   type Storyboard,
   type StyleBible,
@@ -253,12 +254,12 @@ export const FACELESS_DISPLAY_RULES = ['silhouette', 'voice-only'] as const;
 
 /**
  * The audio that drives a lip-sync shot: its `source`, or by default the vocal
- * stem of a music video or the speaker stem of an episode.
+ * stem of a music video or the speaker stem of an episode or a meme.
  */
-export function lipSyncSource(shot: Pick<Shot, 'lipSync'>, kind: 'music-video' | 'episode' | undefined): string | undefined {
+export function lipSyncSource(shot: Pick<Shot, 'lipSync'>, kind: ProjectKind | undefined): string | undefined {
   if (!shot.lipSync) return undefined;
   if (shot.lipSync.source) return shot.lipSync.source;
-  return kind === 'episode' ? `audio/stems/${shot.lipSync.character}.wav` : 'audio/stems/vocals.wav';
+  return kind === 'episode' || kind === 'meme' ? `audio/stems/${shot.lipSync.character}.wav` : 'audio/stems/vocals.wav';
 }
 
 /**

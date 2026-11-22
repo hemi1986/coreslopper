@@ -5,6 +5,7 @@ import {
   loadProject,
   nextStage,
   remainingBudget,
+  setupSkill,
   stageDefinition,
   stageTable,
 } from '@coreslopper/core';
@@ -21,7 +22,7 @@ export async function printStatus(projectDir: string): Promise<void> {
   console.log(
     config.kind === 'episode'
       ? `Kind: episode · series ${config.series} · episode ${config.episode}`
-      : 'Kind: music-video',
+      : `Kind: ${config.kind}`,
   );
   console.log(`Stage: ${state.stage} · Overall: ${state.status}`);
   console.log(stageTable(state).join('\n'));
@@ -56,6 +57,8 @@ export async function printStatus(projectDir: string): Promise<void> {
   }
   // An open review round is answered before the next stage (/video-next reads this line).
   for (const line of await openRoundSummaries(projectDir)) console.log(`Review: ${line}`);
-  console.log(`Next: ${next ? `${next.id} (${next.skills.join(', ')})${interactive ? ' · interactive' : ''}` : 'done'}`);
+  // An interactive stage names the setup skill's command, as the board's production view does.
+  const command = interactive ? ` · interactive · run /${setupSkill(state.kind)} ${config.slug}` : '';
+  console.log(`Next: ${next ? `${next.id} (${next.skills.join(', ')})${command}` : 'done'}`);
   if (!existsSync(loaded.paths.state)) console.log('Note: state.json does not exist yet; showing the initial state.');
 }

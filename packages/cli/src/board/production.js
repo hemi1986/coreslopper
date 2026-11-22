@@ -8,7 +8,7 @@ addStrings({
     production: 'Produktion', projects: 'Projekte', series: 'Serien', noWork: 'Noch kein Projekt und keine Serie im Workspace.',
     groupYou: 'Du bist dran', groupRunning: 'Läuft', groupReleased: 'Freigegeben', groupBroken: 'Nicht lesbar',
     phases: { setup: 'Setup', ready: 'Bereit', running: 'Läuft', failed: 'Fehlgeschlagen', done: 'Fertig' },
-    kindVideo: 'Musikvideo', kindEpisode: function (s, n) { return 'Episode ' + n + ' · ' + s; },
+    kindVideo: 'Musikvideo', kindMeme: 'Meme', kindEpisode: function (s, n) { return 'Episode ' + n + ' · ' + s; },
     budget: 'Budget', spent: 'ausgegeben', reserved: 'reserviert', since: 'seit', stage: 'Stage', status: 'Status', attempts: 'Versuche', when: 'Zeit', error: 'Fehler',
     queue: 'Generierungs-Queue', queueStates: { pending: 'offen', generating: 'generiert', reviewing: 'im Review', passed: 'bestanden', 'needs-fix': 'braucht Fix', error: 'Fehler' },
     reviews: 'Art-Director-Reviews', failedReviews: function (n) { return n + ' Review(s) nicht bestanden'; }, documents: 'Dokumente', noDocument: 'Dokument nicht gefunden', renders: 'Renders', contact: 'Contact Sheet',
@@ -42,7 +42,7 @@ addStrings({
     production: 'Production', projects: 'Projects', series: 'Series', noWork: 'No project or series in this workspace yet.',
     groupYou: 'Your turn', groupRunning: 'Running', groupReleased: 'Approved for release', groupBroken: 'Unreadable',
     phases: { setup: 'Setup', ready: 'Ready', running: 'Running', failed: 'Failed', done: 'Done' },
-    kindVideo: 'Music video', kindEpisode: function (s, n) { return 'Episode ' + n + ' · ' + s; },
+    kindVideo: 'Music video', kindMeme: 'Meme', kindEpisode: function (s, n) { return 'Episode ' + n + ' · ' + s; },
     budget: 'Budget', spent: 'spent', reserved: 'reserved', since: 'for', stage: 'Stage', status: 'Status', attempts: 'Attempts', when: 'Time', error: 'Error',
     queue: 'Generation queue', queueStates: { pending: 'pending', generating: 'generating', reviewing: 'in review', passed: 'passed', 'needs-fix': 'needs a fix', error: 'error' },
     reviews: 'Art-director reviews', failedReviews: function (n) { return n + ' review(s) failed'; }, documents: 'Documents', noDocument: 'Document not found', renders: 'Renders', contact: 'Contact sheet',
@@ -88,8 +88,8 @@ function nextBox(next, label, slug, kind) {
   const box = el('div', { class: 'next' }, [el('span', { text: text })]);
   if (next.command) box.appendChild(el('code', { text: next.command }));
   if (next.command) box.appendChild(copyButton(next.command, { copy: t('copy'), copied: t('copied') }));
-  // A setup the wizard can finish: project data, lyrics, song, references.
-  if (next.reason === 'interactive' && next.stage === 'setup' && slug && kind !== 'episode') box.appendChild(el('a', { href: '#/new/video/' + slug, text: t('wizard') + ' →', onclick: function (e) { e.stopPropagation(); } }));
+  // A music video's setup the wizard can finish: project data, lyrics, song, references.
+  if (next.reason === 'interactive' && next.stage === 'setup' && slug && (kind || 'music-video') === 'music-video') box.appendChild(el('a', { href: '#/new/video/' + slug, text: t('wizard') + ' →', onclick: function (e) { e.stopPropagation(); } }));
   if (next.where === 'board' && slug) box.appendChild(el('a', { href: '#/p/' + slug + '/release', text: t('tabRelease') + ' →', onclick: function (e) { e.stopPropagation(); } }));
   return box;
 }
@@ -137,7 +137,8 @@ function watchdogLine() {
 }
 
 function kindLabel(project) {
-  return project.kind === 'episode' ? t('kindEpisode')(project.series, project.episode) : t('kindVideo');
+  if (project.kind === 'episode') return t('kindEpisode')(project.series, project.episode);
+  return project.kind === 'meme' ? t('kindMeme') : t('kindVideo');
 }
 
 function queueLine(queue) {
