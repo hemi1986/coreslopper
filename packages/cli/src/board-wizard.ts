@@ -20,6 +20,7 @@ import {
   writeJsonAtomic,
   writeTextAtomic,
   type ImageProviderKind,
+  type LipSyncProviderKind,
   type Reference,
   type ReferenceKind,
   type References,
@@ -350,10 +351,16 @@ export async function videoWizardState(projectDir: string): Promise<VideoWizardS
   };
 }
 
-/** Mark `setup` done once the lyrics and the song are in: then `/new-video <slug>` starts with the brief. */
+/**
+ * Mark `setup` done: a music video once the lyrics and the song are in, so `/new-video <slug>` starts with the
+ * brief; a meme once its pitch holds the idea, so `/new-meme <slug>` starts with the script.
+ */
 export async function finishSetup(projectDir: string): Promise<void> {
   const project = await loadProject(projectDir);
-  if (project.config.kind !== 'episode') {
+  if (project.config.kind === 'meme') {
+    const pitch = await readFile(join(projectDir, 'pitch.md'), 'utf8').catch(() => '');
+    if (!pitchHasIdea(pitch)) throw new ValidationError('still missing: the idea in pitch.md');
+  } else if (project.config.kind !== 'episode') {
     const state = await videoWizardState(projectDir);
     if (state.missing.length) throw new ValidationError(`still missing: ${state.missing.join(', ')}`);
   }
@@ -408,6 +415,92 @@ export async function createEpisode(root: string, input: NewEpisodeInput): Promi
   return dir;
 }
 
+// ---------------------------------------------------------------------- meme
+
+export interface NewMemeInput {
+  slug: unknown;
+  /** The CLI may leave it out; it is then derived from the slug. */
+  title?: unknown;
+  /** Defaults to `MEME_DEFAULT_BUDGET_USD`. */
+  budget?: unknown;
+  imageProvider: unknown;
+  videoProvider: unknown;
+  /** Defaults to the video provider's lip-sync default. */
+  lipsyncProvider?: unknown;
+  /** Required: what the meme is about, in the user's words. */
+  idea: unknown;
+  setting?: unknown;
+  /** Library character ids to copy in; none is valid. */
+  characters?: unknown;
+  /** `true`: never released publicly (`distribution: internal`). */
+  internal?: unknown;
+}
+
+export const MEME_DEFAULT_BUDGET_USD = 10;
+
+/** 10 USD, or the configured minimum when that is higher. */
+async function memeDefaultBudget(root: string): Promise<number> {
+  return Math.max(MEME_DEFAULT_BUDGET_USD, (await loadDefaults(root)).budget.minimum_usd);
+}
+
+/** pitch.md: the idea and the setting in the user's words, where the grilling starts (ADR 0051). */
+export function memePitch(idea: string, setting?: string): string {
+  return ['# Pitch', '', '## Idea', '', idea, ...(setting ? ['', '## Setting', '', setting] : []), ''].join('\n');
+}
+
+/** The chosen library ids; `loadLibraryCharacter` checks each with the library's own id rule. */
+function characterIds(value: unknown): string[] {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value) || value.some((id) => typeof id !== 'string')) {
+    throw new ValidationError('characters is a list of library character ids');
+  }
+  return [...new Set(value as string[])];
+}
+
+/** Whether pitch.md holds more than headings, i.e. an idea. */
+function pitchHasIdea(text: string): boolean {
+  return text.split('\n').some((line) => line.trim() && !line.trim().startsWith('#'));
+}
+
+/**
+ * CMD-CreateMeme: a project of kind meme in its one 9:16 format, `pitch.md` from the idea and the setting, the
+ * chosen library characters copied in through `useCharacter`, and `setup` done, so `/new-meme <slug>` starts
+ * with the script. Every check runs before the folder exists; a later failure removes the folder again.
+ */
+export async function createMeme(root: string, input: NewMemeInput): Promise<string> {
+  const idea = typeof input.idea === 'string' ? input.idea.trim() : '';
+  if (!idea) throw new ValidationError('the meme needs an idea');
+  if (idea.length > 2000) throw new ValidationError('the idea is longer than 2000 characters');
+  const setting = optionalText(input.setting, 'setting');
+  const slug = slugOf(input.slug);
+  if (existsSync(join(root, 'projects', slug))) throw new ValidationError(`the slug "${slug}" is taken`);
+  const characters = characterIds(input.characters);
+  const { loadLibraryCharacter, useCharacter } = await import('./character-library.js');
+  for (const id of characters) await loadLibraryCharacter(root, id);
+
+  const dir = await createProject({
+    root,
+    slug,
+    kind: 'meme',
+    // The CLI may leave the title out; createProject derives it from the slug.
+    title: optionalText(input.title, 'title', 200),
+    budget: input.budget === undefined || input.budget === '' ? await memeDefaultBudget(root) : budget(input.budget),
+    imageProvider: choice(input.imageProvider, IMAGE_PROVIDERS, 'image provider') as ImageProviderKind,
+    videoProvider: choice(input.videoProvider, VIDEO_PROVIDERS, 'video provider') as VideoProviderKind,
+    ...(input.lipsyncProvider === undefined ? {} : { lipsyncProvider: choice(input.lipsyncProvider, VIDEO_PROVIDERS, 'lip-sync provider') as LipSyncProviderKind }),
+    ...distribution(input.internal),
+  });
+  try {
+    await writeTextAtomic(join(dir, 'pitch.md'), memePitch(idea, setting));
+    for (const id of characters) await useCharacter(root, dir, id);
+    await finishSetup(dir);
+  } catch (error) {
+    await rm(dir, { recursive: true, force: true });
+    throw error;
+  }
+  return dir;
+}
+
 // ------------------------------------------------------------------- options
 
 export interface WizardOptions {
@@ -416,6 +509,9 @@ export interface WizardOptions {
   formats: string[];
   series: Array<{ slug: string; title: string; canonReady: boolean; remainingUsd?: number; next?: { episode: number; title: string }; created: number[] }>;
   slugs: string[];
+  /** The library characters a meme can take, sorted by id. */
+  library: Array<{ id: string; name: string }>;
+  memeDefaultBudgetUsd: number;
 }
 
 /** What the wizard offers: providers with credentials, the series with their next planned episode, and the slugs in use. */
@@ -446,6 +542,10 @@ export async function wizardOptions(root: string, env: NodeJS.ProcessEnv = proce
     formats: Object.keys(FORMAT_SIZES),
     series,
     slugs: [...(await projectDirs(root)), ...(await seriesDirs(root))].map((dir) => basename(dir)),
+    library: (await (await import('./character-library.js')).listLibrary(root)).characters
+      .map((entry) => ({ id: entry.id, name: entry.name }))
+      .sort((a, b) => a.id.localeCompare(b.id)),
+    memeDefaultBudgetUsd: MEME_DEFAULT_BUDGET_USD,
   };
 }
 

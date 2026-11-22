@@ -522,7 +522,7 @@ program
 
 program
   .command('new <slug>')
-  .description('Create a new project from templates/project, or an episode from templates/episode.')
+  .description('Create a new project from templates/project, an episode from templates/episode, or a meme from templates/meme (--idea required; setup done).')
   .option('--kind <kind>', 'music-video | episode | meme', 'music-video')
   .option('--series <slug>', 'Episode: the series in projects/<slug>/')
   .option('--episode <n>', 'Episode: the episode number', (value) => Number(value))
@@ -533,10 +533,15 @@ program
   .option('--image-provider <provider>', 'mock | fal | higgsfield | topview')
   .option('--video-provider <provider>', 'mock | fal | higgsfield | topview | comfyui')
   .option('--lipsync-provider <provider>', 'mock | fal | higgsfield | topview | comfyui (default: the video provider; fal for topview)')
+  .option('--distribution <distribution>', 'public | internal (internal: never released publicly, no release package; default: public, nothing written)')
+  .option('--idea <text>', 'Meme (required): the idea, in your words; written to pitch.md')
+  .option('--setting <text>', 'Meme: where it happens; written to pitch.md')
   .action(
     (
       slug: string,
       options: {
+        idea?: string;
+        setting?: string;
         title?: string;
         budget?: number;
         brand: string;
@@ -560,6 +565,34 @@ program
         const videoProvider = options.videoProvider
           ? validateChoice(options.videoProvider, [...visuals, 'comfyui'] as const, 'video provider')
           : visual;
+        const lipsyncProvider = options.lipsyncProvider
+          ? validateChoice(options.lipsyncProvider, [...visuals, 'comfyui'] as const, 'lip-sync provider')
+          : undefined;
+        const distribution = options.distribution
+          ? validateChoice(options.distribution, ['public', 'internal'] as const, 'distribution')
+          : undefined;
+        if (kind !== 'meme' && (options.idea !== undefined || options.setting !== undefined)) {
+          throw new ValidationError('--idea and --setting are for --kind meme only');
+        }
+        if (kind === 'meme' && (options.series !== undefined || options.episode !== undefined)) {
+          throw new ValidationError('a meme has no series; leave out --series and --episode');
+        }
+        if (kind === 'meme') {
+          // CMD-CreateMeme: pitch.md from the idea and the setting, setup done.
+          const { createMeme } = await import('./board-wizard.js');
+          await createMeme(repoRoot(), {
+            slug,
+            title: options.title,
+            budget: options.budget,
+            imageProvider,
+            videoProvider,
+            lipsyncProvider,
+            idea: options.idea,
+            setting: options.setting,
+            internal: distribution === 'internal',
+          });
+          return;
+        }
         await createProject({
           slug,
           title: options.title,
@@ -567,15 +600,11 @@ program
           brand: options.brand,
           imageProvider,
           videoProvider,
-          lipsyncProvider: options.lipsyncProvider
-            ? validateChoice(options.lipsyncProvider, [...visuals, 'comfyui'] as const, 'lip-sync provider')
-            : undefined,
+          lipsyncProvider,
           kind,
           series: options.series,
           episode: options.episode,
-          distribution: options.distribution
-            ? validateChoice(options.distribution, ['public', 'internal'] as const, 'distribution')
-            : undefined,
+          distribution,
         });
       }),
   );

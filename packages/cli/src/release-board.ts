@@ -192,6 +192,10 @@ export function boardHandler(options: BoardOptions = {}) {
       const dir = await wizard.createSeriesCanon(root, (await body(req)) as never);
       return answer({ slug: dir.split(sep).at(-1) });
     }
+    if (req.method === 'POST' && path === '/api/new/meme') {
+      const slug = (await wizard.createMeme(root, (await body(req)) as never)).split(sep).at(-1)!;
+      return answer({ slug, next: `/new-meme ${slug}` });
+    }
     if (req.method === 'POST' && path === '/api/new/episode') {
       const dir = await wizard.createEpisode(root, (await body(req)) as never);
       return answer({ slug: dir.split(sep).at(-1) });

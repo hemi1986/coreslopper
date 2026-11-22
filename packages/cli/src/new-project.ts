@@ -109,7 +109,16 @@ export async function createProject(options: NewProjectOptions): Promise<string>
   // A meme's template holds its project.yaml: the kind and the one 9:16 format.
   const memeTemplate =
     kind === 'meme' ? await readYamlFile(join(templateDir, 'project.yaml'), MemeTemplateSchema) : undefined;
-  await cp(templateDir, projectDir, { recursive: true, errorOnExist: true });
+  // The folder is claimed with a plain mkdir: of two creates of one slug at once, the second is refused here
+  // instead of writing into the first one's folder.
+  await mkdir(join(root, 'projects'), { recursive: true });
+  try {
+    await mkdir(projectDir);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new ValidationError(`Project directory already exists: ${projectDir}`);
+    throw error;
+  }
+  await cp(templateDir, projectDir, { recursive: true, force: false });
 
   const planned = series?.episodes.find((entry) => entry.episode === options.episode);
   const config: ProjectConfig = {
@@ -212,7 +221,7 @@ export async function createProject(options: NewProjectOptions): Promise<string>
     return projectDir;
   }
   if (kind === 'meme') {
-    console.log(`Next: write the idea into pitch.md, then run /new-meme ${slug} in Claude Code to grill it into script.yaml.`);
+    console.log(`Next: run /new-meme ${slug} in Claude Code to grill the pitch into script.yaml.`);
     return projectDir;
   }
   const audio = relativeToRoot(join(projectDir, 'audio'), root);

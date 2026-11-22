@@ -12,7 +12,7 @@ risk: null
 events: [EVT-MemeCreated, EVT-MemeRefused]
 depends_on: [ST-007]
 labels: [feature:meme]
-status: ready
+status: done
 ---
 
 ## Story

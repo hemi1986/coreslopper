@@ -3,7 +3,7 @@
 //   #/p/<slug>       a project's production   #/p/<slug>/release[/<platform>[/<event>]]
 //   #/p/<slug>/review[/<render>]             the review player
 //   #/p/<slug>/doc/<path>                    a project document (brief, treatment, …)
-//   #/s/<slug>       a series                #/new[/video|series|episode[/<slug>]]  the wizard
+//   #/s/<slug>       a series                #/new[/video|series|episode|meme[/<slug>]]  the wizard
 //   #/characters[/<id>]                     the character library
 //   #/guide[/<doc>]                          the board guide, or another page of docs/
 import { addStrings, api, el, go, loading, showError, t } from './lib.js';
@@ -88,7 +88,7 @@ function route() {
   kept = false;
   const hash = decodeURIComponent(location.hash || '#/');
   let match, view;
-  if ((match = /^#\/new(?:\/(video|series|episode)(?:\/([a-z0-9-]+))?)?\/?$/.exec(hash))) { active = 'new'; view = showWizard(match[1], match[2]); }
+  if ((match = /^#\/new(?:\/(video|series|episode|meme)(?:\/([a-z0-9-]+))?)?\/?$/.exec(hash))) { active = 'new'; view = showWizard(match[1], match[2]); }
   else if (hash === '#/calendar') { active = 'calendar'; view = showCalendar(); }
   else if ((match = /^#\/guide(?:\/([a-z][a-z0-9-]*(?:\.de)?))?\/?$/.exec(hash))) { active = 'guide'; view = showGuide(match[1]); }
   else if ((match = /^#\/characters(?:\/([a-z0-9][a-z0-9_-]*))?\/?$/.exec(hash))) { active = 'characters'; view = showCharacters(match[1]); }

@@ -1,8 +1,9 @@
-// The wizard for a new music video, series, or episode. It collects what a
-// form can hold (project data, lyrics, song, references) and ends with the one
-// command to type in Claude Code, where the grilling happens.
+// The wizard for a new music video, series, episode, or meme. It collects what a
+// form can hold (project data, lyrics, song, a meme's pitch, references) and
+// ends with the one command to type in Claude Code, where the grilling happens.
 //   #/new                 choose            #/new/video[/<slug>]
 //   #/new/series[/<slug>]                   #/new/episode[/<slug>]
+//   #/new/meme[/<slug>]
 import { addStrings, api, copyButton, el, go, pending, post, projectFile, setLang, showError, t, upload } from './lib.js';
 import { libraryPicker } from './characters.js';
 
@@ -25,7 +26,11 @@ addStrings({
     seriesNext: 'Jetzt in Claude Code den Canon grillen lassen:', episodeNext: 'Episode angelegt. In Claude Code das Skript grillen lassen:',
     series: 'Serie', episode: 'Episode', canonNotReady: 'Der Canon dieser Serie ist noch nicht fertig; eine Episode braucht Figuren und Sets mit Referenzen.',
     remaining: function (v) { return 'frei im Serienbudget: $' + v; }, warnings: 'Hinweise', uploading: 'lädt hoch …', open: 'öffnen', remove: 'Entfernen', back: 'Zurück',
-    toProject: 'Zum Projekt →', toSeries: 'Zur Serie →'
+    toProject: 'Zum Projekt →', toSeries: 'Zur Serie →',
+    newMeme: 'Meme', newMemeSub: 'Ein kurzes, witziges Hochkant-Video (~15 s) für TikTok, Shorts und Reels.',
+    idea: 'Idee', ideaHelp: 'Worum geht es? In deinen Worten – das Grilling startet hier, nichts ist schon entschieden.', setting: 'Setting (optional)', settingHelp: 'Wo spielt es?',
+    memeChars: 'Figuren aus der Bibliothek (optional)', memeNoChars: 'Noch keine Figuren in der Bibliothek – Claude erfindet sie aus deiner Idee.',
+    memeNext: 'Meme angelegt. In Claude Code das Skript grillen lassen:'
   },
   en: {
     newTitle: 'Create', newVideo: 'Music video', newVideoSub: 'For a finished song: project data, lyrics, song, references, characters.',
@@ -45,7 +50,11 @@ addStrings({
     seriesNext: 'Now let Claude Code grill the canon:', episodeNext: 'Episode created. Let Claude Code grill the script:',
     series: 'Series', episode: 'Episode', canonNotReady: 'This series’ canon is not complete yet; an episode needs characters and sets with references.',
     remaining: function (v) { return 'uncommitted in the series budget: $' + v; }, warnings: 'Notes', uploading: 'uploading …', open: 'open', remove: 'Remove', back: 'Back',
-    toProject: 'Go to the project →', toSeries: 'Go to the series →'
+    toProject: 'Go to the project →', toSeries: 'Go to the series →',
+    newMeme: 'Meme', newMemeSub: 'A short, funny vertical video (~15 s) for TikTok, Shorts, and Reels.',
+    idea: 'Idea', ideaHelp: 'What is it about? In your words – the grilling starts here, nothing is decided yet.', setting: 'Setting (optional)', settingHelp: 'Where does it happen?',
+    memeChars: 'Characters from the library (optional)', memeNoChars: 'No characters in the library yet – Claude invents them from your idea.',
+    memeNext: 'Meme created. Let Claude Code grill the script:'
   }
 });
 
@@ -83,7 +92,7 @@ function choose() {
   const node = main();
   node.appendChild(el('h2', { text: t('newTitle'), style: 'margin:0 0 16px;font-size:20px' }));
   node.appendChild(el('div', { class: 'grid' }, [
-    ['video', t('newVideo'), t('newVideoSub')], ['series', t('newSeries'), t('newSeriesSub')], ['episode', t('newEpisode'), t('newEpisodeSub')]
+    ['video', t('newVideo'), t('newVideoSub')], ['series', t('newSeries'), t('newSeriesSub')], ['episode', t('newEpisode'), t('newEpisodeSub')], ['meme', t('newMeme'), t('newMemeSub')]
   ].map(function (c) {
     return el('section', { class: 'card', onclick: function () { go('#/new/' + c[0]); } }, [el('h3', { text: c[1], style: 'margin:0 0 6px' }), el('p', { class: 'meta', text: c[2] })]);
   })));
@@ -316,6 +325,56 @@ function episodeSteps(slug) {
   }).catch(showError);
 }
 
+// --------------------------------------------------------------------- meme
+
+function memeForm() {
+  const node = main();
+  node.appendChild(el('h2', { text: t('newMeme'), style: 'margin:0 0 16px;font-size:20px' }));
+  const title = input({ required: true }), slug = input({ required: true, pattern: '[a-z0-9][a-z0-9-]*' });
+  const budget = input({ type: 'number', min: options.minimumBudgetUsd, step: '1', value: String(Math.max(options.memeDefaultBudgetUsd, options.minimumBudgetUsd)) });
+  const providers = ['mock', 'fal', 'higgsfield', 'topview', 'comfyui'];
+  const best = ['fal', 'higgsfield', 'topview'].filter(function (p) { return options.providers[p]; })[0] || 'mock';
+  const image = providerSelect(providers, best), video = providerSelect(providers, options.providers.comfyui ? 'comfyui' : best);
+  const idea = el('textarea', { class: 'note-input', rows: 4, required: true });
+  const setting = input({});
+  const internal = internalBox();
+  const boxes = options.library.map(function (c) { return { id: c.id, box: el('input', { type: 'checkbox' }), name: c.name }; });
+  const characters = boxes.length
+    ? el('div', { class: 'form-row' }, boxes.map(function (b) { return el('label', {}, [b.box, ' ' + b.name + ' (' + b.id + ')']); }))
+    : el('p', { class: 'meta', text: t('memeNoChars') });
+  let slugEdited = false;
+  title.oninput = function () { if (!slugEdited) slug.value = slugify(title.value); };
+  slug.oninput = function () { slugEdited = true; };
+  const error = el('p', { class: 'error' });
+  const form = el('form', { class: 'card form' }, [
+    el('div', { class: 'form-row' }, [field(t('title'), title), field(t('slug'), slug), field(t('budget'), budget, t('minimum')(options.minimumBudgetUsd))]),
+    el('div', { class: 'form-row' }, [field(t('imageProvider'), image), field(t('videoProvider'), video)]),
+    field(t('idea'), idea, t('ideaHelp')),
+    field(t('setting'), setting, t('settingHelp')),
+    el('h4', { class: 'section-title', text: t('memeChars') }), characters,
+    internal.node, error, el('button', { class: 'primary', type: 'submit', text: t('create') })
+  ]);
+  form.onsubmit = pending(function () {
+    if (options.slugs.indexOf(slug.value) >= 0) { error.textContent = t('taken'); return; }
+    const chosen = boxes.filter(function (b) { return b.box.checked; }).map(function (b) { return b.id; });
+    return post('/api/new/meme', { title: title.value, slug: slug.value, budget: Number(budget.value), imageProvider: image.value, videoProvider: video.value, idea: idea.value, setting: setting.value, characters: chosen, internal: internal.box.checked })
+      .then(function (r) { go('#/new/meme/' + r.slug); })
+      .catch(function (e) { error.textContent = e.message; });
+  });
+  node.appendChild(form);
+}
+
+function memeSteps(slug) {
+  return api('/api/new/project/' + encodeURIComponent(slug) + '/references').then(function (refs) {
+    const node = main();
+    node.appendChild(el('header', { class: 'project' }, [el('h2', { text: slug }), el('span', { class: 'chip', text: t('newMeme') })]));
+    node.appendChild(el('div', { style: 'height:12px' }));
+    node.appendChild(commandBox(t('memeNext'), '/new-meme ' + slug, projectLink(slug)));
+    node.appendChild(el('div', { style: 'height:12px' }));
+    node.appendChild(referencesStep(1, 'project', slug, refs.references, function () { memeSteps(slug); }));
+  }).catch(showError);
+}
+
 /** Route `#/new...`. */
 export function showWizard(kind, slug) {
   setLang(null);
@@ -323,6 +382,7 @@ export function showWizard(kind, slug) {
     if (kind === 'video') return slug ? videoSteps(slug) : videoForm();
     if (kind === 'series') return slug ? seriesSteps(slug) : seriesForm();
     if (kind === 'episode') return slug ? episodeSteps(slug) : episodeForm();
+    if (kind === 'meme') return slug ? memeSteps(slug) : memeForm();
     return choose();
   }).catch(showError);
 }
