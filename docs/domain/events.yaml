@@ -146,6 +146,9 @@ bounded_contexts:
     name: Model bench
     purpose: Replays fixed scenes from past projects – the bench cases – on several bench targets before a model, workflow, server or provider switch, measures every result mechanically, has the art director score it against the case's rubric and the user rate it, and ends with a recommendation per operation; it has its own budget and never produces project assets
 
+  - id: BC-Board
+    name: Board
+    purpose: The workspace's local page that hosts the views of the other contexts – production, review, release, the release calendar, the character library and the wizard – behind one navigation; it starts the server, routes, serves the page and the whitelisted files, guards every write and chooses the language, and owns no state of its own – every write goes to the module of the context that owns it
 aggregates:
   - id: AGG-Project
     name: Project
@@ -1293,6 +1296,37 @@ events:
     context: BC-Bench
     data: [Run id, Ratings]
     description: "The page's Export ratings.json downloaded the ratings; the user saves the file into the run folder by hand (bench-report.ts:288-292; bench/README.md)"
+  - id: EVT-BoardStarted
+    name: Board started
+    context: BC-Board
+    data: [Host, Port, URL, Watch interval]
+    description: "board (alias release-board) listened on 127.0.0.1:4848 or the given --host and --port and printed the URL; with --watch <minutes> the watchdog round runs in the same process (packages/cli/src/index.ts:352-378; packages/cli/src/release-board.ts:513-525)"
+  - id: EVT-BoardViewOpened
+    name: Board view opened
+    context: BC-Board
+    data: [Address, View, Project, Series, Render, Platform, Calendar event, Character]
+    description: "The address after # chose a view: the overview, a project or series, a project's review or release view, the release calendar, the character library or the wizard; an unknown address shows the overview, an old release-board link #/p/<slug>/<platform> goes to the release view (packages/cli/src/board/app.js:1-6,60-73)"
+  - id: EVT-BoardRefreshed
+    name: Board refreshed
+    context: BC-Board
+    data: [Projects, Series, Release progress]
+    description: "The navigation was loaded again from /api/production and /api/projects, and the production view redrawn when its data changed and no video plays; as-is every 10 s while the tab is visible (app.js:19,53-58,82-86; production.js:301-315)"
+  - id: EVT-BoardFileServed
+    name: Board file served
+    context: BC-Board
+    data: [Scope, Slug, Path, MIME type, Byte range]
+    description: "A file of a project, series canon, release folder or library entry was sent with nosniff and a sandboxing content security policy, whole or as one byte range (release-board.ts:128-151,259-266,402-411,503)"
+  - id: EVT-BoardFileRefused
+    name: Board file refused
+    context: BC-Board
+    data: [Scope, Slug, Path, Reason]
+    description: "403: a project or series path outside the whitelist, a dot or .. segment, a library entry's character.yaml or dot file, or a path that resolves outside its folder; 404 for a page file that is not a lower-case .js or .css name (release-board.ts:66-70,134,259-264,350-355,406-408)"
+  - id: EVT-BoardWriteRefused
+    name: Board write refused
+    context: BC-Board
+    origin: external
+    data: [Method, Path, Host, Origin, Fetch site, Content type, Reason]
+    description: "403: a request other than GET without a loopback Host, with an Origin other than the board's, a cross-site Sec-Fetch-Site, or a body that is not JSON – an upload needs an Origin and a raw octet-stream body (release-board.ts:102-126,343-346; tests/release-autopilot.test.ts, board-wizard.test.ts, board-review.test.ts)"
 commands:
   - id: CMD-CreateProject
     name: Create project
@@ -2142,6 +2176,45 @@ commands:
     description: "Export ratings.json on the page, then save it into bench/runs/<id>/ (bench-report.ts:288-292)"
     rules:
       - The browser's copy wins over an embedded ratings.json when the page loads (the code does this, bench-report.ts:268-272)
+  - id: CMD-StartBoard
+    name: Start the board
+    actor: ACT-User
+    produces: [EVT-BoardStarted]
+    description: "npm run cli -- board [--port] [--host] [--watch <minutes>], or the board container (docker compose up -d, which runs board --host 0.0.0.0 --port 4848 --watch 5) (index.ts:352-378; docker/Dockerfile; docs/board.md)"
+    rules:
+      - The board listens on the computer's loopback by default; --host 0.0.0.0 only inside the board container, whose port is published on the loopback (the code does this, index.ts:352-378; compose.yaml:11; ADR 0030)
+      - The user uses the board only on the computer it runs on (user, 2026-11-22)
+      - Every request other than a read passes the write guard, so only the board's own page writes (the code does this, release-board.ts:102-126,343-346)
+      - Every request, reads included, needs a loopback Host (decided 2026-11-22, HS-247; reads answer any Host – gap register)
+      - The board writes nothing itself; every write goes to the module of the context that owns it – release status, approval and autopilot marks, review notes and rounds, the wizard's projects and references, the character library (the code does this, release-board.ts:176-320,379-474)
+      - --watch takes whole minutes, at least 1, checked before the server listens (decided 2026-11-22, HS-249; checked after it listens – gap register)
+  - id: CMD-OpenBoardView
+    name: Open a board view
+    actor: ACT-User
+    produces: [EVT-BoardViewOpened]
+    description: "A click in the board navigation or on a project's tab, or a link to #/…; the view loads its own data (app.js:60-73; lib.js:112-121)"
+    rules:
+      - The release view speaks the project's language, every other view the browser's; a text missing in German falls back to English (the code does this, lib.js:3-17; the user keeps it, 2026-11-22)
+      - The navigation lists every project and series, an unreadable one with its error instead of hiding it (the code does this, app.js:32-50; ADR 0030)
+      - Once the list grows, finished and released projects can be folded away without leaving the board (user, 2026-11-22, HS-245; the list is flat – gap register)
+  - id: CMD-RefreshBoard
+    name: Refresh the board
+    actor: ACT-User
+    produces: [EVT-BoardRefreshed]
+    description: "The user refreshes the board by hand when they want to see the pipeline's progress (user, 2026-11-22, HS-244); as-is the page polls every 10 s while the tab is visible (app.js:19,82-86 – gap register)"
+    rules:
+      - The board does not refresh by itself; the user refreshes it (user, 2026-11-22, HS-244; it polls every 10 s – gap register)
+      - A refresh never restarts a playing video and never discards what the user is typing (the code does this for the production view, production.js:301-315; decided 2026-11-22, HS-244)
+  - id: CMD-OpenBoardFile
+    name: Open a file on the board
+    actor: ACT-User
+    produces: [EVT-BoardFileServed, EVT-BoardFileRefused]
+    description: "GET /files/<project>/<path>, /series-files/<series>/<path>, /media/<project>/<path> (the release folder) or /library-files/<id>/<name>; the views embed them as images, players and links (release-board.ts:128-151,259-266,402-411,503)"
+    rules:
+      - A project serves only renders/, review/, assets/, characters/, sets/, props/ and its written documents; a series canon its characters/, sets/, props/, assets/, review/ and bible.md; never project.yaml, state.json or a dot file (the code does this, release-board.ts:66-68,402-408; tests/board-production.test.ts; ADR 0030)
+      - The release folder follows the same dot-file rule (decided 2026-11-22, HS-248; /media checks only that the path stays in the folder – gap register)
+      - A served file never runs a script, even an SVG or HTML file (the code does this, release-board.ts:129-132; tests/board-production.test.ts)
+      - Videos seek through single byte ranges; an unsatisfiable range is 416 (the code does this, release-board.ts:138-148; tests/release-folder.test.ts; tests/board-shell-characterization.test.ts)
 policies:
   - id: POL-RunNextStage
     name: Run the next autonomous stage
@@ -2463,6 +2536,18 @@ read_models:
     used_by: [ACT-User]
     fields: [Operation, Rubric mean, Worst seed, Time, VRAM peak, Cost, Refusals, Same bytes, Cases that differ most, Recommendation, config/models.yaml change]
     description: "The skill's summary per operation – keep, switch, or use only for some shots – and the config/models.yaml change it implies; models.yaml changes only when the user asks (SKILL.md step 8)"
+  - id: RM-BoardNavigation
+    name: Board navigation
+    fed_by: [EVT-ProjectCreated, EVT-StageStarted, EVT-StageCompleted, EVT-StageFailed, EVT-ReleaseCalendarPlanned, EVT-CalendarEventMarkedDone, EVT-BoardRefreshed]
+    used_by: [ACT-User]
+    fields: [Production, Release calendar, Characters, New, Project, Production phase, Current stage, Release day, Done of total, Series, Created of planned episodes, Error, Motto]
+    description: "The board's left column: the fixed entries, then every project with its production phase and current stage – or, once done, its release day and done marks – and every series with its created and planned episodes; the channel's motto at the top right (app.js:24-58,76-79; release-board.ts:412-433)"
+  - id: RM-BoardActivity
+    name: Board activity
+    fed_by: [EVT-StageStarted, EVT-StageCompleted, EVT-StageFailed]
+    used_by: [ACT-User]
+    fields: [Last round, Interval, Stalled projects, Event, Project, At]
+    description: "/api/activity: the watchdog's last round and interval, the stalled projects and the latest 50 events of the production scan from .cache/watch/ (release-board.ts:357-364; packages/cli/src/production-watch.ts); the production view shows it under Activity"
 hotspots:
   - id: HS-1
     question: "'Production phase' (setup/ready/running/failed/done) is a derived project status, but the glossary lists 'phase' under Avoid for Stage, and 'setup' is both a stage ID and a phase. Which word is the domain term?"
@@ -3670,6 +3755,81 @@ hotspots:
     refs: [BC-Bench, AGG-BenchCase]
     status: resolved
     resolution: "ADR 0048 (proposed) records the workspace as the bench's host, the user's cases as workspace content with generic examples upstream, and bench/'s configuration and cases as the workspace's own at update, shipped before the cases leave upstream; it amends 0020 (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-242
+    question: "The board's shell routes, serves and guards, and writes nothing itself. Is it a bounded context, and does it own an aggregate?"
+    refs: [BC-Board]
+    status: resolved
+    resolution: "One context, Board: a host for the views of the other contexts. No aggregate – the shell owns no state; the per-project refresh queue lives in the process only (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-243
+    question: "One word for two things: the command board with the alias release-board, the file release-board.ts and its log prefix serve the whole board, while the glossary's Release Board is one view; the code also says page, view and tab for a view. Which words?"
+    refs: [BC-Board, CMD-OpenBoardView]
+    status: resolved
+    resolution: "Board is the whole page, release-board only an old alias; Board View for one view (a project's views are its tabs); Release Board stays the release view; Board Navigation, Write Guard and Activity are new terms (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-244
+    question: "The page polls every 10 s while it is visible (ADR 0030). Keep it?"
+    refs: [CMD-RefreshBoard]
+    status: resolved
+    resolution: "No automatic refresh: the user refreshes by hand (user, 2026-11-22: sounds annoying, bad while typing, a manual refresh is enough). A refresh never discards what the user types (recommendation, not reviewed by the user – delegated, 2026-11-22). Medium; ADR 0049 amends 0030"
+  - id: HS-245
+    question: "The navigation lists every project and series in one flat column. Enough?"
+    refs: [RM-BoardNavigation, CMD-OpenBoardView]
+    status: resolved
+    resolution: "Enough for now, but it will become unclear (user, 2026-11-22). Finished and released projects can be folded away, and a series' episodes stay under their series (recommendation, not reviewed by the user – delegated, 2026-11-22). Low today, rising with the number of projects"
+  - id: HS-246
+    question: "The board speaks the browser's language and the release view the project's; server errors are English behind a German prefix, upload failed is hard-coded, and a failing refresh adds one more error line each time. Keep the rule, fix the texts?"
+    refs: [CMD-OpenBoardView]
+    status: resolved
+    resolution: "Keep the language rule (user, 2026-11-22). The texts follow it: errors the user sees are in the board's language, one error line replaces the last, and the page's title and lang follow the view. Low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-247
+    question: "Writes need a loopback Host, reads do not: a web page in the browser that rebinds its own domain to 127.0.0.1 can read the board's data, lyrics and unreleased renders. Guard the reads?"
+    refs: [CMD-StartBoard]
+    status: resolved
+    resolution: "Yes: every request needs a loopback Host, since the user opens the board only on the computer it runs on (user, 2026-11-22) and the container publishes the port on the loopback. Medium (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-248
+    question: "/media serves any file under the release folder, dot files included, while ADR 0030 promises a whitelist and never a dot file. Intended?"
+    refs: [CMD-OpenBoardFile]
+    status: resolved
+    resolution: "No: the release folder follows the same dot-file rule as /files. Low – the release folder holds no secret today (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-249
+    question: "A malformed JSON body or a broken % escape in the address gives 500, an unknown slug 400, and a wrong --watch value stops the board after it started. Which status for what?"
+    refs: [CMD-StartBoard, CMD-OpenBoardFile]
+    status: resolved
+    resolution: "Malformed input is 400, an unknown project, series or file 404, an error of the board 500; --watch is checked before the server listens. Low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-250
+    question: "serveMedia has no error handler on its read stream, so a file removed between the check and the read throws an unhandled error and stops the board; a syntactically invalid range such as bytes=5-2 gives 416 instead of the whole file. Fix?"
+    refs: [CMD-OpenBoardFile]
+    status: resolved
+    resolution: "Yes: a read error ends that one response, and an invalid range is ignored as the HTTP standard says. Low, inference, untested; the container restarts a stopped board (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-251
+    question: "Routes are partly inline in release-board.ts (production, review, release, autopilot) and partly delegated (wizard, library); the file is named for one view. A rule for new views?"
+    refs: [BC-Board]
+    status: resolved
+    resolution: "Each view's routes live in that view's module, as for the wizard and the library, and the server file is named for the board; release-board stays an alias of the command. Low, a chore (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-252
+    question: "The release refresh queue runs one refresh per change, chained; its comment says a change during a refresh queues one more. Which one?"
+    refs: [BC-Board]
+    status: resolved
+    resolution: "The comment: changes during a refresh queue one more refresh, not one each. Low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-253
+    question: "Served files carry a sandboxing content security policy; the page itself (/ and /board/*) carries none. Give the page one?"
+    refs: [CMD-StartBoard]
+    status: resolved
+    resolution: "Yes: the page allows only its own scripts, styles and the board's files. Low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-254
+    question: "Drifted texts: the server's header comment omits the review writes; serveMedia says a file of a release folder; the refusal says 127.0.0.1 only while localhost and [::1] pass; ADR 0030 names five page modules and the automatic refresh; docs/board.md and conventions say the page refreshes every ten seconds. Fix together?"
+    refs: [BC-Board]
+    status: resolved
+    resolution: "Fixed together with HS-244 and HS-251; ADR 0030 stays accepted, ADR 0049 amends it. Low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-255
+    question: "What pins the shell's behaviour now, and what stays untested?"
+    refs: [CMD-StartBoard, CMD-OpenBoardFile]
+    status: resolved
+    resolution: "Five characterization tests in tests/board-shell-characterization.test.ts: a read answers a foreign Host, a JSON body over 64 KiB is 400 while a malformed one is 500, a series canon serves bible.md and refuses series.yaml, a suffix range and an unsatisfiable range, activity without a watchdog round. The rest is a gap: the page's script (routes, language, navigation), the MIME table, the content-type branch alone, HEAD and OPTIONS. Low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-256
+    question: "Is the shell's change – a manual refresh, guarded reads, one route module per view – worth an ADR beside 0030?"
+    refs: [BC-Board]
+    status: resolved
+    resolution: "ADR 0049 (proposed) records the board as a host without state, the manual refresh, a loopback Host for every request, the release folder's dot-file rule, the page's own security policy, the status codes and one route module per view; it amends 0030 (recommendation, not reviewed by the user – delegated, 2026-11-22)"
 flows:
   - id: FLOW-AutonomousStage
     name: One autonomous stage
@@ -3725,3 +3885,6 @@ flows:
   - id: FLOW-ModelComparison
     name: From a comparison question to a model recommendation
     sequence: [ACT-User, ACT-BenchSkill, CMD-AddBenchTarget, EVT-BenchTargetAdded, CMD-ImportBenchFixtures, EVT-BenchFixturesImported, RM-BenchList, CMD-RunBench, EVT-BenchRunPlanned, EVT-BenchResultRecorded, EVT-BenchSpendRecorded, POL-ScoreEveryBenchCase, CMD-ScoreBenchCase, EVT-BenchCaseScored, POL-ReportAfterBenchRun, CMD-BuildBenchReport, EVT-BenchReportBuilt, RM-ComparisonPage, CMD-RateBenchResult, EVT-BenchResultRated, CMD-ExportRatings, EVT-RatingsExported, RM-ModelRecommendation]
+  - id: FLOW-BoardSession
+    name: From starting the board to a view, a refresh and a file
+    sequence: [ACT-User, CMD-StartBoard, EVT-BoardStarted, RM-BoardNavigation, CMD-OpenBoardView, EVT-BoardViewOpened, RM-BoardActivity, CMD-RefreshBoard, EVT-BoardRefreshed, CMD-OpenBoardFile, EVT-BoardFileServed]

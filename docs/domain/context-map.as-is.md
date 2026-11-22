@@ -3,7 +3,7 @@
 > Recovered from code by `/adopt` on 2026-11-21 at b195086. This is **not a target**.
 > Target: [context-map.md](context-map.md) · Gap register: [gap-register.md](gap-register.md).
 
-Adopted slices: project and stage pipeline; human review; art-director verdicts and the generation queue (decided by recommendation); song timing and lyrics (decided by recommendation, four answers from the user); the storyboard (decided by recommendation, four answers from the user); generation and the provider adapters (decided by recommendation, four answers from the user); series budget, script, takes and the episode track (decided by recommendation, four answers from the user); the bibles, user references and the character library (decided by recommendation, four answers from the user); render, Shorts, composed images and the media directory (decided by recommendation, four answers from the user); the release package, calendar, release board and approval (decided by recommendation, four answers from the user); publishing – the publish command, the release autopilot, the platform credentials and the watchdog round (decided by recommendation, four answers from the user); the workspace – init, onboarding, update, doctor, the layout migration, the runtime build and the board container (decided by recommendation, four answers from the user); the model bench – cases, targets, fixtures, runs, bench scores, ratings and the bench budget (decided by recommendation, four answers from the user). The board's shell appears only as a neighbour until its own slice is adopted.
+Adopted slices: project and stage pipeline; human review; art-director verdicts and the generation queue (decided by recommendation); song timing and lyrics (decided by recommendation, four answers from the user); the storyboard (decided by recommendation, four answers from the user); generation and the provider adapters (decided by recommendation, four answers from the user); series budget, script, takes and the episode track (decided by recommendation, four answers from the user); the bibles, user references and the character library (decided by recommendation, four answers from the user); render, Shorts, composed images and the media directory (decided by recommendation, four answers from the user); the release package, calendar, release board and approval (decided by recommendation, four answers from the user); publishing – the publish command, the release autopilot, the platform credentials and the watchdog round (decided by recommendation, four answers from the user); the workspace – init, onboarding, update, doctor, the layout migration, the runtime build and the board container (decided by recommendation, four answers from the user); the model bench – cases, targets, fixtures, runs, bench scores, ratings and the bench budget (decided by recommendation, four answers from the user); the board's shell – the server, the routes, the write guard, the served files, the navigation, the language and the refresh (decided by recommendation, four answers from the user). Every slice is adopted.
 
 ```mermaid
 flowchart LR
@@ -73,6 +73,15 @@ flowchart LR
   BC-Bench -->|VRAM sampled from /system_stats; another server per target| ComfyUI
   BC-Bench -->|frame strips, review clips, vocal windows cut, media probed| FFmpeg
   BC-Workspace -->|bench/ ships with the runtime and is merged by update like any runtime file| BC-Bench
+  BC-Board -->|the production view and the next command, read only| BC-Pipeline
+  BC-Board -->|the review view; notes and rounds written through board-review| BC-Review
+  BC-Board -->|the release view and the calendar; done marks and live URLs through updateStatus, a release refresh after a live URL or an approval| BC-Release
+  BC-Board -->|the approval, its withdrawal and the autopilot's marks through release-autopilot; the activity of the watchdog round| BC-Publish
+  BC-Board -->|the library view; entries, files and uses through character-library| BC-CharacterLibrary
+  BC-Board -->|the wizard; new music videos and episodes, the lyrics and the finished setup stage through board-wizard| BC-Pipeline
+  BC-Board -->|the wizard; new series canons through board-wizard| BC-Series
+  BC-Board -->|the wizard; the user's references through board-wizard| BC-Bibles
+  BC-Board -->|renders, the contact sheet and the reviewed images served from the whitelist| BC-Render
 ```
 
 ## Contexts
@@ -446,8 +455,7 @@ Evidence:
 Boundaries:
 - Writes the runtime's files, `.env` (provider keys), `GETTING_STARTED.md` and the marker; into `projects/`,
   `series/` and `library/` only missing files. `migrate-layout` is the one writer that moves projects.
-- The board server, its routes and the watchdog round belong to the release, publish and pipeline slices; the
-  container only runs them.
+- The board server and its routes are BC-Board, the watchdog round is BC-Publish; the container only runs them.
 - Outside: the npm registry, the tool installers, the providers' key checks, Docker.
 - A conflict is reported once (HS-209); the upstream CI ships and cannot pass in a workspace (HS-211); `update` says
   nothing about a changed `docker/` (HS-212).
@@ -475,3 +483,29 @@ Boundaries:
 - The art director scores bench results by the rubric; a bench score is not a verdict and files nothing (HS-224).
 - The tracked cases cite the maintainer's projects and ship to every workspace (HS-226); `update` merges `bench/`
   like any runtime file (HS-227).
+
+### BC-Board – Board
+Purpose (as recovered, decided by recommendation HS-242): the workspace's local page that hosts the views of the
+other contexts behind one navigation. It starts the server, routes, serves the page and the whitelisted files, guards
+every write and chooses the language. It owns no state: every write goes to the module of the context that owns it
+(ADR 0030, ADR 0031, ADR 0049 proposed).
+Core terms: Board, Board View, Board Navigation, Write Guard, Activity; the views' terms belong to their contexts.
+Evidence:
+- the server: `startBoard` and `boardHandler`, one request handler that tests call directly, with the write guard
+  `trustedWrite`, the file server `serveMedia`, the whitelists and the per-project release refresh
+  (`packages/cli/src/release-board.ts`)
+- the `board` command with the alias `release-board`, `--host`, `--port`, `--watch` (`packages/cli/src/index.ts:352-378`);
+  the board container runs `board --host 0.0.0.0 --port 4848 --watch 5` (`docker/Dockerfile`)
+- the page: static ES modules without a build step – `index.html`, `app.js` (routes, navigation, the 10 s poll),
+  `lib.js` (DOM, the JSON API, uploads, languages, dates, a project's tabs), `board.css`
+  (`packages/cli/src/board/`); the views beside them are their contexts'
+Boundaries:
+- Reads every project and series; writes nothing itself. Writes go through `updateStatus`, `release-autopilot`,
+  `board-review`, `board-wizard` and `character-library`.
+- Two sets of projects: the production, review and file routes see every project; the release routes and `/media`
+  only those with a release folder or a calendar (`boardProjectDirs`, also read by the autopilot).
+- Only the board's own page writes (the write guard); reads answer any Host today (HS-247).
+- The user refreshes by hand (HS-244); the page polls every 10 s today.
+- Routes are inline for production, review, release and autopilot, delegated for the wizard and the library
+  (HS-251).
+

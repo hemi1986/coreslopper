@@ -148,6 +148,13 @@ state in memory), one core transition (`setStageRunning`, `setStageDone`, `setSt
   `providerFactory` and the cache key extras; never call a provider around it. `run.json` is written whole after
   every result. A bench writes only under `bench/` and never into a project. Workflow node ids belong in a target,
   not in a case. The run, state and ratings files have no schema yet (G-202).
+- Board shell: one request handler, `boardHandler` (`packages/cli/src/release-board.ts`), kept apart from
+  `startBoard` so tests call it with a stub request. The shell writes no workspace file itself; a route reaches the
+  owning context's module (`updateStatus`, `release-autopilot`, `board-review`, `board-wizard`,
+  `character-library`). Every request that is not a GET passes `trustedWrite`; a file goes out through
+  `serveMedia` from a whitelist. A `ValidationError` becomes a 400. New view routes go into a `<view>Route`
+  function in the view's module, as the wizard and the library do (HS-251, G-214). The page is static ES
+  modules in `packages/cli/src/board/` without a build step; each view registers its strings with `addStrings`.
 - User-owned files (`timing.overrides.json`, `lyrics.txt`, imported stems, `project.yaml`) are never replaced by
   a tool; a command that would do so is a hard stop. The one exception: fixing a proposed release day writes
   `release.release_date` into `project.yaml`, keeping every comment (`setReleaseDate`,
@@ -157,7 +164,8 @@ state in memory), one core transition (`setStageRunning`, `setStageDone`, `setSt
 
 Pure functions over loaded files: `stageViews`, `productionPhase`, `projectNextAction`, `seriesNextAction`
 (`packages/core/src/production.ts`); `status` (`packages/cli/src/status.ts`); the board's production view
-(`packages/cli/src/board-production.ts`), which reads files and never writes. The board polls every 10 s.
+(`packages/cli/src/board-production.ts`), which reads files and never writes. The board polls every 10 s today;
+decided: the user refreshes by hand (HS-244, G-207).
 The release board's view is `boardProject` (`packages/cli/src/release-board-data.ts`), a pure read of the release
 folder's manifest, `upload.yaml`, the calendar and the status; whether an approval holds is `approvalHolds`
 (`packages/core/src/autopilot.ts`) wherever it is read (G-159).
@@ -236,5 +244,6 @@ directory. `tests/helpers/release-fixture.ts` builds release projects.
 | Runtime classification | `runtimePath`, `planRuntime` on paths or `git ls-files` (not shipped) | unit | `tests/runtime-files.test.ts` |
 | Provider key check | `validateFalKey`, `validateHiggsfieldKey` with a fake `fetchImpl` | unit | `tests/init.test.ts` |
 | Model bench | `runBench({ targets, cases, id, dryRun, paths: benchPaths(tempDir) })` on a temp bench folder with inline case and target files and fixtures written by the test; mock targets cost nothing, a `fal` target with a price checks the budget in a dry run; `summarizeTargets` on an inline `BenchRun` | integration, unit | `tests/bench.test.ts`, `tests/bench-characterization.test.ts` |
+| Board shell | `boardHandler({ root, refresh: async () => undefined })` called with a stub request (a `Readable` plus `method`, `url`, `headers`) and a stub response that collects `writeHead`, `setHeader`, `write` and `end`; writes send the board's `host`, `origin` and `content-type` | integration | `tests/board-production.test.ts`, `tests/board-shell-characterization.test.ts` |
 | Remotion render | a real still or JPEG; opt-in with `CORESLOPPER_RENDER_TESTS=1` (needs Chrome) | integration | `tests/thumbnail-render.test.ts` |
 | Agent instruction | not testable deterministically | – | `workspace/.claude/commands/video-next.md` |

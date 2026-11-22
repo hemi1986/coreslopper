@@ -293,8 +293,24 @@ The release day the calendar picked from the release schedule because the projec
 _Avoid_: tentative date, draft date
 
 **Board**:
-The workspace's local page (`board`). Its **production view** shows every project and series as the pipeline leaves them, with the next command for Claude Code; its release view is the release board.
-_Avoid_: dashboard, studio
+The workspace's local page (`board`; `release-board` is only an old alias of the command). It hosts the **Board Views** behind the **Board Navigation**: its **production view** shows every project and series as the pipeline leaves them, with the next command for Claude Code; its release view is the release board. The board guards every write with its **Write Guard** and owns no state of its own: every write goes to the context that owns it. The user opens it only on the computer it runs on and refreshes it by hand.
+_Avoid_: dashboard, studio, release board (one view of it)
+
+**Board View**:
+One view of the board, chosen by the address after `#`: the production view (the overview, a project, a series), a project's review and release views, the release calendar, the character library, and the wizard. A project's views are its tabs. The release view speaks the project's language, every other view the browser's.
+_Avoid_: page, screen, tab (only the switch between a project's views)
+
+**Board Navigation**:
+The board's left column: production, the release calendar, characters, **+ New**, then every project with its production phase and current stage (once done, its release day and done marks) and every series with its episodes. A project whose files do not load shows its error instead of disappearing.
+_Avoid_: sidebar, menu
+
+**Write Guard**:
+The board's check on every request that is not a read: the board's loopback address, the board's own page as origin, and a JSON body (an upload: a raw file body that names its origin). It keeps any other web page in the browser from approving a release or changing a project.
+_Avoid_: CSRF token, login, auth (the board has no users)
+
+**Activity**:
+What the **Watchdog**'s production scan recorded for the board: the last round and its interval, the **stalled** projects, and the latest events (stages, renders, queue, budget). The production view shows it; the board never changes it.
+_Avoid_: log, feed, notifications
 
 **Release Board**:
 The board's release view over all release folders: per platform the posts with files, texts, limits, and settings, the calendar of all projects, and the user's done state and live URLs in `review/release-status.json`.

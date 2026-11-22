@@ -561,3 +561,41 @@ Decisions (by recommendation, not reviewed by the user):
   ADR 0048 (proposed) records the rest.
 - The untracked runs, fixtures and spend in this repository's `bench/` are left alone. They are gitignored and
   never ship.
+
+## Gaps found by the adoption of the board shell (2026-11-22)
+
+Candidates only – no stories until the user asks (`/adopt <scope> --stories`). Priority is a suggestion. The user
+opens the board only on the computer it runs on, keeps the language rule, does not want the page to refresh by
+itself, and expects the navigation to become unclear as projects accumulate. Two gaps are medium: the automatic
+refresh the user does not want, and reads that answer any `Host`, since they expose unreleased media to any web page
+that rebinds its domain.
+
+| # | Class | Gap | Evidence | Source | Priority |
+|---|---|---|---|---|---|
+| G-207 | Exists but contradicts | The page polls every 10 s while the tab is visible (the navigation always, the production view when its data changed); the user refreshes by hand and wants no automatic refresh, and a refresh must never discard what they type | `packages/cli/src/board/app.js:19,82-86`; `production.js:301-315`; ADR 0030; `docs/board.md` (Production) | HS-244 | medium |
+| G-208 | Missing | The board navigation lists every project and series in one flat column; nothing folds away finished or released projects | `app.js:32-50` | HS-245 | low |
+| G-209 | Exists but contradicts | Reads answer any `Host`: only writes pass the write guard, so a web page that rebinds its own domain to 127.0.0.1 can read projects, lyrics and unreleased renders (pinned by `tests/board-shell-characterization.test.ts`) | `release-board.ts:343-346` | HS-247 | medium |
+| G-210 | Exists but contradicts | `/media` serves any file under the release folder, dot files included; only the containment check applies, while `/files` refuses dot and `..` segments (ADR 0030) | `release-board.ts:134,406-408,503` | HS-248 | low |
+| G-211 | Exists but contradicts | Status codes: a malformed JSON body (pinned) and a broken `%` escape in the address are a 500; an unknown project, series or file is a 400; `--watch` is checked after the server listens, so a wrong value stops a board that already started | `release-board.ts:99,168-172,321-326,342,505-507`; `index.ts:365-367` | HS-249 | low |
+| G-212 | Exists but contradicts | `serveMedia` has no error handler on its read stream: a file removed between `stat` and the read throws an unhandled error and stops the board (inference, untested); an invalid range such as `bytes=5-2` (pinned) or `bytes=-` is a 416 instead of the whole file | `release-board.ts:128-151` | HS-250 | low |
+| G-213 | Exists but contradicts | The release refresh queue chains one refresh per live URL or approval; its comment says a change during a refresh queues one more | `release-board.ts:157-167` | HS-252 | low |
+| G-214 | Exists but contradicts | Route layering: production, review, release and autopilot routes are inline in `boardHandler`, the wizard and the library delegated; `quickRelease` imports `release.js` lazily though the file imports it statically; the server file and its log prefix are `release-board` though it serves the whole board | `release-board.ts:7-12,37-40,164,176-320,339-504` | HS-251 | low |
+| G-215 | Missing | The page itself (`/`, `/board/*`) carries no content security policy; only served files are sandboxed | `release-board.ts:129-132,347-355` | HS-253 | low |
+| G-216 | Exists but contradicts | Texts the user sees: server errors are English behind a German prefix; `upload failed` is hard-coded; a failing refresh appends one more error line each time; the page's title and `lang` stay `Board`/`en` until a view sets them | `lib.js:94,101-104`; `index.html:2,6`; `release-board.ts:505-507` | HS-246 | low |
+| G-217 | Exists but contradicts | Drifted texts: the server's header comment omits the review notes and rounds among the writes; `serveMedia` says "a file of a release folder"; the refusal says "127.0.0.1 only" while `localhost` and `[::1]` pass; ADR 0030 names five page modules (eight exist) and the automatic refresh; `docs/board.md` and the conventions say the page refreshes every ten seconds | `release-board.ts:14-24,113,128`; ADR 0030; `docs/board.md`; `docs/engineering/conventions.md` | HS-254 | low |
+| G-218 | Missing | No test of the page's script (routes, language, navigation, the old release links), the MIME table, the content-type branch alone, `HEAD` and `OPTIONS` (403 today), or the lazy route groups' order | `tests/board-*.test.ts`; `tests/board-shell-characterization.test.ts` | HS-255 | low |
+
+Decisions (by recommendation, not reviewed by the user):
+
+- `BC-Board` has no aggregate: the shell owns no state, so the gap register has no generated row for it (HS-242).
+- Exists and is intended:
+  - the board as one local page over the workspace that the user starts, never Claude Code (ADR 0030);
+  - writes only from the board's own page (the write guard; ADR 0029, 0030) and a port on the loopback only, also
+    in the container (user: only on the same computer);
+  - the browser's language, the project's in the release view (user);
+  - a dependency-free, build-free page of static ES modules served by the same Node server (ADR 0030);
+  - project and series files from a whitelist, never a script from a served file;
+  - an unreadable project listed with its error instead of hidden;
+  - the old release-board links, which still lead to the release view.
+
+  ADR 0049 (proposed) records the rest.

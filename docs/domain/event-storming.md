@@ -80,6 +80,10 @@ flowchart LR
     CMD_BuildBenchReport["Build the bench report"]:::cmd
     CMD_RateBenchResult["Rate a bench result"]:::cmd
     CMD_ExportRatings["Export the ratings"]:::cmd
+    CMD_StartBoard["Start the board"]:::cmd
+    CMD_OpenBoardView["Open a board view"]:::cmd
+    CMD_RefreshBoard["Refresh the board"]:::cmd
+    CMD_OpenBoardFile["Open a file on the board"]:::cmd
     subgraph BC_Timing["Timing"]
         CMD_WriteLyrics["Write lyrics"]:::cmd
         CMD_AnalyzeSong["Analyze song"]:::cmd
@@ -279,6 +283,14 @@ flowchart LR
         EVT_BenchResultRated["Bench result rated"]:::evt
         EVT_RatingsExported["Ratings exported"]:::evt
     end
+    subgraph BC_Board["Board"]
+        EVT_BoardStarted["Board started"]:::evt
+        EVT_BoardViewOpened["Board view opened"]:::evt
+        EVT_BoardRefreshed["Board refreshed"]:::evt
+        EVT_BoardFileServed["Board file served"]:::evt
+        EVT_BoardFileRefused["Board file refused"]:::evt
+        EVT_BoardWriteRefused["Board write refused"]:::evt
+    end
     ACT_User(["User"]):::act
     ACT_Orchestrator(["Orchestrator"]):::act
     ACT_SetupSkill(["Setup skill"]):::act
@@ -362,6 +374,8 @@ flowchart LR
     RM_BenchList[("Bench list")]:::rm
     RM_ComparisonPage[("Comparison page")]:::rm
     RM_ModelRecommendation[("Model recommendation")]:::rm
+    RM_BoardNavigation[("Board navigation")]:::rm
+    RM_BoardActivity[("Board activity")]:::rm
     ACT_SetupSkill --> CMD_CreateProject
     CMD_CreateProject --> EVT_ProjectCreated
     ACT_Orchestrator --> CMD_StartStage
@@ -618,6 +632,15 @@ flowchart LR
     CMD_RateBenchResult --> EVT_BenchResultRated
     ACT_User --> CMD_ExportRatings
     CMD_ExportRatings --> EVT_RatingsExported
+    ACT_User --> CMD_StartBoard
+    CMD_StartBoard --> EVT_BoardStarted
+    ACT_User --> CMD_OpenBoardView
+    CMD_OpenBoardView --> EVT_BoardViewOpened
+    ACT_User --> CMD_RefreshBoard
+    CMD_RefreshBoard --> EVT_BoardRefreshed
+    ACT_User --> CMD_OpenBoardFile
+    CMD_OpenBoardFile --> EVT_BoardFileServed
+    CMD_OpenBoardFile --> EVT_BoardFileRefused
     EVT_StageCompleted --> POL_RunNextStage
     EVT_StageSkipped --> POL_RunNextStage
     POL_RunNextStage --> CMD_StartStage
@@ -861,6 +884,18 @@ flowchart LR
     EVT_BenchCaseScored -.-> RM_ModelRecommendation
     EVT_RatingsExported -.-> RM_ModelRecommendation
     RM_ModelRecommendation -.-> ACT_User
+    EVT_ProjectCreated -.-> RM_BoardNavigation
+    EVT_StageStarted -.-> RM_BoardNavigation
+    EVT_StageCompleted -.-> RM_BoardNavigation
+    EVT_StageFailed -.-> RM_BoardNavigation
+    EVT_ReleaseCalendarPlanned -.-> RM_BoardNavigation
+    EVT_CalendarEventMarkedDone -.-> RM_BoardNavigation
+    EVT_BoardRefreshed -.-> RM_BoardNavigation
+    RM_BoardNavigation -.-> ACT_User
+    EVT_StageStarted -.-> RM_BoardActivity
+    EVT_StageCompleted -.-> RM_BoardActivity
+    EVT_StageFailed -.-> RM_BoardActivity
+    RM_BoardActivity -.-> ACT_User
     classDef evt fill:#a3391f,stroke:#e65100,color:#fff
     classDef cmd fill:#64b5f6,stroke:#0d47a1,color:#000
     classDef pol fill:#ce93d8,stroke:#4a148c,color:#000
@@ -1517,6 +1552,41 @@ flowchart LR
     classDef hs fill:#e57373,stroke:#b71c1c,color:#fff
 ```
 
+### From starting the board to a view, a refresh and a file
+
+```mermaid
+flowchart LR
+    ACT_User(["User"]):::act
+    CMD_StartBoard["Start the board"]:::cmd
+    EVT_BoardStarted["Board started"]:::evt
+    RM_BoardNavigation[("Board navigation")]:::rm
+    CMD_OpenBoardView["Open a board view"]:::cmd
+    EVT_BoardViewOpened["Board view opened"]:::evt
+    RM_BoardActivity[("Board activity")]:::rm
+    CMD_RefreshBoard["Refresh the board"]:::cmd
+    EVT_BoardRefreshed["Board refreshed"]:::evt
+    CMD_OpenBoardFile["Open a file on the board"]:::cmd
+    EVT_BoardFileServed["Board file served"]:::evt
+    ACT_User --> CMD_StartBoard
+    CMD_StartBoard --> EVT_BoardStarted
+    EVT_BoardStarted --> RM_BoardNavigation
+    RM_BoardNavigation --> CMD_OpenBoardView
+    CMD_OpenBoardView --> EVT_BoardViewOpened
+    EVT_BoardViewOpened --> RM_BoardActivity
+    RM_BoardActivity --> CMD_RefreshBoard
+    CMD_RefreshBoard --> EVT_BoardRefreshed
+    EVT_BoardRefreshed --> CMD_OpenBoardFile
+    CMD_OpenBoardFile --> EVT_BoardFileServed
+    classDef evt fill:#a3391f,stroke:#e65100,color:#fff
+    classDef cmd fill:#64b5f6,stroke:#0d47a1,color:#000
+    classDef pol fill:#ce93d8,stroke:#4a148c,color:#000
+    classDef rm fill:#81c784,stroke:#1b5e20,color:#000
+    classDef act fill:#a3751f,stroke:#f57f17,color:#000
+    classDef ext fill:#f48fb1,stroke:#880e4f,color:#000
+    classDef agg fill:#ffe082,stroke:#ff6f00,color:#000
+    classDef hs fill:#e57373,stroke:#b71c1c,color:#fff
+```
+
 ## Bounded Contexts & Aggregates
 
 | Context | Purpose | Aggregates | Events |
@@ -1535,6 +1605,7 @@ flowchart LR
 | Publishing (`BC-Publish`) | Gets an approved release onto the platforms – the publish command uploads by hand, privately or as drafts; the release autopilot posts every calendar event a platform API can post at its time once the user approved the release, without ever posting twice; the platform credentials and the watchdog round that runs it every few minutes | Publish log, Autopilot log, Autopilot round, Platform credentials | Platform authorized, Token rotated, Publish planned, Video uploaded, Upload failed, Autopilot round run, Post claimed, Calendar event posted, Calendar event uploaded, Video went public, Post attempt failed, Pinned comment posted, Spotify link appended, Microsite page deployed, Retry requested, Post forced, Timer installed |
 | Workspace (`BC-Workspace`) | Gives the user a private, self-contained workspace and keeps it current – init and its onboarding copy the runtime snapshot, store the provider keys and record the baseline; update merges a newer runtime against the baseline without losing the user's own edits; doctor checks the workspace, tools and keys; migrate-layout moves an old layout; the board container runs the board and its watchdog. Upstream, the runtime build decides what ships | Workspace marker, Runtime snapshot | Workspace created, Provider key stored, Tool installed, Dependencies installed, Workspace updated, Conflict copy written, Layout migrated, Runtime built, Board container started |
 | Model bench (`BC-Bench`) | Replays fixed scenes from past projects – the bench cases – on several bench targets before a model, workflow, server or provider switch, measures every result mechanically, has the art director score it against the case's rubric and the user rate it, and ends with a recommendation per operation; it has its own budget and never produces project assets | Bench case, Bench run, Bench budget | Bench case added, Bench target added, Bench fixtures imported, Bench run planned, Bench run refused over budget, Bench result recorded, Bench result refused, Bench result failed, Bench result skipped, Bench spend recorded, Bench case scored, Bench report built, Bench result rated, Ratings exported |
+| Board (`BC-Board`) | The workspace's local page that hosts the views of the other contexts – production, review, release, the release calendar, the character library and the wizard – behind one navigation; it starts the server, routes, serves the page and the whitelisted files, guards every write and chooses the language, and owns no state of its own – every write goes to the module of the context that owns it | – | Board started, Board view opened, Board refreshed, Board file served, Board file refused, Board write refused |
 
 ## Aggregates
 

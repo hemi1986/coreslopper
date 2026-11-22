@@ -699,6 +699,14 @@ not validated; EVT-RatingsExported), `out/<target>/<case>/s<n>/` and `index.html
 | Spent | Money, the planned cost of every paid generation | yes | EVT-BenchSpendRecorded |
 | Batch cap | Money, `batch_cap_usd`; the whole remaining budget for the run, 30 % for each generation today (HS-230) | no | configuration |
 
+### The board shell – no aggregate
+
+The board's shell (`BC-Board`) owns no stored data. It reads every project and series through the other contexts'
+read models, and every write it receives goes to the owning context's aggregate: the release status and approval,
+the review notes and rounds, the wizard's project, canon and references, and the character library. The only shell
+state is in the process: the per-project chain of release refreshes (`release-board.ts:157-167`). On the page,
+the language and the current view live in the browser only (HS-242).
+
 ## Lifecycle
 
 Stage state as the code allows it today. Every transition is accepted from every status (HS-11); the diagram

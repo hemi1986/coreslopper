@@ -2571,3 +2571,193 @@ The board's shell (`board/app.js`, `lib.js`, `index.html`, `board.css` and the s
 | HS-239 | Drifted texts fixed together | recommendation; low | G-204 |
 | HS-240 | Four characterization tests now, the rest a gap | recommendation; low | `tests/bench-characterization.test.ts`, G-205 |
 | HS-241 | ADR 0048 | recommendation | `docs/adr/0048-bench-in-the-workspace.md` |
+
+# Adoption – board-shell
+Date: 2026-11-22 · Commit: 3f855fa · Slice: the board's shell – the server, the routes, the write guard, the served files, the navigation, the language and the refresh (concept `board`) · Analysts: 3 lenses
+
+## Scope
+
+- **Slice:**
+  - server: the shell parts of `packages/cli/src/release-board.ts`: `startBoard`, `boardHandler`'s dispatch and
+    error mapping, `trustedWrite`, `serveMedia`, the MIME table, the whitelists, `body()`, `/`, `/board/<file>`,
+    `/api/channel`, `/api/activity`, `/files`, `/series-files`, the release refresh queue;
+  - cli: the `board` command (`index.ts:352-378`) and how the container starts it (`docker/Dockerfile`);
+  - page: `packages/cli/src/board/index.html`, `app.js`, `lib.js`, `board.css`;
+  - docs: `docs/board.md`, ADR 0030 and 0031 where they describe the shell.
+- **Out of scope:**
+  - the views `production.js`, `review.js`, `release.js`, `wizard.js`, `characters.js` and their server modules.
+    They belong to the pipeline, review, release, publish, character and workspace slices, already adopted;
+  - the release refresh's effect on the folder: release slice (G-151).
+- **Intent:** domain model, as for the earlier slices. **Language:** artifacts `en`, UI `en` (the board also speaks
+  German).
+- **Since the last slice:** no code change. `slice.ts` was not needed; the scope was named by the last report.
+- **The map after this slice:** every cluster the map still lists as a candidate (`episode`, `generate`, `sery`,
+  `init`, `lipsync`) was adopted under another slice's name (series, generation, workspace). The adoption ranking
+  now reads "no churn" because the latest commits are all adoption docs; it is no evidence of a new slice.
+
+| Layer | Files |
+|---|---|
+| cli (application) | `packages/cli/src/release-board.ts` (shell parts), `index.ts` (the `board` command) |
+| page | `packages/cli/src/board/index.html`, `app.js`, `lib.js`, `board.css` |
+| container | `docker/Dockerfile` (the command), `compose.yaml` (the port) |
+| tests | the shell cases in `board-production`, `release-folder`, `release-autopilot`, `board-wizard`, `board-review`, `character-library`; new `board-shell-characterization` |
+
+## How this slice was decided
+
+As in the earlier slices, there were no code-level questions. Every technical hotspot was decided by the
+recommendation and is marked "not reviewed by the user – delegated". The user answered four questions about how
+they use the board:
+1. Language: keep it as it is – the browser's language, and the project's in the release view.
+2. Device: only the computer the board runs on.
+3. The 10 s refresh: not tried yet; it sounds annoying and bad while typing; not needed – a manual refresh is enough.
+4. Navigation: fine for now, but it will become unclear.
+
+How the answers shaped the model:
+- Answer 3 is the slice's one user decision against the code: the board does not refresh by itself (HS-244, G-207,
+  medium). Today the poll redraws only the navigation and, when its data changed, the production view – never
+  the wizard's or the review's forms – so no typing is lost today. The decision still removes the poll.
+- Answer 2 confirms the loopback and raises reads that answer any `Host` to medium (HS-247, G-209).
+- Answer 1 keeps the language rule; only the texts around it are gaps (G-216).
+- Answer 4 makes folding away released projects a low gap that rises with the number of projects (G-208).
+
+ADR 0049 stays `Proposed`.
+
+## What the repository is (facts)
+
+- **The command.** `board` (alias `release-board`) with `--port` (4848), `--host` (127.0.0.1) and `--watch
+  <minutes>` (at least 1, runs the watchdog loop in the process). The container runs `board --host 0.0.0.0 --port
+  4848 --watch 5` and publishes the port on `127.0.0.1` only; its healthcheck reads `/api/production`.
+- **The handler.** `boardHandler` is one function that tests call directly.
+  - `trustedWrite` runs first for every request that is not a GET. It needs a loopback `Host`, an `Origin` equal to
+    `http://<host>` when sent, a `Sec-Fetch-Site` of `same-origin` or `none`, and a JSON body. An upload needs an
+    `Origin` and `application/octet-stream`.
+  - Then the page, production and activity, review, the library, the wizard, the files, the channel, the release
+    routes, the calendar, `/calendar.ics` and `/media`; 404 for the rest.
+  - A `ValidationError` is 400, anything else 500, each with its message. A JSON body over 64 KiB is 400.
+- **Files.** `serveMedia` sends `nosniff`, a sandboxing CSP and single byte ranges (416 when unsatisfiable).
+  - Projects: `renders/`, `review/`, `assets/`, `characters/`, `sets/`, `props/` and the written documents.
+  - Series canons: `characters/`, `sets/`, `props/`, `assets/`, `review/` and `bible.md`.
+  - Library entries: every file but `character.yaml` and dot files.
+  - The release folder: any file inside it.
+  - Page files: lower-case `.js`/`.css` names in `packages/cli/src/board/`, found through `import.meta.url`.
+- **Two sets of projects.** Every project and series for production, review, files and the wizard. Only those with a
+  release folder or a calendar for the release routes and `/media` (`boardProjectDirs`, also read by the autopilot).
+- **The page.** Static ES modules, no framework, no build step.
+  - `app.js` holds the hash routes, an unknown address shows the overview, and an old `#/p/<slug>/<platform>` leads to
+    the release view.
+  - The navigation shows every project with its phase and current stage (once done, its release day and done marks),
+    every series with its episodes, and an unreadable one with its error.
+  - Every 10 s while visible, the page reloads the navigation and, on a production view, redraws it when the data
+    changed and no video plays.
+  - The channel's motto at the top right.
+- **Language.** `lib.js` picks German when the browser's language starts with `de`, else English. The release view
+  switches to the project's language; every other view goes back to the browser's. A missing German string falls
+  back to English. Server messages are English.
+- **History.** All of it from 2026-11-21:
+  - `bea73af`: the release board, one HTML page;
+  - `c022d9d`: the motto;
+  - `ac7ca26` and `e44dde1`: the approval and the write guard, after review findings;
+  - `07aef79`: the split into modules, the whitelist, the CSP and ADR 0030;
+  - `e7c2599`, `42b6e99`, `a2fc0a7`, `ec8a147`: activity, review, wizard and library, each adding routes to the same
+    handler.
+
+  There are no reverts or TODOs.
+
+## Domain model (decided by recommendation)
+
+- **Context:** `BC-Board` – Board, a host for the views of the other contexts. **No aggregate**: the shell owns no
+  state (HS-242).
+- **Commands:** start the board, open a board view, refresh the board (by hand, HS-244), open a file on the board.
+- **Events:** board started, board view opened, board refreshed, board file served, board file refused, board write
+  refused (`origin: external` – a foreign page's request).
+- **Read models:** the board navigation, the board activity.
+- **Flow:** `FLOW-BoardSession`. **Actor:** the user.
+- **Glossary:**
+  - New: **Board View**, **Board Navigation**, **Write Guard**, **Activity**.
+  - Sharpened: **Board** (the whole page; `release-board` only an alias; owns no state; on the same computer;
+    refreshed by hand; _Avoid_ release board for the whole).
+- **ADR:** 0049 (Proposed), which amends 0030.
+
+## Package documentation written
+
+- `.claude/rules/board.md` – the path-scoped slice doc. Nothing is left `[OPEN]`.
+- `docs/engineering/conventions.md` – the board shell's layering, the write guard and the route rule; the refresh
+  decision under read models; a seam row.
+- `docs/architecture/data-model.md` – the shell owns no aggregate.
+- `docs/domain/context-map.as-is.md` – `BC-Board` and its edges to Pipeline, Review, Release, Publish, Character
+  library, Series, Bibles and Render; the workspace's boundary note now names `BC-Board`.
+
+## Contradictions found and how they were resolved
+
+| Contradiction | Resolution |
+|---|---|
+| ADR 0030 and `app.js`: the page refreshes itself, versus the user, who wants to refresh by hand | manual refresh, no polling (user; ADR 0049, G-207) |
+| Writes need a loopback `Host`, versus reads that answer any `Host` | every request needs one (user: same computer; G-209) |
+| ADR 0030: a whitelist and never a dot file, versus `/media` serving any file of the release folder | the dot-file rule for the release folder too (G-210) |
+| The glossary: Release Board is one view, versus the command alias, the file and the log prefix `release-board` for the whole board | **Board** for the whole, `release-board` only an alias; the file named for the board (G-214) |
+| "page", "view" and "tab" for one thing | **Board View**; tab only for the switch between a project's views |
+| The refresh queue's comment: a change during a refresh queues one more, versus one refresh per change | the comment (G-213) |
+| Input errors are 400 by convention, versus a malformed body or address as 500 and an unknown slug as 400 | 400 for malformed input, 404 for unknown names (G-211) |
+| ADR 0030 lists five page modules, versus eight | text fix (G-217) |
+| The refusal "127.0.0.1 only", versus `localhost` and `[::1]` passing | text fix (G-217) |
+
+## Rules and checks
+
+| Rule | Enforcement | State |
+|---|---|---|
+| A read answers a foreign `Host`; a write from it is refused | `tests/board-shell-characterization.test.ts` | green |
+| A JSON body over 64 KiB is 400, a malformed one 500 | `tests/board-shell-characterization.test.ts` | green |
+| A series canon serves `bible.md` and refuses `series.yaml`; an unknown series is 400 | `tests/board-shell-characterization.test.ts` | green |
+| A suffix range sends the last bytes; an unsatisfiable or reversed range is 416 | `tests/board-shell-characterization.test.ts` | green |
+| Activity without a watchdog round is empty | `tests/board-shell-characterization.test.ts` | green |
+| Writes only from the board's page (foreign origin, text body, another port, rebinding, cross-site) | existing `tests/release-autopilot.test.ts`, `board-wizard.test.ts`, `board-review.test.ts` | green |
+| The page files, the project whitelist, dot files, `..`, the sandbox CSP | existing `tests/board-production.test.ts`, `release-folder.test.ts`, `character-library.test.ts` | green |
+| `providers` and `remotion` import only `core`; `cli` is free | `tests/package-boundaries.test.ts`, `docs/architecture/boundaries.yaml` | green |
+| Manual refresh, guarded reads, the release folder's dot files, status codes, a stream error handler, one queued refresh, route modules, the page's CSP, texts | documentation until stories build them (G-207–G-218) | – |
+
+## Gap register (candidates – stories only with --stories)
+
+12 candidates, G-207 to G-218, in `docs/domain/gap-register.md`:
+- 9 *exist but contradict*. G-207 (the automatic refresh) and G-209 (reads from any `Host`) are medium. G-210 to
+  G-214, G-216 and G-217 are low.
+- 3 are *missing*: G-208, G-215 and G-218, all low.
+- None is *dead*.
+
+## Deliberately left alone
+
+- Production code, `docs/board.md` and ADR 0030, which is accepted. ADR 0049 amends it. Only the glossary was
+  corrected.
+- The views and their server modules: their slices' (the review player's, the release view's and the wizard's own
+  gaps stay there).
+- `/calendar.ics`, `/api/calendar` and the release routes' validations: the release and publish slices'.
+- `HEAD` and `OPTIONS` refused as writes: intended, since the board never answers a preflight (ADR 0030).
+- The different id patterns of slugs and library character ids: each context's own rule.
+
+## Open hotspots
+
+None. HS-242 to HS-256 are resolved, four of them partly by the user's answers.
+
+## Next slice
+
+None: every slice is adopted. Next comes working the gaps, G-1 to G-218, starting with the high and medium ones
+across all slices – `/adopt <scope> --stories` or `/feature` for the ones the user picks first.
+
+## Decision log
+
+| # | Decision | How | Written to |
+|---|---|---|---|
+| HS-244 | The user refreshes the board by hand; no polling; a refresh never discards typing | user (a manual refresh is enough) and recommendation; medium | `CMD-RefreshBoard`, ADR 0049, G-207 |
+| HS-247 | Every request needs a loopback `Host`, reads too | user (only on the same computer) and recommendation; medium | `CMD-StartBoard`, ADR 0049, G-209 |
+| HS-245 | Released projects can fold away once the list grows | user (will become unclear) and recommendation; low | `CMD-OpenBoardView`, ADR 0049, G-208 |
+| HS-246 | Keep the language rule; texts follow it | user (keep it) and recommendation; low | `CMD-OpenBoardView`, G-216 |
+| HS-242 | One context, Board, without an aggregate | recommendation | `BC-Board`, data model |
+| HS-243 | Board, Board View, Board Navigation, Write Guard, Activity; `release-board` only an alias | recommendation | glossary |
+| HS-248 | The release folder follows the dot-file rule | recommendation; low | `CMD-OpenBoardFile`, G-210 |
+| HS-249 | 400 for malformed input, 404 for unknown names; `--watch` checked before listening | recommendation; low | `CMD-StartBoard`, G-211 |
+| HS-250 | A read error ends one response; an invalid range is ignored | recommendation; low | `CMD-OpenBoardFile`, G-212 |
+| HS-251 | A view's routes in its own module; the server file named for the board | recommendation; low | conventions, G-214 |
+| HS-252 | One queued refresh, as the comment says | recommendation; low | G-213 |
+| HS-253 | The page gets its own content security policy | recommendation; low | G-215 |
+| HS-254 | Drifted texts fixed together | recommendation; low | G-217 |
+| HS-255 | Five characterization tests now, the rest a gap | recommendation; low | `tests/board-shell-characterization.test.ts`, G-218 |
+| HS-256 | ADR 0049 | recommendation | `docs/adr/0049-board-shell.md` |
