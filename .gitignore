@@ -65,6 +65,11 @@ series/*/assets/*
 library/characters/*/*
 !library/characters/*/character.yaml
 
+# Sound library audio; each sound.yaml stays tracked
+library/sounds/*/*
+!library/sounds/*/sound.yaml
+library/sounds/.incoming-*/
+
 # Python
 .venv/
 __pycache__/

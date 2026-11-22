@@ -85,10 +85,14 @@ function exactLength(duration: number): string {
   return `aresample=${SAMPLE_RATE},asetpts=N/SR/TB,apad=whole_len=${samples},atrim=end_sample=${samples}`;
 }
 
-/** Integrated loudness of a file in LUFS, from ffmpeg's loudnorm analysis. */
-export function measureLoudness(file: string): { lufs: number; truePeak: number } {
+/**
+ * Integrated loudness of a file in LUFS, from ffmpeg's loudnorm analysis.
+ * `loops` plays the file that many extra times first: integrated loudness
+ * needs 400 ms, so a short sound is measured as played back to back.
+ */
+export function measureLoudness(file: string, loops = 0): { lufs: number; truePeak: number } {
   const ffmpeg = resolveBinary('ffmpeg');
-  const result = spawnSync(ffmpeg, ['-hide_banner', '-nostats', '-i', file, '-af', 'loudnorm=print_format=json', '-f', 'null', '-'], {
+  const result = spawnSync(ffmpeg, ['-hide_banner', '-nostats', ...(loops > 0 ? ['-stream_loop', String(loops)] : []), '-i', file, '-af', 'loudnorm=print_format=json', '-f', 'null', '-'], {
     encoding: 'utf8',
     maxBuffer: 64 * 1024 * 1024,
   });

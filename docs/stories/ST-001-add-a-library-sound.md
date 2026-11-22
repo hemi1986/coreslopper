@@ -12,7 +12,7 @@ risk: null
 events: [EVT-LibrarySoundAdded, EVT-LibrarySoundRefused]
 depends_on: []
 labels: [feature:meme]
-status: ready
+status: done
 ---
 
 ## Story

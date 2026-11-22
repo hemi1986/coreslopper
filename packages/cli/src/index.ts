@@ -742,6 +742,31 @@ character
     }),
   );
 
+const sound = program
+  .command('sound')
+  .description('The workspace sound library (library/sounds/<id>/): add.');
+
+sound
+  .command('add <file>')
+  .description('Store a local audio file as a WAV in the library with what it is used for; length and loudness are measured, the file is never normalised.')
+  .requiredOption('--title <title>', 'What the sound is called ("Vine Boom")')
+  .requiredOption('--use-when <text>', 'What it is typically used for ("a dramatic reveal")')
+  .option('--id <id>', 'Library id (default: from the title)')
+  .option('--tags <list>', 'Comma-separated words for finding the sound')
+  .option('--cue <seconds>', 'Where the sound lands, in seconds from its (trimmed) start')
+  .option('--trim <a-b>', 'The part to use, in seconds: 0.1-1.2')
+  .option('--source <url>', 'Where the sound came from')
+  .option('--licence <licence>', 'Its licence (default: unknown)')
+  .option('--credit <text>', 'The credit text its licence asks for')
+  .action((file: string, options: { title: string; useWhen: string; id?: string; tags?: string; cue?: string; trim?: string; source?: string; licence?: string; credit?: string }) =>
+    run(async () => {
+      const { addLibrarySound, soundDir } = await import('./sound-library.js');
+      const root = repoRoot();
+      const entry = await addLibrarySound(root, { file, ...options });
+      console.log(`✔ ${entry.id} in ${relative(process.cwd(), soundDir(root, entry.id)) || '.'}: ${entry.length} s, ${entry.loudness} LUFS, licence ${entry.licence}`);
+    }),
+  );
+
 function printImport(result: { character: string; id: string; created: boolean; added: string[]; missing: string[] }): void {
   const what = result.created ? `new entry ${result.id}` : result.added.length ? `${result.id}: ${result.added.join(', ')}` : `${result.id}: nothing new`;
   console.log(`✔ ${result.character} → ${what}`);
