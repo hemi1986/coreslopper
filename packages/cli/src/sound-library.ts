@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, statSync } from 'node:fs';
 import { mkdir, mkdtemp, readdir, rename, rm } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { stringify } from 'yaml';
 import {
   LIBRARY_SOUND_ENTRY,
@@ -55,6 +55,27 @@ export async function loadLibrarySound(root: string, id: string): Promise<Librar
   const file = soundFile(root, id);
   if (!existsSync(file)) throw new ValidationError(`no library sound "${id}" (${file})`);
   return readYamlFile(file, LibrarySoundSchema);
+}
+
+/** `library/sounds/<id>/sound.yaml` of the workspace's sound library. */
+export function isLibrarySoundFile(file: string): boolean {
+  const dir = dirname(resolve(file));
+  return basename(file) === LIBRARY_SOUND_ENTRY && basename(dirname(dir)) === 'sounds' && basename(dirname(dirname(dir))) === 'library';
+}
+
+/**
+ * CMD-ValidateLibrarySound: the user's own edit of a sound.yaml, checked by the
+ * workspace hook (POL-ValidateEverySoundEntryEdit). The schema keeps title and
+ * use when filled and a cue and a trim inside the sound; the id is the folder's
+ * name and the folder's WAV exists. A failing edit is refused (EVT-LibrarySoundRefused).
+ */
+export async function validateLibrarySoundEntry(file: string): Promise<LibrarySound> {
+  const path = resolve(file);
+  const folder = basename(dirname(path));
+  const sound = await readYamlFile(path, LibrarySoundSchema);
+  if (sound.id !== folder) throw new SoundRefused(`sound.yaml says id "${sound.id}", but the id must be the folder name "${folder}"`, 'invalid', undefined, folder);
+  if (!existsSync(join(dirname(path), LIBRARY_SOUND_FILE))) throw new SoundRefused(`library sound ${folder}: ${LIBRARY_SOUND_FILE} does not exist next to its sound.yaml`, 'invalid', undefined, folder);
+  return sound;
 }
 
 /** Write an entry its caller has parsed with LibrarySoundSchema. */
