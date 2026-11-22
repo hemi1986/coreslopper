@@ -338,7 +338,7 @@ canon spend − episode budgets), computed by `seriesBudget` on every read.
 
 ### AGG-Script – Script (as-is)
 
-`script.yaml` of an episode, and of a meme (target) (`ScriptSchema`, `packages/core/src/schema.ts:587-657`), parsed whole by `loadProject`
+`script.yaml` of an episode and of a meme (`ScriptSchema`, `packages/core/src/schema.ts:587-657`), parsed whole by `loadProject`
 and checked whole against the canon by `validateScript` (`packages/core/src/episode.ts:59-104`). Written only by
 the agent (HS-121).
 
@@ -350,13 +350,14 @@ the agent (HS-121).
 | Script line | id (unique), kind `dialogue` \| `voiceover` \| `announcement` \| `chat` \| `sfx` \| `pause`, pause after | yes | EVT-ScriptWritten |
 | Spoken line fields | speaker (a canon character), `text_de` (TTS rule), `text_en` (subtitle), `direction` (unused today, HS-112) | speaker and text yes | EVT-ScriptWritten |
 | Chat line fields | speaker, `text_de` (shown on screen), `text_en` | yes | EVT-ScriptWritten |
-| Sfx line fields | prompt, duration, optional `text_en` (on-screen text) | prompt, duration yes | EVT-ScriptWritten |
-| Sfx line source (target) | exactly one of: `sound` – a Library sound id, no duration (the length is the sound's trim); or `prompt` with a duration, as above | one of the two | EVT-ScriptWritten (CMD-WriteMemeScript rule), EVT-LibrarySoundTaken |
+| Sfx line fields | `sound` or `prompt`, duration, optional `text_en` (on-screen text) | see the source | EVT-ScriptWritten |
+| Sfx line source | exactly one of: `sound` – a Library sound id, memes only, no duration (the length is the sound's trim); or `prompt` with a duration. An episode's sfx line keeps prompt and duration | one of the two | EVT-ScriptWritten (CMD-WriteMemeScript rule), EVT-LibrarySoundTaken |
 | Pause line fields | duration | yes | EVT-ScriptWritten |
 
 `with` (overlap) is parsed and always refused, also for a sound line (HS-257). A sound line's sound cue is reached
-through the anchor `line:<id>:cue`. A meme's script is the same model; what its scenes and speakers refer to before
-its bibles exist is HS-262.
+through the anchor `line:<id>:cue`. A meme's script is the same model: before its bibles exist its scenes and
+speakers are checked as ids only, afterwards against its own bibles (HS-262); its known lengths (pauses, pauses
+after, effects and library sounds) add up to at most 30 seconds (HS-264).
 
 ### AGG-TakeRegistry – Take registry (as-is)
 

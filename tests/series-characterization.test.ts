@@ -62,11 +62,16 @@ describe('take source', () => {
     const script = await demoScript();
     const effect = lineOf(script, 'sfx');
     const hash = hashObject(takeSource(effect));
-    expect(hashObject(takeSource({ ...effect, duration: effect.duration + 1 }))).not.toBe(hash);
+    expect(hashObject(takeSource({ ...effect, duration: effect.duration! + 1 }))).not.toBe(hash);
     expect(hashObject(takeSource({ ...effect, prompt: `${effect.prompt}, louder` }))).not.toBe(hash);
     expect(ambienceSource('office hum')).toEqual({ kind: 'ambience', prompt: 'office hum' });
     expect(() => takeSource(lineOf(script, 'pause'))).toThrow(/has no take/);
     expect(() => takeSource(lineOf(script, 'chat'))).toThrow(/has no take/);
+  });
+
+  it('describes a generated effect by kind, prompt and length only, so existing effect takes keep their hash', async () => {
+    const effect = lineOf(await demoScript(), 'sfx');
+    expect(takeSource({ ...effect, text_en: 'A sign', pause_after: 2 })).toEqual({ kind: 'sfx', prompt: effect.prompt, duration: effect.duration });
   });
 });
 
