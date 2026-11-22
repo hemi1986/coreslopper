@@ -4,15 +4,20 @@
 
 **Progress: 3 of 20 domain stories done** · scenarios 12 of 68
 
-**34 stories** · In Progress: 0 · Ready: 28 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 6 · Superseded: 0
+**34 stories** · In Progress: 1 · Ready: 27 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 6 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
+
+## In Progress
+
+| ID | Title | Type | Context | Priority | Size | Risk | Depends on |
+|---|---|---|---|---|---|---|---|
+| [ST-007](ST-007-project-kind-meme.md) | Project kind meme with its stages | tech-task | – | must | – | – | – |
 
 ## Ready
 
 | ID | Title | Type | Context | Priority | Size | Risk | Depends on |
 |---|---|---|---|---|---|---|---|
-| [ST-007](ST-007-project-kind-meme.md) | Project kind meme with its stages | tech-task | – | must | – | – | – |
 | [ST-008](ST-008-create-a-meme-in-the-wizard.md) | Create a meme in the board's wizard | domain | Pipeline | must | – | – | ST-007 |
 | [ST-009](ST-009-validate-a-memes-script.md) | Validate a meme's script with library sounds | domain | Scripted audio | must | – | – | ST-001, ST-007 |
 | [ST-010](ST-010-the-new-meme-skill.md) | The new-meme skill grills the pitch into a script | task | – | must | – | – | ST-006, ST-008, ST-009 |
