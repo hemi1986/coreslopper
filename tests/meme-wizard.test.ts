@@ -69,7 +69,7 @@ async function withOfficeRobot(ws: string): Promise<void> {
   await addLibraryCharacter(ws, { id: 'office-robot', name: 'Office Robot', description: 'A boxy grey robot with a coffee-stained screen face.' });
 }
 
-describe('ST-008: the meme wizard', () => {
+describe('the meme wizard (CMD-CreateMeme)', () => {
   it('ST-008: A meme is created with its pitch and a library character', async () => {
     const ws = await workspace();
     await withOfficeRobot(ws);
