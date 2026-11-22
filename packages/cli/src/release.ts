@@ -214,7 +214,7 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
   const deps = { ...(await defaultDeps()), ...options.deps };
   const project = await loadProject(options.projectDir);
   if (!releasedPublicly(project.config)) {
-    throw new ValidationError(`${project.config.slug} has distribution: internal and is not released publicly; it gets no release package.`);
+    throw new ValidationError(`${project.config.slug} is not released publicly (distribution: internal): it gets no release package.`);
   }
   const root = repoRoot();
   const music = project.config.kind !== 'episode';

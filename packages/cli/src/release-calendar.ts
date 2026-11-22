@@ -151,11 +151,14 @@ export async function runCalendar(options: {
   now?: Date;
   log?: (line: string) => void;
 }): Promise<ReleaseCalendar> {
-  const { loadProject, releaseIdentity } = await import('@coreslopper/core');
+  const { loadProject, releaseIdentity, releasedPublicly } = await import('@coreslopper/core');
   const { listShorts, shortName } = await import('./release-files.js');
   const { loadUploadData, uploadPaths } = await import('./upload-text.js');
   const { songJson } = await import('./release.js');
   const project = await loadProject(options.projectDir);
+  if (!releasedPublicly(project.config)) {
+    throw new ValidationError(`${project.config.slug} is not released publicly (distribution: internal): it gets no release calendar.`);
+  }
   const data = existsSync(uploadPaths(project.paths.root).data) ? await loadUploadData(project.paths.root) : undefined;
   const identity = releaseIdentity(project.config, await songJson(project));
   const shorts = (await listShorts(project.paths.renders)).map((file) => shortName(file)!).filter(Boolean);
