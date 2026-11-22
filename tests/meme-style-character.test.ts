@@ -5,12 +5,13 @@ import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parse, stringify } from 'yaml';
-import { ValidationError, setStageDone, loadProject } from '@coreslopper/core';
+import { ValidationError, loadProject, setStageDone, setStageRunning } from '@coreslopper/core';
 import { createProject } from '../packages/cli/src/new-project.ts';
 import { addLibraryCharacter, addLibraryFile, entryDir, loadLibraryCharacter, useCharacter } from '../packages/cli/src/character-library.ts';
 
 const entryFile = (ws: string, id: string) => join(entryDir(ws, id), 'character.yaml');
 import { validateProject } from '../packages/cli/src/validate.ts';
+import { validateChangedFile } from '../packages/cli/src/validate-file.ts';
 
 // ST-013: a meme's style-character stage writes its own bibles; finishing it takes new characters into the library.
 
@@ -116,6 +117,21 @@ describe('the style-character stage of a meme', () => {
     expect(bo.voice?.transcript).toBe('Oh nein.');
     expect(await readFile(entryFile(ws, 'kim'), 'utf8')).toBe(kimBefore);
     expect(existsSync(entryFile(ws, 'kim-office-prank'))).toBe(false);
+  });
+
+  it('takes an invented speaker while only the library character from setup is in the bible, until style-character starts', async () => {
+    const { ws, dir } = await meme();
+    const sheet = join(ws, 'kim-sheet.png');
+    await writeFile(sheet, 'kim-sheet');
+    await addLibraryCharacter(ws, { id: 'kim', name: 'Kim', description: 'Office prankster, red cardigan.' });
+    await addLibraryFile(ws, 'kim', sheet, 'sheet');
+    await useCharacter(ws, dir, 'kim');
+
+    await expect(validateChangedFile(join(dir, 'script.yaml'))).resolves.toBe('script');
+
+    const project = await loadProject(dir);
+    await writeFile(project.paths.state, JSON.stringify(setStageRunning(setStageDone(project.state, 'script', []), 'style-character'), null, 2));
+    await expect(validateChangedFile(join(dir, 'script.yaml'))).rejects.toThrow(ValidationError);
   });
 
   it('validate checks every speaker against the character bible once the stage is done', async () => {
