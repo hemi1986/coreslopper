@@ -12,7 +12,7 @@ risk: null
 events: [EVT-ReleasePackageBuilt, EVT-ReleaseRulesBroken, EVT-ReleaseCalendarPlanned]
 depends_on: []
 labels: [feature:internal-projects]
-status: in-progress
+status: done
 ---
 
 ## Story
