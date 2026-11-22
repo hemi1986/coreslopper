@@ -15,7 +15,7 @@
 # Slices adopted 2026-11-21: project and stage pipeline (confirmed); human review (confirmed); art-director verdicts and the
 # generation queue (decided by recommendation, not reviewed by the user – see the adoption report); song timing and lyrics
 # (decided by recommendation, four answers from the user); storyboard and generation (decided by recommendation, four answers from the user each).
-# Slices adopted 2026-11-22: series; bibles and the character library; render (decided by recommendation, four answers from the user each).
+# Slices adopted 2026-11-22: series; bibles and the character library; render; release; publishing (decided by recommendation, four answers from the user each).
 # See docs/domain/adoption-report.md.
 
 version: 1
@@ -40,6 +40,9 @@ actors:
     name: Queue run
     description: The one queue run process per project (queue run) that generates ready items in order and hands every attempt to the art director
 
+  - id: ACT-Watchdog
+    name: Watchdog round
+    description: The round watch runs every few minutes – in the board container (board --watch 5) or from release-timer – the release autopilot first, then the production scan (ADR 0031); it never approves and never starts Claude Code
 external_systems:
   - id: EXT-Provider
     name: Generation provider
@@ -62,6 +65,27 @@ external_systems:
     name: Distributor
     description: The service that delivers a song to streaming stores, such as DistroKid; its upload stays manual, from the release folder and texts/spotify.md (ADR 0024)
 
+  - id: EXT-YouTube
+    name: YouTube Data API
+    description: Resumable private or scheduled uploads, thumbnails, the video's status, the description and comments; OAuth with PKCE, scopes youtube.upload and youtube.force-ssl, 10,000 quota units a Pacific day; an unaudited project uploads private only (packages/providers/src/publish/youtube.ts)
+  - id: EXT-TikTok
+    name: TikTok Content Posting API
+    description: Inbox drafts (video.upload), or direct public posts for an audited app (video.publish); the refresh token rotates (packages/providers/src/publish/tiktok.ts)
+  - id: EXT-Instagram
+    name: Instagram Graph API
+    description: Reels, feed posts and stories for the user's own professional account, fetched from a public URL; the token is pasted from the Meta dashboard and refreshed (packages/providers/src/publish/instagram.ts)
+  - id: EXT-X
+    name: X API v2
+    description: Posts with media and a reply, billed per call ($0.015 a post, $0.20 with a link); refresh tokens are single-use (packages/providers/src/publish/x.ts)
+  - id: EXT-LinkedIn
+    name: LinkedIn Posts API
+    description: Posts with native video or an image on the member's profile; the token lasts 60 days, a refresh token only for approved partners (packages/providers/src/publish/linkedin.ts)
+  - id: EXT-FalStorage
+    name: fal.ai storage
+    description: Hosts the files Instagram fetches, uploaded at post time with the user's FAL_KEY; the files stay public there (packages/providers/src/fal.ts:73-93; release-autopilot.ts:138-139)
+  - id: EXT-OsScheduler
+    name: Operating system scheduler
+    description: Starts the watchdog round when no board container runs – the Windows Task Scheduler under WSL, a systemd user timer on Linux, launchd on macOS (packages/cli/src/release-timer.ts)
 bounded_contexts:
   - id: BC-Pipeline
     name: Pipeline
@@ -97,6 +121,9 @@ bounded_contexts:
     name: Release
     purpose: Turns a finished project into everything its release needs – the release folder with its manifest, the platform texts laid out and checked against the limits, the release calendar planned across the workspace, and the release board where the user ticks off what went live and gives the one release approval
 
+  - id: BC-Publish
+    name: Publishing
+    purpose: Gets an approved release onto the platforms – the publish command uploads by hand, privately or as drafts; the release autopilot posts every calendar event a platform API can post at its time once the user approved the release, without ever posting twice; the platform credentials and the watchdog round that runs it every few minutes
 aggregates:
   - id: AGG-Project
     name: Project
@@ -426,6 +453,59 @@ aggregates:
       - An approval needs a release folder, upload data and a calendar, wherever it is given (decided 2026-11-22, HS-168; only the board's button checks – gap register)
       - Every write takes the project's release lock (the code does this, release-calendar.ts:30,118-142)
 
+  - id: AGG-PublishLog
+    name: Publish log
+    context: BC-Publish
+    status: as-is
+    evidence:
+      - review/publish.json, read validated and written after every item by publishProject – the publish command's and the autopilot's YouTube and TikTok uploads alike (packages/cli/src/publish.ts:113-116,217-227,413-476; packages/core/src/schema.ts:1136-1164)
+    invariants:
+      - A file already uploaded to a platform – same item, same SHA-256, not a mock entry – is not uploaded again; a new render or --force uploads again (the code does this, publish.ts:216-227; tests/publish.test.ts)
+      - A failed upload keeps the uploads before it, and the next run tries it again (the code does this, publish.ts:457-467)
+      - The publish command never makes a video public – YouTube private or scheduled, TikTok an inbox draft; only the autopilot's direct TikTok mode posts (the code does this, packages/cli/src/index.ts:467-477; release-autopilot.ts:391)
+      - A batch over the YouTube quota of the Pacific day stops before the first upload (the code does this, publish.ts:230-235,337-342), and every YouTube call the autopilot makes counts against it (decided 2026-11-22, HS-192; polling, description and comment calls are not counted – gap register)
+      - Every write takes the project's release lock (decided 2026-11-22, HS-189; written without a lock – gap register)
+  - id: AGG-AutopilotLog
+    name: Autopilot log
+    context: BC-Publish
+    status: as-is
+    evidence:
+      - review/autopilot.json, appended only under the project's release lock review/.release.lock; the claim plans again from the fresh release status and log and appends the running entry in the same lock (packages/cli/src/autopilot-state.ts:46-65; packages/cli/src/release-autopilot.ts:258-273; packages/core/src/schema.ts:1087-1132)
+      - the autopilot state of every calendar event, a pure function of the release status, the log, the settings, the readiness and the clock (packages/core/src/autopilot.ts:147-211)
+    invariants:
+      - An event's autopilot state is derived, never stored – from the release status, the log since the user's last retry, the settings, the readiness and the clock (the code does this, autopilot.ts:151-211)
+      - A done mark and a take-over win over every other state; nothing else is claimed for a release whose approval does not hold for the calendar's day (the code does this, autopilot.ts:160-170; tests/publish-characterization.test.ts)
+      - An event is claimed once – the running entry is appended under the release lock after planning again from fresh files (the code does this, release-autopilot.ts:258-273)
+      - Never twice – a send that may have gone out is stuck and waits for the user, on every platform; it is never tried again by itself (the code does this for X, LinkedIn and Instagram, packages/providers/src/publish/http.ts:79-83; decided 2026-11-22 for YouTube uploads and TikTok, HS-187 – gap register)
+      - A plain failure is tried again after attempts × 10 minutes until retries failed attempts; a configuration or validation failure waits for the user at once (the code does this, autopilot.ts:186-188,205-209; release-autopilot.ts:362-368; tests/publish-characterization.test.ts)
+      - A post more than late_hours past its calendar time with no attempt is missed, also a YouTube upload that was due a day earlier; only the user's Post now sends it (the code does this, autopilot.ts:192-196; tests/publish-characterization.test.ts)
+      - A post that links to the main video waits until the main video is done with its live URL (the code does this, autopilot.ts:198-200)
+      - A running attempt older than an hour is stuck (the code does this, autopilot.ts:175-178)
+      - Try again and Post now are accepted only for an event of the calendar, in a state the board offers them for (decided 2026-11-22, HS-193; any id in any state – gap register)
+      - What may still go out or may be live is shown also when the approval no longer holds (decided 2026-11-22, HS-190; a running or stuck attempt shows as unapproved – gap register)
+  - id: AGG-AutopilotRound
+    name: Autopilot round
+    context: BC-Publish
+    status: as-is
+    evidence:
+      - .cache/release-run.lock, a holder lock with pid, host and time, stale after two hours, and .cache/release-run.last with the time and interval of the last round (packages/cli/src/release-autopilot.ts:173-212; packages/cli/src/file-lock.ts:45-81; packages/cli/src/autopilot-state.ts:28-42)
+    invariants:
+      - One round at a time per workspace, across the computer and the board container – a lock held on another host counts as alive until it is stale (the code does this, release-autopilot.ts:173-187; file-lock.ts:48-81)
+      - A dry run takes no lock and writes nothing (the code does this, release-autopilot.ts:192)
+      - Every round that is not a dry run records when it ran and how often a round is due; the board calls the autopilot stale after max(15, 3 × interval) minutes (the code does this, release-autopilot.ts:209-212; packages/cli/src/board/release.js:103-106)
+      - One mechanism runs the round, the board container or the timer – the other one says so and does not start (decided 2026-11-22, HS-195; only printed – gap register)
+  - id: AGG-PlatformCredentials
+    name: Platform credentials
+    context: BC-Publish
+    status: as-is
+    evidence:
+      - the workspace's .env (mode 0600), written by saveEnvValue from publish-auth and from the adapters when a token rotates (packages/cli/src/publish-auth.ts:24-34; packages/cli/src/social-auth.ts:51-127; packages/providers/src/publish/x.ts:227-232; tiktok.ts:253-257); readiness from autopilotReadiness (packages/cli/src/autopilot-state.ts:68-91)
+    invariants:
+      - Tokens live only in .env and in memory – never printed, never written unmasked into a log, never shown on the board (the code does this, packages/providers/src/publish/http.ts:4-13; publish.ts:389-393,460; packages/cli/src/release-board-data.ts:719-752)
+      - A rotated refresh token is saved at once – X's is single-use (the code does this, x.ts:227-232)
+      - A long-running watchdog reads .env again before every round, so a token renewed on the computer reaches the container (the code does this, packages/cli/src/production-watch.ts:129-152)
+      - A platform is ready by one rule, the same for doctor, the board and the plan, and a token that can be refreshed counts as ready (decided 2026-11-22, HS-196; doctor and the plan differ, LinkedIn with a refresh token is blocked – gap register)
+      - Every write of .env is atomic and under a lock (decided 2026-11-22, HS-189; plain read and write, no lock – gap register)
 events:
   - id: EVT-ProjectCreated
     name: Project created
@@ -900,6 +980,104 @@ events:
     data: [Project, Package, Files, Formats, Thumbnails, Shorts, Audio, Cover, Canvas, Lyrics, Texts, Metadata]
     description: "qa's release checks in review/report.md: PASS, FAIL, WARN, TODO or N/A; one TODO before release ran (packages/cli/src/release-qa.ts:56-231; packages/cli/src/qa.ts:177-221,379-381)"
 
+  - id: EVT-PlatformAuthorized
+    name: Platform authorized
+    aggregate: AGG-PlatformCredentials
+    data: [Platform, Scopes, Expires at]
+    description: "publish-auth <platform>: the one-time consent in the browser (OAuth with PKCE on a loopback port; Instagram a pasted token, refreshed once); the tokens go into .env (packages/cli/src/publish-auth.ts:36-119; packages/cli/src/social-auth.ts:51-127)"
+  - id: EVT-TokenRotated
+    name: Token rotated
+    aggregate: AGG-PlatformCredentials
+    origin: external
+    data: [Platform, Expires at]
+    description: "An adapter refreshed a token and saved the new refresh token or expiry into .env – TikTok, X (single-use), LinkedIn, Instagram (tiktok.ts:253-257; x.ts:227-232; linkedin.ts:248-270; instagram.ts:181-199)"
+  - id: EVT-PublishPlanned
+    name: Publish planned
+    context: BC-Publish
+    data: [Project, Steps, Skipped, Problems, Quota]
+    description: "What a publish run will upload and skip, with the problems and the YouTube quota it found, before any network call; --dry-run prints only this (packages/cli/src/publish.ts:267-351)"
+  - id: EVT-VideoUploaded
+    name: Video uploaded
+    aggregate: AGG-PublishLog
+    pivotal: true
+    data: [Platform, Item, File hash, Remote ID, URL, Status, At]
+    description: "A publish log entry: uploaded, scheduled, processing or draft – from the publish command or an autopilot upload (publish.ts:441-456)"
+  - id: EVT-UploadFailed
+    name: Upload failed
+    aggregate: AGG-PublishLog
+    data: [Platform, Item, File hash, Error, At]
+    description: "A failed publish log entry with the masked error; the uploads before it stay (publish.ts:457-467)"
+  - id: EVT-AutopilotRoundRun
+    name: Autopilot round run
+    aggregate: AGG-AutopilotRound
+    data: [At, Every, Projects, Acted, Needs the user, Locked]
+    description: "release-run, inside every watchdog round: for each approved project the pending YouTube uploads, then the due events in order, then the pinned comment; .cache/release-run.last records it (packages/cli/src/release-autopilot.ts:190-292)"
+  - id: EVT-PostClaimed
+    name: Post claimed
+    aggregate: AGG-AutopilotLog
+    data: [Event, At]
+    description: "The running entry, appended under the release lock after planning again from fresh files (release-autopilot.ts:258-273)"
+  - id: EVT-CalendarEventPosted
+    name: Calendar event posted
+    aggregate: AGG-AutopilotLog
+    pivotal: true
+    data: [Event, Platform, Remote ID, URL, Cost, At]
+    description: "posted in review/autopilot.json: an X, LinkedIn or Instagram post, or a direct TikTok post; the autopilot then marks the event done with its URL (release-autopilot.ts:345-369,404-409)"
+  - id: EVT-CalendarEventUploaded
+    name: Calendar event uploaded
+    aggregate: AGG-AutopilotLog
+    data: [Event, Platform, Status, Remote ID, Manual steps, At]
+    description: "uploaded (a private YouTube video), scheduled (an audited YouTube upload) or draft (a TikTok inbox draft): the event waits to go public (release-autopilot.ts:383-417)"
+  - id: EVT-VideoWentPublic
+    name: Video went public
+    aggregate: AGG-AutopilotLog
+    data: [Event, Remote ID, URL, At]
+    description: "A round reads the status of a pending YouTube upload and finds it public: posted, and the event marked done with its live URL by the autopilot (release-autopilot.ts:294-309)"
+  - id: EVT-PostAttemptFailed
+    name: Post attempt failed
+    aggregate: AGG-AutopilotLog
+    data: [Event, Error, Fatal, Uncertain, At]
+    description: "failed with the masked error; fatal for a configuration or validation error, uncertain when the post may have gone out (release-autopilot.ts:362-368)"
+  - id: EVT-PinnedCommentPosted
+    name: Pinned comment posted
+    aggregate: AGG-AutopilotLog
+    data: [Video, Comment ID, At]
+    description: "youtube:comment, an entry with no calendar event: posted once the main video is done and public; pinning it stays a click in Studio (release-autopilot.ts:311-342)"
+  - id: EVT-SpotifyLinkAppended
+    name: Spotify link appended
+    aggregate: AGG-AutopilotLog
+    data: [Video, URL, At]
+    description: "The links step, the day after: the Spotify link the user entered on the board appended to the YouTube description, once (release-autopilot.ts:419-426)"
+  - id: EVT-MicrositePageDeployed
+    name: Microsite page deployed
+    aggregate: AGG-AutopilotLog
+    data: [Slug, Directory, Command, At]
+    description: "microsite/<slug>.json and its images copied into autopilot.microsite.dir, then its command run there, ten minutes at most (release-autopilot.ts:141-151,427-442)"
+  - id: EVT-RetryRequested
+    name: Retry requested
+    aggregate: AGG-AutopilotLog
+    data: [Event, At]
+    description: "The board's Try again: a retry entry; the attempts count from it again (release-autopilot.ts:111-115; autopilot.ts:135-139)"
+  - id: EVT-PostForced
+    name: Post forced
+    aggregate: AGG-AutopilotLog
+    data: [Event, At]
+    description: "The board's Post now for a missed post: a retry and a force entry, so it goes out however late (release-autopilot.ts:111-115; autopilot.ts:192)"
+  - id: EVT-CalendarEventTakenOver
+    name: Calendar event taken over
+    aggregate: AGG-ReleaseStatus
+    data: [Event]
+    description: "The board's Do it myself sets items[id].manual in review/release-status.json; the autopilot leaves the event alone (release-autopilot.ts:101-108)"
+  - id: EVT-CalendarEventGivenBack
+    name: Calendar event given back
+    aggregate: AGG-ReleaseStatus
+    data: [Event]
+    description: "The board's Give it to the autopilot deletes the manual flag (release-autopilot.ts:101-108)"
+  - id: EVT-TimerInstalled
+    name: Timer installed
+    context: BC-Publish
+    data: [Kind, Every, Script]
+    description: "release-timer install writes ~/.coreslopper/release-run.sh, which runs watch, and registers it with the operating system's scheduler; remove takes it out again (packages/cli/src/release-timer.ts:48-173)"
 commands:
   - id: CMD-CreateProject
     name: Create project
@@ -1531,6 +1709,93 @@ commands:
       - A file whose hash differs from the manifest, a format that is not the current render, a bad WAV, cover or canvas, section tags in lyrics.txt, a missing text file, a broken limit, or an unmarked <ID> fails (the code does this, release-qa.ts:80-221)
       - A gap only the user can close is a TODO, in the release checks and in the upload checks alike; WARN is only for advice (decided 2026-11-22, HS-172; Upload text and Upload data use WARN – gap register)
 
+  - id: CMD-AuthorizePlatform
+    name: Authorize a platform
+    actor: ACT-User
+    aggregate: AGG-PlatformCredentials
+    produces: [EVT-PlatformAuthorized]
+    description: "publish-auth youtube|tiktok|x|linkedin|instagram [--redirect-uri], once per platform; doctor and the board show which are ready (packages/cli/src/index.ts:481-491). The user will set it up later, in their own workspace (user, 2026-11-22)"
+    rules:
+      - YouTube asks for youtube.upload and youtube.force-ssl, so tokens from before the autopilot are authorized again (the code does this, packages/providers/src/publish/youtube.ts:8-16)
+      - Instagram also needs FAL_KEY, because Instagram fetches its files from a public URL (the code does this, packages/cli/src/autopilot-state.ts:87-90)
+  - id: CMD-PublishUploads
+    name: Publish the uploads
+    actor: ACT-User
+    aggregate: AGG-PublishLog
+    produces: [EVT-PublishPlanned, EVT-VideoUploaded, EVT-UploadFailed]
+    description: "publish <project> [--platform] [--only] [--schedule] [--dry-run] [--force] [--mock]: the main video and the Shorts to YouTube, private or scheduled, and the Shorts to TikTok as drafts; a user command, never a stage (index.ts:449-479; ADR 0023). The user posts by hand today (user, 2026-11-22)"
+    rules:
+      - The upload data, files, platform limits and quota are checked before the first network call (the code does this, publish.ts:267-351)
+      - --schedule is at least 15 minutes ahead (the code does this, publish.ts:256)
+      - TikTok from the publish command is always an inbox draft (the code does this, index.ts:467-477)
+  - id: CMD-RunAutopilotRound
+    name: Run an autopilot round
+    actor: ACT-Watchdog
+    aggregate: AGG-AutopilotRound
+    produces: [EVT-AutopilotRoundRun]
+    description: "release-run [--project] [--dry-run] [--plan], run by every watchdog round (watch, from the board container or release-timer); stage runners, /video-next and agents never run it (ADR 0029). The user means to run the board container (user, 2026-11-22)"
+    rules:
+      - A round for a project whose approval does not hold does nothing and says why (the code does this, release-autopilot.ts:237-240)
+      - The pending YouTube uploads are read first, so the posts that link to the main video follow in the same round; then the due events, earliest first (the code does this, release-autopilot.ts:242-288)
+      - An error in the autopilot does not stop the production scan of the same watchdog round (the code does this, packages/cli/src/production-watch.ts:99-126)
+  - id: CMD-PostCalendarEvent
+    name: Post a calendar event
+    actor: ACT-Watchdog
+    aggregate: AGG-AutopilotLog
+    produces: [EVT-PostClaimed, EVT-CalendarEventPosted, EVT-CalendarEventUploaded, EVT-PostAttemptFailed, EVT-SpotifyLinkAppended, EVT-MicrositePageDeployed]
+    description: "A due event, claimed and acted on by the round: YouTube and TikTok through the publish command's code, X, LinkedIn and Instagram through the post adapters, the links step and the microsite (release-autopilot.ts:345-505)"
+    rules:
+      - YouTube is scheduled only with youtube_audited and more than 20 minutes ahead, otherwise uploaded private (the code does this, release-autopilot.ts:385)
+      - TikTok posts directly with tiktok_direct, otherwise it sends a draft – one switch, read the same way everywhere (decided 2026-11-22, HS-188; TIKTOK_DIRECT_POST is read two ways – gap register)
+      - An upload the publish log already has is not uploaded again; the autopilot takes the earlier entry (the code does this, release-autopilot.ts:395; publish.ts:216-227)
+      - The X post's price is recorded with the post, and the board shows what a release's posts cost, apart from the generation budget (decided 2026-11-22, HS-192; recorded, never shown – gap register)
+  - id: CMD-CheckUploadStatus
+    name: Check an upload's status
+    actor: ACT-Watchdog
+    aggregate: AGG-AutopilotLog
+    produces: [EVT-VideoWentPublic]
+    description: "Every round reads the status of each pending YouTube upload (release-autopilot.ts:243-250,294-309); TikTok drafts are not read (HS-191)"
+  - id: CMD-PostPinnedComment
+    name: Post the pinned comment
+    actor: ACT-Watchdog
+    aggregate: AGG-AutopilotLog
+    produces: [EVT-PinnedCommentPosted]
+    description: "The upload data's pinned_comment under the main video, once it is done and public (release-autopilot.ts:311-342)"
+    rules:
+      - Only for the main video, sent once without a retry inside the call; a plain failure is tried again up to retries times, anything else stops it (the code does this, release-autopilot.ts:319-342)
+  - id: CMD-TakeOverCalendarEvent
+    name: Take over a calendar event
+    actor: ACT-User
+    aggregate: AGG-ReleaseStatus
+    produces: [EVT-CalendarEventTakenOver]
+    description: "The board's Do it myself, under the release lock (release-autopilot.ts:101-108; packages/cli/src/release-board.ts:465-476)"
+  - id: CMD-GiveBackCalendarEvent
+    name: Give a calendar event back
+    actor: ACT-User
+    aggregate: AGG-ReleaseStatus
+    produces: [EVT-CalendarEventGivenBack]
+    description: "The board's Give it to the autopilot (release-autopilot.ts:101-108)"
+  - id: CMD-RetryCalendarEvent
+    name: Try a calendar event again
+    actor: ACT-User
+    aggregate: AGG-AutopilotLog
+    produces: [EVT-RetryRequested]
+    description: "The board's Try again for a failed or stuck post (packages/cli/src/board/release.js:120-125)"
+    rules:
+      - Only for an event of the calendar whose state offers it (decided 2026-11-22, HS-193; any id up to 200 characters, in any state – gap register)
+  - id: CMD-ForceCalendarEvent
+    name: Post a missed calendar event now
+    actor: ACT-User
+    aggregate: AGG-AutopilotLog
+    produces: [EVT-PostForced]
+    description: "The board's Post now for a missed post (board/release.js:124)"
+  - id: CMD-InstallTimer
+    name: Install the timer
+    actor: ACT-User
+    produces: [EVT-TimerInstalled]
+    description: "release-timer show|install|remove|status [--every], for a computer without the board container (release-timer.ts:131-173; ADR 0031)"
+    rules:
+      - Install it again after a Node.js upgrade or a moved workspace – the script puts the installing Node.js on PATH (the code does this, release-timer.ts:48-60)
 policies:
   - id: POL-RunNextStage
     name: Run the next autonomous stage
@@ -1597,6 +1862,21 @@ policies:
     then: [CMD-BuildReleasePackage]
     description: "The board runs release in the background without renders and new stills, one at a time per project in its process (packages/cli/src/release-board.ts:37-40,158-167,448-462); a stale format or a changed dated image then leaves the folder (HS-167)"
 
+  - id: POL-MarkPostedEventDone
+    name: A posted calendar event is marked done
+    when: [EVT-CalendarEventPosted, EVT-VideoWentPublic]
+    then: [CMD-MarkCalendarEventDone]
+    description: "The autopilot sets the done mark with by autopilot and the live URL through the release status's writer (release-autopilot.ts:306-308,357-358)"
+  - id: POL-PostsWaitForMainVideo
+    name: Posts that link to the main video follow it
+    when: [EVT-VideoWentPublic]
+    then: [CMD-PostCalendarEvent]
+    description: "The X release post and LinkedIn are blocked until the main video is done with its URL, then due in the same round (packages/core/src/autopilot.ts:123,198-200; release-autopilot.ts:242-252)"
+  - id: POL-CommentWhenPublic
+    name: The main video gets its comment when it is public
+    when: [EVT-VideoWentPublic, EVT-CalendarEventMarkedDone]
+    then: [CMD-PostPinnedComment]
+    description: "Also when the user switched the video public in Studio and ticked it off on the board (release-autopilot.ts:278-285,319-325)"
 read_models:
   - id: RM-Status
     name: Status
@@ -1768,6 +2048,30 @@ read_models:
     fields: [Slug, Artist, Title, Language, Release day, Teaser, Text, Quote, Lyrics, Images, Links, Shorts, Profiles, Disclosure, Credits]
     description: "renders/release/microsite/<slug>.json, written when the upload data has a microsite block (packages/cli/src/release-microsite.ts:8-77; release.ts:416-420); the user wants the microsite (user, 2026-11-22). It is a published language with no schema (HS-178)"
 
+  - id: RM-AutopilotBoard
+    name: Autopilot on the release board
+    fed_by: [EVT-ReleaseApproved, EVT-PostClaimed, EVT-CalendarEventPosted, EVT-CalendarEventUploaded, EVT-PostAttemptFailed, EVT-CalendarEventTakenOver, EVT-AutopilotRoundRun, EVT-PlatformAuthorized]
+    used_by: [ACT-User]
+    fields: [Event, Autopilot state, Block, Needs the user, Last error, Manual steps, Retry at, Ready, Notes, Last run, Approval stale]
+    description: "Per post its autopilot state, what blocks it, the last error and what stays the user's, with the buttons Do it myself, Try again, Post now and It is live; the platforms' readiness and the last round (packages/cli/src/release-board-data.ts:96-129,706-757; board/release.js:20-125). The board is where the user wants to see what went wrong, without notifications (user, 2026-11-22)"
+  - id: RM-AutopilotPlan
+    name: Autopilot plan
+    fed_by: [EVT-ReleaseCalendarPlanned, EVT-ReleaseApproved, EVT-PostClaimed, EVT-CalendarEventPosted, EVT-PostAttemptFailed]
+    used_by: [ACT-User]
+    fields: [Project, Event, Time, Platform, Action, Autopilot state, Due at]
+    description: "release-run --plan: every calendar event of every project with a calendar and its state (release-autopilot.ts:509-525)"
+  - id: RM-PublishPlan
+    name: Publish plan
+    fed_by: [EVT-PublishPlanned, EVT-VideoUploaded]
+    used_by: [ACT-User]
+    fields: [Platform, Item, Upload or skip, Problems, Warnings, Quota]
+    description: "publish --dry-run and the head of every publish run (publish.ts:267-351)"
+  - id: RM-PlatformReadiness
+    name: Platform readiness
+    fed_by: [EVT-PlatformAuthorized, EVT-TokenRotated]
+    used_by: [ACT-User]
+    fields: [Platform, Ready, Expires at, Note]
+    description: "doctor's publish and autopilot rows and the board's readiness, from .env only, no network call (packages/cli/src/doctor.ts:108-178; autopilot-state.ts:68-91); two rules today (HS-196)"
 hotspots:
   - id: HS-1
     question: "'Production phase' (setup/ready/running/failed/done) is a derived project status, but the glossary lists 'phase' under Avoid for Stage, and 'setup' is both a stage ID and a phase. Which word is the domain term?"
@@ -2680,6 +2984,116 @@ hotspots:
     status: resolved
     resolution: "ADR 0045 (proposed) records the three records and who writes them, a release day fixed without the approval, a refresh that never removes a file, one set of checks for release and QA, the approval covering the day only, the microsite data as a published language, and English as the one built-in language; it amends 0019, 0024, 0028 and 0029 (recommendation, not reviewed by the user – delegated, 2026-11-22)"
 
+  - id: HS-183
+    question: "The publish command, the post adapters, publish-auth, the release autopilot, the timer and the watchdog round: one context or several? And where does the watchdog round end and the production scan begin?"
+    refs: [BC-Publish]
+    status: resolved
+    resolution: "One context, Publishing: the publish command, the autopilot's plan and runner, the publish and post adapters, the platform credentials, the timer and the watchdog round that runs the autopilot. The production scan inside the same round stays the pipeline's, the approval, done marks and live URLs the release's (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-184
+    question: "The autopilot's state needs the release status (approval, done marks, take-overs) and the autopilot log at once; the claim reads both under one lock. Which aggregates are real, and where does the take-over flag belong?"
+    refs: [AGG-AutopilotLog, AGG-PublishLog, AGG-AutopilotRound, AGG-PlatformCredentials]
+    status: resolved
+    resolution: "Four as-is aggregates: the publish log, the autopilot log, the autopilot round and the platform credentials. The take-over stays a mark in the release status beside the done marks, because it is the user's like a done mark; the claim reads it under the shared release lock. The state stays derived (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-185
+    question: "publish, post and upload mean different things in different files: the glossary's Publish never goes public, but TikTok's direct mode posts through a PublishAdapter; one glossary term Publish Adapter covers two interfaces with opposite guarantees; Do it myself, manual, take over; stuck, uncertain, not sure it is live; missed, late, force; the timer named release-run runs the whole watchdog round. Which words?"
+    refs: [BC-Publish]
+    status: resolved
+    resolution: "Publish stays the upload that does not go public (the command, YouTube private or scheduled, TikTok drafts); Post is what goes public at a calendar time. Publish Adapter (YouTube, TikTok) and Post Adapter (X, LinkedIn, Instagram) are two terms. New: Take-over (UI 'Do it myself'), Stuck Post (UI 'not sure it is live'), Missed Post, Autopilot State, Platform Credentials, Pinned Comment. Release Autopilot is run by the watchdog round. Code names that say otherwise (release-run timer and script, two Publisher class families) are a low text gap (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-186
+    question: "ADR 0029, docs/publishing.md and the board say a platform without credentials stays manual; the plan calls it blocked (credentials) and needs the user once it is due. Which?"
+    refs: [AGG-AutopilotLog]
+    status: resolved
+    resolution: "Blocked, as the code has it: the post is the autopilot's but cannot go out, and the board says what to run. The texts that say manual are part of the text fix (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-187
+    question: "Never twice holds for X, LinkedIn and Instagram, which mark a send that may have gone out as uncertain. The YouTube upload and TikTok never mark it, the publish command drops the flag when it rethrows, and TikTok's init and status calls are retried five times – a direct TikTok post could go out twice. Rule?"
+    refs: [AGG-AutopilotLog]
+    status: resolved
+    resolution: "Never twice on every platform: a send that may have gone out is stuck and waits for the user; the publish command keeps the flag. Gap, medium – the user wants every platform automated, TikTok's direct mode included (user, 2026-11-22) (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-188
+    question: "TikTok's direct mode has two switches: autopilot.tiktok_direct in the release schedule, and TIKTOK_DIRECT_POST in .env, read as 1/true/yes for the scopes but only as '1' by the runner. docs/publishing.md says the env value affects publish, which never passes the mode. Rule?"
+    refs: [CMD-PostCalendarEvent]
+    status: resolved
+    resolution: "One switch, autopilot.tiktok_direct; the scopes follow it. The publish command stays drafts only. Gap, low – it needs TikTok's audit first (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-189
+    question: "review/publish.json is written from a copy read at the start, without a lock, while the autopilot writes the same file; .env is read, changed and written without a lock or an atomic rename, by publish-auth on the computer and by token rotation in the container. A lost X refresh token means a new consent. Rule?"
+    refs: [AGG-PublishLog, AGG-PlatformCredentials]
+    status: resolved
+    resolution: "Every publish log write takes the project's release lock; every .env write is atomic under a workspace lock. Gap, medium – with the board container the computer and the container both write (user, 2026-11-22) (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-190
+    question: "Withdrawing the approval is said to stop what has not gone out. A YouTube upload scheduled with publishAt still goes public at its time, an attempt in flight finishes, and because the plan checks the approval before running and stuck, a post that may be live shows as 'automatic after approval'. Rule?"
+    refs: [AGG-AutopilotLog, RM-AutopilotBoard]
+    status: resolved
+    resolution: "Withdrawing stops what the autopilot has not sent. The board shows what will still go out (a scheduled upload) and what may be live (running, stuck) also without an approval, and the glossary says so. Cancelling a scheduled upload stays the user's click in Studio. Gap, medium – the board is where the user wants to see what went wrong (user, 2026-11-22) (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-191
+    question: "A TikTok draft and a private YouTube upload are pending and need the user; only YouTube is read again. The board shows no button for pending, so a draft ends only with the done checkbox. Intended?"
+    refs: [RM-AutopilotBoard]
+    status: resolved
+    resolution: "A pending post that needs the user gets It is live on the board, like a stuck one; TikTok's status is not read. Gap, low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-192
+    question: "The X price is written into each posted entry and read by nothing; the YouTube quota counts only inserts and thumbnails from the publish log, not the autopilot's status reads, description updates and comments; the runner drops the publish plan's warnings. Rule?"
+    refs: [AGG-PublishLog, CMD-PostCalendarEvent]
+    status: resolved
+    resolution: "The board shows what a release's posts cost, apart from the generation budget (posting is not generation spend); every YouTube call counts against the day's quota; the plan's warnings reach the round's log. Gap, low – the user does not post by API yet (user, 2026-11-22) (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-193
+    question: "The board's autopilot route takes retry and force for any id up to 200 characters, in any state, also for ids not on the calendar; a retry on a pending event makes it due again. stuckMinutes is fixed at 60, so an upload over an hour shows as stuck. Rule?"
+    refs: [AGG-AutopilotLog]
+    status: resolved
+    resolution: "Try again and Post now only for a calendar event in a state the board offers them for. An hour stays the stuck threshold (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-194
+    question: "The board container runs with TZ=UTC unless the user sets TZ; a release schedule without timezone then plans in UTC, and 'today' for --done-until is UTC's. The template leaves timezone commented out. Rule?"
+    refs: [AGG-AutopilotRound]
+    status: resolved
+    resolution: "A workspace that runs the board container names its time zone: init or the board writes the computer's zone into the release schedule, and the board warns when the schedule has none and the process runs in UTC. Gap, low – times kept for an existing release day are absolute; it bites a new release planned inside the container (user means to run the container, 2026-11-22) (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-195
+    question: "ADR 0031 says the board container or the timer runs the round, not both; only a message says so, and the run lock keeps the second round out. .cache/watch.log grows without bound, and the microsite command's output goes into it. Rule?"
+    refs: [AGG-AutopilotRound]
+    status: resolved
+    resolution: "release-timer install refuses while a container round is recent, and the board warns when both run; the watch log is rotated. Gap, low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-196
+    question: "doctor calls LinkedIn ready only with ten days left, the plan with any; an expired LinkedIn token with a refresh token is blocked although the adapter would refresh it. Rule?"
+    refs: [AGG-PlatformCredentials, RM-PlatformReadiness]
+    status: resolved
+    resolution: "One readiness function for doctor, the board and the plan; a refreshable token is ready; expiry soon is a note, not a block. Gap, low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-197
+    question: "Instagram's files go to the user's fal.ai storage as public URLs, at post time, and are never deleted. Intended?"
+    refs: [EXT-FalStorage]
+    status: resolved
+    resolution: "Intended: Instagram fetches only from a public URL, the upload happens when the post goes public, and the files are the post's own. ADR 0046 records it (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-198
+    question: "The microsite step runs a shell command from the release schedule in a directory that may lie outside the workspace. Intended?"
+    refs: [CMD-PostCalendarEvent]
+    status: resolved
+    resolution: "Intended: the command is the user's own configuration, like a script in their workspace, run at the page's time and cut off after ten minutes (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-199
+    question: "Which failures wait for the user at once, which are retried, and what does retries count?"
+    refs: [AGG-AutopilotLog]
+    status: resolved
+    resolution: "As the code has it: a configuration or validation failure waits at once, a send that may have gone out is stuck, anything else is retried after attempts × 10 minutes; retries counts failed attempts before the post waits for the user. ADR 0046 records it; the docs say it (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-200
+    question: "Stage runners, /video-next and agents never approve, never run release-run and never install the timer – a skill rule with no guard in code. Enough?"
+    refs: [BC-Publish]
+    status: resolved
+    resolution: "Enough: the rule lives in workspace/AGENTS.md and the stage-runner agent; a code guard cannot tell the user's shell from an agent's. The approval itself can come only from the board's own page or the user's command (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-201
+    question: "Texts drifted: ADR 0023 and the PublishAdapter doc (nothing goes public; Instagram later through the same interface), the schema comment (Instagram not yet), docs/publishing.md (TIKTOK_DIRECT_POST for publish, only the youtube.upload scope, the pinned comment for Shorts too), docs/release-platforms.md (no LinkedIn refresh), the glossary (Release Autopilot started by a timer), the board ('they stay manual'), release-run --plan's help (only approved events). Fix?"
+    refs: [BC-Publish]
+    status: resolved
+    resolution: "Yes, as one text fix; accepted ADRs 0023, 0029 and 0031 stay and ADR 0046 amends them. Gap, medium – the user will set the autopilot up from these docs (user, 2026-11-22) (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-202
+    question: "Unused imports (open, rm, stat in release-autopilot.ts), an unused export (redactLinkedIn), branches that cannot run (a failed entry from publish, the mock filter in mainVideoId, the WSL distro fallback), the direct-mode expression twice, YouTube URL building three times. Remove?"
+    refs: [BC-Publish]
+    status: resolved
+    resolution: "Remove the dead parts and keep one expression each. Gap, low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-203
+    question: "No test of socialAuth, watchRound, a withdrawal during a round, the pinned comment's failure path, the microsite step, the audited schedule, a quota that turns fatal, the autopilot reusing a manual publish entry, a fatal runner failure, or the cost written to the log. Which to pin now?"
+    refs: [BC-Publish]
+    status: resolved
+    resolution: "Pinned now (tests/publish-characterization.test.ts): the autopilot defaults, a YouTube upload due a day ahead but late from its calendar time, retries counting failed attempts with the back-off, a done mark and a take-over winning before the approval. The rest is a low gap (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-204
+    question: "Is the publishing context a decision worth recording beside ADRs 0023, 0029 and 0031?"
+    refs: [BC-Publish]
+    status: resolved
+    resolution: "ADR 0046 (proposed) records the four records and their locks, publish versus post and the two adapter families, never twice on every platform, the failure classes, the derived state, the take-over in the release status, what withdrawing stops, the files on fal.ai storage and posting cost apart from the generation budget; it amends 0023, 0029 and 0031 (recommendation, not reviewed by the user – delegated, 2026-11-22)"
 flows:
   - id: FLOW-AutonomousStage
     name: One autonomous stage
@@ -2717,3 +3131,12 @@ flows:
   - id: FLOW-Release
     name: From the upload data to a release ticked off on the board
     sequence: [ACT-StageRunner, CMD-WriteUploadData, EVT-UploadDataWritten, CMD-BuildReleasePackage, EVT-ReleaseCalendarPlanned, EVT-ReleasePackageBuilt, CMD-CheckRelease, EVT-ReleaseChecked, RM-ReleaseBoard, ACT-User, CMD-MarkCalendarEventDone, EVT-CalendarEventMarkedDone, CMD-RecordLiveUrl, EVT-LiveUrlRecorded, POL-RefreshAfterStatusChange]
+  - id: FLOW-Autopilot
+    name: From the approval to a calendar event posted by the autopilot
+    sequence: [ACT-User, CMD-AuthorizePlatform, EVT-PlatformAuthorized, CMD-ApproveRelease, EVT-ReleaseApproved, ACT-Watchdog, CMD-RunAutopilotRound, EVT-AutopilotRoundRun, CMD-PostCalendarEvent, EVT-PostClaimed, EVT-CalendarEventPosted, POL-MarkPostedEventDone, CMD-MarkCalendarEventDone, EVT-CalendarEventMarkedDone, RM-AutopilotBoard]
+  - id: FLOW-MainVideo
+    name: From the main video's upload to the posts that link to it
+    sequence: [ACT-Watchdog, CMD-PostCalendarEvent, EVT-CalendarEventUploaded, CMD-CheckUploadStatus, EVT-VideoWentPublic, POL-PostsWaitForMainVideo, EVT-CalendarEventPosted, POL-CommentWhenPublic, CMD-PostPinnedComment, EVT-PinnedCommentPosted]
+  - id: FLOW-Publish
+    name: From the consent to a private upload by hand
+    sequence: [ACT-User, CMD-AuthorizePlatform, EVT-PlatformAuthorized, CMD-PublishUploads, EVT-PublishPlanned, RM-PublishPlan, EVT-VideoUploaded]

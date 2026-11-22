@@ -1843,3 +1843,265 @@ marks and live URLs into the release status.
 | HS-177 | Fixing the release day is the one write into `project.yaml` | recommendation | conventions, `CMD-ApproveRelease` |
 | HS-179 | Checklist lines keyed by name; every done mark says who | recommendation; low | `AGG-ReleaseStatus`, G-163 |
 | HS-182 | ADR 0045 | recommendation | `docs/adr/0045-release-records-and-fixed-release-day.md` |
+
+# Adoption – publish
+Date: 2026-11-22 · Commit: 7ba5b88 · Slice: the publish command, platform credentials, the release autopilot's plan and runner, the publish and post adapters, the timer and the watchdog round (concept `publish`) · Analysts: 3 lenses
+
+## Scope
+
+- **Slice:**
+  - core: `autopilot.ts` (the plan; `approvalHolds` stays the release slice's), the publish and autopilot parts of
+    `schema.ts` (publish log, autopilot log, autopilot settings, platform enums);
+  - cli: `publish.ts`, `publish-auth.ts`, `publish-setup.ts`, `social-auth.ts`, `release-autopilot.ts` (without
+    `approveRelease`/`revokeApproval`), `autopilot-state.ts`, `release-timer.ts`; the commands `publish`,
+    `publish-auth`, `release-run`, `release-timer`, `watch` and `board --watch`; the autopilot parts of
+    `release-board-data.ts`, `release-board.ts` and `board/release.js`; the publish rows of `doctor.ts`;
+  - providers (the shared library): `packages/providers/src/publish/*`;
+  - workspace: the publish rules in `workspace/AGENTS.md`, `/video-next` and the stage-runner agent.
+- **Out of scope:**
+  - the approval, done marks, live URLs and the calendar: already adopted (release);
+  - the production scan in the watchdog round (`production-watch.ts` `scanProduction`, `core/watch.ts`): already
+    adopted (pipeline);
+  - `init`, `update`, onboarding, the board container's image and entrypoint: slice `workspace`.
+- **Intent:** domain model, as for the earlier slices. **Language:** artifacts `en`, UI `en`.
+- **Since the last slice:** no code change. `slice.ts --cluster publish` found 8 seeds and 56 candidates, `--cluster
+  autopilot` 2 seeds and 9 candidates; the scope was cut by hand along the adoption plan.
+
+| Layer | Files |
+|---|---|
+| core (domain) | `autopilot.ts`, publish and autopilot schemas in `schema.ts` |
+| cli (application) | `publish*.ts`, `social-auth.ts`, `release-autopilot.ts`, `autopilot-state.ts`, `release-timer.ts`, the autopilot parts of the board, the publish rows of `doctor.ts` |
+| providers (shared library) | `publish/` – http, oauth, types, social, mock, youtube, tiktok, x, linkedin, instagram |
+| tests | `publish*.test.ts`, `release-autopilot*.test.ts`; new `publish-characterization` |
+
+## How this slice was decided
+
+As in the earlier slices, there were no code-level questions. Every technical hotspot was decided by the
+recommendation and is marked "not reviewed by the user – delegated". The user answered four questions about how
+they work:
+1. They post everything by hand from the release board; nothing goes out by API yet.
+2. When they use the autopilot, it will run in the board container (Docker).
+3. When a post fails, seeing it on the board is enough; no notifications.
+4. Every platform matters for automatic posting: YouTube, Instagram, TikTok, X and LinkedIn.
+
+How the answers shaped the model:
+- Answer 1 means no gap is high: none of them hits a release posted by hand. Every gap bites at the first approved
+  release, so the ones that cost trust there are medium: a double post (G-168), lost writes between the container
+  and the computer (G-169), and the board hiding what may still go out (G-170).
+- Answer 2 raises the container's issues: `.env` and the publish log written from two hosts (G-169), the container
+  planning in UTC (G-167, low, because existing times are absolute), and "container or timer" being only printed
+  (G-176).
+- Answer 3 makes the board the one place that must show everything that needs the user. Notifications stay out
+  (ADR 0031 already left them out); the board gaps G-170 and G-173 follow from it.
+- Answer 4 keeps TikTok's direct mode in scope: never twice must hold there too (G-168), with one switch (G-172).
+
+ADR 0046 stays `Proposed`.
+
+## What the repository is (facts)
+
+- **Two paths out.**
+  - `publish` is the user's command. It uploads YouTube private or scheduled, and TikTok as an inbox draft. It
+    never passes TikTok's direct mode, and it is never a stage.
+  - The release autopilot (`release-run`) acts per calendar event once the approval holds for the calendar's day.
+  - Both send YouTube and TikTok through `publishProject`, so the publish log's file-hash check covers both.
+- **Four records.**
+  - `review/publish.json` is written after every item, without a lock.
+  - `review/autopilot.json` is appended under `review/.release.lock`.
+  - `.cache/release-run.lock` is a host-aware holder lock, stale after two hours, beside `.cache/release-run.last`.
+  - `.env` (0600) is written by `saveEnvValue`, without a lock.
+- **The plan.**
+  - It is a pure function in core, with an injected `now`. The state is derived every round from the release
+    status, the log since the last retry, the settings, readiness and the clock. The first matching rule wins:
+    done, manual, unapproved, blocked (credentials), running/stuck, pending, done, stuck, failed, waiting, missed,
+    blocked (main video, Spotify), waiting (back-off), due.
+  - YouTube is due `youtube_ahead_hours` (24) early. Lateness counts from the calendar time.
+  - The back-off is attempts × 10 minutes, up to `retries` (3) failed attempts.
+  - A running attempt is stuck after 60 minutes.
+- **The runner.**
+  - A round first reads the pending YouTube uploads, then claims each due event under the release lock, then posts
+    the pinned comment.
+  - YouTube is scheduled only with `youtube_audited` and more than 20 minutes ahead. TikTok goes direct with
+    `tiktok_direct` or `TIKTOK_DIRECT_POST=1`.
+  - The links step appends the Spotify link the day after. The microsite step copies the page and runs a
+    configured command.
+  - A `ConfigError` or `ValidationError` is fatal. An uncertain failure is stuck.
+- **Adapters.**
+  - Two families in providers: `PublishAdapter` (YouTube, TikTok) and `SocialAdapter` (X, LinkedIn, Instagram).
+  - OAuth uses PKCE on loopback ports. Instagram takes a pasted token. X's refresh tokens are single-use.
+  - The post adapters send once and mark a lost answer uncertain. `fetchWithRetry` retries everything else.
+  - Instagram's files go to fal.ai storage. X's price is recorded per post.
+- **Timer and container.**
+  - `release-timer` writes `~/.coreslopper/release-run.sh`, which runs `watch`. It uses the Windows Task Scheduler
+    under WSL, systemd on Linux and launchd on macOS.
+  - The container runs `board --watch 5` with `TZ=UTC` by default. It reads `.env` again before every round.
+- **History.**
+  - The files appeared from 2026-11-16 (`887769d`, publish) to 2026-11-21 (`ba29b3c` social adapters, `ac7ca26`
+    autopilot, `e44dde1` review fixes, `e7c2599` watchdog).
+  - The hotspot is `release-autopilot.ts`. No file has more than four commits.
+  - There are no reverts and no TODOs.
+
+## Domain model (decided by recommendation)
+
+- **Context:** `BC-Publish` – Publishing.
+- **Aggregates (all `as-is`):**
+  - `AGG-PublishLog`:
+    - no second upload of the same file;
+    - a failure keeps the uploads before it;
+    - `publish` never public;
+    - the quota checked first, every YouTube call counted;
+    - writes under the release lock.
+  - `AGG-AutopilotLog`:
+    - the state derived;
+    - a done mark and a take-over win, then the approval;
+    - claimed once;
+    - never twice on every platform;
+    - the failure classes and the back-off;
+    - missed posts;
+    - posts that link to the main video wait;
+    - stuck after an hour;
+    - retry and force only where offered;
+    - what may be live shown without an approval.
+  - `AGG-AutopilotRound`:
+    - one round per workspace across hosts;
+    - a dry run writes nothing;
+    - the last run recorded;
+    - the container or the timer, enforced.
+  - `AGG-PlatformCredentials`:
+    - tokens only in `.env`, masked everywhere;
+    - rotated tokens saved at once;
+    - `.env` read again each round;
+    - one readiness rule;
+    - atomic, locked writes.
+- **Commands:**
+  - authorize a platform;
+  - publish the uploads;
+  - run an autopilot round;
+  - post a calendar event;
+  - check an upload's status;
+  - post the pinned comment;
+  - take over and give back a calendar event;
+  - try again;
+  - post a missed event now;
+  - install the timer.
+- **Policies:**
+  - a posted event is marked done;
+  - posts that link to the main video follow it;
+  - the main video gets its comment when it is public.
+- **Read models:** the autopilot on the release board, the autopilot plan, the publish plan, platform readiness.
+- **Flows:** `FLOW-Autopilot`, `FLOW-MainVideo`, `FLOW-Publish`. **Actor:** the watchdog round. **External
+  systems:** YouTube, TikTok, Instagram, X, LinkedIn, fal.ai storage, the operating system's scheduler.
+- **Glossary:**
+  - New: **Post**, **Post Adapter**, **Platform Credentials**, **Autopilot State**, **Take-over**, **Stuck Post**,
+    **Missed Post**, **Pinned Comment**.
+  - Sharpened:
+    - **Publish**: the autopilot uploads the same way.
+    - **Publish Adapter**: YouTube and TikTok only, with the direct mode as the one post.
+    - **Release Autopilot**: run by the watchdog round.
+    - **Release Approval**: withdrawing stops what the autopilot has not sent; a scheduled upload still goes public.
+    - **Watchdog**: one of the two, never both.
+- **ADR:** 0046 (Proposed), which amends 0023, 0029 and 0031.
+
+## Package documentation written
+
+- `.claude/rules/publish.md` – the path-scoped slice doc. Nothing is left `[OPEN]`.
+- `docs/engineering/conventions.md`:
+  - how the plan and the runner split the work, the claim and the one upload path;
+  - never twice and the failure classes;
+  - secrets;
+  - `now` in the autopilot and the adapters, and the Pacific quota day;
+  - five seams (autopilot plan, autopilot round, publish, post adapter, timer).
+- `docs/architecture/data-model.md` – the four aggregates, the autopilot settings, the autopilot state's
+  lifecycle and the publishing entities in the overview.
+- `docs/domain/context-map.as-is.md` – `BC-Publish` and its edges to Release, Pipeline, the platforms, fal.ai storage,
+  the microsite and the scheduler.
+- `.claude/rules/release.md` – the pointer to the publish rule doc.
+
+## Contradictions found and how they were resolved
+
+| Contradiction | Resolution |
+|---|---|
+| ADR 0023, the glossary and `PublishAdapter`: publishing never goes public, versus TikTok's direct mode through the same interface | publish (stays private) and post (goes public) as two terms; the direct mode is the one post of a publish adapter (glossary, ADR 0046) |
+| ADR 0023: Instagram later through the same enum and interface, versus a second adapter family | two adapter families, Publish Adapter and Post Adapter (G-171) |
+| ADR 0029: never twice, versus the YouTube upload and TikTok never marking a lost answer, and `publish` dropping the mark | never twice on every platform (G-168) |
+| ADR 0029 and the glossary: withdrawing stops what has not gone out, versus a scheduled upload going public and a stuck post shown as unapproved | withdrawing stops what the autopilot has not sent; the board shows the rest (G-170) |
+| Docs and the board: a platform without credentials stays manual, versus the plan's blocked | blocked (G-171) |
+| `docs/publishing.md`: `TIKTOK_DIRECT_POST` for `publish`, versus `publish` never passing the mode; the env value read two ways | one switch, `autopilot.tiktok_direct` (G-172) |
+| The glossary: `release-run` started by a timer, versus the timer and the container running `watch` | run by the watchdog round (glossary fixed; G-178 for code names) |
+| ADR 0031: the container or the timer, versus only a message | enforced (G-176) |
+| ADR 0029: the autopilot logs a cost estimate, versus nothing reading it | shown on the board, apart from the generation budget (G-174) |
+| `doctor` versus the plan: two readiness rules | one rule (G-177) |
+| `docs/publishing.md`: only the `youtube.upload` scope and the pinned comment for Shorts; `docs/release-platforms.md`: no LinkedIn refresh | text fix (G-171) |
+| ADR 0031: the container plans in `TZ`, default UTC, versus a template without a time zone | the workspace names its zone (G-167) |
+
+## Rules and checks
+
+| Rule | Enforcement | State |
+|---|---|---|
+| The autopilot defaults (all six platforms, 24 h ahead, unaudited, drafts, 12 h late, 3 attempts) | `tests/publish-characterization.test.ts` | green |
+| A YouTube upload is due a day ahead, but missed only `late_hours` after its calendar time | `tests/publish-characterization.test.ts` | green |
+| `retries` counts failed attempts; the back-off waits attempts × 10 minutes | `tests/publish-characterization.test.ts` | green |
+| A done mark and a take-over win before the approval is checked | `tests/publish-characterization.test.ts` | green |
+| Approval, back-off, stuck, missed, force, posts waiting for the main video, the claim, the run lock, the board's write guard, the timer plans, idempotent uploads, quota, masked secrets, the post adapters sending once | existing `tests/release-autopilot.test.ts`, `release-autopilot-plan.test.ts`, `publish*.test.ts` | green |
+| The slice stays inside the package import direction (providers import only core) | slice 1 boundary rule and `tests/package-boundaries.test.ts` | green |
+| Never twice everywhere, the locks, what the board shows after a withdrawal, one TikTok switch, one readiness rule, cost and quota, guarded retries, container or timer, a named time zone | documentation until stories build them (G-167–G-180) | – |
+
+## Gap register (candidates – stories only with --stories)
+
+14 candidates, G-167 to G-180, in `docs/domain/gap-register.md`:
+- 7 *exist but contradict*. The highest are G-168 (never twice), G-170 (withdrawal on the board) and G-171 (drifted
+  texts), all medium. G-172, G-175, G-177 and G-178 are low.
+- 6 are *missing*. The highest is G-169 (locks on the publish log and `.env`, medium). G-167, G-173, G-174, G-176
+  and G-180 are low.
+- 1 is *dead*: G-179.
+
+## Deliberately left alone
+
+- Production code, the skills, and ADRs 0023, 0029 and 0031, which are accepted. ADR 0046 amends them. Only the
+  glossary was corrected.
+- The approval's writers in `release-autopilot.ts` (`approveRelease`, `revokeApproval`, `setReleaseDate`): release
+  slice.
+- The production scan and `reloadEnv` in `production-watch.ts`: pipeline slice. This slice relies on `reloadEnv`
+  for the container.
+- `release-autopilot.ts` and `release-board.ts` importing each other: noted, a board concern for the workspace slice.
+- The board container's image, entrypoint and Docker setup: slice `workspace`.
+- The board write guard letting a request without an Origin through (a local non-browser client): intended for
+  the user's own tools on the computer.
+- Pinned API versions (LinkedIn `202610`, Instagram `v25.0`) and the X prices of April 2026: dated facts in code,
+  with env overrides where they exist.
+
+## Open hotspots
+
+None. HS-183 to HS-204 are resolved, nine of them partly by the user's answers.
+
+## Next slice
+
+`workspace` per the adoption plan: `init`, `update` and the baseline, `doctor`, onboarding, the runtime build,
+`migrate-layout`, and the board container's image. It reads this slice's publish setup (`publish-setup.ts`,
+`doctor`'s publish rows) and the time zone the container needs (G-167).
+
+## Decision log
+
+| # | Decision | How | Written to |
+|---|---|---|---|
+| HS-187 | Never twice on every platform | user (every platform, TikTok direct included) and recommendation; medium | `AGG-AutopilotLog`, ADR 0046, G-168 |
+| HS-189 | The publish log and `.env` written under locks, `.env` atomically | user (board container) and recommendation; medium | `AGG-PublishLog`, `AGG-PlatformCredentials`, ADR 0046, G-169 |
+| HS-190 | Withdrawing stops what is not sent; the board shows what still goes out or may be live | user (the board is enough) and recommendation; medium | `AGG-AutopilotLog`, `RM-AutopilotBoard`, glossary, ADR 0046, G-170 |
+| HS-201 | Drifted texts fixed together | user (sets the autopilot up later, from the docs) and recommendation; medium | G-171 |
+| HS-194 | The workspace names its time zone when the container runs | user (board container) and recommendation; low | ADR 0046, conventions, G-167 |
+| HS-192 | Posting cost on the board, apart from the budget; every YouTube call counts | user (posts by hand today) and recommendation; low | `CMD-PostCalendarEvent`, `AGG-PublishLog`, ADR 0046, G-174 |
+| HS-191 | A pending post that needs the user gets It is live | user (the board is enough) and recommendation; low | `RM-AutopilotBoard`, G-173 |
+| HS-195 | Container or timer, enforced; the watch log rotated | user (board container) and recommendation; low | `AGG-AutopilotRound`, G-176 |
+| HS-188 | One TikTok switch, `autopilot.tiktok_direct` | user (TikTok wanted) and recommendation; low | `CMD-PostCalendarEvent`, ADR 0046, G-172 |
+| HS-183 | One context, Publishing; the production scan stays the pipeline's | recommendation | `BC-Publish` |
+| HS-184 | Four as-is aggregates; the take-over stays in the release status | recommendation | the four aggregates |
+| HS-185 | Publish and Post; Publish Adapter and Post Adapter; Take-over, Stuck Post, Missed Post, Autopilot State, Platform Credentials, Pinned Comment | recommendation; low | glossary, G-178 |
+| HS-186 | No credentials is blocked, not manual | recommendation | G-171 |
+| HS-193 | Retry and force only where offered; an hour stays the stuck threshold | recommendation; low | `AGG-AutopilotLog`, G-175 |
+| HS-196 | One readiness rule; a refreshable token is ready | recommendation; low | `AGG-PlatformCredentials`, ADR 0046, G-177 |
+| HS-197 | Instagram's files on fal.ai storage, kept | recommendation | ADR 0046 |
+| HS-198 | The microsite command from the user's configuration | recommendation | `CMD-PostCalendarEvent` |
+| HS-199 | The failure classes; `retries` counts failed attempts | recommendation | `AGG-AutopilotLog`, ADR 0046 |
+| HS-200 | Agents never approve or run the autopilot: a skill rule | recommendation | `.claude/rules/publish.md` |
+| HS-202 | Dead code removed | recommendation; low | G-179 |
+| HS-203 | Four characterization tests now, the rest a gap | recommendation; low | `tests/publish-characterization.test.ts`, G-180 |
+| HS-204 | ADR 0046 | recommendation | `docs/adr/0046-publishing-records-and-never-twice.md` |

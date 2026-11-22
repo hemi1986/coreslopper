@@ -69,6 +69,7 @@ flowchart LR
     CMD_CheckDeterminism["Check determinism"]:::cmd
     CMD_RenderUploadText["Render the upload text"]:::cmd
     CMD_CheckRelease["Check the release package"]:::cmd
+    CMD_InstallTimer["Install the timer"]:::cmd
     subgraph BC_Timing["Timing"]
         CMD_WriteLyrics["Write lyrics"]:::cmd
         CMD_AnalyzeSong["Analyze song"]:::cmd
@@ -192,6 +193,8 @@ flowchart LR
         CMD_RecordLiveUrl["Record a live URL"]:::cmd
         CMD_ApproveRelease["Approve a release"]:::cmd
         CMD_WithdrawApproval["Withdraw the approval"]:::cmd
+        CMD_TakeOverCalendarEvent["Take over a calendar event"]:::cmd
+        CMD_GiveBackCalendarEvent["Give a calendar event back"]:::cmd
         EVT_UploadDataWritten["Upload data written"]:::evt
         EVT_ReleasePackageBuilt["⭐ Release package built"]:::evt
         EVT_ReleaseRulesBroken["Release rules broken"]:::evt
@@ -204,6 +207,35 @@ flowchart LR
         EVT_ApprovalWithdrawn["Approval withdrawn"]:::evt
         EVT_ApprovalRefused["Approval refused"]:::evt
         EVT_ReleaseChecked["Release checked"]:::evt
+        EVT_CalendarEventTakenOver["Calendar event taken over"]:::evt
+        EVT_CalendarEventGivenBack["Calendar event given back"]:::evt
+    end
+    subgraph BC_Publish["Publishing"]
+        CMD_AuthorizePlatform["Authorize a platform"]:::cmd
+        CMD_PublishUploads["Publish the uploads"]:::cmd
+        CMD_RunAutopilotRound["Run an autopilot round"]:::cmd
+        CMD_PostCalendarEvent["Post a calendar event"]:::cmd
+        CMD_CheckUploadStatus["Check an upload's status"]:::cmd
+        CMD_PostPinnedComment["Post the pinned comment"]:::cmd
+        CMD_RetryCalendarEvent["Try a calendar event again"]:::cmd
+        CMD_ForceCalendarEvent["Post a missed calendar event now"]:::cmd
+        EVT_PlatformAuthorized["Platform authorized"]:::evt
+        EVT_TokenRotated["Token rotated"]:::evt
+        EVT_PublishPlanned["Publish planned"]:::evt
+        EVT_VideoUploaded["⭐ Video uploaded"]:::evt
+        EVT_UploadFailed["Upload failed"]:::evt
+        EVT_AutopilotRoundRun["Autopilot round run"]:::evt
+        EVT_PostClaimed["Post claimed"]:::evt
+        EVT_CalendarEventPosted["⭐ Calendar event posted"]:::evt
+        EVT_CalendarEventUploaded["Calendar event uploaded"]:::evt
+        EVT_VideoWentPublic["Video went public"]:::evt
+        EVT_PostAttemptFailed["Post attempt failed"]:::evt
+        EVT_PinnedCommentPosted["Pinned comment posted"]:::evt
+        EVT_SpotifyLinkAppended["Spotify link appended"]:::evt
+        EVT_MicrositePageDeployed["Microsite page deployed"]:::evt
+        EVT_RetryRequested["Retry requested"]:::evt
+        EVT_PostForced["Post forced"]:::evt
+        EVT_TimerInstalled["Timer installed"]:::evt
     end
     ACT_User(["User"]):::act
     ACT_Orchestrator(["Orchestrator"]):::act
@@ -212,6 +244,7 @@ flowchart LR
     ACT_BoardWizard(["Board wizard"]):::act
     ACT_ArtDirector(["Art director"]):::act
     ACT_QueueRun(["Queue run"]):::act
+    ACT_Watchdog(["Watchdog round"]):::act
     EXT_Provider[["Generation provider"]]:::ext
     EXT_ComfyUI[["ComfyUI server"]]:::ext
     EXT_AudioModels[["Local audio models"]]:::ext
@@ -219,6 +252,13 @@ flowchart LR
     EXT_Remotion[["Remotion and headless Chrome"]]:::ext
     EXT_Microsite[["Artist microsite"]]:::ext
     EXT_Distributor[["Distributor"]]:::ext
+    EXT_YouTube[["YouTube Data API"]]:::ext
+    EXT_TikTok[["TikTok Content Posting API"]]:::ext
+    EXT_Instagram[["Instagram Graph API"]]:::ext
+    EXT_X[["X API v2"]]:::ext
+    EXT_LinkedIn[["LinkedIn Posts API"]]:::ext
+    EXT_FalStorage[["fal.ai storage"]]:::ext
+    EXT_OsScheduler[["Operating system scheduler"]]:::ext
     POL_RunNextStage{{"Run the next autonomous stage"}}:::pol
     POL_HardStop{{"A hard stop fails the stage and halts the pipeline"}}:::pol
     POL_AnswerOpenRounds{{"Open review rounds are answered before the next autonomous stage"}}:::pol
@@ -232,6 +272,9 @@ flowchart LR
     POL_ImportFinishedCharacters{{"The characters of a finished character bible go into the library"}}:::pol
     POL_LinkNewProjectMedia{{"A new project's media go to the media directory"}}:::pol
     POL_RefreshAfterStatusChange{{"The release folder follows a live URL and an approval"}}:::pol
+    POL_MarkPostedEventDone{{"A posted calendar event is marked done"}}:::pol
+    POL_PostsWaitForMainVideo{{"Posts that link to the main video follow it"}}:::pol
+    POL_CommentWhenPublic{{"The main video gets its comment when it is public"}}:::pol
     RM_Status[("Status")]:::rm
     RM_NextAction[("Next action")]:::rm
     RM_ProductionView[("Production view")]:::rm
@@ -261,6 +304,10 @@ flowchart LR
     RM_ReleaseChecks[("Release checks")]:::rm
     RM_UploadText[("Upload text")]:::rm
     RM_MicrositeSong[("Microsite song")]:::rm
+    RM_AutopilotBoard[("Autopilot on the release board")]:::rm
+    RM_AutopilotPlan[("Autopilot plan")]:::rm
+    RM_PublishPlan[("Publish plan")]:::rm
+    RM_PlatformReadiness[("Platform readiness")]:::rm
     ACT_SetupSkill --> CMD_CreateProject
     CMD_CreateProject --> EVT_ProjectCreated
     ACT_Orchestrator --> CMD_StartStage
@@ -446,6 +493,35 @@ flowchart LR
     CMD_WithdrawApproval --> EVT_ApprovalWithdrawn
     ACT_StageRunner --> CMD_CheckRelease
     CMD_CheckRelease --> EVT_ReleaseChecked
+    ACT_User --> CMD_AuthorizePlatform
+    CMD_AuthorizePlatform --> EVT_PlatformAuthorized
+    ACT_User --> CMD_PublishUploads
+    CMD_PublishUploads --> EVT_PublishPlanned
+    CMD_PublishUploads --> EVT_VideoUploaded
+    CMD_PublishUploads --> EVT_UploadFailed
+    ACT_Watchdog --> CMD_RunAutopilotRound
+    CMD_RunAutopilotRound --> EVT_AutopilotRoundRun
+    ACT_Watchdog --> CMD_PostCalendarEvent
+    CMD_PostCalendarEvent --> EVT_PostClaimed
+    CMD_PostCalendarEvent --> EVT_CalendarEventPosted
+    CMD_PostCalendarEvent --> EVT_CalendarEventUploaded
+    CMD_PostCalendarEvent --> EVT_PostAttemptFailed
+    CMD_PostCalendarEvent --> EVT_SpotifyLinkAppended
+    CMD_PostCalendarEvent --> EVT_MicrositePageDeployed
+    ACT_Watchdog --> CMD_CheckUploadStatus
+    CMD_CheckUploadStatus --> EVT_VideoWentPublic
+    ACT_Watchdog --> CMD_PostPinnedComment
+    CMD_PostPinnedComment --> EVT_PinnedCommentPosted
+    ACT_User --> CMD_TakeOverCalendarEvent
+    CMD_TakeOverCalendarEvent --> EVT_CalendarEventTakenOver
+    ACT_User --> CMD_GiveBackCalendarEvent
+    CMD_GiveBackCalendarEvent --> EVT_CalendarEventGivenBack
+    ACT_User --> CMD_RetryCalendarEvent
+    CMD_RetryCalendarEvent --> EVT_RetryRequested
+    ACT_User --> CMD_ForceCalendarEvent
+    CMD_ForceCalendarEvent --> EVT_PostForced
+    ACT_User --> CMD_InstallTimer
+    CMD_InstallTimer --> EVT_TimerInstalled
     EVT_StageCompleted --> POL_RunNextStage
     EVT_StageSkipped --> POL_RunNextStage
     POL_RunNextStage --> CMD_StartStage
@@ -478,6 +554,14 @@ flowchart LR
     EVT_LiveUrlRecorded --> POL_RefreshAfterStatusChange
     EVT_ReleaseApproved --> POL_RefreshAfterStatusChange
     POL_RefreshAfterStatusChange --> CMD_BuildReleasePackage
+    EVT_CalendarEventPosted --> POL_MarkPostedEventDone
+    EVT_VideoWentPublic --> POL_MarkPostedEventDone
+    POL_MarkPostedEventDone --> CMD_MarkCalendarEventDone
+    EVT_VideoWentPublic --> POL_PostsWaitForMainVideo
+    POL_PostsWaitForMainVideo --> CMD_PostCalendarEvent
+    EVT_VideoWentPublic --> POL_CommentWhenPublic
+    EVT_CalendarEventMarkedDone --> POL_CommentWhenPublic
+    POL_CommentWhenPublic --> CMD_PostPinnedComment
     EVT_StageStarted -.-> RM_Status
     EVT_StageCompleted -.-> RM_Status
     EVT_StageFailed -.-> RM_Status
@@ -627,6 +711,27 @@ flowchart LR
     EVT_ReleasePackageBuilt -.-> RM_MicrositeSong
     EVT_LiveUrlRecorded -.-> RM_MicrositeSong
     RM_MicrositeSong -.-> EXT_Microsite
+    EVT_ReleaseApproved -.-> RM_AutopilotBoard
+    EVT_PostClaimed -.-> RM_AutopilotBoard
+    EVT_CalendarEventPosted -.-> RM_AutopilotBoard
+    EVT_CalendarEventUploaded -.-> RM_AutopilotBoard
+    EVT_PostAttemptFailed -.-> RM_AutopilotBoard
+    EVT_CalendarEventTakenOver -.-> RM_AutopilotBoard
+    EVT_AutopilotRoundRun -.-> RM_AutopilotBoard
+    EVT_PlatformAuthorized -.-> RM_AutopilotBoard
+    RM_AutopilotBoard -.-> ACT_User
+    EVT_ReleaseCalendarPlanned -.-> RM_AutopilotPlan
+    EVT_ReleaseApproved -.-> RM_AutopilotPlan
+    EVT_PostClaimed -.-> RM_AutopilotPlan
+    EVT_CalendarEventPosted -.-> RM_AutopilotPlan
+    EVT_PostAttemptFailed -.-> RM_AutopilotPlan
+    RM_AutopilotPlan -.-> ACT_User
+    EVT_PublishPlanned -.-> RM_PublishPlan
+    EVT_VideoUploaded -.-> RM_PublishPlan
+    RM_PublishPlan -.-> ACT_User
+    EVT_PlatformAuthorized -.-> RM_PlatformReadiness
+    EVT_TokenRotated -.-> RM_PlatformReadiness
+    RM_PlatformReadiness -.-> ACT_User
     classDef evt fill:#a3391f,stroke:#e65100,color:#fff
     classDef cmd fill:#64b5f6,stroke:#0d47a1,color:#000
     classDef pol fill:#ce93d8,stroke:#4a148c,color:#000
@@ -1057,6 +1162,109 @@ flowchart LR
     classDef hs fill:#e57373,stroke:#b71c1c,color:#fff
 ```
 
+### From the approval to a calendar event posted by the autopilot
+
+```mermaid
+flowchart LR
+    ACT_User(["User"]):::act
+    CMD_AuthorizePlatform["Authorize a platform"]:::cmd
+    EVT_PlatformAuthorized["Platform authorized"]:::evt
+    CMD_ApproveRelease["Approve a release"]:::cmd
+    EVT_ReleaseApproved["⭐ Release approved"]:::evt
+    ACT_Watchdog(["Watchdog round"]):::act
+    CMD_RunAutopilotRound["Run an autopilot round"]:::cmd
+    EVT_AutopilotRoundRun["Autopilot round run"]:::evt
+    CMD_PostCalendarEvent["Post a calendar event"]:::cmd
+    EVT_PostClaimed["Post claimed"]:::evt
+    EVT_CalendarEventPosted["⭐ Calendar event posted"]:::evt
+    POL_MarkPostedEventDone{{"A posted calendar event is marked done"}}:::pol
+    CMD_MarkCalendarEventDone["Mark a calendar event done"]:::cmd
+    EVT_CalendarEventMarkedDone["Calendar event marked done"]:::evt
+    RM_AutopilotBoard[("Autopilot on the release board")]:::rm
+    ACT_User --> CMD_AuthorizePlatform
+    CMD_AuthorizePlatform --> EVT_PlatformAuthorized
+    EVT_PlatformAuthorized --> CMD_ApproveRelease
+    CMD_ApproveRelease --> EVT_ReleaseApproved
+    EVT_ReleaseApproved --> ACT_Watchdog
+    ACT_Watchdog --> CMD_RunAutopilotRound
+    CMD_RunAutopilotRound --> EVT_AutopilotRoundRun
+    EVT_AutopilotRoundRun --> CMD_PostCalendarEvent
+    CMD_PostCalendarEvent --> EVT_PostClaimed
+    EVT_PostClaimed --> EVT_CalendarEventPosted
+    EVT_CalendarEventPosted --> POL_MarkPostedEventDone
+    POL_MarkPostedEventDone --> CMD_MarkCalendarEventDone
+    CMD_MarkCalendarEventDone --> EVT_CalendarEventMarkedDone
+    EVT_CalendarEventMarkedDone --> RM_AutopilotBoard
+    classDef evt fill:#a3391f,stroke:#e65100,color:#fff
+    classDef cmd fill:#64b5f6,stroke:#0d47a1,color:#000
+    classDef pol fill:#ce93d8,stroke:#4a148c,color:#000
+    classDef rm fill:#81c784,stroke:#1b5e20,color:#000
+    classDef act fill:#a3751f,stroke:#f57f17,color:#000
+    classDef ext fill:#f48fb1,stroke:#880e4f,color:#000
+    classDef agg fill:#ffe082,stroke:#ff6f00,color:#000
+    classDef hs fill:#e57373,stroke:#b71c1c,color:#fff
+```
+
+### From the main video's upload to the posts that link to it
+
+```mermaid
+flowchart LR
+    ACT_Watchdog(["Watchdog round"]):::act
+    CMD_PostCalendarEvent["Post a calendar event"]:::cmd
+    EVT_CalendarEventUploaded["Calendar event uploaded"]:::evt
+    CMD_CheckUploadStatus["Check an upload's status"]:::cmd
+    EVT_VideoWentPublic["Video went public"]:::evt
+    POL_PostsWaitForMainVideo{{"Posts that link to the main video follow it"}}:::pol
+    EVT_CalendarEventPosted["⭐ Calendar event posted"]:::evt
+    POL_CommentWhenPublic{{"The main video gets its comment when it is public"}}:::pol
+    CMD_PostPinnedComment["Post the pinned comment"]:::cmd
+    EVT_PinnedCommentPosted["Pinned comment posted"]:::evt
+    ACT_Watchdog --> CMD_PostCalendarEvent
+    CMD_PostCalendarEvent --> EVT_CalendarEventUploaded
+    EVT_CalendarEventUploaded --> CMD_CheckUploadStatus
+    CMD_CheckUploadStatus --> EVT_VideoWentPublic
+    EVT_VideoWentPublic --> POL_PostsWaitForMainVideo
+    POL_PostsWaitForMainVideo --> EVT_CalendarEventPosted
+    EVT_CalendarEventPosted --> POL_CommentWhenPublic
+    POL_CommentWhenPublic --> CMD_PostPinnedComment
+    CMD_PostPinnedComment --> EVT_PinnedCommentPosted
+    classDef evt fill:#a3391f,stroke:#e65100,color:#fff
+    classDef cmd fill:#64b5f6,stroke:#0d47a1,color:#000
+    classDef pol fill:#ce93d8,stroke:#4a148c,color:#000
+    classDef rm fill:#81c784,stroke:#1b5e20,color:#000
+    classDef act fill:#a3751f,stroke:#f57f17,color:#000
+    classDef ext fill:#f48fb1,stroke:#880e4f,color:#000
+    classDef agg fill:#ffe082,stroke:#ff6f00,color:#000
+    classDef hs fill:#e57373,stroke:#b71c1c,color:#fff
+```
+
+### From the consent to a private upload by hand
+
+```mermaid
+flowchart LR
+    ACT_User(["User"]):::act
+    CMD_AuthorizePlatform["Authorize a platform"]:::cmd
+    EVT_PlatformAuthorized["Platform authorized"]:::evt
+    CMD_PublishUploads["Publish the uploads"]:::cmd
+    EVT_PublishPlanned["Publish planned"]:::evt
+    RM_PublishPlan[("Publish plan")]:::rm
+    EVT_VideoUploaded["⭐ Video uploaded"]:::evt
+    ACT_User --> CMD_AuthorizePlatform
+    CMD_AuthorizePlatform --> EVT_PlatformAuthorized
+    EVT_PlatformAuthorized --> CMD_PublishUploads
+    CMD_PublishUploads --> EVT_PublishPlanned
+    EVT_PublishPlanned --> RM_PublishPlan
+    RM_PublishPlan --> EVT_VideoUploaded
+    classDef evt fill:#a3391f,stroke:#e65100,color:#fff
+    classDef cmd fill:#64b5f6,stroke:#0d47a1,color:#000
+    classDef pol fill:#ce93d8,stroke:#4a148c,color:#000
+    classDef rm fill:#81c784,stroke:#1b5e20,color:#000
+    classDef act fill:#a3751f,stroke:#f57f17,color:#000
+    classDef ext fill:#f48fb1,stroke:#880e4f,color:#000
+    classDef agg fill:#ffe082,stroke:#ff6f00,color:#000
+    classDef hs fill:#e57373,stroke:#b71c1c,color:#fff
+```
+
 ## Bounded Contexts & Aggregates
 
 | Context | Purpose | Aggregates | Events |
@@ -1071,7 +1279,8 @@ flowchart LR
 | Bibles (`BC-Bibles`) | Holds what a production must look and sound like before any shot is generated – the style bible, the character bible with its character states, the set bible with plates and prop references, and the user references – per music video, or once per series canon that every episode reads and may only add to | Style bible, Character bible, Set bible, User references | Style bible written, Character bible written, Character state added, Set bible written, Plate added, Prop reference added, User reference added, User reference updated, User reference removed, Library character used |
 | Character library (`BC-CharacterLibrary`) | Keeps the workspace's reusable characters across productions – takes the characters of finished character bibles in and copies a character's identity, and the states the user chooses, into a new music video or series canon | Library character | Library character created, Library character extended, Library character updated, Library file added, Library file removed, Library character deleted, Library character use refused |
 | Render (`BC-Render`) | Turns a validated project into its videos and images – a render per format from one composition, previews for checks, Shorts cut from the 9:16 render, and composed images (thumbnails, covers, feed images) from a generated image and the style bible – and keeps a project's media in the media directory | Render, Short, Composed image | Preview rendered, Passage rendered, Format rendered, Still rendered, Render failed, Short cut, Short refused, Image composed, Image composition refused, Project media linked, Determinism checked |
-| Release (`BC-Release`) | Turns a finished project into everything its release needs – the release folder with its manifest, the platform texts laid out and checked against the limits, the release calendar planned across the workspace, and the release board where the user ticks off what went live and gives the one release approval | Release package, Release calendar, Release status | Upload data written, Release package built, Release rules broken, Upload text rendered, Release calendar planned, Release day fixed, Calendar event marked done, Live URL recorded, Release approved, Approval withdrawn, Approval refused, Release checked |
+| Release (`BC-Release`) | Turns a finished project into everything its release needs – the release folder with its manifest, the platform texts laid out and checked against the limits, the release calendar planned across the workspace, and the release board where the user ticks off what went live and gives the one release approval | Release package, Release calendar, Release status | Upload data written, Release package built, Release rules broken, Upload text rendered, Release calendar planned, Release day fixed, Calendar event marked done, Live URL recorded, Release approved, Approval withdrawn, Approval refused, Release checked, Calendar event taken over, Calendar event given back |
+| Publishing (`BC-Publish`) | Gets an approved release onto the platforms – the publish command uploads by hand, privately or as drafts; the release autopilot posts every calendar event a platform API can post at its time once the user approved the release, without ever posting twice; the platform credentials and the watchdog round that runs it every few minutes | Publish log, Autopilot log, Autopilot round, Platform credentials | Platform authorized, Token rotated, Publish planned, Video uploaded, Upload failed, Autopilot round run, Post claimed, Calendar event posted, Calendar event uploaded, Video went public, Post attempt failed, Pinned comment posted, Spotify link appended, Microsite page deployed, Retry requested, Post forced, Timer installed |
 
 ## Aggregates
 
@@ -1100,3 +1309,7 @@ flowchart LR
 | Release package (`AGG-ReleasePackage`) | Release | as-is | renders/release/ with manifest.json, written last by buildRelease – every file placed (hardlink or copy), generated or composed by a ReleaseWriter that records size, SHA-256, specification and source (packages/cli/src/release.ts:132-175,207-447; packages/core/src/schema.ts:1268-1311)<br>review/upload.yaml, the upload data the agent writes and every layout, check and publish reads (schema.ts:796-926; workspace/.claude/skills/video-qa/release.md §7) |
 | Release calendar (`AGG-ReleaseCalendar`) | Release | as-is | review/calendar.yaml, one per project, written whole by planCalendar from buildCalendar, which reads the workspace's release schedule and every other project's calendar (packages/cli/src/release-calendar.ts:49-57,94-110; packages/core/src/calendar.ts:133-225; schema.ts:1033-1055) |
 | Release status (`AGG-ReleaseStatus`) | Release | as-is | review/release-status.json, written by updateStatus and writeStatus under the project's release lock review/.release.lock (packages/cli/src/release-calendar.ts:28-31,118-142; packages/cli/src/release-autopilot.ts:52-58,66-89; schema.ts:1058-1085) |
+| Publish log (`AGG-PublishLog`) | Publishing | as-is | review/publish.json, read validated and written after every item by publishProject – the publish command's and the autopilot's YouTube and TikTok uploads alike (packages/cli/src/publish.ts:113-116,217-227,413-476; packages/core/src/schema.ts:1136-1164) |
+| Autopilot log (`AGG-AutopilotLog`) | Publishing | as-is | review/autopilot.json, appended only under the project's release lock review/.release.lock; the claim plans again from the fresh release status and log and appends the running entry in the same lock (packages/cli/src/autopilot-state.ts:46-65; packages/cli/src/release-autopilot.ts:258-273; packages/core/src/schema.ts:1087-1132)<br>the autopilot state of every calendar event, a pure function of the release status, the log, the settings, the readiness and the clock (packages/core/src/autopilot.ts:147-211) |
+| Autopilot round (`AGG-AutopilotRound`) | Publishing | as-is | .cache/release-run.lock, a holder lock with pid, host and time, stale after two hours, and .cache/release-run.last with the time and interval of the last round (packages/cli/src/release-autopilot.ts:173-212; packages/cli/src/file-lock.ts:45-81; packages/cli/src/autopilot-state.ts:28-42) |
+| Platform credentials (`AGG-PlatformCredentials`) | Publishing | as-is | the workspace's .env (mode 0600), written by saveEnvValue from publish-auth and from the adapters when a token rotates (packages/cli/src/publish-auth.ts:24-34; packages/cli/src/social-auth.ts:51-127; packages/providers/src/publish/x.ts:227-232; tiktok.ts:253-257); readiness from autopilotReadiness (packages/cli/src/autopilot-state.ts:68-91) |

@@ -1,6 +1,6 @@
 # Engineering conventions – coreslopper
 
-> How the code is built here, recovered by `/adopt` (slices: project and stage pipeline; human review; generation queue and verdicts; timing; storyboard; generation – 2026-11-21; series; bibles and the character library; render – 2026-11-22). The ADRs
+> How the code is built here, recovered by `/adopt` (slices: project and stage pipeline; human review; generation queue and verdicts; timing; storyboard; generation – 2026-11-21; series; bibles and the character library; render; release; publishing – 2026-11-22). The ADRs
 > decide WHAT; this file says HOW. Sections other slices own are marked as such. When code and this file
 > disagree, raise it – don't silently follow either.
 
@@ -110,6 +110,18 @@ state in memory), one core transition (`setStageRunning`, `setStageDone`, `setSt
 - `review/release-status.json` is written only through `updateStatus`/`writeStatus` under `withReleaseLock`
   (`review/.release.lock`); the release folder, `manifest.json` and `calendar.yaml` take no lock today (G-161).
   The board accepts writes only from its own page (`trustedWrite`: loopback Host, same Origin, JSON body).
+- Publishing: the autopilot's plan is a pure function in core (`planAutopilot`, `packages/core/src/autopilot.ts`);
+  the runner (`runAutopilot`, `packages/cli/src/release-autopilot.ts`) does all I/O through `AutopilotDeps`
+  (`publish`, `youtube`, `social`, `runCommand`, `env`, `now`, `log`). A round takes `.cache/release-run.lock`;
+  each due event is claimed by planning again under the release lock and appending `running` to
+  `review/autopilot.json` in the same lock, and the platform call runs outside it. YouTube and TikTok always go
+  through `publishProject`, never around it, so the publish log's hash check covers both paths.
+- Never twice: a post adapter sends the public post once (`attempts: 1`) and marks a failure that may have gone
+  out with `markUncertain` (`packages/providers/src/publish/http.ts`); the runner logs it as `uncertain` and the
+  plan makes it stuck. A `ConfigError` or `ValidationError` is fatal. Keep these classes when adding a platform;
+  the YouTube upload and TikTok do not mark yet (G-168).
+- Secrets: tokens live in `.env` only; write them through `saveEnvValue`, mask every message with `redactSecrets`
+  before it is logged or written. `review/publish.json` and `.env` take no lock today (G-169).
 - User-owned files (`timing.overrides.json`, `lyrics.txt`, imported stems, `project.yaml`) are never replaced by
   a tool; a command that would do so is a hard stop. The one exception: fixing a proposed release day writes
   `release.release_date` into `project.yaml`, keeping every comment (`setReleaseDate`,
@@ -138,7 +150,9 @@ As-is, core reads the clock itself (`new Date()` in every transition and in `cre
 injected. The watchdog takes `options.now` (`packages/cli/src/production-watch.ts`). Vitest pins `TZ`.
 The release slice takes `now` everywhere (`ReleaseDeps.now`, `CalendarContext.now`, `updateStatus(…, now)`, the
 board's `now`); calendar times are local ISO with the offset of the schedule's `timezone`, else the computer's
-zone, so a calendar planned in the board container is in UTC unless `TZ` is set. Status and manifest times are UTC.
+zone, so a calendar planned in the board container is in UTC unless `TZ` is set (G-167). Status and manifest times are UTC.
+The autopilot takes `now` through `AutopilotDeps.now`; the adapters take `now` and `sleep` (TikTok as a number,
+X and Instagram as a `Date`). The YouTube quota day is Pacific time, the one hard-coded zone.
 
 ## UI and texts
 
@@ -186,5 +200,10 @@ directory. `tests/helpers/release-fixture.ts` builds release projects.
 | Release rule | `platformTextProblems`, `chapterProblems`, `releaseTodos`, `canvasWindow` on inline upload data and timing | unit | `tests/release-folder.test.ts`, `tests/release-characterization.test.ts` |
 | Release calendar | `buildCalendar(input, { schedule, now, existing, others })` with `ReleaseScheduleSchema.parse({ version: 1 })` | unit | `tests/release-calendar.test.ts`, `tests/release-characterization.test.ts` |
 | Release board | `boardHandler({ root, now, refresh })` over a fixture workspace | integration | `tests/release-folder.test.ts` |
+| Autopilot plan | `planAutopilot({ calendar, status, log, settings, now })` on a calendar from `buildCalendar` | unit | `tests/release-autopilot-plan.test.ts`, `tests/publish-characterization.test.ts` |
+| Autopilot round | `runAutopilot({ root, deps })` with `MockPublisher`, `MockSocialAdapter`, a fake `runCommand` and a moving clock over `fixture()` | integration | `tests/release-autopilot.test.ts` |
+| Publish | `publishProject({ projectDir, adapters, probe, now })` with `MockPublisher` or an adapter on a fake `fetchImpl` | integration | `tests/publish.test.ts` |
+| Post adapter | `XPublisher`, `LinkedInPublisher`, `InstagramPublisher` with a fake `fetchImpl` router | unit | `tests/publish-x.test.ts`, `tests/publish-linkedin.test.ts`, `tests/publish-instagram.test.ts` |
+| Timer | `timerPlan({ root, kind, env, home, nodeBin })` – the files and commands, nothing installed | unit | `tests/release-autopilot.test.ts` |
 | Remotion render | a real still or JPEG; opt-in with `CORESLOPPER_RENDER_TESTS=1` (needs Chrome) | integration | `tests/thumbnail-render.test.ts` |
 | Agent instruction | not testable deterministically | – | `workspace/.claude/commands/video-next.md` |

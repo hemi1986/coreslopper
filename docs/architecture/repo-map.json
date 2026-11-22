@@ -135,47 +135,51 @@
   ],
   "ranking": [
     {
-      "path": "scripts/audio-analysis",
-      "score": 0.15,
-      "reasons": [
-        "no churn or consumers recorded"
-      ]
-    },
-    {
-      "path": "scripts/review-player",
-      "score": 0.15,
-      "reasons": [
-        "no churn or consumers recorded"
-      ]
-    },
-    {
       "path": "packages/cli",
-      "score": 0.06,
+      "score": 0.61,
       "reasons": [
+        "320 changed files in recent history",
         "shared library",
         "shared infrastructure – not a domain slice"
+      ]
+    },
+    {
+      "path": "scripts/audio-analysis",
+      "score": 0.19,
+      "reasons": [
+        "24 changed files in recent history"
       ]
     },
     {
       "path": "packages/remotion",
-      "score": 0.06,
+      "score": 0.16,
       "reasons": [
+        "61 changed files in recent history",
         "shared library",
         "shared infrastructure – not a domain slice"
       ]
     },
     {
-      "path": "packages/core",
-      "score": 0.01,
+      "path": "scripts/review-player",
+      "score": 0.16,
       "reasons": [
+        "8 changed files in recent history"
+      ]
+    },
+    {
+      "path": "packages/core",
+      "score": 0.04,
+      "reasons": [
+        "111 changed files in recent history",
         "shared library",
         "layer package – hosts many concepts, not a domain slice"
       ]
     },
     {
       "path": "packages/providers",
-      "score": 0.01,
+      "score": 0.03,
       "reasons": [
+        "77 changed files in recent history",
         "shared library",
         "layer package – hosts many concepts, not a domain slice"
       ]
@@ -562,7 +566,9 @@
         "2 layers: cli, tests",
         "2 packages",
         "8 files"
-      ]
+      ],
+      "adopted": true,
+      "adoptedAt": "2026-11-22"
     },
     {
       "name": "sery",

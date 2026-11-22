@@ -3,7 +3,7 @@
 > Recovered from code by `/adopt` on 2026-11-21 at b195086. This is **not a target**.
 > Target: [context-map.md](context-map.md) · Gap register: [gap-register.md](gap-register.md).
 
-Adopted slices: project and stage pipeline; human review; art-director verdicts and the generation queue (decided by recommendation); song timing and lyrics (decided by recommendation, four answers from the user); the storyboard (decided by recommendation, four answers from the user); generation and the provider adapters (decided by recommendation, four answers from the user); series budget, script, takes and the episode track (decided by recommendation, four answers from the user); the bibles, user references and the character library (decided by recommendation, four answers from the user); render, Shorts, composed images and the media directory (decided by recommendation, four answers from the user); the release package, calendar, release board and approval (decided by recommendation, four answers from the user). Other areas – publishing, the workspace, model bench – appear only as neighbours until their own slice is adopted.
+Adopted slices: project and stage pipeline; human review; art-director verdicts and the generation queue (decided by recommendation); song timing and lyrics (decided by recommendation, four answers from the user); the storyboard (decided by recommendation, four answers from the user); generation and the provider adapters (decided by recommendation, four answers from the user); series budget, script, takes and the episode track (decided by recommendation, four answers from the user); the bibles, user references and the character library (decided by recommendation, four answers from the user); render, Shorts, composed images and the media directory (decided by recommendation, four answers from the user); the release package, calendar, release board and approval (decided by recommendation, four answers from the user); publishing – the publish command, the release autopilot, the platform credentials and the watchdog round (decided by recommendation, four answers from the user). Other areas – the workspace, model bench – appear only as neighbours until their own slice is adopted.
 
 ```mermaid
 flowchart LR
@@ -46,7 +46,15 @@ flowchart LR
   BC-Render -->|segments joined, song muxed, Shorts cut| FFmpeg
   BC-Render -->|compositions rendered frame by frame| Remotion[Remotion and headless Chrome - external]
   BC-GenerationQueue -->|thumbnails and covers judged by the art director| BC-Render
-  BC-Release -->|release folder, upload data, calendar and approval| Publish[Publish and release autopilot - not adopted]
+  BC-Release -->|release folder, upload data, calendar and approval| BC-Publish
+  BC-Publish -->|done marks by the autopilot, live URLs, take-overs, under the release lock| BC-Release
+  BC-Publish -->|the watchdog round runs the production scan after the autopilot| BC-Pipeline
+  BC-Publish -->|private and scheduled uploads, status, description, comment| YouTube[YouTube Data API - external]
+  BC-Publish -->|drafts, direct posts after the audit| TikTok[TikTok Content Posting - external]
+  BC-Publish -->|posts through the post adapters| Social[X, LinkedIn, Instagram - external]
+  BC-Publish -->|Instagram's files as public URLs| FalStorage[fal.ai storage - external]
+  BC-Publish -->|the microsite page copied and its command run| Microsite
+  BC-Publish -->|the watchdog round every few minutes, without the board container| Scheduler[OS scheduler - external]
   BC-Release -->|the approval, done marks and the release folder's presence for the next action| BC-Pipeline
   BC-Release -->|the song page as data| Microsite[Artist microsite - external]
   BC-Release -->|WAV, cover and the form fields, uploaded by hand| Distributor[Distributor - external]
@@ -371,9 +379,38 @@ Boundaries:
   timing and lyrics (BC-Timing), the project's `project.yaml` release block and `state.json` (BC-Pipeline). It writes
   nothing of theirs, except `release.release_date` in `project.yaml` when a proposed day is approved (HS-177) and the
   formats it renders again through BC-Render's command.
-- Publish and the release autopilot (not adopted) read the release folder, the upload data, the calendar and the
+- Publishing (BC-Publish) reads the release folder, the upload data, the calendar and the
   approval, and write done marks and live URLs into the release status under the same lock.
 - The microsite and the distributor are outside; the microsite reads `renders/release/microsite/<slug>.json`
   (HS-178), the distributor gets its files by hand.
 - The release folder and the calendar take no lock (HS-174); the board's refresh can remove a file it could not
   refresh (HS-167); a proposed day is fixed only by the approval (HS-165).
+
+### BC-Publish – Publishing
+Purpose (as recovered, decided by recommendation HS-183): gets an approved release onto the platforms – the publish
+command uploads by hand, privately or as drafts; the release autopilot posts every calendar event a platform API can
+post at its time once the user approved the release, without ever posting twice; the platform credentials and the
+watchdog round that runs it every few minutes (ADR 0023, ADR 0029, ADR 0031, ADR 0046 proposed).
+Core terms: Publish, Post, Platform, Publish Adapter, Post Adapter, Publish Log, Publish Plan, Draft, Platform
+Credentials, Release Autopilot, Autopilot State, Autopilot Log, Take-over, Stuck Post, Missed Post, Pinned Comment,
+Watchdog.
+Evidence:
+- `publish` uploads through `publishProject` and records `review/publish.json` (`packages/cli/src/publish.ts:217-476`);
+  the autopilot's YouTube and TikTok uploads go through the same function (`packages/cli/src/release-autopilot.ts:383-417`)
+- the plan is pure (`packages/core/src/autopilot.ts:147-211`); the runner claims each due event under
+  `review/.release.lock` and appends to `review/autopilot.json` (`release-autopilot.ts:190-292`,
+  `packages/cli/src/autopilot-state.ts:46-65`); one round per workspace under `.cache/release-run.lock`
+- two adapter families in providers: `PublishAdapter` (YouTube, TikTok) and `SocialAdapter` (X, LinkedIn,
+  Instagram) (`packages/providers/src/publish/types.ts`, `social.ts`)
+- tokens in `.env` from `publish-auth` and token rotation (`packages/cli/src/publish-auth.ts`, `social-auth.ts`)
+- the round: `watch` = `release-run`, then the production scan (`packages/cli/src/production-watch.ts:96-161`), from
+  `board --watch` in the container or `release-timer` (`packages/cli/src/release-timer.ts`)
+Boundaries:
+- Reads only: the release folder, the upload data, the calendar and the approval (BC-Release); the renders through
+  the release folder. It writes into the release status only through the release slice's writers: done marks by the
+  autopilot with their live URLs, and take-overs.
+- The production scan in the same round is BC-Pipeline's; the round only calls it.
+- Outside: the platform APIs, fal.ai storage for Instagram's files, the microsite's directory and command, the
+  operating system's scheduler.
+- The publish log and `.env` take no lock (HS-189); never twice is missing for YouTube uploads and TikTok (HS-187);
+  the board container plans in UTC without a named time zone (HS-194).

@@ -536,8 +536,71 @@ song, the effective timing, the `release:` block of `project.yaml`, `config/chan
 | Item | per calendar event id, or `<event>#<index>` for a checklist line (HS-179) | – | EVT-CalendarEventMarkedDone |
 | Done, at, by | done mark; Timestamp; `user` \| `autopilot` (missing from `calendar --done-until`, HS-179) | done yes | EVT-CalendarEventMarkedDone |
 | Live URL | http or https | no | EVT-LiveUrlRecorded |
-| Manual | the user took the event over from the autopilot (publish slice) | no | – |
+| Manual | the user's take-over of the event from the autopilot | no | EVT-CalendarEventTakenOver, EVT-CalendarEventGivenBack |
 | Approval | at (Timestamp), release day (Date); holds while it equals the calendar's day | no | EVT-ReleaseApproved, EVT-ApprovalWithdrawn |
+
+### AGG-PublishLog – Publish log (as-is)
+
+`review/publish.json` (`PublishLogSchema`, `packages/core/src/schema.ts:1136-1164`), read validated and written
+after every item by `publishProject` (`packages/cli/src/publish.ts:113-116,413-476`) – for the `publish` command and
+for the autopilot's YouTube and TikTok uploads. Written without a lock today (HS-189).
+
+| Attribute | Type | Required | Source |
+|---|---|---|---|
+| Platform | `youtube` \| `tiktok` | yes | EVT-VideoUploaded, EVT-UploadFailed |
+| Item | `main` or a Short's name | yes | EVT-VideoUploaded, EVT-UploadFailed |
+| File, file hash | path; SHA-256 of the file uploaded | yes | EVT-VideoUploaded |
+| Remote ID, URL | the platform's video or publish id; the video's address | for a success | EVT-VideoUploaded |
+| Status | `uploaded` \| `scheduled` \| `draft` \| `processing` \| `failed` | yes | EVT-VideoUploaded, EVT-UploadFailed |
+| Scheduled at | Timestamp of `publishAt` | no | EVT-VideoUploaded |
+| Warnings, error, mock, at | texts; the masked error; a mock entry never satisfies a real run; Timestamp | yes | EVT-VideoUploaded, EVT-UploadFailed |
+
+### AGG-AutopilotLog – Autopilot log (as-is)
+
+`review/autopilot.json` (`AutopilotLogSchema`, `schema.ts:1087-1132`), appended only under `review/.release.lock`
+(`packages/cli/src/autopilot-state.ts:46-65`) by the runner (`packages/cli/src/release-autopilot.ts`) and the board's
+Try again and Post now. The autopilot state of each calendar event is derived from it, the release status, the
+settings `autopilot:` of `config/release-schedule.yaml` (`schema.ts:1003-1027`), readiness and the clock
+(`packages/core/src/autopilot.ts:147-211`), and never stored.
+
+| Attribute | Type | Required | Source |
+|---|---|---|---|
+| Event | a calendar event id, or `youtube:comment` for the pinned comment | yes | every autopilot event |
+| Status | `running` \| `posted` \| `uploaded` \| `scheduled` \| `draft` \| `failed` \| `retry` \| `force` | yes | EVT-PostClaimed, EVT-CalendarEventPosted, EVT-CalendarEventUploaded, EVT-PostAttemptFailed, EVT-RetryRequested, EVT-PostForced |
+| Fatal, uncertain | a failure that waits for the user at once; a send that may have gone out (stuck) | no | EVT-PostAttemptFailed |
+| Remote ID, URL | the post's or video's id and address | for a success | EVT-CalendarEventPosted, EVT-CalendarEventUploaded, EVT-VideoWentPublic |
+| Cost | USD, the X price of the post | no | EVT-CalendarEventPosted |
+| Warnings, manual steps, error, mock, at | texts; what stays the user's; the masked error; Timestamp | yes | every autopilot event |
+
+**Settings** (value object, `autopilot:` in the release schedule): platforms (all six), `youtube_ahead_hours` (24),
+`youtube_audited` (false), `tiktok_direct` (false), `late_hours` (12), `retries` (3, failed attempts), `microsite`
+(dir, command; optional) – pinned by `tests/publish-characterization.test.ts`.
+
+### AGG-AutopilotRound – Autopilot round (as-is)
+
+`.cache/release-run.lock` (a holder lock: pid, host, at; stale after two hours) and `.cache/release-run.last`
+(`packages/cli/src/release-autopilot.ts:173-212`; `packages/cli/src/file-lock.ts:45-81`;
+`packages/cli/src/autopilot-state.ts:28-42`).
+
+| Attribute | Type | Required | Source |
+|---|---|---|---|
+| Holder | pid, host, Timestamp | while a round runs | EVT-AutopilotRoundRun |
+| Last run | Timestamp; the interval in minutes (`CORESLOPPER_TIMER_EVERY` or the board's `--watch`) | after the first round | EVT-AutopilotRoundRun |
+
+### AGG-PlatformCredentials – Platform credentials (as-is)
+
+The workspace's `.env` (mode 0600), written by `saveEnvValue` (`packages/cli/src/publish-auth.ts:24-34`) from
+`publish-auth` and from token rotation in the adapters; readiness from `autopilotReadiness`
+(`autopilot-state.ts:68-91`) and `doctor` (`packages/cli/src/doctor.ts:108-178`).
+
+| Attribute | Type | Required | Source |
+|---|---|---|---|
+| Client | `YOUTUBE_CLIENT_ID/SECRET`, `TIKTOK_CLIENT_KEY/SECRET`, `X_CLIENT_ID/SECRET`, `LINKEDIN_CLIENT_ID/SECRET` | per platform | the user |
+| Refresh token | YouTube, TikTok (rotates), X (single-use), LinkedIn (approved partners only) | per platform | EVT-PlatformAuthorized, EVT-TokenRotated |
+| Access token, expires at | LinkedIn (60 days), Instagram (refreshed with 10 days left) | per platform | EVT-PlatformAuthorized, EVT-TokenRotated |
+| Account | `LINKEDIN_MEMBER_URN`, `INSTAGRAM_USER_ID` | per platform | EVT-PlatformAuthorized |
+| Media host key | `FAL_KEY`, for Instagram | for Instagram | the user |
+| Switches | `YOUTUBE_DAILY_QUOTA`, `TIKTOK_DIRECT_POST` (HS-188), API versions | no | the user |
 
 ## Lifecycle
 
@@ -565,7 +628,7 @@ from `pending` or `failed` after every earlier stage is `done` or `skipped`; com
 The next stage is the first `pending` or `failed` stage in list order. The project is done when every stage is
 `done` or `skipped`; any `failed` stage makes the overall status `failed`.
 
-Release approval as the code allows it (the release autopilot that acts on it is the publish slice's):
+Release approval as the code allows it (the autopilot state below acts on it):
 
 ```mermaid
 stateDiagram-v2
@@ -577,6 +640,32 @@ stateDiagram-v2
   stale --> approved: Release approved again
   approved --> fixed: Approval withdrawn
   stale --> fixed: Approval withdrawn
+```
+
+The autopilot state of one calendar event, worked out every round (`packages/core/src/autopilot.ts:151-211`; the
+first matching rule wins – a done mark, then no action or a take-over, then the approval):
+
+```mermaid
+stateDiagram-v2
+  [*] --> unapproved
+  unapproved --> waiting: Release approved, before its time
+  waiting --> due: its time (YouTube youtube_ahead_hours earlier)
+  waiting --> missed: more than late_hours past its time, no attempt
+  missed --> due: Post forced
+  due --> blocked: no credentials, or the main video not live yet
+  blocked --> due: Platform authorized, Video went public
+  due --> running: Post claimed
+  running --> done: Calendar event posted
+  running --> pending: Calendar event uploaded (private, scheduled, draft)
+  pending --> done: Video went public, or the user's done mark
+  running --> waiting: Post attempt failed (back-off attempts x 10 min)
+  running --> failed: fatal, or retries failed attempts
+  running --> stuck: may have gone out, or running for over an hour
+  failed --> due: Retry requested
+  stuck --> due: Retry requested
+  stuck --> done: the user's It is live
+  waiting --> manual: Calendar event taken over
+  manual --> waiting: Calendar event given back
 ```
 
 ## Overview
@@ -652,4 +741,13 @@ erDiagram
   RELEASE_STATUS ||--o{ DONE_MARK : "per event"
   DONE_MARK }o--|| CALENDAR_EVENT : "of"
   RELEASE_STATUS ||--o| RELEASE_APPROVAL : "for one release day"
+  PROJECT ||--o| PUBLISH_LOG : "review/publish.json"
+  PUBLISH_LOG ||--o{ PUBLISH_ENTRY : "one per upload attempt"
+  PUBLISH_ENTRY }o--|| RELEASE_FILE : "uploads by hash"
+  PROJECT ||--o| AUTOPILOT_LOG : "review/autopilot.json"
+  AUTOPILOT_LOG ||--o{ AUTOPILOT_ENTRY : "steps"
+  AUTOPILOT_ENTRY }o--o| CALENDAR_EVENT : "of"
+  AUTOPILOT_ENTRY }o--o| PUBLISH_ENTRY : "YouTube and TikTok through"
+  RELEASE_STATUS ||--o{ TAKE_OVER : "per event"
+  RELEASE_SCHEDULE ||--|| AUTOPILOT_SETTINGS : "autopilot:"
 ```

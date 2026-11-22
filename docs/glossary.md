@@ -289,15 +289,15 @@ The public address of a calendar event's post, entered on the release board or r
 _Avoid_: link (a channel link is a profile), permalink
 
 **Release Approval**:
-The user's one click on the release board that hands a release to the release autopilot, for one release day. It covers the day, not the content; when the day moves the user approves again. Before it nothing goes out by itself; withdrawing it stops what has not gone out and keeps the done marks.
+The user's one click on the release board that hands a release to the release autopilot, for one release day. It covers the day, not the content; when the day moves the user approves again. Before it nothing goes out by itself; withdrawing it stops what the autopilot has not sent yet and keeps the done marks. A YouTube upload already scheduled still goes public at its time unless the user changes it in Studio.
 _Avoid_: go-live, publish (the **Publish** command uploads privately)
 
 **Release Autopilot**:
-`release-run`, started by a timer every few minutes: for an approved release it posts each calendar event that a platform API can post, at the event's time, and leaves the rest to the user. A post it cannot be sure about waits for the user instead of going out twice.
+`release-run`, run by every **Watchdog** round: for an approved release it posts each calendar event that a platform API can post, at the event's time, and leaves the rest to the user. A post it cannot be sure about waits for the user instead of going out twice.
 _Avoid_: scheduler, bot, cron job
 
 **Watchdog**:
-The round `watch` runs every few minutes (the board container or `release-timer`): the release autopilot, then the production scan, which records stage, render, queue, and budget events and **stalled** stages (running, but no file changed for an hour) for the board. It reads and records; it never changes a stage or starts Claude Code.
+The round `watch` runs every few minutes (the board container or `release-timer`, one of the two, never both): the release autopilot, then the production scan, which records stage, render, queue, and budget events and **stalled** stages (running, but no file changed for an hour) for the board. It reads and records; it never changes a stage or starts Claude Code.
 _Avoid_: monitor, daemon, supervisor
 
 **Autopilot Log**:
@@ -323,16 +323,50 @@ _Avoid_: warning, error
 ## Publishing
 
 **Publish**:
-The user's explicit act of uploading a release package to platforms, as private videos or drafts. It is never a stage, and it never makes a video public.
+The user's explicit act of uploading a release package to platforms, as private videos or drafts. It is never a stage, and it never makes a video public. The release autopilot uploads YouTube and TikTok the same way.
 _Avoid_: release, post, deploy
+
+**Post**:
+What goes public on a platform at a calendar event's time: by the user's hand, or by the release autopilot through a **Post Adapter** or TikTok's direct mode. A post that may have gone out is never sent again by itself.
+_Avoid_: publish (a **Publish** upload stays private), tweet, share
 
 **Platform**:
 A service a release is published on: YouTube, TikTok, Instagram, X, LinkedIn, Spotify, or the microsite.
 _Avoid_: channel, network, provider (a **Provider Adapter** generates media)
 
 **Publish Adapter**:
-The small implementation that uploads one item of upload data to one platform (YouTube, TikTok) or posts one post (Instagram, X, LinkedIn); mock is the test adapter.
-_Avoid_: uploader, integration
+The small implementation that uploads one item of upload data to YouTube or TikTok: a private or scheduled video, or a draft. Only TikTok's direct mode, which the autopilot uses after TikTok's audit, posts with it. Mock is the test adapter.
+_Avoid_: uploader, integration, publisher
+
+**Post Adapter**:
+The small implementation that posts one post to X, LinkedIn, or Instagram. The post is sent once; an answer that is lost marks it a **Stuck Post**. Mock is the test adapter.
+_Avoid_: social adapter, publish adapter
+
+**Platform Credentials**:
+The tokens a platform's API needs, stored only in the workspace's `.env` after the one-time consent of `publish-auth`, renewed by the adapters as they rotate. A platform without them is blocked for the autopilot; `doctor` and the release board say which are ready.
+_Avoid_: login, auth, keys, access
+
+**Autopilot State**:
+What the release autopilot will do with a calendar event now: manual, unapproved, waiting, due, blocked, running, pending, done, failed, stuck, or missed. It is worked out every round from the release status, the autopilot log, and the clock, and never stored.
+_Avoid_: status (the **Release Status** holds the user's marks)
+
+**Take-over**:
+The user's "Do it myself" on a calendar event: the autopilot leaves it alone until the user gives it back. It is a mark in the release status, beside the done mark.
+_Avoid_: manual mode, opt-out
+_UI (en)_: Do it myself
+
+**Stuck Post**:
+A post the autopilot sent and may have gone out, because the answer was lost or the platform failed after receiving it, or an attempt that has run for over an hour. It is never tried again by itself: the user checks the platform and marks it live or tries again.
+_Avoid_: lost post, uncertain post, duplicate
+_UI (en)_: not sure it is live
+
+**Missed Post**:
+A post whose calendar time passed by more than `late_hours` before the autopilot's first attempt, usually because the computer was off. It waits for the user's "Post now" or a take-over.
+_Avoid_: late post, overdue
+
+**Pinned Comment**:
+The comment under the main video from the upload data, posted by the autopilot once the video is public. Pinning it stays a click in YouTube Studio.
+_Avoid_: first comment
 
 **Publish Log**:
 `review/publish.json`: one entry per upload attempt with platform, item, file hash, remote ID, URL, status, and time. A file already in it for a platform is not uploaded again.

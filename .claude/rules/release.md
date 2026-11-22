@@ -73,7 +73,7 @@ Done Mark, Live URL, Release Approval, Announcement, Microsite, TODO. All are in
 - Every write to the release status takes the release lock. The board writes only from its own page.
 - An approval holds for one release day; read it through `approvalHolds`. Stage runners, `/video-next` and agents
   never approve.
-- The release autopilot, publish, the timer and the watchdog are the publish slice. Change them there.
+- The release autopilot, publish, the timer and the watchdog are the publish slice (`.claude/rules/publish.md`).
 
 ## Typical pitfalls
 
