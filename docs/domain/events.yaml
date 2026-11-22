@@ -1139,7 +1139,7 @@ events:
     name: Approval refused
     context: BC-Release
     data: [Project, Reason]
-    description: "No calendar, or a release day that differs from the calendar's (reload the board) (release-autopilot.ts:66-73)"
+    description: "No calendar, a release day that differs from the calendar's (reload the board) (release-autopilot.ts:66-73), or a project with distribution internal (ST-042)"
   - id: EVT-ReleaseChecked
     name: Release checked
     context: BC-Release
@@ -2113,6 +2113,7 @@ commands:
     description: "calendar <project> [--replan] [--done-until <day|today>]; release plans it on every run as well (release-calendar.ts:145-188); the user takes the proposed day (user, 2026-11-22)"
     rules:
       - --replan drops every time the user moved and plans the events again (the code does this, calendar.ts:136)
+      - The calendar of a project with distribution internal is no other release – it books no release day and no slot for any other project's plan (user, 2026-11-22, ST-040)
       - A replan never moves a proposed release day the distributor may already have – it stays until the user moves it (decided 2026-11-22, HS-165; --replan proposes again – gap register)
   - id: CMD-MarkCalendarEventDone
     name: Mark a calendar event done
@@ -2135,6 +2136,7 @@ commands:
     rules:
       - A proposed release day is written into project.yaml first and the calendar planned again – the one place a tool writes the user's project.yaml (the code does this, release-autopilot.ts:74-76,91-98; HS-177)
       - The day in the request must be the calendar's (the code does this, release-autopilot.ts:70-72)
+      - A project with distribution internal is never approved – the approval is refused before anything is written, also with a calendar from before it became internal (user, 2026-11-22, ST-042)
   - id: CMD-WithdrawApproval
     name: Withdraw the approval
     actor: ACT-User
@@ -2178,6 +2180,7 @@ commands:
     description: "release-run [--project] [--dry-run] [--plan], run by every watchdog round (watch, from the board container or release-timer); stage runners, /video-next and agents never run it (ADR 0029). The user means to run the board container (user, 2026-11-22)"
     rules:
       - A round for a project whose approval does not hold does nothing and says why (the code does this, release-autopilot.ts:237-240)
+      - A round leaves a project with distribution internal alone – it posts nothing of it, also with an approval from before it became internal, and its plan lists no event of it (user, 2026-11-22, ST-041)
       - The pending YouTube uploads are read first, so the posts that link to the main video follow in the same round; then the due events, earliest first (the code does this, release-autopilot.ts:242-288)
       - An error in the autopilot does not stop the production scan of the same watchdog round (the code does this, packages/cli/src/production-watch.ts:99-126)
   - id: CMD-PostCalendarEvent
