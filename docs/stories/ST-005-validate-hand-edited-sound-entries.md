@@ -12,7 +12,7 @@ risk: null
 events: [EVT-LibrarySoundUpdated, EVT-LibrarySoundRefused]
 depends_on: [ST-001]
 labels: [feature:meme]
-status: ready
+status: done
 ---
 
 ## Story
@@ -38,9 +38,9 @@ Scenario: An id that is not the folder name is refused
   Then the validation fails because the id must be the folder name "vine-boom"
 
 Scenario: A missing file is refused
-  Given the library holds "vine-boom"
-  When the user saves its sound.yaml naming the file "missing.wav"
-  Then the validation fails because "missing.wav" does not exist
+  Given the library holds "vine-boom" without its sound.wav
+  When the user saves its sound.yaml
+  Then the validation fails because "sound.wav" does not exist
 
 Scenario: An empty title is refused
   Given the library holds "vine-boom"
@@ -51,4 +51,4 @@ Scenario: An empty title is refused
 - Checking the whole library (ST-004)
 
 ## Open Questions
-- none
+- none (an entry names no file; its WAV is always sound.wav next to it – user, 2026-11-22)

@@ -24,6 +24,7 @@ import {
   seriesDir,
   validateScript,
 } from '@coreslopper/core';
+import { isLibrarySoundFile, validateLibrarySoundEntry } from './sound-library.js';
 import { loadUploadData } from './upload-text.js';
 import { assertKindMatches, validateProject } from './validate.js';
 
@@ -111,6 +112,10 @@ export async function validateChangedFile(file: string): Promise<string | undefi
   if (isLibraryCharacterFile(file)) {
     await validateLibraryCharacter(resolve(file));
     return 'library character';
+  }
+  if (isLibrarySoundFile(file)) {
+    await validateLibrarySoundEntry(file);
+    return 'library sound';
   }
   const root = findArtifactRoot(file);
   const name = basename(file);

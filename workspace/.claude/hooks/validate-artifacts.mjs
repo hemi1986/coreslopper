@@ -3,7 +3,7 @@
  * Claude Code PostToolUse hook.
  *
  * Reads the hook payload from stdin, finds the edited file, and validates
- * project and series canon artifacts (below `projects/`), library characters (`library/characters/<id>/character.yaml`), and `config/channel.yaml` with the same CLI the user runs. Exit code 2 blocks the
+ * project and series canon artifacts (below `projects/`), library characters (`library/characters/<id>/character.yaml`), library sounds (`library/sounds/<id>/sound.yaml`), and `config/channel.yaml` with the same CLI the user runs. Exit code 2 blocks the
  * tool call and shows stderr to the agent.
  */
 import { execFileSync } from 'node:child_process';
@@ -27,6 +27,7 @@ const TRACKED = new Set([
   'calendar.yaml',
   'references.yaml',
   'character.yaml',
+  'sound.yaml',
 ]);
 
 function readStdin() {
@@ -85,11 +86,12 @@ const isReplies = /^\d{3,}\.replies\.json$/.test(basename(file)) && basename(dir
 if (!TRACKED.has(basename(file)) && !isReplies) process.exit(0);
 
 // config/channel.yaml and config/release-schedule.yaml belong to the workspace, not to a project or series;
-// so does library/characters/<id>/character.yaml of the character library.
+// so do library/characters/<id>/character.yaml and library/sounds/<id>/sound.yaml of the libraries.
 const isChannel = ['channel.yaml', 'release-schedule.yaml'].includes(basename(file)) && basename(dirname(resolve(file))) === 'config';
-const characterDir = dirname(resolve(file));
-const isLibrary = basename(file) === 'character.yaml' && basename(dirname(characterDir)) === 'characters' && basename(dirname(dirname(characterDir))) === 'library';
-if (basename(file) === 'character.yaml' && !isLibrary) process.exit(0);
+const entryDir = dirname(resolve(file));
+const inLibrary = (kind) => basename(dirname(entryDir)) === kind && basename(dirname(dirname(entryDir))) === 'library';
+const isLibrary = (basename(file) === 'character.yaml' && inLibrary('characters')) || (basename(file) === 'sound.yaml' && inLibrary('sounds'));
+if (['character.yaml', 'sound.yaml'].includes(basename(file)) && !isLibrary) process.exit(0);
 const workspaceFile = isChannel || isLibrary;
 const artifactRoot = workspaceFile ? undefined : findArtifactRoot(file);
 if (!workspaceFile && (!artifactRoot || !artifactRoot.dir.split(sep).includes(artifactRoot.folder))) process.exit(0);

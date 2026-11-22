@@ -4,9 +4,11 @@ import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { stringify } from 'yaml';
 import { resolveBinary } from '../packages/cli/src/media.ts';
 import { hashFileStream } from '../packages/core/src/index.ts';
 import { addLibrarySound, loadLibrarySound, soundDir, SoundRefused, updateLibrarySound } from '../packages/cli/src/sound-library.ts';
+import { validateChangedFile } from '../packages/cli/src/validate-file.ts';
 
 const temporary: string[] = [];
 afterEach(async () => {
@@ -244,5 +246,90 @@ describe.skipIf(!hasFfmpeg())('sound edit', () => {
     await expect(updateLibrarySound(root, 'vine-boom', { title: '' })).rejects.toThrow(/needs a title/);
     await expect(updateLibrarySound(root, 'no-such-sound', { title: 'x' })).rejects.toThrow(/no library sound "no-such-sound"/);
     await expect(updateLibrarySound(root, 'vine-boom', { trim: '0.5-0.4' })).rejects.toThrow(/must start before it ends/);
+  });
+});
+
+describe('a hand edit of sound.yaml', () => {
+  /** "vine-boom" as sound add writes it; validation only reads the entry and checks that its WAV is there. */
+  async function heldVineBoom(): Promise<{ root: string; entry: string }> {
+    const { root } = await workspace();
+    const dir = join(root, 'library', 'sounds', 'vine-boom');
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, 'sound.wav'), 'RIFF');
+    const entry = join(dir, 'sound.yaml');
+    await save(entry, {});
+    return { root, entry };
+  }
+
+  /** The user's own save: the held entry with their changes. */
+  async function save(entry: string, changes: Record<string, unknown>): Promise<void> {
+    const sound = {
+      version: 1,
+      id: 'vine-boom',
+      title: 'Vine Boom',
+      use_when: 'a dramatic reveal',
+      tags: [],
+      length: 1.4,
+      loudness: -14.2,
+      cue: 0.12,
+      licence: 'unknown',
+      hash: 'a'.repeat(64),
+      added: '2026-11-22T10:00:00.000Z',
+      ...changes,
+    };
+    await writeFile(entry, stringify(sound));
+  }
+
+  /** What the hook shows the user: the refusal and its reasons, as the CLI prints them. */
+  async function refusal(entry: string): Promise<string> {
+    try {
+      await validateChangedFile(entry);
+    } catch (error) {
+      const { message, details = [] } = error as { message: string; details?: string[] };
+      return [message, ...details].join('\n');
+    }
+    throw new Error(`${entry} passed`);
+  }
+
+  it('ST-005: A valid hand edit passes', async () => {
+    const { entry } = await heldVineBoom();
+
+    await save(entry, { tags: ['reveal', 'shock'] });
+
+    expect(await validateChangedFile(entry)).toBe('library sound');
+  });
+
+  it('ST-005: An id that is not the folder name is refused', async () => {
+    const { entry } = await heldVineBoom();
+
+    await save(entry, { id: 'boom' });
+
+    expect(await refusal(entry)).toMatch(/the id must be the folder name "vine-boom"/);
+  });
+
+  it('ST-005: An empty title is refused', async () => {
+    const { entry } = await heldVineBoom();
+
+    await save(entry, { title: '' });
+
+    expect(await refusal(entry)).toMatch(/a library sound needs a title/);
+  });
+
+  it('ST-005: A missing file is refused', async () => {
+    const { entry } = await heldVineBoom();
+    await rm(join(entry, '..', 'sound.wav'));
+
+    await save(entry, {});
+
+    expect(await refusal(entry)).toMatch(/"?sound\.wav"? does not exist/);
+  });
+
+  it('refuses a cue outside the sound and an empty use when', async () => {
+    const { entry } = await heldVineBoom();
+
+    await save(entry, { cue: 2 });
+    expect(await refusal(entry)).toMatch(/the cue 2 lies outside the sound's length/);
+    await save(entry, { use_when: '  ' });
+    expect(await refusal(entry)).toMatch(/a library sound needs a use when/);
   });
 });

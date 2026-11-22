@@ -1477,9 +1477,9 @@ export const LibrarySoundSchema = z
   .object({
     version: z.literal(1),
     id: ScriptIdSchema,
-    title: z.string().trim().min(1),
+    title: z.string().trim().min(1, 'a library sound needs a title'),
     /** What the sound is typically used for; the meme skill picks by it. */
-    use_when: z.string().trim().min(1),
+    use_when: z.string().trim().min(1, 'a library sound needs a use when'),
     tags: z.array(z.string().min(1)).default([]),
     /** Seconds, measured from `sound.wav`. */
     length: z.number().finite().positive(),
