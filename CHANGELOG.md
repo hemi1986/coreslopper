@@ -1,5 +1,89 @@
 # Changelog
 
+## [0.9.0](https://github.com/hemi1986/coreslopper/compare/v0.8.0...v0.9.0) (2026-11-22)
+
+
+### ⚠ BREAKING CHANGES
+
+* **bench:** a new workspace gets only the two example cases. An existing workspace keeps the cases it has.
+* retire the desktop review player
+
+### Features
+
+* **ai-clips:** Pika H3 reference-to-video as the default for clips without lip-sync ([f5600f3](https://github.com/hemi1986/coreslopper/commit/f5600f3125453b78701443d4921e2d3bb23dcf32))
+* **bench:** run image-to-video cases as reference-to-video (as: referenceToVideo) ([83e262d](https://github.com/hemi1986/coreslopper/commit/83e262d91b8d12daeeb467328da588c23369c2a4))
+* **bench:** ship generic example cases and keep the workspace's bench at update ([65a3cf7](https://github.com/hemi1986/coreslopper/commit/65a3cf7b7c35cb119e41a78454536e14796f5cd8))
+* **board:** add a favicon ([2ffd00b](https://github.com/hemi1986/coreslopper/commit/2ffd00bb36e403dac71a348aac1d1302be7e3828))
+* **board:** board guide with screenshots, and formatted docs on the board ([e4962db](https://github.com/hemi1986/coreslopper/commit/e4962dba0de71e807495229e02f9f29ea99353b0))
+* **board:** open the board guide from the navigation ([ddfeb04](https://github.com/hemi1986/coreslopper/commit/ddfeb047a0f1faadf74e4e2c3e7d453f2b63a968))
+* **board:** production view of every project and series, the board as the workspace's hub ([07aef79](https://github.com/hemi1986/coreslopper/commit/07aef796525d2e21e78003ceea7c287e52285cdd))
+* **board:** refresh by hand instead of polling ([2f6c731](https://github.com/hemi1986/coreslopper/commit/2f6c7313056ed6a57d0f1a681c074042c860cdb5))
+* **board:** show project documents formatted on the board ([2597751](https://github.com/hemi1986/coreslopper/commit/2597751c4d5876dff171fd39164d9552850711a1))
+* **board:** watchdog round, render progress, and the board container ([e7c2599](https://github.com/hemi1986/coreslopper/commit/e7c2599cab0686096692470c2d604e7d3de61240))
+* **board:** web review player and review rounds the agent answers ([42b6e99](https://github.com/hemi1986/coreslopper/commit/42b6e99d62367432cfc2e5a99ec76d20ce6a6ad2))
+* **board:** wizard for new music videos, series, and episodes, with user references ([a2fc0a7](https://github.com/hemi1986/coreslopper/commit/a2fc0a7e6dce274aed5d0d097449edc2e34f4ead))
+* **comfyui:** Pika H3 Flex FL2VA, Pika frame count, required tags, model locks in config ([7347be5](https://github.com/hemi1986/coreslopper/commit/7347be54fda57999b29623542f7f3ccfa9ad85e3))
+* **comfyui:** Pika H3 Flex FL2VA, Pika frame count, required tags, model locks in config ([ff93c33](https://github.com/hemi1986/coreslopper/commit/ff93c33437a1d2145671abd91562f94228f26aff))
+* generation queue, patch, and runner commands for mechanical steps ([8017b96](https://github.com/hemi1986/coreslopper/commit/8017b9685bfdf135becd1e5cad01c4f48768419e))
+* generation queue, patch, and runner commands for mechanical steps ([73063bc](https://github.com/hemi1986/coreslopper/commit/73063bc237362d81a739761cadd67d25a6e3294c))
+* **lipsync:** Pika H3 lip-sync with an anchored vocal as the first local choice ([cb849c7](https://github.com/hemi1986/coreslopper/commit/cb849c7fd60f76ed4625de9db1d53a2ee279e77f))
+* **lipsync:** Pika H3 lip-sync with an anchored vocal as the first local choice ([6bfc386](https://github.com/hemi1986/coreslopper/commit/6bfc3862b5e661e00c41c19f0d1e7696d8fe2d13))
+* **publish:** social post adapter contract for the release autopilot ([3532a64](https://github.com/hemi1986/coreslopper/commit/3532a641e8a93d64350846ab47819112e64a0d42))
+* **publish:** X, LinkedIn, and Instagram post adapters; YouTube status, description, and comment calls; TikTok direct post ([ba29b3c](https://github.com/hemi1986/coreslopper/commit/ba29b3c56b1b053abd9deedff5799c3e138fc27f))
+* **release-board:** optional channel motto top right; tasks say done, posts say posted ([c022d9d](https://github.com/hemi1986/coreslopper/commit/c022d9dbf5a0d6cc2fa99d743e42868787de43dd))
+* **release:** announcement, story, and feed images with the release date, the teaser, and the 4:5 thumbnail format ([4af5277](https://github.com/hemi1986/coreslopper/commit/4af5277547ac6d8ef12b64065c9a5b1dfc32d6dc))
+* **release:** channel release defaults, autopilot doctor checks, schedule and channel templates ([2fa41ca](https://github.com/hemi1986/coreslopper/commit/2fa41ca8895b20cf115db3f3ba1af0cdb5959d40))
+* **release:** release autopilot — one approval, then the calendar posts by API ([e5cabdd](https://github.com/hemi1986/coreslopper/commit/e5cabdd754f83576d24f9ff472523c73ef779c22))
+* **release:** release board, cross-project release calendar, X/LinkedIn/microsite texts ([eac7dba](https://github.com/hemi1986/coreslopper/commit/eac7dbabc538fab310250affe6a7068372751589))
+* **release:** release board, cross-project release calendar, X/LinkedIn/microsite texts ([bea73af](https://github.com/hemi1986/coreslopper/commit/bea73af9b9610e45932ecc4bcd3d63bfc4ef1792))
+* **release:** release-backfill skill, feed format for Instagram and LinkedIn, board language ([769f4cc](https://github.com/hemi1986/coreslopper/commit/769f4ccfe8dc07bf48b5a50c1e51d38ede6cf7dd))
+* **release:** the release autopilot — approval on the board, release-run, release-timer, publish-auth for X, LinkedIn, Instagram ([ac7ca26](https://github.com/hemi1986/coreslopper/commit/ac7ca267256256c94ec21fa6888a7600c62f48f9))
+* retire the desktop review player ([33bea50](https://github.com/hemi1986/coreslopper/commit/33bea503ba9b51f781cf99fd7cbe615220596c02))
+* review-image command and per-image art-director review loop ([ad4d298](https://github.com/hemi1986/coreslopper/commit/ad4d298682dfe13bf38cf192eabbd0ce27f6c802))
+* review-image command and per-image art-director review loop ([e4eaf95](https://github.com/hemi1986/coreslopper/commit/e4eaf959b4c1a7ed4f437e1998df8f03ab9cfa54))
+
+
+### Bug Fixes
+
+* **audio-analysis:** default to the project's vocal stem ([bc4dddf](https://github.com/hemi1986/coreslopper/commit/bc4dddfad2f9bd14a4abc2d3d73877cbc40b255a))
+* **autopilot:** missing credentials need the user only once a post is due ([c776275](https://github.com/hemi1986/coreslopper/commit/c7762756cdf8223c8bb7573718508f8619e4a570))
+* **autopilot:** review findings — board writes only from its own page, approval per release day, locks, TikTok tokens and direct posts, timer PATH ([e44dde1](https://github.com/hemi1986/coreslopper/commit/e44dde1f11113fad9dfa52c2baaa0765469e7b86))
+* close the low gaps the user hits ([7c2aa90](https://github.com/hemi1986/coreslopper/commit/7c2aa905c426111b1934cea6d45c52fa09e3e801))
+* close the low gaps the user hits ([5c70cd5](https://github.com/hemi1986/coreslopper/commit/5c70cd525e5719caaee835aa10d6e069728fb632))
+* land --scrim and --text-offset ([#41](https://github.com/hemi1986/coreslopper/issues/41)) on main ([c81e8b1](https://github.com/hemi1986/coreslopper/commit/c81e8b13c42b8a525b2360ab65434d21cf45a360))
+* land the board ([#58](https://github.com/hemi1986/coreslopper/issues/58)–[#61](https://github.com/hemi1986/coreslopper/issues/61)) on main ([dcaa7fb](https://github.com/hemi1986/coreslopper/commit/dcaa7fbdc5044580918d1e5179aff10bbd64b4a4))
+* land the runner commands ([#53](https://github.com/hemi1986/coreslopper/issues/53)) on main ([1280f8f](https://github.com/hemi1986/coreslopper/commit/1280f8f4c3a43f724a1eded5eea7fb3232d20ddb))
+* **pipeline:** rebuild a missing release folder instead of a dead end ([745787e](https://github.com/hemi1986/coreslopper/commit/745787e01f49f61414d7945ee16c1ee0201550b4))
+* **publish:** lock the publish log and .env for every write ([af8706e](https://github.com/hemi1986/coreslopper/commit/af8706e2b6b56df9f8737f79ea36a77361b64399))
+* **publish:** never post twice on YouTube and TikTok, and show what a withdrawal cannot stop ([371c737](https://github.com/hemi1986/coreslopper/commit/371c7374f1c955d6ab9264179e8ef5763045b6f4))
+* **release:** keep a stale format's earlier copy on the board's refresh ([4efd346](https://github.com/hemi1986/coreslopper/commit/4efd346da6506b7c7e586d8aa2128566e558cbfd))
+* the medium gaps the user hits ([f3e39e1](https://github.com/hemi1986/coreslopper/commit/f3e39e197e38b3edfc150fbadd7cd3e85ab37a3b))
+
+
+### Documentation
+
+* adopt every slice of coreslopper ([e09bb39](https://github.com/hemi1986/coreslopper/commit/e09bb396242716cf365d01143fb8c5dbe5d40972))
+* adopt the bibles and character library slice ([e5a39c3](https://github.com/hemi1986/coreslopper/commit/e5a39c328e92b45cfd8b16324bbcd6babb362559))
+* adopt the board shell slice ([e1b633e](https://github.com/hemi1986/coreslopper/commit/e1b633e74f926d66d5d059fb4f7fad1c20c2ab0c))
+* adopt the generation queue and verdicts slice ([5e06927](https://github.com/hemi1986/coreslopper/commit/5e0692729ff85f03386e08677f02ff89c59743ee))
+* adopt the generation slice ([2ec8a70](https://github.com/hemi1986/coreslopper/commit/2ec8a7006d7bbe39a2272c49e8ee2ecab367c92d))
+* adopt the human review slice ([7c7b81e](https://github.com/hemi1986/coreslopper/commit/7c7b81edc25cf62e1dcf4c7608bd6d2636e6c3d6))
+* adopt the model bench slice ([3f855fa](https://github.com/hemi1986/coreslopper/commit/3f855faf5eb591c3b27ddbe71f9381d6ea45b44a))
+* adopt the project and stage pipeline slice ([5128f52](https://github.com/hemi1986/coreslopper/commit/5128f52d5a164968c7b497c24dee061859ca9d3c))
+* adopt the publish slice ([e6fddce](https://github.com/hemi1986/coreslopper/commit/e6fddcec160485517fb60d278a88ed5c4fa6776b))
+* adopt the release slice ([7ba5b88](https://github.com/hemi1986/coreslopper/commit/7ba5b8864ebf7f2b4601dfe55cb1f72fe9212aa7))
+* adopt the render slice ([5fdf981](https://github.com/hemi1986/coreslopper/commit/5fdf98192494be02968b498e090b0e9111877cd1))
+* adopt the series slice ([f6aea03](https://github.com/hemi1986/coreslopper/commit/f6aea03bee10511670043fd0021f49a8649e5c68))
+* adopt the storyboard slice ([512350f](https://github.com/hemi1986/coreslopper/commit/512350fc8c000aae08b8482a15e9ea4817b60283))
+* adopt the timing slice ([2ba1480](https://github.com/hemi1986/coreslopper/commit/2ba1480f2e06c6c2e150d82750dd775927be6ef4))
+* adopt the workspace slice ([6023e3c](https://github.com/hemi1986/coreslopper/commit/6023e3cb7cdfb80e770178e613103995a95606cc))
+* **adr:** accept ADR 0050 ([4d7dde6](https://github.com/hemi1986/coreslopper/commit/4d7dde6259f33b12a0fb73fea83712f581e8b589))
+* **board:** add a board guide with screenshots, in English and German ([b968248](https://github.com/hemi1986/coreslopper/commit/b968248c1a821609f41020a47b7c80cae18927b6))
+* **domain:** defer the upstream locale defaults (G-156) ([45ef841](https://github.com/hemi1986/coreslopper/commit/45ef841346833db791c2a58acb4bac655d9b939b))
+* **release:** release board, calendar, and backfill in README, publishing, architecture, onboarding ([225f0ee](https://github.com/hemi1986/coreslopper/commit/225f0ee978663139f7514d567eaf37643e56faa8))
+* **skills:** video-qa and release-backfill reviewed with writing-for-agents ([1def34e](https://github.com/hemi1986/coreslopper/commit/1def34e50a2e30bb2b3975d21a1f2777ceaceacc))
+* the release autopilot — ADR 0029, publishing setup for X, LinkedIn, Instagram, glossary, skills, README ([967ff38](https://github.com/hemi1986/coreslopper/commit/967ff3876cb77bc0947fc9a451132b7470770220))
+
 ## [0.8.0](https://github.com/hemi1986/coreslopper/compare/v0.7.0...v0.8.0) (2026-11-19)
 
 
