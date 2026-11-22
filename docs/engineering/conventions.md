@@ -25,7 +25,7 @@ npm workspaces (`packages/*`), but no package builds or tests on its own: `npm t
 same. There is no affected-test selection. `runtime/` is build output (`npm run build`), gitignored; never read
 it as source. The generated overview is `docs/architecture/repo-map.md`.
 
-Distribution (workspace slice):
+Packaging (workspace slice):
 - Two CLIs share one source tree. `packages/cli/src/npx.ts`, bundled by tsup into `dist/cli.js`, is what
   `npx coreslopper` runs: `init`, `update`, `doctor [dir]`, `new`, `status`, `validate`. `index.ts`, run with tsx as
   `npm run cli` inside a workspace, is the full CLI. `update` exists only in the npx CLI, `migrate-layout` only in

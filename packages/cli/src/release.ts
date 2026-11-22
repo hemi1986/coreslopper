@@ -24,6 +24,7 @@ import {
   readJsonFile,
   releaseIdentity,
   releaseTodos,
+  releasedPublicly,
   repoRoot,
   resolveAnchor,
   safeFileName,
@@ -212,6 +213,9 @@ export function projectFormats(project: Pick<LoadedProject, 'config'>): { id: st
 export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResult> {
   const deps = { ...(await defaultDeps()), ...options.deps };
   const project = await loadProject(options.projectDir);
+  if (!releasedPublicly(project.config)) {
+    throw new ValidationError(`${project.config.slug} is not released publicly (distribution: internal): it gets no release package.`);
+  }
   const root = repoRoot();
   const music = project.config.kind !== 'episode';
   const dir = releaseDir(project.paths.root);
@@ -572,10 +576,19 @@ function resolveCanvasStart(value: string, timing: NonNullable<LoadedProject['ef
   }
 }
 
-/** Run `release` and print the summary; returns the result for the caller. */
-export async function runRelease(options: ReleaseOptions): Promise<ReleaseResult> {
-  const result = await buildRelease(options);
+/**
+ * Run `release` and print the summary; returns the result for the caller. An
+ * internal project builds and plans nothing (undefined), and an earlier folder
+ * or calendar is left as it is.
+ */
+export async function runRelease(options: ReleaseOptions): Promise<ReleaseResult | undefined> {
   const log = options.deps?.log ?? ((line: string) => console.log(line));
+  const { config } = await loadProject(options.projectDir);
+  if (!releasedPublicly(config)) {
+    log(`${config.slug} is not released publicly (distribution: internal): no release folder, no release calendar.`);
+    return undefined;
+  }
+  const result = await buildRelease(options);
   log(`Release folder: ${result.dir} (${result.manifest.files.length} files)`);
   for (const warning of result.warnings) log(`! ${warning}`);
   for (const todo of result.todos) log(`TODO ${todo}`);

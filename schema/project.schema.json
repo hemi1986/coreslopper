@@ -313,6 +313,13 @@
           "minLength": 1
         }
       }
+    },
+    "distribution": {
+      "type": "string",
+      "enum": [
+        "public",
+        "internal"
+      ]
     }
   },
   "required": [

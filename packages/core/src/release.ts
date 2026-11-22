@@ -22,6 +22,11 @@ export async function loadChannel(root: string): Promise<ChannelConfig | undefin
   return existsSync(path) ? readYamlFile(path, ChannelConfigSchema) : undefined;
 }
 
+/** A project with `distribution: internal` is never released publicly: no release package, no release calendar. */
+export function releasedPublicly(config: Pick<ProjectConfig, 'distribution'>): boolean {
+  return config.distribution !== 'internal';
+}
+
 /** A link value that still holds the `<ID>` placeholder. */
 export const PLACEHOLDER = /<ID>/;
 
