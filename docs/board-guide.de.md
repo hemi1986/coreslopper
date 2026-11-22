@@ -52,7 +52,7 @@ Klicke in der Navigation auf ein Projekt.
 
 ![Der Produktions-Tab eines fertigen Projekts](assets/board/de/project.webp)
 
-Der Tab **Produktion** listet jede Stage mit Status, Versuchen und Zeit. Darunter stehen das Budget, die Dokumente (Brief, Treatment, Storyboard, QA-Bericht) und die Renders. Der Kasten oben nennt immer den nächsten Schritt.
+Der Tab **Produktion** listet jede Stage mit Status, Versuchen und Zeit. Darunter stehen das Budget, die Dokumente (Brief, Treatment, Storyboard, QA-Bericht) und die Renders. Ein Dokument öffnet sich formatiert im Board; der Dateiname oben rechts öffnet die Datei selbst. Der Kasten oben nennt immer den nächsten Schritt.
 
 ## Einen Render reviewen
 

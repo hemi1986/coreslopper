@@ -50,7 +50,9 @@ release view only. "Page", "screen" and "sidebar" are not terms; "tab" is only t
   autopilot reads it too.
 - The page (`packages/cli/src/board/`) is static ES modules with no build step:
   - `app.js` holds the hash routes, the navigation and the user's refresh (no poll, ADR 0049);
-  - `guide.js` shows a page of the workspace's `docs/` with its own small markdown renderer, built as DOM nodes;
+  - `markdown.js` renders the markdown subset of the docs and the project documents as DOM nodes, never as HTML;
+    `guide.js` shows a page of the workspace's `docs/` with it, and `production.js` a project document
+    (`#/p/<slug>/doc/<path>`);
   - `lib.js` holds the DOM helper, `api`/`post`/`upload`, the string tables (`addStrings`/`t`/`setLang`), dates,
     and a project's tabs;
   - each view registers its own strings.

@@ -52,7 +52,7 @@ Click a project in the navigation.
 
 ![A finished project's production tab](assets/board/en/project.webp)
 
-The **Production** tab lists every stage with its status, attempts, and time, then the budget, the documents (brief, treatment, storyboard, QA report), and the renders. The box at the top always names the next step.
+The **Production** tab lists every stage with its status, attempts, and time, then the budget, the documents (brief, treatment, storyboard, QA report), and the renders. A document opens formatted on the board; the file name at its top right opens the file itself. The box at the top always names the next step.
 
 ## Review a render
 

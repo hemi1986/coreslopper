@@ -1,6 +1,7 @@
 // The production view: every project and series as the pipeline leaves them,
 // with the next step to take in Claude Code.
 import { addStrings, ago, api, bytes, copyButton, el, go, local, projectFile, setLang, showError, t, usd, viewTabs } from './lib.js';
+import { renderMarkdown } from './markdown.js';
 
 addStrings({
   de: {
@@ -10,7 +11,7 @@ addStrings({
     kindVideo: 'Musikvideo', kindEpisode: function (s, n) { return 'Episode ' + n + ' · ' + s; },
     budget: 'Budget', spent: 'ausgegeben', reserved: 'reserviert', since: 'seit', stage: 'Stage', status: 'Status', attempts: 'Versuche', when: 'Zeit', error: 'Fehler',
     queue: 'Generierungs-Queue', queueStates: { pending: 'offen', generating: 'generiert', reviewing: 'im Review', passed: 'bestanden', 'needs-fix': 'braucht Fix', error: 'Fehler' },
-    reviews: 'Art-Director-Reviews', failedReviews: function (n) { return n + ' Review(s) nicht bestanden'; }, documents: 'Dokumente', renders: 'Renders', contact: 'Contact Sheet',
+    reviews: 'Art-Director-Reviews', failedReviews: function (n) { return n + ' Review(s) nicht bestanden'; }, documents: 'Dokumente', noDocument: 'Dokument nicht gefunden', renders: 'Renders', contact: 'Contact Sheet',
     noRenders: 'Noch kein Render.', interactiveNote: 'interaktiv',
     next: {
       interactive: function (s) { return 'In Claude Code weitermachen (' + s + '):'; },
@@ -44,7 +45,7 @@ addStrings({
     kindVideo: 'Music video', kindEpisode: function (s, n) { return 'Episode ' + n + ' · ' + s; },
     budget: 'Budget', spent: 'spent', reserved: 'reserved', since: 'for', stage: 'Stage', status: 'Status', attempts: 'Attempts', when: 'Time', error: 'Error',
     queue: 'Generation queue', queueStates: { pending: 'pending', generating: 'generating', reviewing: 'in review', passed: 'passed', 'needs-fix': 'needs a fix', error: 'error' },
-    reviews: 'Art-director reviews', failedReviews: function (n) { return n + ' review(s) failed'; }, documents: 'Documents', renders: 'Renders', contact: 'Contact sheet',
+    reviews: 'Art-director reviews', failedReviews: function (n) { return n + ' review(s) failed'; }, documents: 'Documents', noDocument: 'Document not found', renders: 'Renders', contact: 'Contact sheet',
     noRenders: 'No render yet.', interactiveNote: 'interactive',
     next: {
       interactive: function (s) { return 'Continue in Claude Code (' + s + '):'; },
@@ -242,7 +243,7 @@ function renderProject(p) {
   ]));
 
   if (p.documents.length) main.appendChild(section(t('documents'), [el('div', { class: 'docs' }, p.documents.map(function (doc) {
-    return el('a', { href: projectFile(p.slug, doc.path), target: '_blank', text: doc.label });
+    return el('a', { href: documentHash(p.slug, doc.path), text: doc.label });
   }))]));
 
   main.appendChild(section(t('renders'), progressRows(p).concat(p.renders.length ? [el('div', { class: 'renders' }, p.renders.map(function (render) {
@@ -295,6 +296,49 @@ function renderSeries(s) {
       el('td', {}, [e.status ? el('span', { class: 'pill ' + e.status, text: e.status }) : null, e.next && e.next !== 'done' ? ' → ' + e.next : ''])
     ]);
   }))]));
+}
+
+function documentHash(slug, path) { return '#/p/' + slug + '/doc/' + encodeURIComponent(path); }
+
+/** An address in a project document: a web link, or an image of the project's media folders, relative to the document. */
+function documentTarget(slug, path) {
+  const folder = path.indexOf('/') >= 0 ? path.slice(0, path.lastIndexOf('/') + 1) : '';
+  return function (href, image) {
+    if (/^https?:\/\//.test(href)) return { href: href, external: true };
+    if (/^[a-z]+:|^\/|^#/.test(href)) return null;
+    const parts = [];
+    (folder + href.replace(/[?#].*$/, '')).split('/').forEach(function (part) { if (part === '..') parts.pop(); else if (part && part !== '.') parts.push(part); });
+    const rel = parts.join('/');
+    if (image && /^(renders|review|assets|characters|sets|props)\//.test(rel)) return { href: projectFile(slug, rel) };
+    if (!image && /\.md$/.test(rel) && documents.some(function (doc) { return doc.path === rel; })) return { href: documentHash(slug, rel) };
+    return null;
+  };
+}
+
+let documents = [];
+
+/** A project document on the board: markdown rendered, lyrics and script as text, the file itself one click away. */
+export function showDocument(slug, path) {
+  setLang(null);
+  return api('/api/production/projects/' + encodeURIComponent(slug)).then(function (p) {
+    documents = p.documents;
+    const doc = p.documents.filter(function (d) { return d.path === path; })[0];
+    if (!doc) throw new Error(t('noDocument') + ': ' + path);
+    return fetch(projectFile(slug, path)).then(function (res) {
+      if (!res.ok) throw new Error(t('noDocument') + ': ' + path);
+      return res.text();
+    }).then(function (source) {
+      const main = document.getElementById('main');
+      main.innerHTML = '';
+      main.appendChild(el('header', { class: 'project' }, [el('h2', { text: (p.artist ? p.artist + ' – ' : '') + p.title }), el('span', { class: 'chip', text: kindLabel(p) })]));
+      main.appendChild(viewTabs(slug, 'production', p.hasRelease));
+      main.appendChild(el('div', { class: 'docs doc-bar' }, [el('a', { href: '#/p/' + slug, text: '← ' + t('documents') })].concat(p.documents.map(function (d) {
+        return el('a', { href: documentHash(slug, d.path), class: d.path === path ? 'active' : undefined, text: d.label });
+      })).concat([el('a', { class: 'raw', href: projectFile(slug, path), target: '_blank', text: path + ' ↗' })])));
+      main.appendChild(el('article', { class: 'markdown card' }, /\.md$/.test(path) ? renderMarkdown(source, documentTarget(slug, path)) : [el('pre', { class: 'plain', text: source })]));
+      window.scrollTo(0, 0);
+    });
+  }).catch(showError);
 }
 
 /** Show a production page: `overview`, `project:<slug>`, or `series:<slug>`. */
