@@ -3,7 +3,7 @@
 > Recovered from code by `/adopt` on 2026-11-21 at b195086. This is **not a target**.
 > Target: [context-map.md](context-map.md) · Gap register: [gap-register.md](gap-register.md).
 
-Adopted slices: project and stage pipeline; human review; art-director verdicts and the generation queue (decided by recommendation); song timing and lyrics (decided by recommendation, four answers from the user); the storyboard (decided by recommendation, four answers from the user); generation and the provider adapters (decided by recommendation, four answers from the user); series budget, script, takes and the episode track (decided by recommendation, four answers from the user); the bibles, user references and the character library (decided by recommendation, four answers from the user); render, Shorts, composed images and the media directory (decided by recommendation, four answers from the user). Other areas – release, publishing, the workspace, model bench – appear only as neighbours until their own slice is adopted.
+Adopted slices: project and stage pipeline; human review; art-director verdicts and the generation queue (decided by recommendation); song timing and lyrics (decided by recommendation, four answers from the user); the storyboard (decided by recommendation, four answers from the user); generation and the provider adapters (decided by recommendation, four answers from the user); series budget, script, takes and the episode track (decided by recommendation, four answers from the user); the bibles, user references and the character library (decided by recommendation, four answers from the user); render, Shorts, composed images and the media directory (decided by recommendation, four answers from the user); the release package, calendar, release board and approval (decided by recommendation, four answers from the user). Other areas – publishing, the workspace, model bench – appear only as neighbours until their own slice is adopted.
 
 ```mermaid
 flowchart LR
@@ -11,7 +11,7 @@ flowchart LR
   BC-Series -->|reads the canon's characters, sets and reference voices; an episode may add plates, props and states| BC-Bibles
   BC-Review -->|open rounds come before the next autonomous stage; fixes reset qa-export| BC-Pipeline
   BC-Review -->|notes map to storyboard shots and timing sections| BC-Storyboard
-  BC-Pipeline -->|done project feeds release| Release[Release - not adopted]
+  BC-Pipeline -->|qa-export builds and checks the release package| BC-Release
   BC-Pipeline -->|style-character stage writes the bibles of a music video| BC-Bibles
   BC-Pipeline -->|style-character done imports characters| BC-CharacterLibrary
   BC-CharacterLibrary -->|character use copies an identity and chosen states into a bible| BC-Bibles
@@ -38,14 +38,20 @@ flowchart LR
   BC-Timing -->|effective timing as render props; anchors for Short windows| BC-Render
   BC-Review -->|sections and beats on the review timeline| BC-Timing
   BC-Timing -->|echo spans, lead stem for lip-sync segments| Lipsync[Lip-sync audio - not adopted]
-  BC-Timing -->|lyrics, effective timing for canvas, Shorts, texts| Release
+  BC-Timing -->|lyrics, effective timing for canvas, chapters, LRC, SRT| BC-Release
   BC-Pipeline -->|assembly and qa-export stages render, cut Shorts and compose images| BC-Render
   BC-Pipeline -->|a new project is linked into the media directory| BC-Render
-  BC-Render -->|whole renders with render records, Shorts, composed images and recipes; stale formats rendered again| Release
+  BC-Render -->|whole renders with render records, Shorts, composed images and recipes; stale formats rendered again| BC-Release
   BC-Render -->|renders and render progress on the board| BC-Review
   BC-Render -->|segments joined, song muxed, Shorts cut| FFmpeg
   BC-Render -->|compositions rendered frame by frame| Remotion[Remotion and headless Chrome - external]
   BC-GenerationQueue -->|thumbnails and covers judged by the art director| BC-Render
+  BC-Release -->|release folder, upload data, calendar and approval| Publish[Publish and release autopilot - not adopted]
+  BC-Release -->|the approval, done marks and the release folder's presence for the next action| BC-Pipeline
+  BC-Release -->|the song page as data| Microsite[Artist microsite - external]
+  BC-Release -->|WAV, cover and the form fields, uploaded by hand| Distributor[Distributor - external]
+  BC-Release -->|WAV, canvas and teaser cut, songs converted| FFmpeg
+  BC-Release -->|announcement, story and feed images composed from the cover's recipe| BC-Render
 ```
 
 ## Contexts
@@ -333,10 +339,41 @@ Boundaries:
   bibles (BC-Bibles), an episode's script, chat lines and subtitle cues (BC-Series). It writes nothing of theirs.
 - The CLI owns all input, output and encoding; `packages/remotion` is a pure function of props and frame and takes
   runtime values only from `@coreslopper/core/browser` (HS-158).
-- Release (not adopted) places the renders, Shorts and composed images in the release folder and renders a missing
+- BC-Release places the renders, Shorts and composed images in the release folder and renders a missing
   or stale format again; it composes the announcement images from the cover's recipe.
 - The art director judges thumbnails and covers (BC-GenerationQueue's agent, run by hand in `video-qa`).
 - The render record lives in `AGG-Project`'s `state.json` and is saved without a lock (G-1, HS-155).
 - A passage render without `--out` replaces the recorded render's file (HS-146); a Short is not tied to the render it
   was cut from (HS-148); a series canon is not linked into the media directory (HS-154).
 
+### BC-Release – Release
+Purpose (as recovered, decided by recommendation HS-162): turns a finished project into everything its release
+needs – the release folder with its manifest, the platform texts laid out and checked against the limits, the
+release calendar planned across the workspace, and the release board where the user ticks off what went live and
+gives the one release approval (ADR 0019, ADR 0024, ADR 0028, ADR 0029, ADR 0045 proposed).
+Core terms: Release Package, Release Folder, Release Manifest, Upload Data, Upload Text, Release Metadata, AI
+Credits, Channel Config, Release Schedule, Release Calendar, Calendar Event, Proposed Release Day, Release Board,
+Release Status, Done Mark, Live URL, Release Approval, Announcement, Microsite, TODO.
+Evidence:
+- `release` builds `renders/release/` and writes `manifest.json` last (`packages/cli/src/release.ts:132-175,207-447`);
+  the texts are laid out from `review/upload.yaml`, which the agent writes (`packages/cli/src/release-texts.ts`,
+  `workspace/.claude/skills/video-qa/release.md`); the rules for facts, limits, chapters and canvas are pure functions
+  in core (`packages/core/src/release.ts`)
+- `buildCalendar` plans `review/calendar.yaml` from `config/release-schedule.yaml` and every other project's calendar
+  (`packages/core/src/calendar.ts:119-225`, `packages/cli/src/release-calendar.ts:49-110`)
+- the board's release view (`packages/cli/src/release-board.ts:412-503`, `release-board-data.ts:432-703`,
+  `board/release.js`) writes `review/release-status.json` under the release lock (`release-calendar.ts:118-142`);
+  the approval is written by `approveRelease` (`packages/cli/src/release-autopilot.ts:66-89`) and read by
+  `approvalHolds` (`packages/core/src/autopilot.ts:142-144`)
+- QA's release checks (`packages/cli/src/release-qa.ts:56-231`, `qa.ts:177-221,379-381`)
+Boundaries:
+- Reads only: the renders, render records, Shorts and composed images with their recipes (BC-Render), the effective
+  timing and lyrics (BC-Timing), the project's `project.yaml` release block and `state.json` (BC-Pipeline). It writes
+  nothing of theirs, except `release.release_date` in `project.yaml` when a proposed day is approved (HS-177) and the
+  formats it renders again through BC-Render's command.
+- Publish and the release autopilot (not adopted) read the release folder, the upload data, the calendar and the
+  approval, and write done marks and live URLs into the release status under the same lock.
+- The microsite and the distributor are outside; the microsite reads `renders/release/microsite/<slug>.json`
+  (HS-178), the distributor gets its files by hand.
+- The release folder and the calendar take no lock (HS-174); the board's refresh can remove a file it could not
+  refresh (HS-167); a proposed day is fixed only by the approval (HS-165).

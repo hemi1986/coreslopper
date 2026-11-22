@@ -67,6 +67,8 @@ flowchart LR
     CMD_RenderStill["Render a still"]:::cmd
     CMD_LinkProjectMedia["Link a project's media"]:::cmd
     CMD_CheckDeterminism["Check determinism"]:::cmd
+    CMD_RenderUploadText["Render the upload text"]:::cmd
+    CMD_CheckRelease["Check the release package"]:::cmd
     subgraph BC_Timing["Timing"]
         CMD_WriteLyrics["Write lyrics"]:::cmd
         CMD_AnalyzeSong["Analyze song"]:::cmd
@@ -182,6 +184,27 @@ flowchart LR
         EVT_ProjectMediaLinked["Project media linked"]:::evt
         EVT_DeterminismChecked["Determinism checked"]:::evt
     end
+    subgraph BC_Release["Release"]
+        CMD_WriteUploadData["Write the upload data"]:::cmd
+        CMD_BuildReleasePackage["Build the release package"]:::cmd
+        CMD_PlanReleaseCalendar["Plan the release calendar"]:::cmd
+        CMD_MarkCalendarEventDone["Mark a calendar event done"]:::cmd
+        CMD_RecordLiveUrl["Record a live URL"]:::cmd
+        CMD_ApproveRelease["Approve a release"]:::cmd
+        CMD_WithdrawApproval["Withdraw the approval"]:::cmd
+        EVT_UploadDataWritten["Upload data written"]:::evt
+        EVT_ReleasePackageBuilt["⭐ Release package built"]:::evt
+        EVT_ReleaseRulesBroken["Release rules broken"]:::evt
+        EVT_UploadTextRendered["Upload text rendered"]:::evt
+        EVT_ReleaseCalendarPlanned["⭐ Release calendar planned"]:::evt
+        EVT_ReleaseDayFixed["Release day fixed"]:::evt
+        EVT_CalendarEventMarkedDone["Calendar event marked done"]:::evt
+        EVT_LiveUrlRecorded["Live URL recorded"]:::evt
+        EVT_ReleaseApproved["⭐ Release approved"]:::evt
+        EVT_ApprovalWithdrawn["Approval withdrawn"]:::evt
+        EVT_ApprovalRefused["Approval refused"]:::evt
+        EVT_ReleaseChecked["Release checked"]:::evt
+    end
     ACT_User(["User"]):::act
     ACT_Orchestrator(["Orchestrator"]):::act
     ACT_SetupSkill(["Setup skill"]):::act
@@ -194,6 +217,8 @@ flowchart LR
     EXT_AudioModels[["Local audio models"]]:::ext
     EXT_FFmpeg[["FFmpeg"]]:::ext
     EXT_Remotion[["Remotion and headless Chrome"]]:::ext
+    EXT_Microsite[["Artist microsite"]]:::ext
+    EXT_Distributor[["Distributor"]]:::ext
     POL_RunNextStage{{"Run the next autonomous stage"}}:::pol
     POL_HardStop{{"A hard stop fails the stage and halts the pipeline"}}:::pol
     POL_AnswerOpenRounds{{"Open review rounds are answered before the next autonomous stage"}}:::pol
@@ -206,6 +231,7 @@ flowchart LR
     POL_ValidateEveryScriptEdit{{"Every script edit is validated"}}:::pol
     POL_ImportFinishedCharacters{{"The characters of a finished character bible go into the library"}}:::pol
     POL_LinkNewProjectMedia{{"A new project's media go to the media directory"}}:::pol
+    POL_RefreshAfterStatusChange{{"The release folder follows a live URL and an approval"}}:::pol
     RM_Status[("Status")]:::rm
     RM_NextAction[("Next action")]:::rm
     RM_ProductionView[("Production view")]:::rm
@@ -230,6 +256,11 @@ flowchart LR
     RM_RenderProgress[("Render progress")]:::rm
     RM_Renders[("Renders")]:::rm
     RM_RenderChecks[("Render checks")]:::rm
+    RM_ReleaseBoard[("Release board")]:::rm
+    RM_WorkspaceReleaseCalendar[("Workspace release calendar")]:::rm
+    RM_ReleaseChecks[("Release checks")]:::rm
+    RM_UploadText[("Upload text")]:::rm
+    RM_MicrositeSong[("Microsite song")]:::rm
     ACT_SetupSkill --> CMD_CreateProject
     CMD_CreateProject --> EVT_ProjectCreated
     ACT_Orchestrator --> CMD_StartStage
@@ -392,6 +423,29 @@ flowchart LR
     CMD_LinkProjectMedia --> EVT_ProjectMediaLinked
     ACT_StageRunner --> CMD_CheckDeterminism
     CMD_CheckDeterminism --> EVT_DeterminismChecked
+    ACT_StageRunner --> CMD_WriteUploadData
+    CMD_WriteUploadData --> EVT_UploadDataWritten
+    ACT_StageRunner --> CMD_BuildReleasePackage
+    CMD_BuildReleasePackage --> EVT_ReleasePackageBuilt
+    CMD_BuildReleasePackage --> EVT_ReleaseRulesBroken
+    CMD_BuildReleasePackage --> EVT_ReleaseCalendarPlanned
+    ACT_StageRunner --> CMD_RenderUploadText
+    CMD_RenderUploadText --> EVT_UploadTextRendered
+    ACT_User --> CMD_PlanReleaseCalendar
+    CMD_PlanReleaseCalendar --> EVT_ReleaseCalendarPlanned
+    ACT_User --> CMD_MarkCalendarEventDone
+    CMD_MarkCalendarEventDone --> EVT_CalendarEventMarkedDone
+    ACT_User --> CMD_RecordLiveUrl
+    CMD_RecordLiveUrl --> EVT_LiveUrlRecorded
+    ACT_User --> CMD_ApproveRelease
+    CMD_ApproveRelease --> EVT_ReleaseDayFixed
+    CMD_ApproveRelease --> EVT_ReleaseCalendarPlanned
+    CMD_ApproveRelease --> EVT_ReleaseApproved
+    CMD_ApproveRelease --> EVT_ApprovalRefused
+    ACT_User --> CMD_WithdrawApproval
+    CMD_WithdrawApproval --> EVT_ApprovalWithdrawn
+    ACT_StageRunner --> CMD_CheckRelease
+    CMD_CheckRelease --> EVT_ReleaseChecked
     EVT_StageCompleted --> POL_RunNextStage
     EVT_StageSkipped --> POL_RunNextStage
     POL_RunNextStage --> CMD_StartStage
@@ -421,6 +475,9 @@ flowchart LR
     POL_ImportFinishedCharacters --> CMD_ImportCharacters
     EVT_ProjectCreated --> POL_LinkNewProjectMedia
     POL_LinkNewProjectMedia --> CMD_LinkProjectMedia
+    EVT_LiveUrlRecorded --> POL_RefreshAfterStatusChange
+    EVT_ReleaseApproved --> POL_RefreshAfterStatusChange
+    POL_RefreshAfterStatusChange --> CMD_BuildReleasePackage
     EVT_StageStarted -.-> RM_Status
     EVT_StageCompleted -.-> RM_Status
     EVT_StageFailed -.-> RM_Status
@@ -550,6 +607,26 @@ flowchart LR
     EVT_DeterminismChecked -.-> RM_RenderChecks
     RM_RenderChecks -.-> ACT_StageRunner
     RM_RenderChecks -.-> ACT_User
+    EVT_ReleasePackageBuilt -.-> RM_ReleaseBoard
+    EVT_ReleaseCalendarPlanned -.-> RM_ReleaseBoard
+    EVT_UploadDataWritten -.-> RM_ReleaseBoard
+    EVT_CalendarEventMarkedDone -.-> RM_ReleaseBoard
+    EVT_LiveUrlRecorded -.-> RM_ReleaseBoard
+    EVT_ReleaseApproved -.-> RM_ReleaseBoard
+    EVT_ApprovalWithdrawn -.-> RM_ReleaseBoard
+    RM_ReleaseBoard -.-> ACT_User
+    EVT_ReleaseCalendarPlanned -.-> RM_WorkspaceReleaseCalendar
+    EVT_CalendarEventMarkedDone -.-> RM_WorkspaceReleaseCalendar
+    RM_WorkspaceReleaseCalendar -.-> ACT_User
+    EVT_ReleasePackageBuilt -.-> RM_ReleaseChecks
+    EVT_ReleaseChecked -.-> RM_ReleaseChecks
+    RM_ReleaseChecks -.-> ACT_StageRunner
+    RM_ReleaseChecks -.-> ACT_User
+    EVT_UploadTextRendered -.-> RM_UploadText
+    RM_UploadText -.-> ACT_User
+    EVT_ReleasePackageBuilt -.-> RM_MicrositeSong
+    EVT_LiveUrlRecorded -.-> RM_MicrositeSong
+    RM_MicrositeSong -.-> EXT_Microsite
     classDef evt fill:#a3391f,stroke:#e65100,color:#fff
     classDef cmd fill:#64b5f6,stroke:#0d47a1,color:#000
     classDef pol fill:#ce93d8,stroke:#4a148c,color:#000
@@ -937,6 +1014,49 @@ flowchart LR
     classDef hs fill:#e57373,stroke:#b71c1c,color:#fff
 ```
 
+### From the upload data to a release ticked off on the board
+
+```mermaid
+flowchart LR
+    ACT_StageRunner(["Stage runner"]):::act
+    CMD_WriteUploadData["Write the upload data"]:::cmd
+    EVT_UploadDataWritten["Upload data written"]:::evt
+    CMD_BuildReleasePackage["Build the release package"]:::cmd
+    EVT_ReleaseCalendarPlanned["⭐ Release calendar planned"]:::evt
+    EVT_ReleasePackageBuilt["⭐ Release package built"]:::evt
+    CMD_CheckRelease["Check the release package"]:::cmd
+    EVT_ReleaseChecked["Release checked"]:::evt
+    RM_ReleaseBoard[("Release board")]:::rm
+    ACT_User(["User"]):::act
+    CMD_MarkCalendarEventDone["Mark a calendar event done"]:::cmd
+    EVT_CalendarEventMarkedDone["Calendar event marked done"]:::evt
+    CMD_RecordLiveUrl["Record a live URL"]:::cmd
+    EVT_LiveUrlRecorded["Live URL recorded"]:::evt
+    POL_RefreshAfterStatusChange{{"The release folder follows a live URL and an approval"}}:::pol
+    ACT_StageRunner --> CMD_WriteUploadData
+    CMD_WriteUploadData --> EVT_UploadDataWritten
+    EVT_UploadDataWritten --> CMD_BuildReleasePackage
+    CMD_BuildReleasePackage --> EVT_ReleaseCalendarPlanned
+    EVT_ReleaseCalendarPlanned --> EVT_ReleasePackageBuilt
+    EVT_ReleasePackageBuilt --> CMD_CheckRelease
+    CMD_CheckRelease --> EVT_ReleaseChecked
+    EVT_ReleaseChecked --> RM_ReleaseBoard
+    RM_ReleaseBoard --> ACT_User
+    ACT_User --> CMD_MarkCalendarEventDone
+    CMD_MarkCalendarEventDone --> EVT_CalendarEventMarkedDone
+    EVT_CalendarEventMarkedDone --> CMD_RecordLiveUrl
+    CMD_RecordLiveUrl --> EVT_LiveUrlRecorded
+    EVT_LiveUrlRecorded --> POL_RefreshAfterStatusChange
+    classDef evt fill:#a3391f,stroke:#e65100,color:#fff
+    classDef cmd fill:#64b5f6,stroke:#0d47a1,color:#000
+    classDef pol fill:#ce93d8,stroke:#4a148c,color:#000
+    classDef rm fill:#81c784,stroke:#1b5e20,color:#000
+    classDef act fill:#a3751f,stroke:#f57f17,color:#000
+    classDef ext fill:#f48fb1,stroke:#880e4f,color:#000
+    classDef agg fill:#ffe082,stroke:#ff6f00,color:#000
+    classDef hs fill:#e57373,stroke:#b71c1c,color:#fff
+```
+
 ## Bounded Contexts & Aggregates
 
 | Context | Purpose | Aggregates | Events |
@@ -951,6 +1071,7 @@ flowchart LR
 | Bibles (`BC-Bibles`) | Holds what a production must look and sound like before any shot is generated – the style bible, the character bible with its character states, the set bible with plates and prop references, and the user references – per music video, or once per series canon that every episode reads and may only add to | Style bible, Character bible, Set bible, User references | Style bible written, Character bible written, Character state added, Set bible written, Plate added, Prop reference added, User reference added, User reference updated, User reference removed, Library character used |
 | Character library (`BC-CharacterLibrary`) | Keeps the workspace's reusable characters across productions – takes the characters of finished character bibles in and copies a character's identity, and the states the user chooses, into a new music video or series canon | Library character | Library character created, Library character extended, Library character updated, Library file added, Library file removed, Library character deleted, Library character use refused |
 | Render (`BC-Render`) | Turns a validated project into its videos and images – a render per format from one composition, previews for checks, Shorts cut from the 9:16 render, and composed images (thumbnails, covers, feed images) from a generated image and the style bible – and keeps a project's media in the media directory | Render, Short, Composed image | Preview rendered, Passage rendered, Format rendered, Still rendered, Render failed, Short cut, Short refused, Image composed, Image composition refused, Project media linked, Determinism checked |
+| Release (`BC-Release`) | Turns a finished project into everything its release needs – the release folder with its manifest, the platform texts laid out and checked against the limits, the release calendar planned across the workspace, and the release board where the user ticks off what went live and gives the one release approval | Release package, Release calendar, Release status | Upload data written, Release package built, Release rules broken, Upload text rendered, Release calendar planned, Release day fixed, Calendar event marked done, Live URL recorded, Release approved, Approval withdrawn, Approval refused, Release checked |
 
 ## Aggregates
 
@@ -976,3 +1097,6 @@ flowchart LR
 | Render (`AGG-Render`) | Render | as-is | one file per format and variant, renders/[preview-]<format>[.en].mp4, written whole – rendered in segments under .cache/render/, joined, the song muxed once, and only then copied over the old file (packages/cli/src/render.ts:182-184,293-445)<br>a whole render of a format – not a preview, not --frames, not --out – is recorded in state.json artifacts as render:<file>:inputs (the hash of the props, the song's bytes and crf 18) and render:<file>:sha256 (render.ts:267-291,431-433); release renders a format again when it is missing or its recorded inputs hash differs from the current one (packages/cli/src/release.ts:237-262) |
 | Short (`AGG-Short`) | Render | as-is | renders/shorts/<name>-9x16.mp4, cut whole by short from renders/9x16.mp4 with one ffmpeg re-encode – crf 18, a 0.15 s fade-in and a 0.4 s fade-out (packages/cli/src/short.ts:22-24,132-175,200-233); its thumbnail and TikTok cover lie beside it as <name>-thumb.jpg and <name>-tiktok.jpg (packages/cli/src/release-files.ts:26-34) |
 | Composed image (`AGG-ComposedImage`) | Render | as-is | one JPEG and its recipe <name>.recipe.json beside it, written by thumbnail in one run – a Remotion still of the Thumbnail composition, encoded at falling JPEG quality until it fits the limit, then the recipe (packages/cli/src/thumbnail.ts:183-217; packages/cli/src/thumbnail-recipe.ts:35-58)<br>five formats with fixed sizes and limits – 16x9 1280x720, 9x16 1080x1920, 3x4 1080x1440, 4x5 1080x1350, 1x1 3000x3000; under 2 MB, under 10 MB for 1x1 (packages/remotion/src/lib/thumbnail.ts:12-18,60-66) |
+| Release package (`AGG-ReleasePackage`) | Release | as-is | renders/release/ with manifest.json, written last by buildRelease – every file placed (hardlink or copy), generated or composed by a ReleaseWriter that records size, SHA-256, specification and source (packages/cli/src/release.ts:132-175,207-447; packages/core/src/schema.ts:1268-1311)<br>review/upload.yaml, the upload data the agent writes and every layout, check and publish reads (schema.ts:796-926; workspace/.claude/skills/video-qa/release.md §7) |
+| Release calendar (`AGG-ReleaseCalendar`) | Release | as-is | review/calendar.yaml, one per project, written whole by planCalendar from buildCalendar, which reads the workspace's release schedule and every other project's calendar (packages/cli/src/release-calendar.ts:49-57,94-110; packages/core/src/calendar.ts:133-225; schema.ts:1033-1055) |
+| Release status (`AGG-ReleaseStatus`) | Release | as-is | review/release-status.json, written by updateStatus and writeStatus under the project's release lock review/.release.lock (packages/cli/src/release-calendar.ts:28-31,118-142; packages/cli/src/release-autopilot.ts:52-58,66-89; schema.ts:1058-1085) |

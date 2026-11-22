@@ -55,6 +55,12 @@ external_systems:
   - id: EXT-Remotion
     name: Remotion and headless Chrome
     description: Renders the MusicVideo and Thumbnail compositions frame by frame in a headless Chrome; pinned to one exact version (package.json), installed with the workspace, the browser fetched with npx remotion browser ensure (ADR 0007)
+  - id: EXT-Microsite
+    name: Artist microsite
+    description: The artist's own website, built elsewhere; it builds a song's page from renders/release/microsite/<slug>.json (ADR 0028)
+  - id: EXT-Distributor
+    name: Distributor
+    description: The service that delivers a song to streaming stores, such as DistroKid; its upload stays manual, from the release folder and texts/spotify.md (ADR 0024)
 
 bounded_contexts:
   - id: BC-Pipeline
@@ -87,6 +93,9 @@ bounded_contexts:
   - id: BC-Render
     name: Render
     purpose: Turns a validated project into its videos and images – a render per format from one composition, previews for checks, Shorts cut from the 9:16 render, and composed images (thumbnails, covers, feed images) from a generated image and the style bible – and keeps a project's media in the media directory
+  - id: BC-Release
+    name: Release
+    purpose: Turns a finished project into everything its release needs – the release folder with its manifest, the platform texts laid out and checked against the limits, the release calendar planned across the workspace, and the release board where the user ticks off what went live and gives the one release approval
 
 aggregates:
   - id: AGG-Project
@@ -372,6 +381,50 @@ aggregates:
       - The same image, text and options give the same pixels on the same machine with the pinned Remotion version (the code does this as far as the browser's font measurement is stable, packages/remotion/src/Thumbnail.tsx:28-89; tests/thumbnail-render.test.ts, opt-in)
       - Every composed image has its recipe, so release can compose more images from the same source (the code does this, thumbnail.ts:213; release.ts reads it)
       - It reads at a quarter of its size, a cover at 64 px – the art director judges this, no code checks it (decided 2026-11-22, HS-152)
+  - id: AGG-ReleasePackage
+    name: Release package
+    context: BC-Release
+    status: as-is
+    evidence:
+      - renders/release/ with manifest.json, written last by buildRelease – every file placed (hardlink or copy), generated or composed by a ReleaseWriter that records size, SHA-256, specification and source (packages/cli/src/release.ts:132-175,207-447; packages/core/src/schema.ts:1268-1311)
+      - review/upload.yaml, the upload data the agent writes and every layout, check and publish reads (schema.ts:796-926; workspace/.claude/skills/video-qa/release.md §7)
+    invariants:
+      - Every file a run writes is in the manifest with size, hash, specification and source; a file an earlier run wrote and this run did not is removed, anything else in the folder is left alone (the code does this, release.ts:146-175,433-437)
+      - Each format in the folder is the current recorded render of that format – a missing or stale one is rendered again first (the code does this, release.ts:237-269; when a render is current is the render slice's rule, HS-147)
+      - A file is never removed from the folder because a run could not refresh it – a run that skips a stale format or a dated image keeps the earlier copy and reports a TODO (decided 2026-11-22, HS-167; the board's refresh unlinks it – gap register)
+      - Release facts are never invented – a missing fact is a TODO; the channel's release defaults fill gaps and the project wins (the code does this, packages/core/src/release.ts:187-259)
+      - A TODO never fails the package or QA; a broken platform limit or invalid chapters is an error (the code does this, release.ts:223-225,570-572; packages/cli/src/release-qa.ts:50-55)
+      - Assembly is idempotent – the same inputs leave the folder untouched (the code does this, release.ts:146-170; tests/release-folder.test.ts "is idempotent")
+      - The release command and QA apply the same checks to the same texts – limits, chapters, the description's bytes, every text file written (decided 2026-11-22, HS-172; QA misses chapters, bytes and linkedin.md – gap register)
+  - id: AGG-ReleaseCalendar
+    name: Release calendar
+    context: BC-Release
+    status: as-is
+    evidence:
+      - review/calendar.yaml, one per project, written whole by planCalendar from buildCalendar, which reads the workspace's release schedule and every other project's calendar (packages/cli/src/release-calendar.ts:49-57,94-110; packages/core/src/calendar.ts:133-225; schema.ts:1033-1055)
+    invariants:
+      - The user's release day wins; without it the calendar proposes the first release weekday at least lead_days ahead, min_gap_weeks from every other release and booked release day, never on a skip day (the code does this, calendar.ts:119-142)
+      - A proposed release day stays the project's release day until the user moves it – the user fixes it on the board without approving the autopilot (decided 2026-11-22, HS-165; only the approval fixes it, and --replan or another project's date can move it – gap register)
+      - A release day the user sets that collides with another release, lies on a skip day or is under the lead time is reported, not refused (decided 2026-11-22, HS-170; accepted silently – gap register)
+      - One Short per slot day across all projects, at most per_song_per_week of one song in a week, never before today (the code does this, calendar.ts:186-219)
+      - Times the user moved by hand are kept while the release day stays; a new release day or --replan plans every event again (the code does this, calendar.ts:136,143-144; HS-171)
+      - A step before or after the release day that lands on a skip day moves away from the release day (the code does this, calendar.ts:146-151)
+      - Every event has a stable id, a time with its offset, a platform, a step and an item, sorted by time, then step order, then id (the code does this, calendar.ts:84,152-224)
+  - id: AGG-ReleaseStatus
+    name: Release status
+    context: BC-Release
+    status: as-is
+    evidence:
+      - review/release-status.json, written by updateStatus and writeStatus under the project's release lock review/.release.lock (packages/cli/src/release-calendar.ts:28-31,118-142; packages/cli/src/release-autopilot.ts:52-58,66-89; schema.ts:1058-1085)
+    invariants:
+      - An item belongs to one calendar event, or to one checklist line of it named by its content, never by its position (decided 2026-11-22, HS-179; checklist lines are keyed <event>#<index> – gap register)
+      - A done mark records when and by whom – the user or the autopilot (decided 2026-11-22, HS-179; calendar --done-until records no one – gap register)
+      - A live URL starts with http:// or https:// (the code does this, packages/cli/src/release-board.ts:444)
+      - Done marks are facts – they survive a new release day and a withdrawn approval (the code does this, release-calendar.ts:127-142; release-autopilot.ts:84-88; HS-171)
+      - An approval holds for the release day it names only; when the day moves, the user approves again (the code does this, packages/core/src/autopilot.ts:142-144), and everything that reads the approval uses this rule (decided 2026-11-22, HS-169; the production view counts any approval – gap register)
+      - An approval covers the release day, not the content – texts, times and files may still change after it (the code does this, autopilot.ts:142-144; HS-168)
+      - An approval needs a release folder, upload data and a calendar, wherever it is given (decided 2026-11-22, HS-168; only the board's button checks – gap register)
+      - Every write takes the project's release lock (the code does this, release-calendar.ts:30,118-142)
 
 events:
   - id: EVT-ProjectCreated
@@ -783,6 +836,69 @@ events:
     context: BC-Render
     data: [Frame, First hash, Second hash, Result]
     description: "qa --determinism <frame>: two stills of one frame at scale 0.25 from one bundle, compared by SHA-256; without the flag QA reports N/A (packages/cli/src/qa.ts:383-417)"
+  - id: EVT-UploadDataWritten
+    name: Upload data written
+    aggregate: AGG-ReleasePackage
+    data: [Project, Language, Main video, Shorts, Instagram post, Spotify, Announcement, X, LinkedIn decision, Microsite]
+    description: "The agent writes review/upload.yaml in qa-export (video-qa release.md §7) or in release-backfill; the hook validates it on every edit (workspace/.claude/hooks/validate-artifacts.mjs:24-27)"
+  - id: EVT-ReleasePackageBuilt
+    name: Release package built
+    aggregate: AGG-ReleasePackage
+    pivotal: true
+    data: [Project, Files, TODOs, Warnings, Generated at]
+    description: "release writes renders/release/ – video, subtitles, thumbnails, Shorts, the song as WAV, cover, canvas, lyrics, announcement and feed images, calendar.ics, the microsite data, texts/, README.md – and manifest.json last (packages/cli/src/release.ts:207-447)"
+  - id: EVT-ReleaseRulesBroken
+    name: Release rules broken
+    aggregate: AGG-ReleasePackage
+    data: [Project, Errors]
+    description: "A broken platform limit, invalid chapters or a YouTube description over its bytes: release writes the whole folder and manifest, then fails with the list (release.ts:378-382,428-429,570-572)"
+  - id: EVT-UploadTextRendered
+    name: Upload text rendered
+    context: BC-Release
+    data: [Project, Main video, Shorts]
+    description: "upload-text renders review/upload.md from the upload data, in the project's language (packages/cli/src/upload-text.ts:148-155)"
+  - id: EVT-ReleaseCalendarPlanned
+    name: Release calendar planned
+    aggregate: AGG-ReleaseCalendar
+    pivotal: true
+    data: [Project, Release day, Proposed, Time zone, Events]
+    description: "review/calendar.yaml, planned by release, calendar [--replan] and an approval of a proposed day (release-calendar.ts:94-110); the release folder gets texts/release-plan.md and calendar.ics with it"
+  - id: EVT-ReleaseDayFixed
+    name: Release day fixed
+    aggregate: AGG-ReleaseCalendar
+    data: [Project, Release day]
+    description: "release.release_date written into project.yaml, comments kept – today only by the approval of a proposed day (packages/cli/src/release-autopilot.ts:74-76,91-98); the user may also write it by hand"
+  - id: EVT-CalendarEventMarkedDone
+    name: Calendar event marked done
+    aggregate: AGG-ReleaseStatus
+    data: [Event, Done, At, By]
+    description: "The board's checkbox per post and per checklist line, the autopilot after a post, and calendar --done-until for a song already published (release-calendar.ts:118-142,175-183)"
+  - id: EVT-LiveUrlRecorded
+    name: Live URL recorded
+    aggregate: AGG-ReleaseStatus
+    data: [Event, URL]
+    description: "The board's live-URL field per post; an empty value removes it (release-board.ts:438-451)"
+  - id: EVT-ReleaseApproved
+    name: Release approved
+    aggregate: AGG-ReleaseStatus
+    pivotal: true
+    data: [Project, Release day, At]
+    description: "approval {at, release_date} in review/release-status.json, from the board's Approve release or release-approve (release-autopilot.ts:66-82); the release autopilot (publish slice) acts on it"
+  - id: EVT-ApprovalWithdrawn
+    name: Approval withdrawn
+    aggregate: AGG-ReleaseStatus
+    data: [Project]
+    description: "The board's Withdraw approval or release-approve --revoke deletes the approval and keeps the done marks (release-autopilot.ts:84-89)"
+  - id: EVT-ApprovalRefused
+    name: Approval refused
+    context: BC-Release
+    data: [Project, Reason]
+    description: "No calendar, or a release day that differs from the calendar's (reload the board) (release-autopilot.ts:66-73)"
+  - id: EVT-ReleaseChecked
+    name: Release checked
+    context: BC-Release
+    data: [Project, Package, Files, Formats, Thumbnails, Shorts, Audio, Cover, Canvas, Lyrics, Texts, Metadata]
+    description: "qa's release checks in review/report.md: PASS, FAIL, WARN, TODO or N/A; one TODO before release ran (packages/cli/src/release-qa.ts:56-231; packages/cli/src/qa.ts:177-221,379-381)"
 
 commands:
   - id: CMD-CreateProject
@@ -1341,6 +1457,79 @@ commands:
     rules:
       - Determinism holds on one machine with the pinned Remotion version; it is not promised across machines (decided 2026-11-22, HS-151)
       - Every QA pass runs the check (decided 2026-11-22, HS-151; only with the flag today – gap register)
+  - id: CMD-WriteUploadData
+    name: Write the upload data
+    actor: ACT-StageRunner
+    aggregate: AGG-ReleasePackage
+    produces: [EVT-UploadDataWritten]
+    description: "The agent writes review/upload.yaml in qa-export (video-qa release.md §7), or for an older song in release-backfill; the user takes the texts as they are (user, 2026-11-22)"
+    rules:
+      - Facts come only from the project – spend from state.json, models from the manifest, credits from song.json and the brief (skill rule, ADR 0019)
+      - The texts are in the project's language and the brief's tone, one per platform; the Instagram and TikTok captions differ (skill rule; the code refuses identical captions, packages/core/src/release.ts:307-309)
+      - The channel's hashtag sets are applied by the agent; no code reads them (skill rule, video-qa release.md:5,83; HS-181)
+      - The agent decides post or skip for LinkedIn with a reason from the song's theme (skill rule, ADR 0028)
+  - id: CMD-BuildReleasePackage
+    name: Build the release package
+    actor: ACT-StageRunner
+    aggregate: AGG-ReleasePackage
+    produces: [EVT-ReleasePackageBuilt, EVT-ReleaseRulesBroken, EVT-ReleaseCalendarPlanned]
+    description: "release <project> [--no-render] [--canvas-from <time>] [--canvas-seconds <n>] [--replan], in qa-export or by the user; the board runs it without renders and stills after a live URL or an approval (POL-RefreshAfterStatusChange) (packages/cli/src/index.ts:321-334; release.ts:207-447)"
+    rules:
+      - A missing or stale format is rendered first; with --no-render it is a TODO (the code does this, release.ts:254-261)
+      - The song goes into the folder as deliverable WAV (PCM, at least 44.1 kHz, stereo), converted once when it is not; more than 2 s of silence warns (the code does this, packages/cli/src/release-media.ts:108-192)
+      - The canvas is a silent 3–8 s loop from the 9:16 render near the first chorus without lyrics on screen, or a TODO (the code does this, packages/core/src/release.ts:130-165)
+      - The announcement, story and feed images are composed from the cover's recipe, again whenever the release day moves – by a full run only (the code does this, release.ts:455-549; HS-171)
+      - Text files are laid out from the upload data with chapters, footer, credits and links; a live URL reaches every text that points to the main video, in the folder and on the board alike (decided 2026-11-22, HS-166; only the board fields get it – gap register)
+      - The folder's files and the board's posts come from one layout of the release folder and one release context (decided 2026-11-22, HS-175; the layout is spelled in three files, the context twice – gap register)
+  - id: CMD-RenderUploadText
+    name: Render the upload text
+    actor: ACT-StageRunner
+    produces: [EVT-UploadTextRendered]
+    description: "upload-text <project>, after the upload data is written (video-qa release.md §8); review/upload.md is generated, never edited by hand"
+  - id: CMD-PlanReleaseCalendar
+    name: Plan the release calendar
+    actor: ACT-User
+    aggregate: AGG-ReleaseCalendar
+    produces: [EVT-ReleaseCalendarPlanned]
+    description: "calendar <project> [--replan] [--done-until <day|today>]; release plans it on every run as well (release-calendar.ts:145-188); the user takes the proposed day (user, 2026-11-22)"
+    rules:
+      - --replan drops every time the user moved and plans the events again (the code does this, calendar.ts:136)
+      - A replan never moves a proposed release day the distributor may already have – it stays until the user moves it (decided 2026-11-22, HS-165; --replan proposes again – gap register)
+  - id: CMD-MarkCalendarEventDone
+    name: Mark a calendar event done
+    actor: ACT-User
+    aggregate: AGG-ReleaseStatus
+    produces: [EVT-CalendarEventMarkedDone]
+    description: "The board's checkbox per post and per checklist line; calendar --done-until marks every event up to a day for a song already published (release-backfill). The user posts by hand and ticks off on the board (user, 2026-11-22)"
+  - id: CMD-RecordLiveUrl
+    name: Record a live URL
+    actor: ACT-User
+    aggregate: AGG-ReleaseStatus
+    produces: [EVT-LiveUrlRecorded]
+    description: "The board's live-URL field per post (release-board.ts:438-451)"
+  - id: CMD-ApproveRelease
+    name: Approve a release
+    actor: ACT-User
+    aggregate: AGG-ReleaseStatus
+    produces: [EVT-ReleaseDayFixed, EVT-ReleaseCalendarPlanned, EVT-ReleaseApproved, EVT-ApprovalRefused]
+    description: "The board's Approve release, or release-approve <project> (release-autopilot.ts:66-82; packages/cli/src/index.ts:421-437); stage runners, /video-next and agents never approve (ADR 0029)"
+    rules:
+      - A proposed release day is written into project.yaml first and the calendar planned again – the one place a tool writes the user's project.yaml (the code does this, release-autopilot.ts:74-76,91-98; HS-177)
+      - The day in the request must be the calendar's (the code does this, release-autopilot.ts:70-72)
+  - id: CMD-WithdrawApproval
+    name: Withdraw the approval
+    actor: ACT-User
+    aggregate: AGG-ReleaseStatus
+    produces: [EVT-ApprovalWithdrawn]
+    description: "The board's Withdraw approval, or release-approve <project> --revoke; what has not gone out stays (release-autopilot.ts:84-89)"
+  - id: CMD-CheckRelease
+    name: Check the release package
+    actor: ACT-StageRunner
+    produces: [EVT-ReleaseChecked]
+    description: "qa <project> in qa-export, beside the render checks (qa.ts:379-381; release-qa.ts:56)"
+    rules:
+      - A file whose hash differs from the manifest, a format that is not the current render, a bad WAV, cover or canvas, section tags in lyrics.txt, a missing text file, a broken limit, or an unmarked <ID> fails (the code does this, release-qa.ts:80-221)
+      - A gap only the user can close is a TODO, in the release checks and in the upload checks alike; WARN is only for advice (decided 2026-11-22, HS-172; Upload text and Upload data use WARN – gap register)
 
 policies:
   - id: POL-RunNextStage
@@ -1402,6 +1591,11 @@ policies:
     when: [EVT-ProjectCreated]
     then: [CMD-LinkProjectMedia]
     description: "createProject links assets/ and renders/ when CORESLOPPER_MEDIA_DIR is set, for a music video and an episode (packages/cli/src/new-project.ts:182-186); new-series does not (HS-154)"
+  - id: POL-RefreshAfterStatusChange
+    name: The release folder follows a live URL and an approval
+    when: [EVT-LiveUrlRecorded, EVT-ReleaseApproved]
+    then: [CMD-BuildReleasePackage]
+    description: "The board runs release in the background without renders and new stills, one at a time per project in its process (packages/cli/src/release-board.ts:37-40,158-167,448-462); a stale format or a changed dated image then leaves the folder (HS-167)"
 
 read_models:
   - id: RM-Status
@@ -1543,6 +1737,36 @@ read_models:
     used_by: [ACT-StageRunner, ACT-User]
     fields: [Master render, Formats, Thumbnails, Shorts, Short thumbnails, Determinism]
     description: "qa's render checks in review/report.md: the master exists (FAIL), each derivative exists (WARN), three valid 1280x720 JPEGs in renders/thumbnails/, three Shorts of at most 60 s with a 9x16 thumbnail, and determinism (packages/cli/src/qa.ts:107-174,350-417); none checks that a render is current (HS-147)"
+  - id: RM-ReleaseBoard
+    name: Release board
+    fed_by: [EVT-ReleasePackageBuilt, EVT-ReleaseCalendarPlanned, EVT-UploadDataWritten, EVT-CalendarEventMarkedDone, EVT-LiveUrlRecorded, EVT-ReleaseApproved, EVT-ApprovalWithdrawn]
+    used_by: [ACT-User]
+    fields: [Platform, Post, Files, Texts, Limits, Settings, Target, Checklist, Done, Live URL, Approval, Approval stale, Blockers]
+    description: "boardProject per project with a release folder or a calendar: per platform the posts with their files, the texts to copy with live counters, the settings and checklists, the done marks and live URLs, the approval and its blockers (packages/cli/src/release-board-data.ts:432-703); the user's way to release (user, 2026-11-22). A broken upload.yaml shows as no texts (HS-173)"
+  - id: RM-WorkspaceReleaseCalendar
+    name: Workspace release calendar
+    fed_by: [EVT-ReleaseCalendarPlanned, EVT-CalendarEventMarkedDone]
+    used_by: [ACT-User]
+    fields: [Project, Event, Time, Platform, Step, Done]
+    description: "/api/calendar and /calendar.ics over every project, and per project texts/release-plan.md and calendar.ics in the release folder (release-board.ts:477-500; packages/core/src/calendar.ts:231-248)"
+  - id: RM-ReleaseChecks
+    name: Release checks
+    fed_by: [EVT-ReleasePackageBuilt, EVT-ReleaseChecked]
+    used_by: [ACT-StageRunner, ACT-User]
+    fields: [Release package, Release files, Release formats, Release thumbnails, Release Shorts, Release audio, Release cover, Release canvas, Release lyrics, Release texts, Release metadata, Upload text, Upload data]
+    description: "The release rows of review/report.md; only FAIL blocks READY (release-qa.ts:56-231; qa.ts:419-421)"
+  - id: RM-UploadText
+    name: Upload text
+    fed_by: [EVT-UploadTextRendered]
+    used_by: [ACT-User]
+    fields: [Main video, Shorts, Title, Description, Tags, Hashtags, Checklist]
+    description: "review/upload.md, the main video and the Shorts for people, with a pointer to the release folder (packages/cli/src/upload-text.ts:45-143)"
+  - id: RM-MicrositeSong
+    name: Microsite song
+    fed_by: [EVT-ReleasePackageBuilt, EVT-LiveUrlRecorded]
+    used_by: [EXT-Microsite]
+    fields: [Slug, Artist, Title, Language, Release day, Teaser, Text, Quote, Lyrics, Images, Links, Shorts, Profiles, Disclosure, Credits]
+    description: "renders/release/microsite/<slug>.json, written when the upload data has a microsite block (packages/cli/src/release-microsite.ts:8-77; release.ts:416-420); the user wants the microsite (user, 2026-11-22). It is a published language with no schema (HS-178)"
 
 hotspots:
   - id: HS-1
@@ -2350,6 +2574,111 @@ hotspots:
     refs: [BC-Render]
     status: resolved
     resolution: "ADR 0044 (proposed) records one composition for every format, derivatives re-rendered with focus points, the render record and when a render is current, previews never recorded, Shorts cut from the current 9:16 render, one command for every composed image with its recipe, determinism per machine and version, and the media directory; it amends 0007 and 0018 (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-162
+    question: "Where does the release slice end? The approval is written in release-autopilot.ts, read by the autopilot's plan and by the board's production view; publish, the post adapters, the timer and the watchdog use the release folder and the calendar."
+    refs: [BC-Release]
+    status: resolved
+    resolution: "One context, Release: the release folder and its manifest, the upload data and texts, the release checks, the release schedule and calendar, the release board, the done marks, live URLs and the approval. The release autopilot that acts on an approval, publish, the post adapters, the timer and the watchdog belong to the publish slice (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-163
+    question: "Which consistency boundaries does the code show for the release?"
+    refs: [AGG-ReleasePackage, AGG-ReleaseCalendar, AGG-ReleaseStatus]
+    status: resolved
+    resolution: "Three as-is aggregates, one file each: the release package (renders/release/ and manifest.json, with upload.yaml as its input), the release calendar (review/calendar.yaml) and the release status (review/release-status.json with the done marks, live URLs and the approval) (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-164
+    question: "The code says event, step, post, task, item, done, posted, live, approval, proposed, upload package, release plan. Which are terms?"
+    refs: [BC-Release]
+    status: resolved
+    resolution: "New: Calendar Event (with a step and an item), Proposed Release Day, Done Mark, Live URL, Release Status, Release Manifest. 'Post' and 'task' stay UI words for a board card; 'upload package' is avoided (Release Package); 'release plan' names only texts/release-plan.md. Sharpened: Release Approval (one release day, not the content), Upload Text (main video and Shorts), Announcement (a full release composes it again), TODO (QA's word for a user gap) (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-165
+    question: "A proposed release day becomes the project's day only through the approval. The user takes the calendar's proposal and posts by hand without approving, so the day stays a proposal and a TODO – also at T−21, when the distributor gets it – and --replan or another project's date can still move it. Rule?"
+    refs: [AGG-ReleaseCalendar, CMD-PlanReleaseCalendar]
+    status: resolved
+    resolution: "The user fixes the proposed day on the board without approving the autopilot (it writes release.release_date like the approval does); until then the board says the distributor step needs a fixed day, and a replan keeps a proposed day while no other release holds it. Gap, high – the user releases by hand and takes the proposed day (user, 2026-11-22) (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-166
+    question: "ADR 0028 says the live YouTube URL replaces the link slot in the X and LinkedIn texts; only the board fields and the microsite data get it, texts/x.md and texts/linkedin.md keep the slot. Rule?"
+    refs: [CMD-BuildReleasePackage]
+    status: resolved
+    resolution: "Every text that points to the main video gets the live URL, in the folder and on the board, from one layout. Gap, medium – the user copies from the board, where the URL is already right (user, 2026-11-22) (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-167
+    question: "The board's background release runs without renders and stills. A stale format or a changed dated image is skipped, and the clean-up then deletes the earlier video or image from the release folder (release.ts:255-258,433-437,497-502). Rule?"
+    refs: [AGG-ReleasePackage, POL-RefreshAfterStatusChange]
+    status: resolved
+    resolution: "A run never removes a file because it could not refresh it: it keeps the earlier copy in the folder and the manifest and reports the TODO. Gap, high – entering a live URL on the board, the user's way to release, can take the video out of the folder they upload from (user, 2026-11-22) (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-168
+    question: "The board disables Approve release without a release folder, upload data or a calendar; the API and release-approve approve anyway. And does an approval cover the content at that moment?"
+    refs: [AGG-ReleaseStatus, CMD-ApproveRelease]
+    status: resolved
+    resolution: "The approval checks the same blockers wherever it is given. It covers the release day, not the content: texts, times and files may change after it, as now. Gap, low – the user does not approve yet (user, 2026-11-22) (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-169
+    question: "The production view counts any approval as approved (Boolean(status.approval)), while the autopilot and the release board count only an approval of the current day. Rule?"
+    refs: [AGG-ReleaseStatus]
+    status: resolved
+    resolution: "One rule, approvalHolds, everywhere the approval is read. Gap, low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-170
+    question: "A release day the user sets is never checked against other releases, skip days or the lead time; two songs can share a Friday. Rule?"
+    refs: [AGG-ReleaseCalendar]
+    status: resolved
+    resolution: "The user's day wins, as now, but a collision, a skip day or a short lead is reported as a TODO on the board and by release. Gap, low – the user takes the proposed day (user, 2026-11-22) (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-171
+    question: "ADR 0028 says times in the calendar are kept so the user may move an event; they are kept only while the release day stays. Done marks survive a new day. The board's refresh drops dated images instead of composing them again. Intended?"
+    refs: [AGG-ReleaseCalendar, AGG-ReleaseStatus]
+    status: resolved
+    resolution: "Intended: a new release day plans every event again; done marks are facts and stay; a full release composes the dated images again. Only the texts that say otherwise are a gap (text fix) (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-172
+    question: "release errors on invalid chapters and a YouTube description over 5000 bytes, QA does not check them; QA never checks linkedin.md or the 15-hashtag YouTube limit; the upload checks call a missing item WARN, the release checks TODO. Rule?"
+    refs: [AGG-ReleasePackage, CMD-CheckRelease]
+    status: resolved
+    resolution: "One set of checks for the release command and QA, from one function; a gap only the user can close is a TODO everywhere, WARN is advice. Gap, medium – the user takes the texts as they are, so a broken limit goes straight to the platform (user, 2026-11-22) (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-173
+    question: "The board reads upload.yaml with .catch(() => undefined): a broken file shows as no texts, without an error. Rule?"
+    refs: [RM-ReleaseBoard]
+    status: resolved
+    resolution: "The board shows the validation error instead of empty texts. Gap, medium – the user copies the texts from the board (user, 2026-11-22) (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-174
+    question: "The status takes the release lock; the release folder, manifest.json and calendar.yaml take none. The board serializes its refreshes only in its own process; approveRelease writes project.yaml, the calendar and the status in three steps; a holder over 60 s loses the file lock; projects planned at once can take one slot. Rule?"
+    refs: [AGG-ReleasePackage, AGG-ReleaseCalendar]
+    status: resolved
+    resolution: "Building the package and planning the calendar take the project's release lock (one that a long holder keeps), and the approval runs under it in one step; the workspace's calendars are planned one at a time. Gap, low – one user, one board (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-175
+    question: "Logic exists twice or three times: the release context (language chain, identity, defaults) in release.ts and release-board-data.ts; the folder layout in the writer, the board's file regexes and QA; chapters checked in release, not on the board; the X link counting, the hashtag count, the AI-share rule, the section-tag pattern, the text-file list; buildRelease and QA find the workspace from the working directory, not the board's root. Rule?"
+    refs: [CMD-BuildReleasePackage]
+    status: resolved
+    resolution: "One source each: one release context, one folder layout, one set of counting rules, the workspace root passed in. Gap, low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-176
+    question: "Upstream ships German jurisdiction notes (Impressum, § 5 DDG) in both languages, a de/en switch in five places, a German channel example, a Berlin ISRC example and time-zone comment, and tests pinned to Europe/Berlin and German. The upstream repository stays generic. Rule?"
+    refs: [BC-Release]
+    status: resolved
+    resolution: "English is the one built-in language and other languages are data; jurisdiction notes come from the channel config, not the code; examples are neutral; the tests do not assume one time zone or language. Gap, medium – the repository is the workflow others fork (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-177
+    question: "The conventions say a tool never replaces a user-owned file such as project.yaml; the approval writes release.release_date into it. Exception?"
+    refs: [CMD-ApproveRelease]
+    status: resolved
+    resolution: "A recorded exception: fixing the release day writes only release.release_date into project.yaml, keeping comments, under the release lock. The conventions say so now (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-178
+    question: "The microsite data is read by a site built elsewhere but has no schema (a TypeScript interface only); the autopilot writes a second copy; its release_date falls back to the proposed day. Rule?"
+    refs: [RM-MicrositeSong]
+    status: resolved
+    resolution: "The microsite data is a published language: a versioned schema in core, one producer (release; the autopilot copies the file), and a release day only once it is fixed. Gap, medium – the user wants the microsite (user, 2026-11-22) (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-179
+    question: "The board keys a checklist line by its position (<event>#<index>), so ticks move when a line appears or goes; calendar --done-until stores no 'by'. Rule?"
+    refs: [AGG-ReleaseStatus]
+    status: resolved
+    resolution: "A checklist line is keyed by a stable name, and every done mark says who set it (--done-until: the user). Gap, low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-180
+    question: "Texts drifted: ADR 0019 (a missing package is a WARN), ADR 0028 (kept times, never colliding, the live URL in the files), docs/architecture.md (the board's only write is the status), /video-next after the pipeline (publish --dry-run, not the board), video-qa release.md (the calendar planned first, a ✖ line per broken limit), the glossary's Upload Text and Announcement. Fix?"
+    refs: [BC-Release]
+    status: resolved
+    resolution: "Yes, as one text fix; the accepted ADRs stay and ADR 0045 amends them. /video-next sends the user to the release board. Gap, medium – the board is the user's way to release (user, 2026-11-22) (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-181
+    question: "No code reads hashtag_sets; episodes get no release-day TODO and English subtitles only; a release whose Spotify extras and announcement the user does not use. Intended?"
+    refs: [BC-Release]
+    status: resolved
+    resolution: "Hashtag sets stay a skill rule for the agent; English episode subtitles are intended (series slice); an episode gets the release-day TODO like a song (gap, low). Canvas, lyrics files, the pitch and the announcement stay product features; the user uses the distributor and the microsite, so their gaps rank low (user, 2026-11-22) (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-182
+    question: "Is the release package, calendar and board a decision worth recording beside ADRs 0019, 0024, 0028 and 0029?"
+    refs: [BC-Release]
+    status: resolved
+    resolution: "ADR 0045 (proposed) records the three records and who writes them, a release day fixed without the approval, a refresh that never removes a file, one set of checks for release and QA, the approval covering the day only, the microsite data as a published language, and English as the one built-in language; it amends 0019, 0024, 0028 and 0029 (recommendation, not reviewed by the user – delegated, 2026-11-22)"
 
 flows:
   - id: FLOW-AutonomousStage
@@ -2385,3 +2714,6 @@ flows:
   - id: FLOW-Render
     name: From the resolved storyboard to the videos and images of a release
     sequence: [ACT-StageRunner, CMD-RenderPreview, EVT-PreviewRendered, CMD-RenderFormat, EVT-FormatRendered, CMD-RenderStill, EVT-StillRendered, CMD-CheckDeterminism, EVT-DeterminismChecked, CMD-CutShort, EVT-ShortCut, CMD-ComposeImage, EVT-ImageComposed, RM-RenderChecks]
+  - id: FLOW-Release
+    name: From the upload data to a release ticked off on the board
+    sequence: [ACT-StageRunner, CMD-WriteUploadData, EVT-UploadDataWritten, CMD-BuildReleasePackage, EVT-ReleaseCalendarPlanned, EVT-ReleasePackageBuilt, CMD-CheckRelease, EVT-ReleaseChecked, RM-ReleaseBoard, ACT-User, CMD-MarkCalendarEventDone, EVT-CalendarEventMarkedDone, CMD-RecordLiveUrl, EVT-LiveUrlRecorded, POL-RefreshAfterStatusChange]

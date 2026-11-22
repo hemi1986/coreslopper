@@ -492,6 +492,53 @@ thumbnails and TikTok covers beside the Short, the cover at `renders/cover-3000x
 | Accent, font | a style-bible palette key or role (default `accent`); a typography key (default `display`) | no | EVT-ImageComposed |
 | Recipe | version 1 and every input above | yes | EVT-ImageComposed |
 
+### AGG-ReleasePackage – Release package (as-is)
+
+`renders/release/` and its `manifest.json` (`ReleaseManifestSchema`, `packages/core/src/schema.ts:1268-1311`),
+written by `buildRelease` (`packages/cli/src/release.ts:207-447`) from the renders, Shorts and composed images, the
+song, the effective timing, the `release:` block of `project.yaml`, `config/channel.yaml` and the upload data
+`review/upload.yaml` (`UploadDataSchema`, `schema.ts:796-926`), which the agent writes.
+
+| Attribute | Type | Required | Source |
+|---|---|---|---|
+| File | path in the folder: `video/<slug>-<format>.mp4`, `video/<slug>.<lang>.srt`, `thumbnails/thumb-1..3.jpg`, `shorts/<name>-9x16.mp4` with `-thumb.jpg` and `-tiktok.jpg`; music only `audio/<Artist> - <Title>.wav`, `streaming/cover-3000x3000.jpg`, `canvas-9x16.mp4`, `lyrics.txt`, `lyrics.lrc`; `announce/`, `instagram/`, `calendar.ics`, `microsite/<slug>.json`, `texts/*.md`, `README.md` | yes | EVT-ReleasePackageBuilt |
+| Kind, bytes, SHA-256, specification, source | per file; the source relative to the project or `generated` | yes | EVT-ReleasePackageBuilt |
+| TODOs | the gaps only the user can close | yes | EVT-ReleasePackageBuilt |
+| Generated at | Timestamp | yes | EVT-ReleasePackageBuilt |
+| Upload data | per platform the texts of the main video and every Short, the Instagram post, Spotify, the announcement, X, LinkedIn (post or skip with a reason), the microsite | for the texts | EVT-UploadDataWritten |
+| Release metadata | artist, title, genres, language, explicit, release day, songwriters, producer, label, ISRC, AI credits (lyrics, music, vocals, instrumental: none \| partial \| full), AI tool, licence note; the channel's release defaults fill gaps | no (each missing one a TODO) | the user |
+
+**Not part of it**: errors and warnings of a run (printed, not stored). **Derived**: `review/upload.md`
+(EVT-UploadTextRendered), the release checks in `review/report.md` (EVT-ReleaseChecked), the microsite data
+(RM-MicrositeSong, no schema yet – HS-178).
+
+### AGG-ReleaseCalendar – Release calendar (as-is)
+
+`review/calendar.yaml` (`ReleaseCalendarSchema`, `schema.ts:1033-1055`), planned by `buildCalendar`
+(`packages/core/src/calendar.ts:133-225`) from `config/release-schedule.yaml` (`ReleaseScheduleSchema`,
+`schema.ts:935-1028`, optional, defaults built in) and every other project's calendar.
+
+| Attribute | Type | Required | Source |
+|---|---|---|---|
+| Project, title | the project's slug and title | yes | EVT-ReleaseCalendarPlanned |
+| Release day | Date; `release.release_date` of `project.yaml` when set (EVT-ReleaseDayFixed) | yes | EVT-ReleaseCalendarPlanned |
+| Proposed | whether the calendar picked the day (HS-165) | yes | EVT-ReleaseCalendarPlanned |
+| Time zone | the schedule's `timezone`, else the computer's | yes | EVT-ReleaseCalendarPlanned |
+| Event | id (`distributor`, `pitch`, `canvas`, `announce:<platform>`, `song`, `artist-pick`, `youtube`, `community`, `story`, `instagram-post`, `x`, `microsite`, `links`, `linkedin`, `short:<name>:<platform>`), time with offset, platform, step, item | yes | EVT-ReleaseCalendarPlanned |
+
+### AGG-ReleaseStatus – Release status (as-is)
+
+`review/release-status.json` (`ReleaseStatusSchema`, `schema.ts:1058-1085`), written under `review/.release.lock`
+(`packages/cli/src/release-calendar.ts:28-31,118-142`).
+
+| Attribute | Type | Required | Source |
+|---|---|---|---|
+| Item | per calendar event id, or `<event>#<index>` for a checklist line (HS-179) | – | EVT-CalendarEventMarkedDone |
+| Done, at, by | done mark; Timestamp; `user` \| `autopilot` (missing from `calendar --done-until`, HS-179) | done yes | EVT-CalendarEventMarkedDone |
+| Live URL | http or https | no | EVT-LiveUrlRecorded |
+| Manual | the user took the event over from the autopilot (publish slice) | no | – |
+| Approval | at (Timestamp), release day (Date); holds while it equals the calendar's day | no | EVT-ReleaseApproved, EVT-ApprovalWithdrawn |
+
 ## Lifecycle
 
 Stage state as the code allows it today. Every transition is accepted from every status (HS-11); the diagram
@@ -517,6 +564,20 @@ from `pending` or `failed` after every earlier stage is `done` or `skipped`; com
 
 The next stage is the first `pending` or `failed` stage in list order. The project is done when every stage is
 `done` or `skipped`; any `failed` stage makes the overall status `failed`.
+
+Release approval as the code allows it (the release autopilot that acts on it is the publish slice's):
+
+```mermaid
+stateDiagram-v2
+  [*] --> proposed: Release calendar planned without a release day
+  [*] --> fixed: Release calendar planned with the user's release day
+  proposed --> fixed: Release day fixed (today only by the approval, HS-165)
+  fixed --> approved: Release approved
+  approved --> stale: the release day moves
+  stale --> approved: Release approved again
+  approved --> fixed: Approval withdrawn
+  stale --> fixed: Approval withdrawn
+```
 
 ## Overview
 
@@ -577,4 +638,18 @@ erDiagram
   PROJECT ||--o{ COMPOSED_IMAGE : "thumbnails, cover, feed images"
   COMPOSED_IMAGE ||--|| THUMBNAIL_RECIPE : "beside it"
   COMPOSED_IMAGE }o--|| STYLE_BIBLE : "colours and fonts from"
+  PROJECT ||--o| UPLOAD_DATA : "review/upload.yaml"
+  PROJECT ||--o| RELEASE_PACKAGE : "renders/release/"
+  RELEASE_PACKAGE ||--|{ RELEASE_FILE : "manifest.json"
+  RELEASE_FILE }o--o| RENDER : "placed from"
+  RELEASE_FILE }o--o| SHORT : "placed from"
+  RELEASE_FILE }o--o| COMPOSED_IMAGE : "placed or composed from"
+  UPLOAD_DATA ||--o{ RELEASE_FILE : "laid out as texts"
+  PROJECT ||--o| RELEASE_CALENDAR : "review/calendar.yaml"
+  RELEASE_CALENDAR ||--|{ CALENDAR_EVENT : "dated steps"
+  RELEASE_CALENDAR }o--|| RELEASE_SCHEDULE : "planned under"
+  PROJECT ||--o| RELEASE_STATUS : "review/release-status.json"
+  RELEASE_STATUS ||--o{ DONE_MARK : "per event"
+  DONE_MARK }o--|| CALENDAR_EVENT : "of"
+  RELEASE_STATUS ||--o| RELEASE_APPROVAL : "for one release day"
 ```

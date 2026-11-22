@@ -135,51 +135,47 @@
   ],
   "ranking": [
     {
-      "path": "packages/cli",
-      "score": 0.61,
-      "reasons": [
-        "320 changed files in recent history",
-        "shared library",
-        "shared infrastructure – not a domain slice"
-      ]
-    },
-    {
       "path": "scripts/audio-analysis",
-      "score": 0.19,
+      "score": 0.15,
       "reasons": [
-        "24 changed files in recent history"
-      ]
-    },
-    {
-      "path": "packages/remotion",
-      "score": 0.16,
-      "reasons": [
-        "61 changed files in recent history",
-        "shared library",
-        "shared infrastructure – not a domain slice"
+        "no churn or consumers recorded"
       ]
     },
     {
       "path": "scripts/review-player",
-      "score": 0.16,
+      "score": 0.15,
       "reasons": [
-        "8 changed files in recent history"
+        "no churn or consumers recorded"
+      ]
+    },
+    {
+      "path": "packages/cli",
+      "score": 0.06,
+      "reasons": [
+        "shared library",
+        "shared infrastructure – not a domain slice"
+      ]
+    },
+    {
+      "path": "packages/remotion",
+      "score": 0.06,
+      "reasons": [
+        "shared library",
+        "shared infrastructure – not a domain slice"
       ]
     },
     {
       "path": "packages/core",
-      "score": 0.04,
+      "score": 0.01,
       "reasons": [
-        "111 changed files in recent history",
         "shared library",
         "layer package – hosts many concepts, not a domain slice"
       ]
     },
     {
       "path": "packages/providers",
-      "score": 0.03,
+      "score": 0.01,
       "reasons": [
-        "77 changed files in recent history",
         "shared library",
         "layer package – hosts many concepts, not a domain slice"
       ]
@@ -305,6 +301,7 @@
         "autopilot",
         "board",
         "calendar",
+        "characterization",
         "data",
         "file",
         "folder",
@@ -336,6 +333,7 @@
         "tests/release-autopilot-plan.test.ts",
         "tests/release-autopilot.test.ts",
         "tests/release-calendar.test.ts",
+        "tests/release-characterization.test.ts",
         "tests/release-folder.test.ts",
         "tests/release.test.ts"
       ],
@@ -353,8 +351,10 @@
       "reasons": [
         "3 layers: cli, core, tests",
         "3 packages",
-        "20 files"
-      ]
+        "21 files"
+      ],
+      "adopted": true,
+      "adoptedAt": "2026-11-22"
     },
     {
       "name": "thumbnail",
@@ -598,12 +598,14 @@
     {
       "name": "character",
       "terms": [
-        "character"
+        "character",
+        "characterization"
       ],
       "tables": [],
       "files": [
         "packages/cli/src/board/characters.js",
         "packages/cli/src/character-library.ts",
+        "tests/character-characterization.test.ts",
         "tests/character-library.test.ts"
       ],
       "packages": [
@@ -614,11 +616,11 @@
         "cli",
         "tests"
       ],
-      "score": 11,
+      "score": 12,
       "reasons": [
         "2 layers: cli, tests",
         "2 packages",
-        "3 files"
+        "4 files"
       ],
       "adopted": true,
       "adoptedAt": "2026-11-21"
@@ -733,6 +735,36 @@
       ]
     },
     {
+      "name": "render",
+      "terms": [
+        "characterization",
+        "progress",
+        "render"
+      ],
+      "tables": [],
+      "files": [
+        "packages/cli/src/render-progress.ts",
+        "packages/cli/src/render.ts",
+        "tests/render-characterization.test.ts"
+      ],
+      "packages": [
+        "?",
+        "packages/cli"
+      ],
+      "layers": [
+        "cli",
+        "tests"
+      ],
+      "score": 11,
+      "reasons": [
+        "2 layers: cli, tests",
+        "2 packages",
+        "3 files"
+      ],
+      "adopted": true,
+      "adoptedAt": "2026-11-22"
+    },
+    {
       "name": "state",
       "terms": [
         "characterization",
@@ -813,31 +845,6 @@
       ]
     },
     {
-      "name": "comfyui",
-      "terms": [
-        "comfyui"
-      ],
-      "tables": [],
-      "files": [
-        "packages/providers/src/comfyui.ts",
-        "tests/comfyui.test.ts"
-      ],
-      "packages": [
-        "?",
-        "packages/providers"
-      ],
-      "layers": [
-        "providers",
-        "tests"
-      ],
-      "score": 10,
-      "reasons": [
-        "2 layers: providers, tests",
-        "2 packages",
-        "2 files"
-      ]
-    },
-    {
       "name": "pipeline",
       "terms": [],
       "tables": [],
@@ -849,7 +856,7 @@
         "marked adopted manually"
       ],
       "adopted": true,
-      "adoptedAt": "2026-11-21"
+      "adoptedAt": "2026-11-22"
     },
     {
       "name": "verdict",
@@ -863,7 +870,7 @@
         "marked adopted manually"
       ],
       "adopted": true,
-      "adoptedAt": "2026-11-21"
+      "adoptedAt": "2026-11-22"
     },
     {
       "name": "storyboard",
@@ -877,7 +884,7 @@
         "marked adopted manually"
       ],
       "adopted": true,
-      "adoptedAt": "2026-11-21"
+      "adoptedAt": "2026-11-22"
     },
     {
       "name": "generation",
@@ -891,7 +898,7 @@
         "marked adopted manually"
       ],
       "adopted": true,
-      "adoptedAt": "2026-11-21"
+      "adoptedAt": "2026-11-22"
     },
     {
       "name": "series",
@@ -905,21 +912,7 @@
         "marked adopted manually"
       ],
       "adopted": true,
-      "adoptedAt": "2026-11-21"
-    },
-    {
-      "name": "render",
-      "terms": [],
-      "tables": [],
-      "files": [],
-      "packages": [],
-      "layers": [],
-      "score": 0,
-      "reasons": [
-        "marked adopted manually"
-      ],
-      "adopted": true,
-      "adoptedAt": "2026-11-21"
+      "adoptedAt": "2026-11-22"
     }
   ]
 }

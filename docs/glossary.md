@@ -213,16 +213,20 @@ _Avoid_: clip (an AI clip is a generated shot), teaser, reel
 _Avoid_: metadata, upload manifest
 
 **Upload Text**:
-`review/upload.md`: the YouTube part of the upload data rendered for people, with a pointer to the release folder. It is generated, never edited by hand.
-_Avoid_: metadata, copy
+`review/upload.md`: the main video and the Shorts of the upload data rendered for people, with a pointer to the release folder. It is generated, never edited by hand.
+_Avoid_: metadata, copy, upload package (the **Release Package** is everything to upload)
 
 **Release Package**:
 Everything a finished song and video need to be published, collected in the **Release Folder**: every format, thumbnails, Shorts, the song as WAV, cover, canvas, lyrics, the platform texts, and the release plan.
 _Avoid_: deliverables, export bundle
 
 **Release Folder**:
-`renders/release/`, the one place the user uploads from. Its manifest records every file with size, hash, specification, and source.
+`renders/release/`, the one place the user uploads from. `release` assembles it again whenever its sources change; a run never removes a file it could not refresh.
 _Avoid_: export folder, output
+
+**Release Manifest**:
+`renders/release/manifest.json`: every file of the release folder with size, hash, specification, and source, and the open TODOs. `release` writes it last; QA compares the folder against it.
+_Avoid_: file list, index
 
 **Release Metadata**:
 The `release:` block of a project: the facts a distributor asks for, such as artist, genres, songwriters, release date, and AI credits. Only the user supplies them, per project or once as the channel's release defaults; a missing one is a TODO.
@@ -253,8 +257,16 @@ _Avoid_: label, aggregator
 _Avoid_: posting plan, cadence
 
 **Release Calendar**:
-`review/calendar.yaml`: when what goes online where for one project, planned in the next free slots of the release schedule without colliding with other projects. Each entry is an event with an id, a time, a platform, and a step.
+`review/calendar.yaml`: when what goes online where for one project, planned in the next free slots of the release schedule without colliding with other projects. Each entry is a **Calendar Event**. A new release day plans every event again; times moved by hand are kept only while the day stays.
 _Avoid_: release plan (the plan is the calendar's table in the release folder), timeline
+
+**Calendar Event**:
+One entry of a release calendar: a stable id, a time with its offset, a platform, a step (such as `distributor`, `announce`, `post`, `short`), and the item it concerns (the main video, a Short, or the announcement). The board shows each event as a card; a done mark or a live URL belongs to it.
+_Avoid_: post, task (both are only labels on the board), slot
+
+**Proposed Release Day**:
+The release day the calendar picked from the release schedule because the project has no `release.release_date` yet. It stays the project's day until the user moves it, and the user fixes it without approving the autopilot; until then it is a TODO.
+_Avoid_: tentative date, draft date
 
 **Board**:
 The workspace's local page (`board`). Its **production view** shows every project and series as the pipeline leaves them, with the next command for Claude Code; its release view is the release board.
@@ -264,8 +276,20 @@ _Avoid_: dashboard, studio
 The board's release view over all release folders: per platform the posts with files, texts, limits, and settings, the calendar of all projects, and the user's done state and live URLs in `review/release-status.json`.
 _Avoid_: dashboard, CMS
 
+**Release Status**:
+`review/release-status.json`: per calendar event the user's or the autopilot's **Done Mark** and **Live URL**, and the **Release Approval**. Written only under the project's release lock.
+_Avoid_: progress, tracker
+
+**Done Mark**:
+The record that a calendar event went online, with when and by whom – the user ticking it off on the release board, or the autopilot after posting. A fact: it stays when the release day moves or the approval is withdrawn.
+_Avoid_: posted (an autopilot state), checked
+
+**Live URL**:
+The public address of a calendar event's post, entered on the release board or recorded by the autopilot. The live YouTube URL goes into every text that points to the main video, and into the microsite data.
+_Avoid_: link (a channel link is a profile), permalink
+
 **Release Approval**:
-The user's one click on the release board that hands a release to the release autopilot. Before it nothing goes out by itself; withdrawing it stops what has not gone out.
+The user's one click on the release board that hands a release to the release autopilot, for one release day. It covers the day, not the content; when the day moves the user approves again. Before it nothing goes out by itself; withdrawing it stops what has not gone out and keeps the done marks.
 _Avoid_: go-live, publish (the **Publish** command uploads privately)
 
 **Release Autopilot**:
@@ -281,7 +305,7 @@ _Avoid_: monitor, daemon, supervisor
 _Avoid_: publish log (the **Publish Log** records uploads of `publish`)
 
 **Announcement**:
-The release's posts a week before: a story and a post image with the release date on them, the teaser, and the announcement text. `release` composes the images from the cover's still again whenever the date moves.
+The release's posts a week before: a story and a post image with the release date on them, the teaser, and the announcement text. A full `release` composes the images from the cover's still again whenever the date moves.
 _Avoid_: teaser post, pre-save
 
 **Thumbnail Recipe**:
@@ -289,11 +313,11 @@ _Avoid_: teaser post, pre-save
 _Avoid_: preset, template (a **Template** seeds a project)
 
 **Microsite**:
-The artist's own website. A song's page is built from `renders/release/microsite/<slug>.json`.
+The artist's own website, built elsewhere. A song's page is built from `renders/release/microsite/<slug>.json`, the microsite data: texts, lyrics, images, credits, the AI disclosure line, and the live URLs.
 _Avoid_: landing page, link-in-bio
 
 **TODO**:
-A gap in the release package that only the user can close, such as a missing songwriter or an `<ID>` link. It never fails QA.
+A gap in the release package that only the user can close, such as a missing songwriter, a proposed release day, or an `<ID>` link. It never fails QA; QA reports it as TODO, never as a warning.
 _Avoid_: warning, error
 
 ## Publishing

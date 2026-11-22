@@ -100,14 +100,29 @@ state in memory), one core transition (`setStageRunning`, `setStageDone`, `setSt
 - Adapters take an injectable `fetchImpl` and poll interval; HTTP calls go through `fetchJsonWithRetry` and
   downloads through `downloadOutputs` (`packages/providers/src/http.ts`). Each adapter keeps its own timeout and
   poll loop (G-98); a submission is retried only with an idempotency key (G-86).
+- Release: the rules for facts, limits, chapters, the canvas window and the calendar are pure functions in core
+  (`packages/core/src/release.ts`, `calendar.ts`); the CLI does all file work. `buildRelease`
+  (`packages/cli/src/release.ts`) places, generates and composes every file through one `ReleaseWriter`, renders a
+  stale format through the render command, plans the calendar, and writes `manifest.json` last; a run writes only
+  what changed and removes only files an earlier run wrote. Texts are laid out from the agent's `upload.yaml` in
+  `release-texts.ts`; the board reads the same layout helpers. The release context (language, identity, defaults)
+  and the folder layout exist twice today (G-162): add to one place and remove the other, never add a third.
+- `review/release-status.json` is written only through `updateStatus`/`writeStatus` under `withReleaseLock`
+  (`review/.release.lock`); the release folder, `manifest.json` and `calendar.yaml` take no lock today (G-161).
+  The board accepts writes only from its own page (`trustedWrite`: loopback Host, same Origin, JSON body).
 - User-owned files (`timing.overrides.json`, `lyrics.txt`, imported stems, `project.yaml`) are never replaced by
-  a tool; a command that would do so is a hard stop.
+  a tool; a command that would do so is a hard stop. The one exception: fixing a proposed release day writes
+  `release.release_date` into `project.yaml`, keeping every comment (`setReleaseDate`,
+  `packages/cli/src/release-autopilot.ts`; HS-177).
 
 ## Read models
 
 Pure functions over loaded files: `stageViews`, `productionPhase`, `projectNextAction`, `seriesNextAction`
 (`packages/core/src/production.ts`); `status` (`packages/cli/src/status.ts`); the board's production view
 (`packages/cli/src/board-production.ts`), which reads files and never writes. The board polls every 10 s.
+The release board's view is `boardProject` (`packages/cli/src/release-board-data.ts`), a pure read of the release
+folder's manifest, `upload.yaml`, the calendar and the status; whether an approval holds is `approvalHolds`
+(`packages/core/src/autopilot.ts`) wherever it is read (G-159).
 
 The resolved storyboard (shots in seconds and frames) is made on demand and never stored; render passes it to
 Remotion unchanged as props, apart from public asset paths (`render.ts:98-111`). Derived documents of the
@@ -121,11 +136,17 @@ functions over the effective timing in `packages/core/src/timing.ts`; Remotion h
 
 As-is, core reads the clock itself (`new Date()` in every transition and in `createInitialState`); it cannot be
 injected. The watchdog takes `options.now` (`packages/cli/src/production-watch.ts`). Vitest pins `TZ`.
+The release slice takes `now` everywhere (`ReleaseDeps.now`, `CalendarContext.now`, `updateStatus(…, now)`, the
+board's `now`); calendar times are local ISO with the offset of the schedule's `timezone`, else the computer's
+zone, so a calendar planned in the board container is in UTC unless `TZ` is set. Status and manifest times are UTC.
 
 ## UI and texts
 
 English only. CLI messages are inline strings; the board's texts are inline in the static modules in
-`packages/cli/src/board/`. There is no message catalog.
+`packages/cli/src/board/`. There is no message catalog. The release texts, images, microsite data and the release
+board have English and German labels behind a `startsWith('de')` switch, with German jurisdiction notes in both
+(G-156); decided: English built in, other languages and jurisdiction notes as data (HS-176). Do not add a third
+hard-coded language.
 
 ## Test data and seams
 
@@ -161,5 +182,9 @@ directory. `tests/helpers/release-fixture.ts` builds release projects.
 | Composed-image layout | the pure functions of `packages/remotion/src/lib/thumbnail.ts`, `buildThumbnailProps`, `thumbnailProblems` on a JPEG header | unit | `tests/thumbnail.test.ts`, `tests/render-characterization.test.ts` |
 | Thumbnail recipe | `writeRecipe` / `readRecipe` on a temp copy of a project | integration | `tests/render-characterization.test.ts` |
 | Media directory | `mediaDirFor`, `linkProjectMedia(dir, { mediaDir })` in a temp folder | integration | `tests/media-dir.test.ts` |
+| Release package | `buildRelease({ projectDir, deps: fakeDeps() })` on `fixture()` from `tests/helpers/release-fixture.ts` – probe, ffmpeg, render, thumbnail and `now` injected | integration | `tests/release-folder.test.ts` |
+| Release rule | `platformTextProblems`, `chapterProblems`, `releaseTodos`, `canvasWindow` on inline upload data and timing | unit | `tests/release-folder.test.ts`, `tests/release-characterization.test.ts` |
+| Release calendar | `buildCalendar(input, { schedule, now, existing, others })` with `ReleaseScheduleSchema.parse({ version: 1 })` | unit | `tests/release-calendar.test.ts`, `tests/release-characterization.test.ts` |
+| Release board | `boardHandler({ root, now, refresh })` over a fixture workspace | integration | `tests/release-folder.test.ts` |
 | Remotion render | a real still or JPEG; opt-in with `CORESLOPPER_RENDER_TESTS=1` (needs Chrome) | integration | `tests/thumbnail-render.test.ts` |
 | Agent instruction | not testable deterministically | – | `workspace/.claude/commands/video-next.md` |

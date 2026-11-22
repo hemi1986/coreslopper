@@ -1574,3 +1574,272 @@ board's release view and approval. It reads this slice's render records, Shorts 
 | HS-158 | The CLI reaches Remotion by relative path; Remotion's runtime imports from `core/browser` only | recommendation | conventions |
 | HS-159 | Animatic removed from the glossary | recommendation | glossary |
 | HS-161 | ADR 0044 | recommendation | `docs/adr/0044-render-records-and-composed-images.md` |
+
+# Adoption – release
+Date: 2026-11-22 · Commit: 5fdf981 · Slice: the release package and folder, upload data and texts, release QA, the release schedule and calendar, the board's release view, done marks, live URLs and the release approval (concept `release`) · Analysts: 3 lenses
+
+## Scope
+
+- **Slice:**
+  - core: `release.ts`, `calendar.ts`; the release parts of `schema.ts` (release metadata, channel config, release
+    schedule, calendar, upload data, release status, release manifest); `approvalHolds` in `autopilot.ts`;
+  - cli: `release.ts`, `release-files.ts` (non-Short parts), `release-images.ts`, `release-media.ts`,
+    `release-microsite.ts`, `release-texts.ts`, `release-qa.ts`, `upload-text.ts`, `release-calendar.ts`,
+    `release-board.ts`, `release-board-data.ts`, `board/release.js`; the `upload-text`, `release`, `calendar`,
+    `board` (release view) and `release-approve` commands; the release rows of `qa.ts`; `approveRelease` and
+    `revokeApproval` as the approval's writers;
+  - workspace: `release-backfill`, `video-qa/release.md`, the release steps of `/video-next`, `qa-checker`,
+    `new-video` (release data only), the hook's release files.
+- **Out of scope:**
+  - the release autopilot's plan and runner, `publish`, `publish-auth`, `publish-setup`, `release-timer`, the
+    watchdog and the post adapters: slice `publish`;
+  - renders, Shorts, composed images and the media directory: already adopted (render);
+  - `init`, `update`, `doctor`, `migrate-layout`: slice `workspace`.
+- **Intent:** domain model, as for the earlier slices. **Language:** artifacts `en`, UI `en`.
+- **Since the last slice:** no code change. `slice.ts --cluster release` found 20 seeds and 93 candidates; the
+  scope was cut to the release folder, calendar, board and approval by hand, along the adoption plan.
+
+| Layer | Files |
+|---|---|
+| core (domain) | `release.ts`, `calendar.ts`, release schemas in `schema.ts`, `approvalHolds` |
+| cli (application) | `release*.ts` (without the autopilot and timer), `upload-text.ts`, `board/release.js`, release rows in `qa.ts`, `approveRelease`/`revokeApproval` |
+| workspace (orchestration) | `release-backfill`, `video-qa/release.md`, `/video-next` after the pipeline, `qa-checker` |
+| tests | `release-folder`, `release-calendar`, the upload-text parts of `release`, `helpers/release-fixture.ts`; new `release-characterization` |
+
+## How this slice was decided
+
+As in the earlier slices, there were no code-level questions. Every technical hotspot was decided by the
+recommendation and is marked "not reviewed by the user – delegated". The user answered four questions about how
+they work:
+1. They release from the release board and post by hand: they upload, tick off and enter the live URLs.
+2. They take the platform texts as the agent wrote them.
+3. They take the release day the calendar proposes.
+4. Of the release's parts they use the distributor and the microsite; not the Spotify extras (canvas, lyrics
+   files, pitch) and not the announcement.
+
+How the answers shaped the model:
+- Answers 1 and 3 together show the worst gap: a proposed day is fixed only by the approval, which a user who posts
+  by hand never gives. The day stays a TODO, also at the distributor step, and a replan can move it (G-150, high).
+- Answer 1 makes the board the place that must not lose anything: the background refresh after a live URL that can
+  delete the video from the folder is high (G-151). The board hiding a broken `upload.yaml` is medium (G-153).
+- Answer 2 means a broken limit goes straight to the platform: QA and `release` checking different things is
+  medium (G-152).
+- Answer 4 raises the microsite data's missing schema to medium (G-155) and keeps the gaps of the canvas, lyrics,
+  pitch and announcement low.
+
+ADR 0045 stays `Proposed`.
+
+## What the repository is (facts)
+
+- **Three records.**
+  - The release folder `renders/release/` with `manifest.json` is written only by `buildRelease`.
+  - `review/calendar.yaml` is planned only by `buildCalendar`.
+  - `review/release-status.json` (done marks, live URLs, the approval) is written only under
+    `review/.release.lock`.
+  - The agent writes `review/upload.yaml`, and no code writes it.
+- **Release package.**
+  - Formats are placed by hardlink or copy, and a stale one is rendered first. Subtitles, three thumbnails and
+    the Shorts follow.
+  - For a music video: the WAV (converted once when it cannot be delivered), the cover, the canvas (a silent
+    3–8 s loop without lyrics on screen), `lyrics.txt` and LRC.
+  - Then the calendar, the dated announcement, story and feed images from the cover's recipe, `calendar.ics`,
+    the microsite data, `texts/`, the README with the TODOs, and the manifest last.
+  - The run is idempotent. It removes only files an earlier run wrote. It throws after writing when a limit or
+    the chapters are broken.
+- **Facts and limits.**
+  - Missing release facts are TODOs. Channel release defaults fill gaps, and the project wins.
+  - The limits are a code table that `channel.yaml` can override per key.
+  - X counts each link as 23 characters. LinkedIn shows 210 characters before "see more".
+  - The Instagram and TikTok captions must differ.
+- **Calendar.**
+  - The user's day wins and is not checked.
+  - Otherwise the calendar picks the first release weekday at least 21 days ahead, a week from every other
+    release, never on a skip day. It keeps that day while no other release holds it.
+  - Moved times are kept while the day stays.
+  - One Short per slot day across all projects, one per song a week, the first on the release day.
+  - Times carry the schedule's or the computer's zone.
+- **Board.**
+  - It is a loopback page that writes only from its own origin.
+  - The user ticks off posts and checklist lines (keyed by position) and enters live URLs, which start a
+    background refresh without renders and stills.
+  - The user approves or withdraws. There is no date or time change on the board.
+- **Approval.**
+  - It is `{at, release_date}`. It holds while the day equals the calendar's.
+  - Approving a proposed day writes `release.release_date` into `project.yaml` first.
+  - The blockers are checked only by the button. The production view counts any approval.
+- **QA.**
+  - Ten release rows. FAIL for changed files, stale formats, bad media, broken limits and unmarked `<ID>`, TODO
+    for user gaps.
+  - The upload checks use WARN.
+  - QA does not check chapters, the description's bytes or `linkedin.md`.
+- **Architecture.**
+  - Core holds pure rules; the CLI holds all files.
+  - The release context and the folder layout exist twice or three times.
+  - There is no lock around the folder or the calendar, and `buildRelease` finds the workspace from the working
+    directory.
+  - German labels and jurisdiction notes are hard-coded.
+- **History.** 23 commits from 2026-11-13 to 2026-11-21. The hotspots are `release-folder.test.ts` (13),
+  `release-board.ts` (9) and `release-board-data.ts` (8). There are no reverts. Five fixes; the largest (`e44dde1`)
+  made writes come only from the board's own page and tied the approval to the day.
+
+## Domain model (decided by recommendation)
+
+- **Context:** `BC-Release` – Release.
+- **Aggregates (all `as-is`):**
+  - `AGG-ReleasePackage`:
+    - every written file in the manifest, only own files removed;
+    - each format the current render;
+    - a file never removed because it could not be refreshed;
+    - facts never invented;
+    - a TODO never fails;
+    - idempotent;
+    - one set of checks for `release` and QA.
+  - `AGG-ReleaseCalendar`:
+    - the user's day wins;
+    - a proposed day stays until the user moves it, fixed without the approval;
+    - a colliding user day is reported;
+    - one Short per slot day;
+    - moved times kept while the day stays;
+    - steps off skip days;
+    - stable event ids.
+  - `AGG-ReleaseStatus`:
+    - items keyed by event or a named checklist line;
+    - done marks with who and when;
+    - http(s) live URLs;
+    - done marks survive;
+    - the approval holds for one day, through `approvalHolds` everywhere;
+    - it covers the day, not the content;
+    - its blockers checked everywhere;
+    - every write under the release lock.
+- **Commands:**
+  - write the upload data;
+  - build the release package;
+  - render the upload text;
+  - plan the release calendar;
+  - mark a calendar event done;
+  - record a live URL;
+  - approve a release;
+  - withdraw the approval;
+  - check the release package.
+- **Policy:** the release folder follows a live URL and an approval (`POL-RefreshAfterStatusChange`).
+- **Read models:** release board, workspace release calendar, release checks, upload text, microsite song.
+- **Flow:** `FLOW-Release`. **External systems:** artist microsite, distributor.
+- **Glossary:**
+  - New: **Release Manifest**, **Calendar Event**, **Proposed Release Day**, **Release Status**, **Done Mark**,
+    **Live URL**.
+  - Sharpened:
+    - **Upload Text**: the main video and the Shorts; "upload package" is avoided.
+    - **Release Folder**: no file lost on a refresh.
+    - **Release Calendar**: a new day plans again.
+    - **Release Approval**: one day, not the content; withdrawing keeps the done marks.
+    - **Announcement**: a full release composes it.
+    - **Microsite**: its data.
+    - **TODO**: a proposed release day; never a warning in QA.
+- **ADR:** 0045 (Proposed), which amends 0019, 0024, 0028 and 0029.
+
+## Package documentation written
+
+- `.claude/rules/release.md` – the path-scoped slice doc. Nothing is left `[OPEN]`.
+- `docs/engineering/conventions.md`:
+  - how a release run works;
+  - the release lock and the board's write guard;
+  - the `project.yaml` exception;
+  - time zones in the calendar;
+  - the release labels;
+  - four seams (release package, release rule, release calendar, release board).
+- `docs/architecture/data-model.md` – the three aggregates, the approval's lifecycle and the release entities in the
+  overview.
+- `docs/domain/context-map.as-is.md` – `BC-Release` and its edges to Pipeline, Render, Timing, publish (not adopted),
+  the microsite and the distributor.
+
+## Contradictions found and how they were resolved
+
+| Contradiction | Resolution |
+|---|---|
+| ADR 0028: without `release_date` the day is a proposal, versus a user who never approves and so never fixes it | the user fixes it without approving (ADR 0045, G-150) |
+| Board refresh "texts and microsite data, no renders", versus the clean-up deleting skipped videos and images | a refresh never removes a file (G-151) |
+| ADR 0028: the live URL goes into the X and LinkedIn texts, versus only the board fields getting it | every text, folder and board (G-154) |
+| ADR 0028: times in the calendar are kept, versus kept only while the day stays | a new day plans again; the ADR's wording is stale (G-157) |
+| ADR 0028: never colliding with another project, versus a user day never checked | the user's day wins and a collision is reported (G-160) |
+| ADR 0019: a missing package is a WARN; `qa` WARN for upload checks, versus TODO in the release checks and the glossary | TODO for user gaps, WARN for advice (G-152) |
+| `release` fails on chapters and description bytes, versus QA never checking them; QA's comment on `linkedin.md` versus its list | one set of checks (G-152) |
+| `approvalHolds` (day must match), versus the production view's `Boolean(approval)` | `approvalHolds` everywhere (G-159) |
+| Board disables Approve on blockers, versus the API and CLI approving anyway | blockers everywhere (G-158) |
+| Conventions: a tool never replaces `project.yaml`, versus the approval writing `release.release_date` | a recorded exception (HS-177, conventions) |
+| Glossary Upload Text "the YouTube part", versus `upload.md` covering the Shorts too, titled "Upload package" | glossary fixed; "upload package" avoided |
+| Glossary Announcement "`release` composes again whenever the date moves", versus the refresh dropping the images | a full release composes them; glossary fixed |
+| `docs/architecture.md`: the board's only write is the status, versus approval, wizard, library, review | text fix (G-157) |
+| `/video-next` after the pipeline points to `publish --dry-run`, versus the board as the user's way to release | `/video-next` points to the board (G-157) |
+| `video-qa/release.md`: the calendar planned first, a `✖` line per broken limit | text fix (G-157) |
+| Upstream stays generic, versus German jurisdiction notes, a de/en switch, Berlin examples and tests | English built in, the rest as data (G-156) |
+
+## Rules and checks
+
+| Rule | Enforcement | State |
+|---|---|---|
+| A proposed day is kept while no other release holds it; a new day plans every event again, the same day keeps moved times | `tests/release-characterization.test.ts` | green |
+| An approval holds for its release day only | `tests/release-characterization.test.ts` | green |
+| X counts links as 23 and the reply's link as 24; LinkedIn's first paragraph at most 210, its media main or a Short | `tests/release-characterization.test.ts` | green |
+| Chapters start at 0:00, number at least three, last at least 10 s | `tests/release-characterization.test.ts` | green |
+| The documented folder, idempotence, own-file clean-up, TODOs never failing, broken limits as errors, release QA, the board's status and write guard, the calendar's planning rules | existing `tests/release-folder.test.ts`, `release-calendar.test.ts`, `release.test.ts`, `release-autopilot.test.ts` | green |
+| The slice stays inside the package import direction | slice 1 boundary rule and `tests/package-boundaries.test.ts` | green |
+| A fixed day without approval, no file lost on refresh, one set of checks, the live URL in the files, the microsite schema, locks, the approval's blockers and staleness everywhere, named checklist keys, English built in | documentation until stories build them (G-150–G-166) | – |
+
+## Gap register (candidates – stories only with --stories)
+
+17 candidates, G-150 to G-166, in `docs/domain/gap-register.md`:
+- 9 *exist but contradict*. The highest is G-151 (a refresh deletes files, high). Then G-152 (checks differ),
+  G-153 (a broken `upload.yaml` hidden), G-154 (the live URL missing from the files), G-156 (locale upstream) and
+  G-157 (drifted texts), all medium.
+- 7 are *missing*. The highest are G-150 (the day fixed without the approval, high) and G-155 (the microsite
+  schema, medium); G-160, G-161, G-164 and G-166 are low.
+- 1 is *dead*: G-165 (the LinkedIn skip branch).
+
+## Deliberately left alone
+
+- Production code, the skills, and ADRs 0019, 0024, 0028 and 0029, which are accepted. ADR 0045 amends them. Only
+  the glossary was corrected.
+- The release autopilot's plan, states and runner, `publish`, the timer, the watchdog and the post adapters: the
+  publish slice. That includes the second microsite copy the autopilot writes and the `due` state the plan never
+  returns.
+- The board server's routes for the wizard, the library and review rounds, which share `release-board.ts`: already
+  adopted slices.
+- The episode subtitles in English only: decided in the series slice.
+- Over-exported helpers (`PLACEHOLDER`, `CHAPTER_RULES`, `daysBetween`, …): not dead, only exported.
+- `vitest.config.ts` pinning `TZ: 'Europe/Berlin'`: noted in slice 1, now part of G-156.
+
+## Open hotspots
+
+None. HS-162 to HS-182 are resolved, eight of them partly by the user's answers.
+
+## Next slice
+
+`publish` per the adoption plan: publish and the post adapters, auth, the release autopilot's plan and runner, the
+timer and the watchdog. It reads this slice's release folder, upload data, calendar and approval, and writes done
+marks and live URLs into the release status.
+
+## Decision log
+
+| # | Decision | How | Written to |
+|---|---|---|---|
+| HS-165 | The user fixes a proposed release day without approving; a replan keeps it | user (posts by hand, takes the proposed day, 2026-11-22) and recommendation; high | `AGG-ReleaseCalendar`, `CMD-PlanReleaseCalendar`, ADR 0045, G-150 |
+| HS-167 | A refresh never removes a file it could not refresh | user (releases from the board) and recommendation; high | `AGG-ReleasePackage`, `POL-RefreshAfterStatusChange`, ADR 0045, G-151 |
+| HS-172 | One set of checks for `release` and QA; TODO for user gaps | user (takes the texts as they are) and recommendation; medium | `AGG-ReleasePackage`, `CMD-CheckRelease`, ADR 0045, G-152 |
+| HS-173 | The board shows a broken `upload.yaml` | user (copies from the board) and recommendation; medium | `RM-ReleaseBoard`, G-153 |
+| HS-166 | The live URL in every text, folder and board | user (copies from the board) and recommendation; medium | `CMD-BuildReleasePackage`, ADR 0045, G-154 |
+| HS-178 | The microsite data is a published language with a schema | user (uses the microsite) and recommendation; medium | `RM-MicrositeSong`, ADR 0045, G-155 |
+| HS-180 | Drifted texts fixed together; `/video-next` points to the board | user (releases from the board) and recommendation; medium | G-157 |
+| HS-181 | Hashtag sets stay a skill rule; an episode gets the release-day TODO; Spotify extras and the announcement rank low | user (uses the distributor and the microsite) and recommendation; low | `CMD-WriteUploadData`, G-164 |
+| HS-162 | One context, Release; the autopilot that acts on the approval is publish's | recommendation | `BC-Release` |
+| HS-163 | Three as-is aggregates: release package, calendar, status | recommendation | the three aggregates |
+| HS-164 | Calendar Event, Proposed Release Day, Done Mark, Live URL, Release Status, Release Manifest; "post", "task" UI only | recommendation | glossary |
+| HS-168 | The approval covers the day, not the content; its blockers checked everywhere | recommendation; low | `AGG-ReleaseStatus`, `CMD-ApproveRelease`, ADR 0045, G-158 |
+| HS-169 | `approvalHolds` everywhere | recommendation; low | `AGG-ReleaseStatus`, G-159 |
+| HS-170 | The user's day wins; a collision is reported | recommendation; low | `AGG-ReleaseCalendar`, ADR 0045, G-160 |
+| HS-171 | A new day plans again; done marks stay; a full release composes the dated images | recommendation | the aggregates, glossary, G-157 |
+| HS-174 | The package and the calendar under the release lock; the approval in one step | recommendation; low | ADR 0045 (not named), G-161 |
+| HS-175 | One release context, one folder layout, one set of counting rules, the root passed in | recommendation; low | `CMD-BuildReleasePackage`, conventions, G-162 |
+| HS-176 | English built in; other languages and jurisdiction notes as data | recommendation; medium | conventions, ADR 0045, G-156 |
+| HS-177 | Fixing the release day is the one write into `project.yaml` | recommendation | conventions, `CMD-ApproveRelease` |
+| HS-179 | Checklist lines keyed by name; every done mark says who | recommendation; low | `AGG-ReleaseStatus`, G-163 |
+| HS-182 | ADR 0045 | recommendation | `docs/adr/0045-release-records-and-fixed-release-day.md` |

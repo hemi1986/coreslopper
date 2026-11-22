@@ -27,6 +27,9 @@
 | GAP-AGG-Render | as-is boundary | [AGG-Render](events.yaml) | [BC-Render](context-map.as-is.md#bc-render--render) | – | one file per format and variant, renders/[preview-]<format>[.en].mp4, written whole – rendered in segments under .cache/render/, joined, the song muxed once, and only then copied over the old file (packages/cli/src/render.ts:182-184,293-445)<br>a whole render of a format – not a preview, not --frames, not --out – is recorded in state.json artifacts as render:<file>:inputs (the hash of the props, the song's bytes and crf 18) and render:<file>:sha256 (render.ts:267-291,431-433); release renders a format again when it is missing or its recorded inputs hash differs from the current one (packages/cli/src/release.ts:237-262) | Decide the target boundary |
 | GAP-AGG-Short | as-is boundary | [AGG-Short](events.yaml) | [BC-Render](context-map.as-is.md#bc-render--render) | – | renders/shorts/<name>-9x16.mp4, cut whole by short from renders/9x16.mp4 with one ffmpeg re-encode – crf 18, a 0.15 s fade-in and a 0.4 s fade-out (packages/cli/src/short.ts:22-24,132-175,200-233); its thumbnail and TikTok cover lie beside it as <name>-thumb.jpg and <name>-tiktok.jpg (packages/cli/src/release-files.ts:26-34) | Decide the target boundary |
 | GAP-AGG-ComposedImage | as-is boundary | [AGG-ComposedImage](events.yaml) | [BC-Render](context-map.as-is.md#bc-render--render) | – | one JPEG and its recipe <name>.recipe.json beside it, written by thumbnail in one run – a Remotion still of the Thumbnail composition, encoded at falling JPEG quality until it fits the limit, then the recipe (packages/cli/src/thumbnail.ts:183-217; packages/cli/src/thumbnail-recipe.ts:35-58)<br>five formats with fixed sizes and limits – 16x9 1280x720, 9x16 1080x1920, 3x4 1080x1440, 4x5 1080x1350, 1x1 3000x3000; under 2 MB, under 10 MB for 1x1 (packages/remotion/src/lib/thumbnail.ts:12-18,60-66) | Decide the target boundary |
+| GAP-AGG-ReleasePackage | as-is boundary | [AGG-ReleasePackage](events.yaml) | [BC-Release](context-map.as-is.md#bc-release--release) | – | renders/release/ with manifest.json, written last by buildRelease – every file placed (hardlink or copy), generated or composed by a ReleaseWriter that records size, SHA-256, specification and source (packages/cli/src/release.ts:132-175,207-447; packages/core/src/schema.ts:1268-1311)<br>review/upload.yaml, the upload data the agent writes and every layout, check and publish reads (schema.ts:796-926; workspace/.claude/skills/video-qa/release.md §7) | Decide the target boundary |
+| GAP-AGG-ReleaseCalendar | as-is boundary | [AGG-ReleaseCalendar](events.yaml) | [BC-Release](context-map.as-is.md#bc-release--release) | – | review/calendar.yaml, one per project, written whole by planCalendar from buildCalendar, which reads the workspace's release schedule and every other project's calendar (packages/cli/src/release-calendar.ts:49-57,94-110; packages/core/src/calendar.ts:133-225; schema.ts:1033-1055) | Decide the target boundary |
+| GAP-AGG-ReleaseStatus | as-is boundary | [AGG-ReleaseStatus](events.yaml) | [BC-Release](context-map.as-is.md#bc-release--release) | – | review/release-status.json, written by updateStatus and writeStatus under the project's release lock review/.release.lock (packages/cli/src/release-calendar.ts:28-31,118-142; packages/cli/src/release-autopilot.ts:52-58,66-89; schema.ts:1058-1085) | Decide the target boundary |
 <!-- kataster:gap-register:end -->
 
 ## Gaps found by the adoption of the project and stage pipeline (2026-11-21)
@@ -377,3 +380,49 @@ Decisions (by recommendation, not reviewed by the user):
   ADR 0044 (proposed) records them.
 - 1:1 serves the Instagram feed by default (`config/defaults.yaml`); 4:5 stays optional per project. The feed
   post's choice of format is the release slice's.
+
+## Gaps found by the adoption of the release slice (2026-11-22)
+
+Candidates only – no stories until the user asks (`/adopt <scope> --stories`). Priority is a suggestion.
+
+| # | Class | Gap | Evidence | Source | Priority |
+|---|---|---|---|---|---|
+| G-150 | Missing | A proposed release day is fixed only by the approval. The user posts by hand without approving, so the day stays a proposal and a TODO, also at the distributor step (T−21), and `calendar --replan` proposes a new day | `packages/core/src/calendar.ts:136-142,224`; `packages/cli/src/release-autopilot.ts:66-98`; `packages/cli/src/release-board.ts:452-464` | HS-165 | high |
+| G-151 | Exists but contradicts | The board's background release (after a live URL or an approval) runs without renders and stills; a stale format or a changed dated image is skipped, and the clean-up deletes the earlier copy from the release folder | `packages/cli/src/release.ts:255-258,433-437,497-502`; `release-board.ts:37-40,448-462` | HS-167 | high |
+| G-152 | Exists but contradicts | QA and `release` check different things: QA misses invalid chapters, the YouTube description's bytes, `linkedin.md` (its comment says otherwise) and the 15-hashtag YouTube limit, which nothing checks; the upload checks call a missing item WARN, the release checks TODO | `release.ts:378-382,428-429`; `packages/cli/src/release-qa.ts:35-38,206-209`; `packages/cli/src/qa.ts:177-221`; `packages/core/src/schema.ts:1170-1184` | HS-172 | medium |
+| G-153 | Exists but contradicts | The board reads `upload.yaml` with `.catch(() => undefined)`; a broken file shows as no texts, without the error | `packages/cli/src/release-board-data.ts:401` | HS-173 | medium |
+| G-154 | Exists but contradicts | The live YouTube URL never reaches `texts/x.md` and `texts/linkedin.md` in the folder (ADR 0028 says it does); only the board fields and the microsite data get it | `packages/cli/src/release-texts.ts:751,792`; `release-board-data.ts:442,529,639`; `docs/adr/0028-release-board-and-calendar.md` | HS-166 | medium |
+| G-155 | Missing | The microsite data has no schema (a TypeScript interface only), the autopilot writes a second copy, and its `release_date` falls back to the proposed day | `packages/cli/src/release-microsite.ts:8-77`; `release-autopilot.ts:432-438` | HS-178 | medium |
+| G-156 | Exists but contradicts | Locale defaults upstream: German jurisdiction notes (Impressum, § 5 DDG) in both languages, a `de`/`en` switch in five places and a third mechanism in `upload-text`, a German channel example, a German ISRC example, `Europe/Berlin` in the schedule template, tests pinned to Berlin and German; dated platform facts in code text | `release-board-data.ts:162-207,434`; `release-texts.ts:473,706`; `packages/cli/src/release-images.ts:39`; `release-microsite.ts:26,40`; `packages/cli/src/upload-text.ts:81-83`; `schema.ts:80,937`; `templates/channel/`; `vitest.config.ts:18`; `tests/helpers/release-fixture.ts:60,83` | HS-176 | medium |
+| G-157 | Exists but contradicts | Drifted texts: ADR 0019 (a missing package is a WARN), ADR 0028 (kept times, never colliding, the live URL in the files), `docs/architecture.md:190` (the board's only write), `/video-next` after the pipeline (`publish --dry-run`, not the board), `video-qa/release.md` (the calendar planned first, a `✖` line per limit), the glossary's Upload Text and Announcement (fixed in this pass) | the files named | HS-180, HS-171 | medium |
+| G-158 | Exists but contradicts | Only the board's button checks the approval's blockers (no release folder, upload data or calendar); the API and `release-approve` approve without them | `release-board-data.ts:719-722`; `release-autopilot.ts:66-81`; `packages/cli/src/index.ts:421-437` | HS-168 | low |
+| G-159 | Exists but contradicts | The production view counts any approval (`Boolean(status.approval)`), also one for a day that moved | `packages/cli/src/board-production.ts:273-274`; `packages/core/src/production.ts:78`; `packages/core/src/autopilot.ts:142-144` | HS-169 | low |
+| G-160 | Missing | A release day the user sets is not checked against other releases, skip days or the lead time | `calendar.ts:137-142` | HS-170 | low |
+| G-161 | Missing | No lock around the release folder, `manifest.json` or `calendar.yaml`; the board serializes refreshes only in its process; `approveRelease` writes in three steps; a file-lock holder over 60 s loses the lock; two projects planned at once can take one slot | `release.ts:433-445`; `packages/cli/src/release-calendar.ts:49-57,94-110`; `release-autopilot.ts:65-82`; `packages/cli/src/file-lock.ts:12-38`; `release-board.ts:158-167` | HS-174 | low |
+| G-162 | Exists but contradicts | Logic twice or three times: the release context (`buildRelease`, `projectReleaseContext`), the folder layout (writer, board regexes, QA), chapters checked in `release` only, the X link counting, the hashtag count, the AI-share rule, the section-tag pattern, the text-file list, the `song.json` reader; `buildRelease` and QA find the workspace from the working directory, not the board's root | `release.ts:188,216-231,263,296-306`; `release-board-data.ts:353-402,422,444`; `release-qa.ts:36-42,90,128-131,178`; `packages/cli/src/board/release.js:43` | HS-175 | low |
+| G-163 | Exists but contradicts | Checklist lines are keyed by position (`<event>#<index>`), so ticks move when a line appears or goes; `calendar --done-until` records no `by` | `board/release.js:154-166`; `release-board-data.ts:521`; `release-calendar.ts:175-183` | HS-179 | low |
+| G-164 | Missing | An episode gets no release-day TODO, so it can be approved on a proposed day without one | `release.ts:233`; `packages/core/src/release.ts:230-259` | HS-181 | low |
+| G-165 | Dead | The skip branch of the LinkedIn text never runs, because `linkedin.md` is written only for `post` | `release-texts.ts:787-791,826-837` | analyst | low |
+| G-166 | Missing | No test of a user release day that collides, a date move dropping moved times (now pinned), done marks across a new day, the approval despite blockers, QA's missing chapter and byte checks, the X and LinkedIn limits (now pinned), the microsite disclosure, the board hiding a broken `upload.yaml`, the English branches of the texts and images, any concurrent writer; covered now by `tests/release-characterization.test.ts`: a proposed day kept, a new day planning every event again, the approval holding for one day, the X and LinkedIn limits, the chapter rules | `tests/release-characterization.test.ts`; `tests/release-folder.test.ts`; `tests/release-calendar.test.ts` | analyst | low |
+
+Decisions (by recommendation, not reviewed by the user):
+
+- GAP-AGG-ReleasePackage, GAP-AGG-ReleaseCalendar and GAP-AGG-ReleaseStatus: the boundaries stay as recovered
+  (`as-is`).
+- Exists and is intended:
+  - one release folder with a manifest, assembled mechanically and idempotently, the texts written by the agent and
+    laid out and checked by code (user: takes the texts as they are);
+  - facts never invented, a TODO never failing, the channel's release defaults filling gaps;
+  - the release calendar planned across the workspace from the release schedule, the user's day winning, a new
+    release day planning every event again (user: takes the proposed day);
+  - the release board as the place to post from, tick off and record live URLs, writing only from its own page
+    (user: posts by hand from the board);
+  - the approval holding for one release day, not for the content, and withdrawing it keeping the done marks;
+  - the distributor upload manual from the folder and `texts/spotify.md` (user: uses the distributor);
+  - hashtag sets applied by the agent; English episode subtitles.
+
+  ADR 0045 (proposed) records them.
+- The user uses the distributor and the microsite; canvas, lyrics files, the pitch and the announcement stay product
+  features, so their gaps rank low (user, 2026-11-22).
+- The release autopilot's use of the approval, publish, the post adapters, the timer and the watchdog are the
+  publish slice's.
