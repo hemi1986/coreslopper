@@ -57,9 +57,10 @@ export async function loadLibrarySound(root: string, id: string): Promise<Librar
   return readYamlFile(file, LibrarySoundSchema);
 }
 
+/** Write an entry its caller has parsed with LibrarySoundSchema. */
 async function writeSound(file: string, sound: LibrarySound): Promise<void> {
   const header = '# A sound of the workspace library; its audio is sound.wav next to this file. See docs/adr/0051-memes-and-the-sound-library.md.\n';
-  await writeTextAtomic(file, header + stringify(LibrarySoundSchema.parse(sound)));
+  await writeTextAtomic(file, header + stringify(sound));
 }
 
 /** Every readable entry's id and hashes; a broken entry is skipped here and reported by `sound check`. */
@@ -96,12 +97,12 @@ export interface NewLibrarySound {
 
 function text(value: unknown, field: string, max: number, required = false): string | undefined {
   if (value === undefined || value === null || value === '') {
-    if (required) throw new SoundRefused(`${field} is required`, 'invalid');
+    if (required) throw new SoundRefused(`a library sound needs a ${field}`, 'invalid');
     return undefined;
   }
   if (typeof value !== 'string' || value.length > max) throw new SoundRefused(`${field} must be text up to ${max} characters`, 'invalid');
   const trimmed = value.trim();
-  if (!trimmed && required) throw new SoundRefused(`${field} is required`, 'invalid');
+  if (!trimmed && required) throw new SoundRefused(`a library sound needs a ${field}`, 'invalid');
   return trimmed || undefined;
 }
 
@@ -246,24 +247,20 @@ const cleared = (value: unknown) => value === null || value === '';
  * CMD-UpdateLibrarySound (`sound edit`): change a library sound's metadata,
  * never its file (EVT-LibrarySoundUpdated). Title and use when stay filled; a
  * cue and a trim stay inside the sound, the cue inside the trim; length and
- * loudness are measured and cannot be typed. A refused edit leaves the entry
- * as it was.
+ * loudness are measured and cannot be typed. A refused edit, or one that
+ * changes nothing, leaves the entry as it was and writes nothing.
  */
-export async function updateLibrarySound(root: string, id: string, changes: LibrarySoundChanges): Promise<LibrarySound> {
+export async function updateLibrarySound(root: string, id: string, changes: LibrarySoundChanges): Promise<{ sound: LibrarySound; changed: boolean }> {
   for (const measured of ['length', 'loudness'] as const) {
     if (changes[measured] !== undefined) throw new SoundRefused(`the ${measured} is measured from the file and cannot be typed`, 'invalid', undefined, id);
   }
   const current = await loadLibrarySound(root, id);
-  const required = (value: unknown, field: string, name: string, max: number, keep: string) => {
-    if (value === undefined) return keep;
-    if (typeof value === 'string' && !value.trim()) throw new SoundRefused(`a library sound needs ${name}`, 'invalid', undefined, id);
-    return text(value, field, max, true)!;
-  };
+  const required = (value: unknown, field: string, max: number, keep: string) => (value === undefined ? keep : text(value, field, max, true)!);
   const optional = <T>(value: unknown, keep: T | undefined, parse: (value: unknown) => T | undefined) => (value === undefined ? keep : cleared(value) ? undefined : parse(value));
 
   const next = {
-    title: required(changes.title, 'title', 'a title', 200, current.title),
-    use_when: required(changes.useWhen, 'use when', 'a use when', 1000, current.use_when),
+    title: required(changes.title, 'title', 200, current.title),
+    use_when: required(changes.useWhen, 'use when', 1000, current.use_when),
     tags: changes.tags === undefined ? current.tags : parseTags(changes.tags),
     cue: optional(changes.cue, current.cue, (value) => seconds(value, 'cue')),
     trim: optional(changes.trim, current.trim, parseTrim),
@@ -277,6 +274,7 @@ export async function updateLibrarySound(root: string, id: string, changes: Libr
   const sound: Record<string, unknown> = { ...current, ...next };
   for (const field of ['cue', 'trim', 'source', 'credit'] as const) if (next[field] === undefined) delete sound[field];
   const updated = LibrarySoundSchema.parse(sound);
+  if (JSON.stringify(updated) === JSON.stringify(current)) return { sound: current, changed: false };
   await writeSound(soundFile(root, id), updated);
-  return updated;
+  return { sound: updated, changed: true };
 }

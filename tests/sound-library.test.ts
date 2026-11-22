@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { resolveBinary } from '../packages/cli/src/media.ts';
@@ -147,7 +147,7 @@ describe.skipIf(!hasFfmpeg())('sound edit', () => {
     const wav = join(soundDir(root, 'vine-boom'), 'sound.wav');
     const before = await hashFileStream(wav);
 
-    const updated = await updateLibrarySound(root, 'vine-boom', { useWhen: 'a shocking twist', tags: 'reveal,shock' });
+    const { sound: updated } = await updateLibrarySound(root, 'vine-boom', { useWhen: 'a shocking twist', tags: 'reveal,shock' });
 
     expect(updated).toMatchObject({ use_when: 'a shocking twist', tags: ['reveal', 'shock'] });
     expect(await loadLibrarySound(root, 'vine-boom')).toMatchObject({ title: 'Vine Boom', use_when: 'a shocking twist', tags: ['reveal', 'shock'], hash: before });
@@ -187,15 +187,43 @@ describe.skipIf(!hasFfmpeg())('sound edit', () => {
 
   it('clears optional fields with an empty value and keeps the rest', async () => {
     const root = await vineBoom('0.1-1.0');
-    await updateLibrarySound(root, 'vine-boom', { cue: 0.3, source: 'https://example.com', licence: 'CC-BY', credit: 'someone' });
+    const { sound: filled } = await updateLibrarySound(root, 'vine-boom', { cue: 0.3, source: 'https://example.com', licence: 'CC-BY', credit: 'someone' });
+    expect(filled).toMatchObject({ cue: 0.3, source: 'https://example.com', licence: 'CC-BY', credit: 'someone' });
 
-    const cleared = await updateLibrarySound(root, 'vine-boom', { trim: '', cue: '', source: '', licence: '', credit: '' });
+    await updateLibrarySound(root, 'vine-boom', { trim: '', cue: '', source: '', licence: '', credit: '' });
 
-    expect(cleared).toMatchObject({ title: 'Vine Boom', use_when: 'a dramatic reveal', licence: 'unknown' });
-    expect(cleared).not.toHaveProperty('trim');
-    expect(cleared).not.toHaveProperty('cue');
-    expect(cleared).not.toHaveProperty('source');
-    expect(cleared).not.toHaveProperty('credit');
+    const stored = await loadLibrarySound(root, 'vine-boom');
+    expect(stored).toMatchObject({ title: 'Vine Boom', use_when: 'a dramatic reveal', licence: 'unknown' });
+    for (const field of ['trim', 'cue', 'source', 'credit']) expect(stored).not.toHaveProperty(field);
+  });
+
+  it('writes nothing for an edit that changes nothing', async () => {
+    const root = await vineBoom();
+    const entry = join(soundDir(root, 'vine-boom'), 'sound.yaml');
+    const before = await readFile(entry, 'utf8');
+
+    const result = await updateLibrarySound(root, 'vine-boom', { useWhen: 'a dramatic reveal' });
+
+    expect(result.changed).toBe(false);
+    expect(await readFile(entry, 'utf8')).toBe(before);
+  });
+
+  it('refuses a typed length and an empty use when at the command line', async () => {
+    const root = await vineBoom();
+    const cli = (...args: string[]) =>
+      spawnSync(join(process.cwd(), 'node_modules', '.bin', 'tsx'), [join(process.cwd(), 'packages', 'cli', 'src', 'index.ts'), 'sound', 'edit', 'vine-boom', ...args], { cwd: root, encoding: 'utf8' });
+    await writeFile(join(root, 'package.json'), JSON.stringify({ name: 'coreslopper' }));
+
+    const length = cli('--length', '3');
+    const empty = cli('--use-when', '');
+    const changed = cli('--use-when', 'a shocking twist');
+
+    expect(length.status).not.toBe(0);
+    expect(length.stderr + length.stdout).toMatch(/length is measured from the file/);
+    expect(empty.status).not.toBe(0);
+    expect(empty.stderr + empty.stdout).toMatch(/needs a use when/);
+    expect(changed.status).toBe(0);
+    expect((await loadLibrarySound(root, 'vine-boom')).use_when).toBe('a shocking twist');
   });
 
   it('refuses the loudness, an empty title and an unknown sound', async () => {
@@ -204,5 +232,6 @@ describe.skipIf(!hasFfmpeg())('sound edit', () => {
     await expect(updateLibrarySound(root, 'vine-boom', { loudness: '-10' })).rejects.toThrow(/loudness is measured from the file/);
     await expect(updateLibrarySound(root, 'vine-boom', { title: '' })).rejects.toThrow(/needs a title/);
     await expect(updateLibrarySound(root, 'no-such-sound', { title: 'x' })).rejects.toThrow(/no library sound "no-such-sound"/);
+    await expect(updateLibrarySound(root, 'vine-boom', { trim: '0.5-0.4' })).rejects.toThrow(/must start before it ends/);
   });
 });

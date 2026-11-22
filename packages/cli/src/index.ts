@@ -783,8 +783,8 @@ sound
   .action((id: string, options: Record<string, string | undefined>) =>
     run(async () => {
       const { updateLibrarySound } = await import('./sound-library.js');
-      const entry = await updateLibrarySound(repoRoot(), id, options);
-      console.log(`✔ ${entry.id} updated: ${entry.title} – ${entry.use_when}${entry.tags.length ? ` [${entry.tags.join(', ')}]` : ''}`);
+      const { sound: entry, changed } = await updateLibrarySound(repoRoot(), id, options);
+      console.log(changed ? `✔ ${entry.id} updated: ${entry.title} – ${entry.use_when}${entry.tags.length ? ` [${entry.tags.join(', ')}]` : ''}` : `✔ ${entry.id}: nothing changed`);
     }),
   );
 
