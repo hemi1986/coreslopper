@@ -212,6 +212,22 @@ _Avoid_: sync, export
 Copying a library character into a music video or series canon: its identity always, each character state only when chosen, together with the states it derives from. An episode takes its characters from its series canon.
 _Avoid_: import (the other direction), take
 
+**Set Library**:
+The workspace's collection of sets to reuse across music videos and series, in `library/sets/<id>/`. Sets of finished set bibles and canons come in by themselves; a project or canon takes a copy with `set use`, and its set then names the library set in `library`.
+_Avoid_: location database, set catalogue
+
+**Library Set**:
+One entry of the set library: a set's name, description, prompt, reference images, and plates with their camera angles, tags, where it came from first, and the history of later imports. A set of a set bible that names it in `library` is a copy of it.
+_Avoid_: library entry, location
+
+**Set Import**:
+Taking the sets of a set bible into the set library, each into the library set it came from or a new one. Files are stored once by content; an existing library set keeps its name, description, and prompt and gains new reference images and plates. Every file of a library set is named by it.
+_Avoid_: sync, export
+
+**Set Use**:
+Copying a library set into a music video or series canon: its reference images and every plate. An episode takes its sets from its series canon.
+_Avoid_: import (the other direction)
+
 **Brand Kit**:
 A reusable package of logo, colors, fonts, tokens, and style guide, stored under `brand/<kit>/`.
 _Avoid_: theme

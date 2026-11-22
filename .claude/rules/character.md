@@ -8,7 +8,7 @@ paths:
   - "tests/continuity.test.ts"
 ---
 
-# Bibles and the character library (BC-Bibles, BC-CharacterLibrary)
+# Bibles and the character library (BC-Bibles, BC-Library)
 
 > Concept slice across core's schemas, the CLI, the board and two workspace skills. Adopted 2026-11-22. Decided by
 > recommendation plus four answers from the user. The model is in `docs/domain/events.yaml` (`AGG-StyleBible`,

@@ -164,6 +164,7 @@ flowchart LR
         CMD_UpdateUserReference["Update a user reference"]:::cmd
         CMD_RemoveUserReference["Remove a user reference"]:::cmd
         CMD_UseLibraryCharacter["Use a library character"]:::cmd
+        CMD_UseLibrarySet["Use a library set"]:::cmd
         EVT_StyleBibleWritten["Style bible written"]:::evt
         EVT_CharacterBibleWritten["⭐ Character bible written"]:::evt
         EVT_CharacterStateAdded["Character state added"]:::evt
@@ -174,14 +175,21 @@ flowchart LR
         EVT_UserReferenceUpdated["User reference updated"]:::evt
         EVT_UserReferenceRemoved["User reference removed"]:::evt
         EVT_LibraryCharacterUsed["⭐ Library character used"]:::evt
+        EVT_LibrarySetUsed["⭐ Library set used"]:::evt
     end
-    subgraph BC_CharacterLibrary["Character library"]
+    subgraph BC_Library["Library"]
         CMD_ImportCharacters["Take characters into the library"]:::cmd
         CMD_AddLibraryCharacter["Add a library character by hand"]:::cmd
         CMD_AddLibraryFile["Add a file to a library character"]:::cmd
         CMD_UpdateLibraryCharacter["Update a library character"]:::cmd
         CMD_RemoveLibraryFile["Remove a file from a library character"]:::cmd
         CMD_DeleteLibraryCharacter["Delete a library character"]:::cmd
+        CMD_ImportSets["Take sets into the library"]:::cmd
+        CMD_AddLibrarySet["Add a library set by hand"]:::cmd
+        CMD_AddLibrarySetFile["Add a file to a library set"]:::cmd
+        CMD_UpdateLibrarySet["Update a library set"]:::cmd
+        CMD_RemoveLibrarySetFile["Remove a file from a library set"]:::cmd
+        CMD_DeleteLibrarySet["Delete a library set"]:::cmd
         EVT_LibraryCharacterCreated["⭐ Library character created"]:::evt
         EVT_LibraryCharacterExtended["Library character extended"]:::evt
         EVT_LibraryCharacterUpdated["Library character updated"]:::evt
@@ -189,6 +197,13 @@ flowchart LR
         EVT_LibraryFileRemoved["Library file removed"]:::evt
         EVT_LibraryCharacterDeleted["Library character deleted"]:::evt
         EVT_LibraryCharacterUseRefused["Library character use refused"]:::evt
+        EVT_LibrarySetCreated["⭐ Library set created"]:::evt
+        EVT_LibrarySetExtended["Library set extended"]:::evt
+        EVT_LibrarySetUpdated["Library set updated"]:::evt
+        EVT_LibrarySetFileAdded["Library set file added"]:::evt
+        EVT_LibrarySetFileRemoved["Library set file removed"]:::evt
+        EVT_LibrarySetDeleted["Library set deleted"]:::evt
+        EVT_LibrarySetUseRefused["Library set use refused"]:::evt
     end
     subgraph BC_Render["Render"]
         CMD_RenderPreview["Render a preview"]:::cmd
@@ -349,6 +364,7 @@ flowchart LR
     POL_RestartComfyUIOnFailure{{"A failed local generation restarts ComfyUI before the next try"}}:::pol
     POL_ValidateEveryScriptEdit{{"Every script edit is validated"}}:::pol
     POL_ImportFinishedCharacters{{"The characters of a finished character bible go into the library"}}:::pol
+    POL_ImportFinishedSets{{"The sets of a finished set bible go into the library"}}:::pol
     POL_LinkNewProjectMedia{{"A new project's media go to the media directory"}}:::pol
     POL_RefreshAfterStatusChange{{"The release folder follows a live URL and an approval"}}:::pol
     POL_MarkPostedEventDone{{"A posted calendar event is marked done"}}:::pol
@@ -379,6 +395,7 @@ flowchart LR
     RM_TakeStatus[("Take status")]:::rm
     RM_Subtitles[("Subtitles")]:::rm
     RM_CharacterLibrary[("Character library")]:::rm
+    RM_SetLibrary[("Set library")]:::rm
     RM_UserReferences[("User references")]:::rm
     RM_RenderProgress[("Render progress")]:::rm
     RM_Renders[("Renders")]:::rm
@@ -544,6 +561,22 @@ flowchart LR
     CMD_RemoveLibraryFile --> EVT_LibraryFileRemoved
     ACT_User --> CMD_DeleteLibraryCharacter
     CMD_DeleteLibraryCharacter --> EVT_LibraryCharacterDeleted
+    ACT_User --> CMD_ImportSets
+    CMD_ImportSets --> EVT_LibrarySetCreated
+    CMD_ImportSets --> EVT_LibrarySetExtended
+    ACT_User --> CMD_UseLibrarySet
+    CMD_UseLibrarySet --> EVT_LibrarySetUsed
+    CMD_UseLibrarySet --> EVT_LibrarySetUseRefused
+    ACT_User --> CMD_AddLibrarySet
+    CMD_AddLibrarySet --> EVT_LibrarySetCreated
+    ACT_User --> CMD_AddLibrarySetFile
+    CMD_AddLibrarySetFile --> EVT_LibrarySetFileAdded
+    ACT_User --> CMD_UpdateLibrarySet
+    CMD_UpdateLibrarySet --> EVT_LibrarySetUpdated
+    ACT_User --> CMD_RemoveLibrarySetFile
+    CMD_RemoveLibrarySetFile --> EVT_LibrarySetFileRemoved
+    ACT_User --> CMD_DeleteLibrarySet
+    CMD_DeleteLibrarySet --> EVT_LibrarySetDeleted
     ACT_StageRunner --> CMD_RenderPreview
     CMD_RenderPreview --> EVT_PreviewRendered
     CMD_RenderPreview --> EVT_RenderFailed
@@ -671,7 +704,6 @@ flowchart LR
     ACT_BoardWizard --> CMD_CreateMeme
     CMD_CreateMeme --> EVT_MemeCreated
     CMD_CreateMeme --> EVT_MemeRefused
-    CMD_CreateMeme --> EVT_LibraryCharacterUsed
     ACT_User --> CMD_AddLibrarySound
     CMD_AddLibrarySound --> EVT_LibrarySoundAdded
     CMD_AddLibrarySound --> EVT_LibrarySoundRefused
@@ -714,6 +746,9 @@ flowchart LR
     EVT_StageCompleted --> POL_ImportFinishedCharacters
     EVT_CharacterBibleWritten --> POL_ImportFinishedCharacters
     POL_ImportFinishedCharacters --> CMD_ImportCharacters
+    EVT_StageCompleted --> POL_ImportFinishedSets
+    EVT_SetBibleWritten --> POL_ImportFinishedSets
+    POL_ImportFinishedSets --> CMD_ImportSets
     EVT_ProjectCreated --> POL_LinkNewProjectMedia
     POL_LinkNewProjectMedia --> CMD_LinkProjectMedia
     EVT_LiveUrlRecorded --> POL_RefreshAfterStatusChange
@@ -851,6 +886,16 @@ flowchart LR
     RM_CharacterLibrary -.-> ACT_User
     RM_CharacterLibrary -.-> ACT_SetupSkill
     RM_CharacterLibrary -.-> ACT_StageRunner
+    EVT_LibrarySetCreated -.-> RM_SetLibrary
+    EVT_LibrarySetExtended -.-> RM_SetLibrary
+    EVT_LibrarySetUpdated -.-> RM_SetLibrary
+    EVT_LibrarySetFileAdded -.-> RM_SetLibrary
+    EVT_LibrarySetFileRemoved -.-> RM_SetLibrary
+    EVT_LibrarySetDeleted -.-> RM_SetLibrary
+    EVT_LibrarySetUsed -.-> RM_SetLibrary
+    RM_SetLibrary -.-> ACT_User
+    RM_SetLibrary -.-> ACT_SetupSkill
+    RM_SetLibrary -.-> ACT_StageRunner
     EVT_UserReferenceAdded -.-> RM_UserReferences
     EVT_UserReferenceUpdated -.-> RM_UserReferences
     EVT_UserReferenceRemoved -.-> RM_UserReferences
@@ -1249,6 +1294,43 @@ flowchart LR
     RM_CharacterLibrary --> ACT_User
     ACT_User --> CMD_UseLibraryCharacter
     CMD_UseLibraryCharacter --> EVT_LibraryCharacterUsed
+    classDef evt fill:#a3391f,stroke:#e65100,color:#fff
+    classDef cmd fill:#64b5f6,stroke:#0d47a1,color:#000
+    classDef pol fill:#ce93d8,stroke:#4a148c,color:#000
+    classDef rm fill:#81c784,stroke:#1b5e20,color:#000
+    classDef act fill:#a3751f,stroke:#f57f17,color:#000
+    classDef ext fill:#f48fb1,stroke:#880e4f,color:#000
+    classDef agg fill:#ffe082,stroke:#ff6f00,color:#000
+    classDef hs fill:#e57373,stroke:#b71c1c,color:#fff
+```
+
+### From a finished set bible to a set used again
+
+```mermaid
+flowchart LR
+    ACT_StageRunner(["Stage runner"]):::act
+    CMD_WriteSetBible["Write the set bible"]:::cmd
+    EVT_SetBibleWritten["Set bible written"]:::evt
+    CMD_CompleteStage["Complete stage"]:::cmd
+    EVT_StageCompleted["Stage completed"]:::evt
+    POL_ImportFinishedSets{{"The sets of a finished set bible go into the library"}}:::pol
+    CMD_ImportSets["Take sets into the library"]:::cmd
+    EVT_LibrarySetCreated["⭐ Library set created"]:::evt
+    RM_SetLibrary[("Set library")]:::rm
+    ACT_User(["User"]):::act
+    CMD_UseLibrarySet["Use a library set"]:::cmd
+    EVT_LibrarySetUsed["⭐ Library set used"]:::evt
+    ACT_StageRunner --> CMD_WriteSetBible
+    CMD_WriteSetBible --> EVT_SetBibleWritten
+    EVT_SetBibleWritten --> CMD_CompleteStage
+    CMD_CompleteStage --> EVT_StageCompleted
+    EVT_StageCompleted --> POL_ImportFinishedSets
+    POL_ImportFinishedSets --> CMD_ImportSets
+    CMD_ImportSets --> EVT_LibrarySetCreated
+    EVT_LibrarySetCreated --> RM_SetLibrary
+    RM_SetLibrary --> ACT_User
+    ACT_User --> CMD_UseLibrarySet
+    CMD_UseLibrarySet --> EVT_LibrarySetUsed
     classDef evt fill:#a3391f,stroke:#e65100,color:#fff
     classDef cmd fill:#64b5f6,stroke:#0d47a1,color:#000
     classDef pol fill:#ce93d8,stroke:#4a148c,color:#000
@@ -1729,8 +1811,8 @@ flowchart LR
 | Generation (`BC-Generation`) | Turns the items of a generation batch into provider calls for a model role – each refused up front when the batch does not fit the budget, served from the generation cache when the same request ran before, recorded in the manifest, and billed to the project budget at its planned cost | Cached generation, Model roles | Generation batch refused, Generation completed, Generation reused from the cache, Generation failed, Clip restored, Generation filed, Model roles changed, ComfyUI restarted |
 | Series (`BC-Series`) | Keeps a series' umbrella budget and episode plan and creates its episodes with the series' formats, providers and brand | Series | Series created, Episode created, Episode refused, Canon spend recorded |
 | Scripted audio (`BC-ScriptedAudio`) | Turns the script of an episode or a meme into takes – generated, imported, taken from clips or copied from the sound library – and the takes into an episode track with speaker stems, subtitles and lip-sync audio, the scripted project's replacement for the song (HS-258; documentation only, the code stays where it is) | Script, Take registry, Episode track | Script written, Script revised, Script validated, Take generated, Ambience generated, Take imported, Voice track stopped, Episode track built, Subtitles written, Lip-sync audio cut, Library sound taken |
-| Bibles (`BC-Bibles`) | Holds what a production must look and sound like before any shot is generated – the style bible, the character bible with its character states, the set bible with plates and prop references, and the user references – per music video, or once per series canon that every episode reads and may only add to | Style bible, Character bible, Set bible, User references | Style bible written, Character bible written, Character state added, Set bible written, Plate added, Prop reference added, User reference added, User reference updated, User reference removed, Library character used |
-| Character library (`BC-CharacterLibrary`) | Keeps the workspace's reusable characters across productions – takes the characters of finished character bibles in and copies a character's identity, and the states the user chooses, into a new music video or series canon | Library character | Library character created, Library character extended, Library character updated, Library file added, Library file removed, Library character deleted, Library character use refused |
+| Bibles (`BC-Bibles`) | Holds what a production must look and sound like before any shot is generated – the style bible, the character bible with its character states, the set bible with plates and prop references, and the user references – per music video, or once per series canon that every episode reads and may only add to | Style bible, Character bible, Set bible, User references | Style bible written, Character bible written, Character state added, Set bible written, Plate added, Prop reference added, User reference added, User reference updated, User reference removed, Library character used, Library set used |
+| Library (`BC-Library`) | Keeps the workspace's reusable characters and sets across productions – takes the characters and sets of finished bibles in and copies a character's identity with the states the user chooses, or a set with its plates, into a new music video or series canon | Library character, Library set | Library character created, Library character extended, Library character updated, Library file added, Library file removed, Library character deleted, Library character use refused, Library set created, Library set extended, Library set updated, Library set file added, Library set file removed, Library set deleted, Library set use refused |
 | Render (`BC-Render`) | Turns a validated project into its videos and images – a render per format from one composition, previews for checks, Shorts cut from the 9:16 render, and composed images (thumbnails, covers, feed images) from a generated image and the style bible – and keeps a project's media in the media directory | Render, Short, Composed image | Preview rendered, Passage rendered, Format rendered, Still rendered, Render failed, Short cut, Short refused, Image composed, Image composition refused, Project media linked, Determinism checked |
 | Release (`BC-Release`) | Turns a finished project into everything its release needs – the release folder with its manifest, the platform texts laid out and checked against the limits, the release calendar planned across the workspace, and the release board where the user ticks off what went live and gives the one release approval | Release package, Release calendar, Release status | Upload data written, Release package built, Release rules broken, Upload text rendered, Release calendar planned, Release day fixed, Calendar event marked done, Live URL recorded, Release approved, Approval withdrawn, Approval refused, Release checked, Calendar event taken over, Calendar event given back |
 | Publishing (`BC-Publish`) | Gets an approved release onto the platforms – the publish command uploads by hand, privately or as drafts; the release autopilot posts every calendar event a platform API can post at its time once the user approved the release, without ever posting twice; the platform credentials and the watchdog round that runs it every few minutes | Publish log, Autopilot log, Autopilot round, Platform credentials | Platform authorized, Token rotated, Publish planned, Video uploaded, Upload failed, Autopilot round run, Post claimed, Calendar event posted, Calendar event uploaded, Video went public, Post attempt failed, Pinned comment posted, Spotify link appended, Microsite page deployed, Retry requested, Post forced, Timer installed |
@@ -1759,7 +1841,8 @@ flowchart LR
 | Character bible (`AGG-CharacterBible`) | Bibles | as-is | characters.yaml of a music video or series canon, parsed whole with CharacterBibleSchema (packages/core/src/schema.ts:436-489); the files lie in characters/<id>/ beside it<br>written by the character-bible and new-series skills, and by character use through the YAML document with a whole-file schema check before an atomic write (packages/cli/src/character-library.ts:452-525) |
 | Set bible (`AGG-SetBible`) | Bibles | as-is | sets.yaml of a music video or series canon, parsed whole with SetBibleSchema (packages/core/src/schema.ts:496-541); plates in sets/<set>/plates/, props in props/<id>/ beside it<br>written by the style-bible skill in style-character (music video) and by new-series (canon); validated by the hook on every edit (packages/cli/src/validate-file.ts:86-97) |
 | User references (`AGG-UserReferences`) | Bibles | as-is | references.yaml of a project or series canon with ReferencesSchema (packages/core/src/schema.ts:1460-1489), files in assets/references/<br>every change is a read, a change and an atomic save in board-wizard.ts (packages/cli/src/board-wizard.ts:72-178), used by the reference command and the board wizard; validate-file checks unique ids and that every file exists (packages/cli/src/validate-file.ts:234-243) |
-| Library character (`AGG-LibraryCharacter`) | Character library | as-is | library/characters/<id>/character.yaml with LibraryCharacterSchema (packages/core/src/schema.ts:1422-1458) and the character's files beside it; validate-file checks that the id is the folder and that every named file exists (packages/cli/src/validate-file.ts:246-258)<br>every write – import, new, add-file, update, remove – reads the entry, changes it and saves it atomically in character-library.ts (packages/cli/src/character-library.ts:63-66,206-428) |
+| Library character (`AGG-LibraryCharacter`) | Library | as-is | library/characters/<id>/character.yaml with LibraryCharacterSchema (packages/core/src/schema.ts:1422-1458) and the character's files beside it; validate-file checks that the id is the folder and that every named file exists (packages/cli/src/validate-file.ts:246-258)<br>every write – import, new, add-file, update, remove – reads the entry, changes it and saves it atomically in character-library.ts (packages/cli/src/character-library.ts:63-66,206-428) |
+| Library set (`AGG-LibrarySet`) | Library | target | – |
 | Render (`AGG-Render`) | Render | as-is | one file per format and variant, renders/[preview-]<format>[.en].mp4, written whole – rendered in segments under .cache/render/, joined, the song muxed once, and only then copied over the old file (packages/cli/src/render.ts:182-184,293-445)<br>a whole render of a format – not a preview, not --frames, not --out – is recorded in state.json artifacts as render:<file>:inputs (the hash of the props, the song's bytes and crf 18) and render:<file>:sha256 (render.ts:267-291,431-433); release renders a format again when it is missing or its recorded inputs hash differs from the current one (packages/cli/src/release.ts:237-262) |
 | Short (`AGG-Short`) | Render | as-is | renders/shorts/<name>-9x16.mp4, cut whole by short from renders/9x16.mp4 with one ffmpeg re-encode – crf 18, a 0.15 s fade-in and a 0.4 s fade-out (packages/cli/src/short.ts:22-24,132-175,200-233); its thumbnail and TikTok cover lie beside it as <name>-thumb.jpg and <name>-tiktok.jpg (packages/cli/src/release-files.ts:26-34) |
 | Composed image (`AGG-ComposedImage`) | Render | as-is | one JPEG and its recipe <name>.recipe.json beside it, written by thumbnail in one run – a Remotion still of the Thumbnail composition, encoded at falling JPEG quality until it fits the limit, then the recipe (packages/cli/src/thumbnail.ts:183-217; packages/cli/src/thumbnail-recipe.ts:35-58)<br>five formats with fixed sizes and limits – 16x9 1280x720, 9x16 1080x1920, 3x4 1080x1440, 4x5 1080x1350, 1x1 3000x3000; under 2 MB, under 10 MB for 1x1 (packages/remotion/src/lib/thumbnail.ts:12-18,60-66) |
@@ -1780,7 +1863,3 @@ flowchart LR
 ## Open Hotspots
 
 - **HS-259** – Can a meme use TikTok's trending audio – is there an API, what do TikTok's and the music labels' terms allow, and can such a sound leave TikTok at all? _(refs: BC-SoundLibrary)_
-- **HS-262** – The script's invariant says every scene plays in a set of the canon and every speaker is a character of the canon. A meme has no canon, and its script is written before style-character writes its set bible and the characters it invents. What does a meme's script name as set and speaker when the hook validates it in the script stage – and when is it checked against the bibles? _(refs: AGG-Script, CMD-WriteMemeScript, CMD-ValidateScript)_
-- **HS-263** – A meme gets German subtitles burned in, for German speech. The glossary defines subtitles as the translated text and avoids 'captions'; subtitles are English only today (HS-113, CMD-WriteSubtitles). Is a meme's burned-in text subtitles in the spoken language, and is the subtitle language a project setting or fixed per project kind? _(refs: CMD-WriteSubtitles, AGG-Script)_
-- **HS-264** – A meme lasts at most 30 seconds. The episode track checks an episode's length against the series' episode length (HS-114); a meme has no series. Is the 30 seconds a fixed rule of the project kind or a project limit, and is a longer track refused when it is built or only reported by QA? _(refs: AGG-EpisodeTrack, CMD-WriteMemeScript)_
-- **HS-265** – The release check writes a used library sound's credit text into the platform texts (HS-261), but no event or field of a library sound carries a credit text – only source and licence. Is the credit part of the licence, a field of its own, or written from source and licence? _(refs: AGG-LibrarySound, CMD-CheckRelease)_
