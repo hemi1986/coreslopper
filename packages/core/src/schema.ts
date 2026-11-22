@@ -29,6 +29,11 @@ const ScriptIdSchema = z
   .min(1)
   .regex(/^[a-z0-9][a-z0-9_-]*$/, 'id must be lowercase letters, digits, dashes, and underscores');
 
+/** Whether a value is a valid script id (also a character, set, or library sound id). */
+export function isScriptId(value: string): boolean {
+  return ScriptIdSchema.safeParse(value).success;
+}
+
 /** What a project produces. A missing kind means `music-video`. */
 export const ProjectKindSchema = z.enum(['music-video', 'episode', 'meme']);
 

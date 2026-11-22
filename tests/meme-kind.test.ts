@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { existsSync } from 'node:fs';
-import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { stringify } from 'yaml';
+import { parse, stringify } from 'yaml';
 import {
   MEME_MAX_SECONDS,
   MEME_STAGES,
@@ -21,7 +22,7 @@ import {
 import { createProject } from '../packages/cli/src/new-project.ts';
 import { printStatus } from '../packages/cli/src/status.ts';
 import { episodeTrack } from '../packages/cli/src/episode-track.ts';
-import { resolveBinary } from '../packages/cli/src/media.ts';
+import { importTakes, resolveBinary } from '../packages/cli/src/media.ts';
 
 const root = process.cwd();
 const temporary: string[] = [];
@@ -183,7 +184,24 @@ describe('the meme template', () => {
 });
 
 describe('episode-track on a meme', () => {
-  it(`refuses a track over ${MEME_MAX_SECONDS} seconds as a hard stop`, async () => {
+  it.skipIf(!hasFfmpeg())(`refuses a track over ${MEME_MAX_SECONDS} seconds as a hard stop once the takes are measured`, async () => {
+    const projectDir = await memeWorkspace();
+    // 20 s of pause is all the script knows; the 10.5 s take of the spoken line makes it 30.5 s.
+    await writeScript(projectDir, [20]);
+    const scriptPath = join(projectDir, 'script.yaml');
+    const script = parse(await readFile(scriptPath, 'utf8'));
+    script.scenes[0].lines.push({ id: 'punch', kind: 'dialogue', speaker: 'mara', text_de: 'Hallo.', text_en: 'Hello.' });
+    await writeFile(scriptPath, stringify(script), 'utf8');
+    await mkdir(join(projectDir, 'audio', 'lines'), { recursive: true });
+    execFileSync(resolveBinary('ffmpeg'), ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000:duration=10.5', '-ac', '1', join(projectDir, 'audio', 'lines', 'punch.wav')]);
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    await importTakes(projectDir, { lines: ['punch'] });
+    await expect(episodeTrack(projectDir)).rejects.toThrow(/lasts 30\.500 s; a meme lasts at most 30 s/);
+    expect(existsSync(join(projectDir, 'timing.json'))).toBe(false);
+    expect(existsSync(join(projectDir, 'audio', 'episode.wav'))).toBe(false);
+  });
+
+  it(`stops a script whose known lengths are over ${MEME_MAX_SECONDS} seconds before any track is built`, async () => {
     const projectDir = await memeWorkspace();
     await writeScript(projectDir, [20, 10.5]);
     // Pauses are known before any take exists, so the script check stops it first (ST-009, HS-264).

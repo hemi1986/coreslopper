@@ -6,6 +6,7 @@ import { stringify } from 'yaml';
 import { ScriptSchema, ValidationError, knownLineSeconds, validateScript, type Script } from '@coreslopper/core';
 import { createProject } from '../packages/cli/src/new-project.ts';
 import { validateChangedFile } from '../packages/cli/src/validate-file.ts';
+import { scriptSounds } from '../packages/cli/src/script-canon.ts';
 
 // ST-009: a meme's script names library sounds and its own characters; there is no series canon.
 
@@ -47,12 +48,42 @@ function issuesOf(run: () => void): string[] {
 
 const library = { 'vine-boom': 1.4 };
 
+/** The meme "office-prank" in a workspace whose library holds "vine-boom", a 2-second sound trimmed to 1.4 seconds. */
+async function meme(): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), 'coreslopper-meme-script-'));
+  temporary.push(dir);
+  await cp(join(root, 'config'), join(dir, 'config'), { recursive: true });
+  await cp(join(root, 'templates'), join(dir, 'templates'), { recursive: true });
+  vi.spyOn(console, 'log').mockImplementation(() => undefined);
+  const projectDir = await createProject({ root: dir, slug: 'office-prank', budget: 10, kind: 'meme' });
+  vi.restoreAllMocks();
+  await mkdir(join(dir, 'library', 'sounds', 'vine-boom'), { recursive: true });
+  await writeFile(
+    join(dir, 'library', 'sounds', 'vine-boom', 'sound.yaml'),
+    stringify({
+      version: 1,
+      id: 'vine-boom',
+      title: 'Vine boom',
+      use_when: 'a reveal',
+      length: 2,
+      loudness: -14,
+      trim: { start: 0.3, end: 1.7 },
+      hash: 'a'.repeat(64),
+      added: '2026-11-22T00:00:00Z',
+    }),
+  );
+  return projectDir;
+}
+
 describe('a meme script', () => {
-  it('ST-009: A script with a library sound passes', () => {
+  it('ST-009: A script with a library sound passes', async () => {
+    // The library holds "vine-boom" of 1.4 seconds: a 2-second file trimmed to 0.3-1.7.
+    const projectDir = await meme();
     const script = officePrank({ sound: 'vine-boom' });
-    expect(() => validateScript(script, { kind: 'meme', sounds: library })).not.toThrow();
+    const sounds = await scriptSounds(projectDir, script);
+    expect(() => validateScript(script, { kind: 'meme', sounds })).not.toThrow();
     const line = script.scenes[0]!.lines.find((candidate) => candidate.id === 'reveal-boom')!;
-    expect(knownLineSeconds(line, library)).toBe(1.4);
+    expect(knownLineSeconds(line, sounds)).toBeCloseTo(1.4, 9);
   });
 
   it('ST-009: A sound line with both a sound and a prompt is refused', () => {
@@ -117,31 +148,6 @@ describe('a meme script', () => {
 });
 
 describe('the workspace hook on a meme script', () => {
-  async function meme(): Promise<string> {
-    const dir = await mkdtemp(join(tmpdir(), 'coreslopper-meme-script-'));
-    temporary.push(dir);
-    await cp(join(root, 'config'), join(dir, 'config'), { recursive: true });
-    await cp(join(root, 'templates'), join(dir, 'templates'), { recursive: true });
-    vi.spyOn(console, 'log').mockImplementation(() => undefined);
-    const projectDir = await createProject({ root: dir, slug: 'office-prank', budget: 10, kind: 'meme' });
-    vi.restoreAllMocks();
-    await mkdir(join(dir, 'library', 'sounds', 'vine-boom'), { recursive: true });
-    await writeFile(
-      join(dir, 'library', 'sounds', 'vine-boom', 'sound.yaml'),
-      stringify({
-        version: 1,
-        id: 'vine-boom',
-        title: 'Vine boom',
-        use_when: 'a reveal',
-        length: 2,
-        loudness: -14,
-        trim: { start: 0, end: 1.4 },
-        hash: 'a'.repeat(64),
-        added: '2026-11-22T00:00:00Z',
-      }),
-    );
-    return projectDir;
-  }
 
   it('passes a script with a known library sound and refuses one with an unknown sound', async () => {
     const projectDir = await meme();

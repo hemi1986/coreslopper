@@ -3,7 +3,7 @@
  * text of an episode; these checks run before any take is generated.
  */
 import { ValidationError } from './errors.js';
-import type { CharacterBible, Line, ProjectKind, Script, ScriptLine, Section, SetBible, Timing } from './schema.js';
+import { isScriptId, type CharacterBible, type Line, type ProjectKind, type Script, type ScriptLine, type Section, type SetBible, type Timing } from './schema.js';
 import { MEME_MAX_SECONDS } from './state.js';
 
 /** Script line kinds that are spoken and therefore follow the TTS text rule. */
@@ -59,8 +59,6 @@ export interface ScriptCanon {
   sounds?: Record<string, number>;
 }
 
-const ID = /^[a-z0-9][a-z0-9_-]*$/;
-
 /**
  * The length of a script line that is known before any take exists: a pause, a
  * generated effect's duration, a library sound's (trimmed) length. Spoken and
@@ -84,7 +82,9 @@ function soundLineIssues(line: Extract<ScriptLine, { kind: 'sfx' }>, label: stri
     return [`${label} names the library sound "${line.sound}"; library sounds belong to memes, an episode's effect needs a prompt and a duration`];
   }
   if (line.sound !== undefined && line.prompt !== undefined) return [`${label} names a library sound or a prompt, not both`];
-  if (line.sound === undefined && line.prompt === undefined) return [`${label} needs a library sound (sound) or a prompt`];
+  if (line.sound === undefined && line.prompt === undefined) {
+    return [canon.kind === 'meme' ? `${label} needs a library sound (sound) or a prompt` : `${label} needs a prompt and a duration`];
+  }
   if (line.sound !== undefined) {
     const issues: string[] = [];
     if (canon.sounds?.[line.sound] === undefined) issues.push(`${label}: there is no library sound "${line.sound}"`);
@@ -118,7 +118,7 @@ export function validateScript(script: Script, canon: ScriptCanon): void {
     sceneIds.add(scene.id);
     if (setIds && !setIds.has(scene.set)) {
       issues.push(`scene "${scene.id}" plays in unknown set "${scene.set}"; known sets: ${[...setIds].join(', ') || 'none'}`);
-    } else if (!setIds && meme && !ID.test(scene.set)) {
+    } else if (!setIds && meme && !isScriptId(scene.set)) {
       issues.push(`scene "${scene.id}": set "${scene.set}" is not a valid id (lowercase letters, digits, dashes, underscores)`);
     }
   }
@@ -140,7 +140,7 @@ export function validateScript(script: Script, canon: ScriptCanon): void {
 
     if (isSubtitledLine(line)) {
       if (characterIds && !characterIds.has(line.speaker)) issues.push(`${label} has unknown speaker "${line.speaker}"`);
-      else if (!characterIds && meme && !ID.test(line.speaker)) {
+      else if (!characterIds && meme && !isScriptId(line.speaker)) {
         issues.push(`${label}: speaker "${line.speaker}" is not a valid id (lowercase letters, digits, dashes, underscores)`);
       }
       if (!line.text_en?.trim()) issues.push(`${label} needs text_en for the English subtitles`);
