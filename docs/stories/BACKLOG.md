@@ -2,4 +2,14 @@
 
 > Generated from `docs/stories/ST-*.md` – **do not edit manually**. Change the story files instead.
 
-_No stories yet. Derive them from the event storming as a spec engineer (main session)._
+**Progress: 0 of 0 domain stories done** · scenarios 0 of 0
+
+**1 story** · In Progress: 0 · Ready: 0 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 1 · Superseded: 0
+
+Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
+
+## Done
+
+| ID | Title | Type | Context | Priority | Size | Risk | Depends on |
+|---|---|---|---|---|---|---|---|
+| [ST-021](ST-021-wizard-leads-to-the-project.md) | The wizard's last step leads to the new project or series | chore | – | must | – | – | – |
