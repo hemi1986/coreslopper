@@ -3,7 +3,7 @@ import { readFile, readdir, rm, stat } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ValidationError, calendarIcs, loadChannel, repoRoot, type ReleaseCalendar } from '@coreslopper/core';
+import { ValidationError, calendarIcs, loadChannel, loadProject, releasedPublicly, repoRoot, type ReleaseCalendar } from '@coreslopper/core';
 import { boardProject, type BoardProject } from './release-board-data.js';
 import { loadEvents, loadSnapshot } from './production-watch.js';
 import { editNote, reviewData, submitRound } from './board-review.js';
@@ -34,8 +34,9 @@ export interface BoardOptions {
   refresh?: (projectDir: string) => Promise<void>;
 }
 
-/** The quick refresh after a live URL arrives: texts and microsite data, no renders, no new stills. */
+/** The quick refresh after a live URL arrives: texts and microsite data, no renders, no new stills; an internal project has none. */
 async function quickRelease(projectDir: string): Promise<void> {
+  if (!releasedPublicly((await loadProject(projectDir)).config)) return;
   const { buildRelease } = await import('./release.js');
   await buildRelease({ projectDir, render: false, stills: false, deps: { log: () => undefined } });
 }

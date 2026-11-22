@@ -32,6 +32,9 @@ const ScriptIdSchema = z
 /** What a project produces. A missing kind means `music-video`. */
 export const ProjectKindSchema = z.enum(['music-video', 'episode', 'meme']);
 
+/** Whether a project is released on the platforms (`public`) or only shared privately (`internal`). */
+export const DistributionSchema = z.enum(['public', 'internal']);
+
 export const ProvidersSchema = z
   .object({
     image: ImageProviderKindSchema.default('mock'),
@@ -122,6 +125,8 @@ export const ProjectConfigSchema = z
     models: z.record(z.string(), z.unknown()).default({}),
     /** Distributor facts for the release package; music videos only. */
     release: ReleaseMetadataSchema.optional(),
+    /** `internal`: never released publicly (a teaser sent by mail or chat), so no release package and no calendar. Unset is `public`. */
+    distribution: DistributionSchema.optional(),
   })
   .superRefine((config, ctx) => {
     if (config.kind !== 'episode') return;

@@ -260,6 +260,10 @@ _Avoid_: metadata, copy, upload package (the **Release Package** is everything t
 Everything a finished song and video need to be published, collected in the **Release Folder**: every format, thumbnails, Shorts, the song as WAV, cover, canvas, lyrics, the platform texts, and the release plan.
 _Avoid_: deliverables, export bundle
 
+**Distribution**:
+`distribution` in `project.yaml`: `public` (the default) for a project released on the platforms, `internal` for one that never is – a teaser sent by mail or chat. An internal project gets no **Release Package** and no **Release Calendar**.
+_Avoid_: release mode, visibility (a platform's privacy setting)
+
 **Release Folder**:
 `renders/release/`, the one place the user uploads from. `release` assembles it again whenever its sources change; a run never removes a file it could not refresh.
 _Avoid_: export folder, output
