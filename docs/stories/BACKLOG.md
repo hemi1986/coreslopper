@@ -4,15 +4,9 @@
 
 **Progress: 4 of 24 domain stories done** · scenarios 15 of 80
 
-**42 stories** · In Progress: 1 · Ready: 30 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 11 · Superseded: 0
+**42 stories** · In Progress: 0 · Ready: 30 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 12 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
-
-## In Progress
-
-| ID | Title | Type | Context | Priority | Size | Risk | Depends on |
-|---|---|---|---|---|---|---|---|
-| [ST-039](ST-039-restart-comfyui-only-when-stuck.md) | Restart ComfyUI only when it is stuck | task | – | should | – | – | – |
 
 ## Ready
 
@@ -64,3 +58,4 @@ Within each section: by priority, then by story ID, with dependencies pulled in 
 | [ST-036](ST-036-an-internal-project-gets-no-release-package.md) | An internal project gets no release package | domain | Release | must | – | – | – |
 | [ST-037](ST-037-internal-projects-end-after-qa.md) | Internal projects are created as such and end after QA | task | – | must | – | – | ST-036 |
 | [ST-038](ST-038-local-lip-sync-by-default-in-comfyui-projects.md) | ComfyUI projects lip-sync locally by default | task | – | must | – | – | – |
+| [ST-039](ST-039-restart-comfyui-only-when-stuck.md) | Restart ComfyUI only when it is stuck | task | – | should | – | – | – |

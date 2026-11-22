@@ -1739,7 +1739,11 @@ commands:
     name: Restart ComfyUI
     actor: ACT-QueueRun
     produces: [EVT-ComfyUIRestarted]
-    description: "comfy restart, and the queue run between two tries of a failed or hung generation, through COMFYUI_RESTART_COMMAND (packages/cli/src/comfy.ts:62; queue.ts:641)"
+    description: "comfy restart, and the queue run between two tries of a failed or hung generation, through COMFYUI_RESTART_COMMAND (packages/cli/src/comfy.ts:62; queue.ts:641). comfy restart --if-stuck and the watchdog round (ACT-Watchdog, when COMFYUI_RESTART_COMMAND is set) observe the server first (comfyStuckCheck, packages/cli/src/comfy.ts; production-watch.ts)"
+    rules:
+      - "--if-stuck and the watchdog round restart only when every check of a 3-minute window (one every 30 s) is stuck: no answer from /queue within 10 s, or at least one pending prompt, none running, and the same prompt first in the queue; one healthy check ends the window without a restart (ST-039)"
+      - A running prompt is never stuck for this check; a hung generation is the queue run's timeout (queue.ts)
+      - The watchdog round records a restart as a production event (comfyui-restarted in .cache/watch/events.jsonl)
   - id: CMD-RecordCanonSpend
     name: Record canon spend
     actor: ACT-SetupSkill
