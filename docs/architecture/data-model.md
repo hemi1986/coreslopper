@@ -602,6 +602,36 @@ The workspace's `.env` (mode 0600), written by `saveEnvValue` (`packages/cli/src
 | Media host key | `FAL_KEY`, for Instagram | for Instagram | the user |
 | Switches | `YOUTUBE_DAILY_QUOTA`, `TIKTOK_DIRECT_POST` (HS-188), API versions | no | the user |
 
+### AGG-WorkspaceMarker – Workspace marker (as-is)
+
+`coreslopper.workspace.json` at the workspace root, written whole by `init` (`packages/cli/src/init.ts:167-176`) and by
+every `update` that is not a dry run (`packages/cli/src/update.ts:308-315`); schema `WorkspaceMarker`
+(`packages/cli/src/workspace.ts:8-17`). Committed with the workspace.
+
+| Attribute | Type | Required | Source |
+|---|---|---|---|
+| Version | `1` | yes | EVT-WorkspaceCreated |
+| Runtime version | SemVer – the CLI's at init, the runtime's at update (HS-215) | yes | EVT-WorkspaceCreated, EVT-WorkspaceUpdated |
+| Created | Timestamp | yes | EVT-WorkspaceCreated |
+| First project | Slug | no | EVT-WorkspaceCreated |
+| Updated | Timestamp | after the first update | EVT-WorkspaceUpdated |
+| Baseline | map of runtime path → SHA-256, upstream's last offer (HS-208) | yes, since ADR 0012 | EVT-WorkspaceCreated, EVT-WorkspaceUpdated |
+
+Beside it, owned by the workspace: `.env` (mode 0600; the provider keys from init, the platform credentials of the
+publish slice), `GETTING_STARTED.md`, an optional `.mcp.json`, and the conflict copies `<file>.coreslopper-new`
+(EVT-ConflictCopyWritten).
+
+### AGG-RuntimeSnapshot – Runtime snapshot (as-is)
+
+`runtime/` upstream, built whole by `scripts/build-runtime.mjs` from `git ls-files` through `planRuntime`
+(`scripts/runtime-files.mjs`), and shipped in the npm package beside `dist/cli.js`.
+
+| Attribute | Type | Required | Source |
+|---|---|---|---|
+| Files | map of runtime path → source path: `SHIPPED` at the same path, `workspace/*` at the root | yes | EVT-RuntimeBuilt |
+| Package | the root `package.json`, private, without `bin`, `files`, `publishConfig` and the build scripts | yes | EVT-RuntimeBuilt |
+| Version | SemVer, the package's | yes | EVT-RuntimeBuilt |
+
 ## Lifecycle
 
 Stage state as the code allows it today. Every transition is accepted from every status (HS-11); the diagram
@@ -668,10 +698,33 @@ stateDiagram-v2
   manual --> waiting: Calendar event given back
 ```
 
+### A workflow file at update (workspace)
+
+```mermaid
+stateDiagram-v2
+  [*] --> Untouched: init or update installs it
+  Untouched --> Untouched: upstream changed it (updated)
+  Untouched --> [*]: upstream removed it (removed)
+  Untouched --> Changed: the user edits it
+  Untouched --> Deleted: the user deletes it
+  Changed --> Untouched: upstream ships the same bytes
+  Changed --> Changed: upstream unchanged (kept)
+  Changed --> Conflict: upstream changed it too (conflict copy)
+  Changed --> Untouched: update --force (overwritten)
+  Conflict --> Changed: the next update (kept silently, HS-209)
+  Conflict --> Untouched: the user takes the conflict copy
+  Deleted --> Deleted: stays deleted (package-lock.json comes back)
+```
+
 ## Overview
 
 ```mermaid
 erDiagram
+  WORKSPACE ||--|| WORKSPACE_MARKER : "coreslopper.workspace.json"
+  WORKSPACE_MARKER ||--|{ BASELINE_ENTRY : "one per runtime file"
+  WORKSPACE ||--o{ CONFLICT_COPY : "file.coreslopper-new"
+  RUNTIME_SNAPSHOT ||--|{ BASELINE_ENTRY : "hashed into"
+  WORKSPACE ||--o{ PROJECT : "projects/"
   PROJECT ||--|| PROJECT_CONFIG : "configured by"
   PROJECT ||--|{ STAGE_STATE : "one per stage of its kind"
   STAGE_STATE }o--|| STAGE_DEFINITION : "defined by"

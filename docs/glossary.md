@@ -10,11 +10,35 @@ _Avoid_: repo, checkout
 
 **Runtime Snapshot**:
 The versioned copy of the workflow files that `npx coreslopper init` writes into a workspace. It is not a git clone and is updated with `npx coreslopper@latest update`, which merges against the **Baseline**.
-_Avoid_: install, template
+_Avoid_: install, template, runtime assets
 
 **Baseline**:
-The SHA-256 of every runtime file as last installed, stored in `coreslopper.workspace.json`. `coreslopper update` compares it with the workspace to tell local edits from untouched workflow files.
+Upstream's SHA-256 of every file of the runtime snapshot last installed or offered, stored in the **Workspace Marker**. It also holds the files `update` kept as a conflict, a local change, or a local deletion. `coreslopper update` compares it with the workspace to tell local edits from untouched workflow files.
 _Avoid_: lockfile, manifest
+
+**Workspace Marker**:
+`coreslopper.workspace.json` at the workspace root: the runtime version, when the workspace was created and last updated, the first project, and the **Baseline**. Only `init` and `update` write it; a directory with it is a workspace.
+_Avoid_: config, manifest
+
+**Conflict Copy**:
+`<file>.coreslopper-new`, upstream's version of a workflow file that changed both in the workspace and upstream, written by `update` beside the user's file. The user merges it into the file and deletes it; `--force` overwrites the file instead.
+_Avoid_: conflict file, backup
+
+**Onboarding**:
+The interactive `npx coreslopper init` on a terminal: it asks for the directory, the tools to install, the providers and their keys, the first project, and the publishing clients, then creates the workspace.
+_Avoid_: wizard (the board's **+ New**), setup (a **Stage**)
+
+**Doctor**:
+`doctor`: the check of a workspace, its layout, the files it needs, the keys, the tools, and ComfyUI. Only a required check fails it; the rest warn.
+_Avoid_: health check, validate (the **validate** command checks projects)
+
+**Legacy Layout**:
+A workspace whose series canons are still in `series/` beside `projects/`. `migrate-layout` moves them into `projects/` once; until then `update` adds no copy of a canon to `projects/`, and `update` and `doctor` remind the user.
+_Avoid_: old structure
+
+**Board Container**:
+The board and its **Watchdog** in Docker (`compose.yaml`, `docker/`): the workspace mounted, the dependencies in a volume installed again when `package-lock.json` changes, the port on the computer's loopback only. It runs the watchdog instead of `release-timer`, never beside it. After an update changed `docker/`, the image is built again.
+_Avoid_: server, Docker board
 
 **Brief**:
 The one-page statement of topic, source, audience, length, formats, and style that anchors every later creative decision.

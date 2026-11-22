@@ -86,6 +86,16 @@ external_systems:
   - id: EXT-OsScheduler
     name: Operating system scheduler
     description: Starts the watchdog round when no board container runs – the Windows Task Scheduler under WSL, a systemd user timer on Linux, launchd on macOS (packages/cli/src/release-timer.ts)
+  - id: EXT-NpmRegistry
+    name: npm registry
+    description: "Serves the published coreslopper package – the npx CLI (dist/cli.js) and the runtime snapshot – to npx coreslopper init and update, and the workspace's dependencies to npm install (package.json bin and files; ADR 0010)"
+  - id: EXT-ToolInstallers
+    name: Tool installers
+    description: "Where init's optional tool installs come from: astral.sh for uv, uv for Python 3.12, Homebrew, a static ffmpeg build, apt or winget for ffmpeg, npm for Claude Code (packages/cli/src/tools.ts:194-265; scripts/install-ffmpeg.sh)"
+  - id: EXT-Docker
+    name: Docker
+    description: "Builds the board image from docker/ and runs the board container with the workspace mounted at /app (docker/Dockerfile; compose.yaml; ADR 0031)"
+
 bounded_contexts:
   - id: BC-Pipeline
     name: Pipeline
@@ -124,6 +134,11 @@ bounded_contexts:
   - id: BC-Publish
     name: Publishing
     purpose: Gets an approved release onto the platforms – the publish command uploads by hand, privately or as drafts; the release autopilot posts every calendar event a platform API can post at its time once the user approved the release, without ever posting twice; the platform credentials and the watchdog round that runs it every few minutes
+
+  - id: BC-Workspace
+    name: Workspace
+    purpose: Gives the user a private, self-contained workspace and keeps it current – init and its onboarding copy the runtime snapshot, store the provider keys and record the baseline; update merges a newer runtime against the baseline without losing the user's own edits; doctor checks the workspace, tools and keys; migrate-layout moves an old layout; the board container runs the board and its watchdog. Upstream, the runtime build decides what ships
+
 aggregates:
   - id: AGG-Project
     name: Project
@@ -506,6 +521,36 @@ aggregates:
       - A long-running watchdog reads .env again before every round, so a token renewed on the computer reaches the container (the code does this, packages/cli/src/production-watch.ts:129-152)
       - A platform is ready by one rule, the same for doctor, the board and the plan, and a token that can be refreshed counts as ready (decided 2026-11-22, HS-196; doctor and the plan differ, LinkedIn with a refresh token is blocked – gap register)
       - Every write of .env is atomic and under a lock (decided 2026-11-22, HS-189; plain read and write, no lock – gap register)
+  - id: AGG-WorkspaceMarker
+    name: Workspace marker
+    context: BC-Workspace
+    status: as-is
+    evidence:
+      - coreslopper.workspace.json at the workspace root – version, runtime version, created, the first project, the last update and the baseline (SHA-256 per runtime file) – written whole by init and by every update that is not a dry run (packages/cli/src/workspace.ts:6-17; packages/cli/src/init.ts:167-176,324; packages/cli/src/update.ts:96-99,308-315)
+      - updateWorkspace classifies every runtime file against the baseline and the workspace in one pass, then writes the new baseline (update.ts:192-353)
+    invariants:
+      - The baseline holds upstream's hash of every file of the runtime last installed or offered – also of a file kept as a conflict, a local change or a local deletion (the code does this, update.ts:232; glossary fixed, HS-208)
+      - Every runtime file is decided by three states – baseline, workspace, new runtime – updated when untouched, kept when only the user changed it, removed when upstream dropped an untouched file, a conflict copy when both changed; a file identical to upstream needs nothing (the code does this, update.ts:241-292)
+      - .env and every .env.* but .env.example, .mcp.json, GETTING_STARTED.md and the marker itself are never written by update; under projects/, series/ and library/ update only adds missing files; package-lock.json always follows upstream (the code does this, update.ts:36-56,229-239)
+      - No upstream copy of a series canon goes into projects/<slug>/ while the canon is still in series/<slug>/ (the code does this, update.ts:229-235)
+      - A downgrade, and an overwrite of a locally changed file, happen only with --force; a dry run writes nothing (the code does this, update.ts:207-211,252-262,306)
+      - A conflict stays visible until the user resolved it – every update and doctor name each conflict copy left in the workspace (decided 2026-11-22, HS-209; reported once, then kept silently – gap register)
+      - The runtime version recorded is the runtime's own, at init as at update (decided 2026-11-22, HS-215; init records the CLI's version – gap register)
+      - A directory is a workspace when it holds the marker; the upstream repository is not a workspace (decided 2026-11-22, HS-213; a package named coreslopper with a project template counts too – gap register)
+  - id: AGG-RuntimeSnapshot
+    name: Runtime snapshot
+    context: BC-Workspace
+    status: as-is
+    evidence:
+      - runtime/, built whole from the tracked files by build-runtime.mjs through planRuntime, which classifies every tracked path as shipped, shipped from workspace/ or not shipped (scripts/runtime-files.mjs:20-149; scripts/build-runtime.mjs:19-80)
+      - the npm package carries dist/cli.js and runtime/ (package.json bin and files; tsup.config.ts)
+    invariants:
+      - Every tracked file is classified; an unclassified file or two sources for one runtime path stop the build (the code does this, runtime-files.mjs:130-149; tests/runtime-files.test.ts)
+      - workspace/ becomes the workspace root; the engineering layer and every AGENTS.md or CLAUDE.md outside workspace/ never ship (the code does this, runtime-files.mjs:113-124; ADR 0036)
+      - The runtime's package.json is private and has no bin, files, publish settings or build scripts (the code does this, build-runtime.mjs:61-79)
+      - The npx CLI carries no render stack – Remotion and React stay development dependencies the workspace installs (the code does this, package.json; tsup.config.ts:14-16; guarded only by the CI pack smoke test – gap register)
+      - Only what a workspace can run ships into it – the upstream CI does not (decided 2026-11-22, HS-211; ci.yml ships and runs a build the workspace lacks – gap register)
+
 events:
   - id: EVT-ProjectCreated
     name: Project created
@@ -1078,6 +1123,56 @@ events:
     context: BC-Publish
     data: [Kind, Every, Script]
     description: "release-timer install writes ~/.coreslopper/release-run.sh, which runs watch, and registers it with the operating system's scheduler; remove takes it out again (packages/cli/src/release-timer.ts:48-173)"
+  - id: EVT-WorkspaceCreated
+    name: Workspace created
+    context: BC-Workspace
+    aggregate: AGG-WorkspaceMarker
+    data: [Directory, Runtime version, Baseline, First project]
+    description: "init copied the runtime snapshot, wrote .env, optionally ran git init and created the first project, then wrote the marker with the baseline and GETTING_STARTED.md (packages/cli/src/init.ts:276-351)"
+  - id: EVT-ProviderKeyStored
+    name: Provider key stored
+    context: BC-Workspace
+    data: [Provider, Key status]
+    description: "init or onboarding wrote FAL_KEY, HIGGSFIELD_API_KEY or TOPVIEW_API_PLATFORM_KEY into .env (mode 0600) after a check against the provider – valid, invalid or unknown; an invalid key is kept only when the user says so (init.ts:130-160; tools.ts:303-382; onboarding.ts:199-208)"
+  - id: EVT-ToolInstalled
+    name: Tool installed
+    context: BC-Workspace
+    data: [Tool]
+    description: "onboarding or init --install-tools installed uv, Python 3.12, ffmpeg or Claude Code on the computer; best effort, a failure is a warning (tools.ts:194-265; init.ts:254-274)"
+  - id: EVT-DependenciesInstalled
+    name: Dependencies installed
+    context: BC-Workspace
+    data: [Node, Python]
+    description: "npm install and uv sync --group dev in scripts/audio-analysis, after init and after an update that changed something (tools.ts:267-288; update.ts:317-327)"
+  - id: EVT-WorkspaceUpdated
+    name: Workspace updated
+    context: BC-Workspace
+    aggregate: AGG-WorkspaceMarker
+    data: [From version, To version, Changes, Kept local, Baseline]
+    description: "update applied the added, updated and removed files and wrote the marker with the new runtime version and baseline (update.ts:241-315)"
+  - id: EVT-ConflictCopyWritten
+    name: Conflict copy written
+    context: BC-Workspace
+    aggregate: AGG-WorkspaceMarker
+    data: [Path]
+    description: "A file changed both in the workspace and upstream: update kept the user's file and wrote upstream's beside it as <file>.coreslopper-new; with --force it overwrote the file instead (update.ts:256-263)"
+  - id: EVT-LayoutMigrated
+    name: Layout migrated
+    context: BC-Workspace
+    data: [Moved series, Rewritten files]
+    description: "migrate-layout moved every series/<slug>/ with a series.yaml to projects/<slug>/ and rewrote the paths that pointed into it (packages/cli/src/migrate-layout.ts:100-153; ADR 0035)"
+  - id: EVT-RuntimeBuilt
+    name: Runtime built
+    context: BC-Workspace
+    aggregate: AGG-RuntimeSnapshot
+    data: [Files, Version]
+    description: "npm run build wrote runtime/ from the tracked files and bundled the npx CLI into dist/cli.js; prepack runs the same (scripts/build-runtime.mjs; tsup.config.ts; package.json scripts)"
+  - id: EVT-BoardContainerStarted
+    name: Board container started
+    context: BC-Workspace
+    data: [Lock hash, Port]
+    description: "docker compose up started the board and its watchdog on 127.0.0.1; the entrypoint ran npm ci into the node_modules volume when package-lock.json changed, then dropped to the workspace owner's user (docker/entrypoint.sh; compose.yaml)"
+
 commands:
   - id: CMD-CreateProject
     name: Create project
@@ -1796,6 +1891,67 @@ commands:
     description: "release-timer show|install|remove|status [--every], for a computer without the board container (release-timer.ts:131-173; ADR 0031)"
     rules:
       - Install it again after a Node.js upgrade or a moved workspace – the script puts the installing Node.js on PATH (the code does this, release-timer.ts:48-60)
+  - id: CMD-CreateWorkspace
+    name: Create a workspace
+    actor: ACT-User
+    aggregate: AGG-WorkspaceMarker
+    produces: [EVT-WorkspaceCreated, EVT-ProviderKeyStored, EVT-ToolInstalled, EVT-DependenciesInstalled]
+    description: "npx coreslopper init [dir], interactive as onboarding on a terminal, or with --yes and flags (packages/cli/src/npx.ts:63-100; init-command.ts:62-164; onboarding.ts:353-536)"
+    rules:
+      - The target is a new or empty directory – not the filesystem root, the home directory, the package itself, the runtime or the upstream repository; --force merges into a non-empty one and overwrites what the runtime ships (the code does this, init.ts:280-304,111-128)
+      - Provider keys are checked but never block; the first project needs a budget of at least $5 and a valid slug (the code does this, onboarding.ts:446-465; tools.ts:303-382)
+      - Tools are installed only after the user confirmed the workspace (decided 2026-11-22, HS-217; installed before the last question – gap register)
+  - id: CMD-UpdateWorkspace
+    name: Update the workspace
+    actor: ACT-User
+    aggregate: AGG-WorkspaceMarker
+    produces: [EVT-WorkspaceUpdated, EVT-ConflictCopyWritten]
+    description: "npx coreslopper@latest update [dir] [--dry-run] [--force] [--no-install], from the npx CLI only (npx.ts:102-127; update.ts:192-353; ADR 0012)"
+    rules:
+      - Commit first, so git diff shows what the update changed – update warns about uncommitted changes but goes on (the code does this, update.ts:203,298-300; docs/onboarding.md)
+      - A workspace without a baseline treats every differing file as a conflict; a plain update records the baseline (the code does this, update.ts:301-305,308)
+      - Say when an update changed docker/ and the board image needs docker compose build (decided 2026-11-22, HS-212; only docs/board.md says it – gap register)
+      - Name the workspace's own changes to workflow files, so the user can carry them upstream (decided 2026-11-22, HS-210; only counted – gap register)
+  - id: CMD-MigrateLayout
+    name: Migrate the layout
+    actor: ACT-User
+    produces: [EVT-LayoutMigrated]
+    description: "npm run cli -- migrate-layout [--dry-run], once, in a workspace with series canons in series/ (index.ts:645-654; migrate-layout.ts; docs/onboarding.md)"
+    rules:
+      - A slug in both series/ and projects/ stops it before any change; folders without series.yaml stay (the code does this, migrate-layout.ts:100-140)
+      - Commit first – git is the undo; the moves come before the rewritten paths are written (decided 2026-11-22, HS-219; paths are written first – gap register)
+  - id: CMD-BuildRuntime
+    name: Build the runtime
+    actor: ACT-User
+    aggregate: AGG-RuntimeSnapshot
+    produces: [EVT-RuntimeBuilt]
+    description: "npm run build upstream – build:runtime then build:cli; prepack runs it before every npm pack and the release (package.json scripts; scripts/build-runtime.mjs)"
+    rules:
+      - Only tracked files ship – an untracked file only warns (the code does this, build-runtime.mjs:30-41)
+  - id: CMD-CreateSandbox
+    name: Create the sandbox workspace
+    actor: ACT-User
+    produces: [EVT-RuntimeBuilt, EVT-WorkspaceCreated, EVT-WorkspaceUpdated]
+    description: "npm run dev:workspace [-- <dir>] builds the runtime and runs init --yes --skip-project, or update when the sandbox has a marker; default ../coreslopper-sandbox (scripts/dev-workspace.mjs)"
+    rules:
+      - The sandbox lies outside the repository, so Claude Code does not load the repository's CLAUDE.md there (the code does this, dev-workspace.mjs:23-30)
+  - id: CMD-StartBoardContainer
+    name: Start the board container
+    actor: ACT-User
+    produces: [EVT-BoardContainerStarted]
+    description: "docker compose up -d in the workspace; the board at http://127.0.0.1:4848 and the watchdog every five minutes (compose.yaml; docker/; docs/board.md; ADR 0031)"
+    rules:
+      - The port is published on the computer's loopback only, since the board writes approvals (the code does this, compose.yaml:9-11)
+      - The container or release-timer runs the watchdog, never both (publish slice, AGG-AutopilotRound)
+      - Each workspace's container builds its own image (decided 2026-11-22, HS-212; one fixed image name – gap register)
+  - id: CMD-InstallDependencies
+    name: Install the dependencies
+    actor: ACT-User
+    produces: [EVT-DependenciesInstalled]
+    description: "runSetup – npm install, then uv sync --group dev for the audio analysis – run by init and by an update that changed something, or by hand as npm install && npm run python:sync (packages/cli/src/tools.ts:267-288)"
+    rules:
+      - A failed install is a warning; non-interactive init sets exit code 1 when the install was wanted and failed (the code does this, init-command.ts:163; init.ts:326-337)
+
 policies:
   - id: POL-RunNextStage
     name: Run the next autonomous stage
@@ -1877,6 +2033,12 @@ policies:
     when: [EVT-VideoWentPublic, EVT-CalendarEventMarkedDone]
     then: [CMD-PostPinnedComment]
     description: "Also when the user switched the video public in Studio and ticked it off on the board (release-autopilot.ts:278-285,319-325)"
+  - id: POL-InstallAfterUpdate
+    name: An update that changed something installs the dependencies
+    when: [EVT-WorkspaceUpdated]
+    then: [CMD-InstallDependencies]
+    description: "update runs npm install and uv sync when it changed a file and --no-install is not set; the board container installs again when package-lock.json changed (update.ts:317-327; docker/entrypoint.sh:19-26)"
+
 read_models:
   - id: RM-Status
     name: Status
@@ -2072,6 +2234,19 @@ read_models:
     used_by: [ACT-User]
     fields: [Platform, Ready, Expires at, Note]
     description: "doctor's publish and autopilot rows and the board's readiness, from .env only, no network call (packages/cli/src/doctor.ts:108-178; autopilot-state.ts:68-91); two rules today (HS-196)"
+  - id: RM-DoctorReport
+    name: Doctor report
+    fed_by: [EVT-WorkspaceCreated, EVT-WorkspaceUpdated, EVT-ProviderKeyStored, EVT-ToolInstalled, EVT-LayoutMigrated]
+    used_by: [ACT-User]
+    fields: [Group, Check, Status, Required, Detail]
+    description: "doctor's checks grouped by workspace, files, keys, publishing, tools and ComfyUI, as text or --json. Only a required check fails – the workspace, the required files, Node.js 22 and npm; everything else warns, and a required failure sets exit code 1 (doctor.ts:21-36,198-271; tools.ts:89-165)"
+  - id: RM-UpdateReport
+    name: Update report
+    fed_by: [EVT-WorkspaceUpdated, EVT-ConflictCopyWritten]
+    used_by: [ACT-User]
+    fields: [From version, To version, Path, Action, Kept local, Warnings]
+    description: "update's list of added, updated, removed, conflicting, overwritten and kept files, the count of local changes and the warnings; the same list for a dry run (update.ts:113-151,355-381)"
+
 hotspots:
   - id: HS-1
     question: "'Production phase' (setup/ready/running/failed/done) is a derived project status, but the glossary lists 'phase' under Avoid for Stage, and 'setup' is both a stage ID and a phase. Which word is the domain term?"
@@ -3094,6 +3269,92 @@ hotspots:
     refs: [BC-Publish]
     status: resolved
     resolution: "ADR 0046 (proposed) records the four records and their locks, publish versus post and the two adapter families, never twice on every platform, the failure classes, the derived state, the take-over in the release status, what withdrawing stops, the files on fal.ai storage and posting cost apart from the generation budget; it amends 0023, 0029 and 0031 (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-205
+    question: "Is the workspace lifecycle – init, onboarding, update, doctor, migrate-layout, the runtime build and the board container – one context, and does the upstream runtime build belong to it?"
+    refs: [BC-Workspace]
+    status: resolved
+    resolution: "One context, Workspace. The runtime build is its upstream half: it decides what a workspace gets, and update reads the same classification of files. The board container's watchdog round stays the publish and pipeline slices'; the container itself is the workspace's (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-206
+    question: "Which consistency boundaries does the code show – the marker with its baseline, the runtime snapshot, the layout, the container?"
+    refs: [AGG-WorkspaceMarker, AGG-RuntimeSnapshot]
+    status: resolved
+    resolution: "Two as-is aggregates: the workspace marker (written whole by init and update, which decide every file against it in one pass) and the runtime snapshot (built whole from one classification). The layout migration and the board container hold no state of their own and are commands, not aggregates (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-207
+    question: "The code names the same things several ways – runtime, runtime assets, workflow files, upstream; the marker; conflict file, .coreslopper-new; onboarding and wizard; setup for a stage, runSetup and setup.sh. Which words are the terms?"
+    refs: [AGG-WorkspaceMarker, CMD-CreateWorkspace]
+    status: resolved
+    resolution: "New glossary terms: Workspace Marker, Conflict Copy, Onboarding (the interactive init; the Wizard is the board's + New only), Doctor, Board Container, Legacy Layout. Runtime Snapshot stays, with runtime assets avoided; setup stays the stage, and runSetup and setup.sh are code names for installing the dependencies (gap register) (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-208
+    question: "The glossary calls the baseline the hash of every runtime file 'as last installed', but update records upstream's hash also for a file it kept as a conflict, a local change or a local deletion. Which is the baseline?"
+    refs: [AGG-WorkspaceMarker]
+    status: resolved
+    resolution: "The baseline is upstream's hash of every file of the runtime last installed or offered; the glossary is corrected. It is what makes a conflict seen once – HS-209 decides how a conflict stays visible (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-209
+    question: "After a conflict, the next update takes the unmerged file for a local change and keeps it silently, and the conflict copy is never mentioned again and not gitignored. The user edits workflow files with Claude and carries them upstream. How does a conflict stay visible?"
+    refs: [AGG-WorkspaceMarker, EVT-ConflictCopyWritten]
+    status: resolved
+    resolution: "A conflict stays visible until the user resolved it: every update and doctor name each conflict copy left in the workspace; the baseline keeps its meaning. The copy stays out of .gitignore, so git status shows it too. Medium, because the user edits workflow files and updates with update (user: edits with Claude and ports them upstream; update is the path; and recommendation, recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-210
+    question: "update counts the files the user changed and upstream did not, but names none of them. How does the user find what to carry upstream?"
+    refs: [CMD-UpdateWorkspace, RM-UpdateReport]
+    status: resolved
+    resolution: "Update – also as a dry run – names the workspace's own changes to workflow files. Low: a file carried upstream byte for byte is taken silently, and Claude can compare a file with the new runtime (user: ports edits upstream; and recommendation, recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-211
+    question: "The upstream CI (.github/workflows/ci.yml) ships into every workspace and runs npm run build and npm pack, which the workspace's package.json does not have; the issue and pull request templates ship too. Should they?"
+    refs: [AGG-RuntimeSnapshot]
+    status: resolved
+    resolution: "Only what a workspace can run ships into it: the upstream CI and the templates stay upstream. A workspace CI is a later decision. Medium: the user's workspace is a git repository, and a push to GitHub would run a red CI (inference, not run) (user: the workspace is their repository; and recommendation, recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-212
+    question: "The user wants the board in the container. update never says that docker/ changed and the image needs a rebuild, and every workspace's container uses the one image name coreslopper-board. What holds?"
+    refs: [CMD-StartBoardContainer, CMD-UpdateWorkspace]
+    status: resolved
+    resolution: "Update says when it changed docker/ and the image needs docker compose build; each workspace builds its own image. The time zone is the publish slice's G-167. Low, because the first start builds a fresh image (user: wants the board container; and recommendation, recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-213
+    question: "isWorkspace accepts a package named coreslopper with a project template and no marker, so a half-finished init and the upstream repository pass as workspaces; doctor in the repository fails on .claude/skills/video-brief. What makes a workspace?"
+    refs: [AGG-WorkspaceMarker]
+    status: resolved
+    resolution: "A workspace holds the marker; the upstream repository is not a workspace and doctor says so instead of failing a file check. Low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-214
+    question: "Texts drifted: docs/architecture.md (update by init --force, the npx command list, the keys), ADR 0010 (Suno in .mcp.json, init --force), ADR 0012 (projects/** only; nothing about the refusals, the legacy skip, the install), docs/onboarding.md (update --force once without a baseline overwrites local edits; series/ missing among the user's folders; a deleted package-lock.json comes back), workspace/CLAUDE.md's hook matcher, three doctor descriptions, three next-step texts, music videos only in the onboarding texts, shipped tests citing docs that do not ship. Fix them?"
+    refs: [CMD-UpdateWorkspace, CMD-CreateWorkspace]
+    status: resolved
+    resolution: "Fixed together, with ADR 0047 amending 0010 and 0012. Medium: the user updates from these docs, and --force once would overwrite their own edits (user: updates with update and edits workflow files; and recommendation, recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-215
+    question: "init records the CLI's own version in the marker, update the runtime's. Which version is the workspace's?"
+    refs: [AGG-WorkspaceMarker]
+    status: resolved
+    resolution: "The runtime's own version, at init as at update; they differ only with --runtime in development. Low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-216
+    question: "Two CLIs define init, doctor and validate: the workspace CLI's init cannot find a runtime in a workspace, its doctor takes no directory, and npx's --runtime is dropped in the interactive init. Which CLI owns what?"
+    refs: [CMD-CreateWorkspace, RM-DoctorReport]
+    status: resolved
+    resolution: "The npx CLI owns init and update; the workspace CLI delegates doctor and validate to the same code and drops init. The interactive init honours --runtime. Low (related G-84) (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-217
+    question: "Onboarding installs uv, Python and Claude Code before the last question, then says 'No files were written' when the user declines; the budget minimum is hard-coded to 5 beside defaults.budget.minimum_usd. What holds?"
+    refs: [CMD-CreateWorkspace]
+    status: resolved
+    resolution: "Tools are installed only after the user confirmed the workspace; the budget minimum comes from the defaults. Low (user: created the workspace with npx coreslopper init; and recommendation, recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-218
+    question: "The runtime build, update and init each keep their own list of skipped directories and their own .env filter. One rule or three?"
+    refs: [AGG-RuntimeSnapshot, AGG-WorkspaceMarker]
+    status: resolved
+    resolution: "One list and one filter, shared. Latent today – no tracked path hits the difference. Low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-219
+    question: "migrate-layout writes the rewritten paths before it moves the folders; a failure in between leaves paths pointing at folders that are not there yet. Is commit-first enough?"
+    refs: [CMD-MigrateLayout]
+    status: resolved
+    resolution: "Commit first stays the undo, and the moves come before the rewritten paths. Low: the user runs it once, after a commit the docs ask for (user: runs migrate-layout in their workspace; and recommendation, recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-220
+    question: "What should pin the slice's behaviour now, and what is left untested?"
+    refs: [AGG-WorkspaceMarker, AGG-RuntimeSnapshot]
+    status: resolved
+    resolution: "Four characterization tests in tests/workspace-characterization.test.ts (a conflict kept silently at the next update, a file carried upstream taken silently, the two versions in the marker, a workspace without a marker) and one in tests/runtime-files.test.ts (the upstream CI ships). The rest is a gap: doctor, onboarding, the init guards, init --force, the .env mode, the Topview key check, the install trigger, the runtime's package.json, the sandbox, the entrypoint, and a guard that the npx bundle stays free of Remotion. Low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-221
+    question: "Is the workspace lifecycle a decision worth recording beside ADRs 0010, 0012, 0031 and 0036?"
+    refs: [BC-Workspace]
+    status: resolved
+    resolution: "ADR 0047 (proposed) records the marker as the workspace's identity, the baseline as upstream's last offer, conflicts visible until resolved, one runtime version, only what a workspace can run ships, the npx CLI owning init and update, and the container's image per workspace; it amends 0010 and 0012 (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+
 flows:
   - id: FLOW-AutonomousStage
     name: One autonomous stage
@@ -3140,3 +3401,9 @@ flows:
   - id: FLOW-Publish
     name: From the consent to a private upload by hand
     sequence: [ACT-User, CMD-AuthorizePlatform, EVT-PlatformAuthorized, CMD-PublishUploads, EVT-PublishPlanned, RM-PublishPlan, EVT-VideoUploaded]
+  - id: FLOW-Onboarding
+    name: From npx to the first project
+    sequence: [ACT-User, CMD-CreateWorkspace, EVT-ProviderKeyStored, EVT-ToolInstalled, EVT-WorkspaceCreated, EVT-DependenciesInstalled, RM-DoctorReport]
+  - id: FLOW-WorkspaceUpdate
+    name: From a new release to a current workspace
+    sequence: [ACT-User, CMD-UpdateWorkspace, EVT-ConflictCopyWritten, EVT-WorkspaceUpdated, RM-UpdateReport, POL-InstallAfterUpdate, CMD-InstallDependencies, EVT-DependenciesInstalled, CMD-MigrateLayout, EVT-LayoutMigrated, CMD-StartBoardContainer, EVT-BoardContainerStarted]

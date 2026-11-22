@@ -2105,3 +2105,248 @@ None. HS-183 to HS-204 are resolved, nine of them partly by the user's answers.
 | HS-202 | Dead code removed | recommendation; low | G-179 |
 | HS-203 | Four characterization tests now, the rest a gap | recommendation; low | `tests/publish-characterization.test.ts`, G-180 |
 | HS-204 | ADR 0046 | recommendation | `docs/adr/0046-publishing-records-and-never-twice.md` |
+
+# Adoption – workspace
+Date: 2026-11-22 · Commit: e6fddce · Slice: init and onboarding, update and the baseline, doctor, migrate-layout, the runtime build and the npm package, the board container (concept `workspace`) · Analysts: 3 lenses
+
+## Scope
+
+- **Slice:**
+  - cli: `npx.ts` (the npx CLI), `init.ts`, `init-command.ts`, `onboarding.ts`, `update.ts`, `workspace.ts`,
+    `tools.ts`, `doctor.ts` (without the publish and autopilot rows), `migrate-layout.ts`; the commands `init`,
+    `doctor` and `migrate-layout` in `index.ts`;
+  - build and distribution: `scripts/build-runtime.mjs`, `runtime-files.mjs`, `dev-workspace.mjs`, `setup.sh`,
+    `install-ffmpeg.sh`, `tsup.config.ts`, `package.json`, the release configuration, `.github/workflows/`;
+  - the container: `docker/Dockerfile`, `docker/entrypoint.sh`, `compose.yaml`;
+  - the workspace root files: `workspace/.gitignore`, `skills-lock.json`, `.claude/settings.json`;
+  - docs: `docs/onboarding.md`, ADRs 0010, 0012, 0031 and 0036.
+- **Out of scope:**
+  - the board server's routes, the wizard's project creation and the watchdog round: already adopted (release,
+    pipeline, character, publish);
+  - `doctor`'s publish and autopilot rows: publish;
+  - the board's shell (`board/app.js`, `lib.js`, `index.html`, `board.css`): no slice yet, see the next slice;
+  - the model bench: slice `bench`.
+- **Intent:** domain model, as for the earlier slices. **Language:** artifacts `en`, UI `en`.
+- **Since the last slice:** no code change. `slice.ts --cluster init` found 3 seeds and 8 candidates; the scope was
+  widened by hand along the adoption plan, because the resolver misses `@coreslopper/*` imports and the scripts.
+
+| Layer | Files |
+|---|---|
+| cli (application) | `npx.ts`, `init*.ts`, `onboarding.ts`, `update.ts`, `workspace.ts`, `tools.ts`, `doctor.ts`, `migrate-layout.ts` |
+| build (upstream) | `scripts/build-runtime.mjs`, `runtime-files.mjs`, `dev-workspace.mjs`, `tsup.config.ts`, `package.json`, `.github/workflows/` |
+| container | `docker/`, `compose.yaml` |
+| tests | `init`, `update`, `migrate-layout`, `runtime-files`; new `workspace-characterization` |
+
+## How this slice was decided
+
+As in the earlier slices, there were no code-level questions. Every technical hotspot was decided by the
+recommendation and is marked "not reviewed by the user – delegated". The user answered four questions about how
+they work:
+1. They created their workspace with `npx coreslopper init`.
+2. They take new versions with `coreslopper update`.
+3. They sometimes change workflow files in the workspace with Claude, and have Claude carry the change upstream,
+   into this repository.
+4. They have not used the board yet: their workspace has not been updated since the board came. They mean to run it
+   in the Docker container.
+
+How the answers shaped the model:
+- Answers 1 and 2 put init and update on the user's own path. The next `update` is the first one after 0.8.0 (the
+  last release, 2026-11-19). It brings the payload split, series in `projects/` and the board container at once.
+  Gaps on that path are raised: the conflict seen once (G-181), the drifted update docs (G-186).
+- Answer 3 makes conflicts and local changes the slice's core. A change carried upstream byte for byte is taken
+  silently, and the characterization test pins this. A change carried upstream with any difference becomes a
+  conflict, and the next update hides an unmerged conflict (G-181, medium). The user's own changes are only counted
+  (G-182). `docs/onboarding.md`'s "`--force` once" would overwrite them (G-186, medium).
+- Answer 4 raises the container's issues: no hint after `docker/` changed, one image name for every workspace
+  (G-184). The time zone stays the publish slice's G-167.
+- The workspace is the user's git repository, so the shipped upstream CI would run red on a push (G-183, medium).
+
+ADR 0047 stays `Proposed`.
+
+## What the repository is (facts)
+
+- **Two CLIs, one source tree.**
+  - `npx coreslopper` runs `dist/cli.js`, bundled by tsup from `packages/cli/src/npx.ts`: `init`, `update`,
+    `doctor [dir]`, `new`, `status`, `validate`. Without arguments it shows the workspace, or starts onboarding on a
+    terminal.
+  - `npm run cli` in a workspace runs `index.ts` with tsx. It has `init` (which finds no runtime there), `doctor`
+    and `migrate-layout`, but no `update`.
+  - The bundle inlines core and providers. Remotion and React are development dependencies; only the CI pack smoke
+    test keeps them out.
+- **Init.**
+  - It refuses the filesystem root, the home directory, the package, the runtime, the source repository, and a
+    non-empty directory without `--force`. `--force` overwrites what the runtime ships.
+  - Order: copy the runtime, `.env` (0600, the provider keys, empty when unknown), tools, `git init -b main`, the
+    first project, the marker, `npm install` and `uv sync --group dev`, `GETTING_STARTED.md`.
+  - Onboarding asks on a terminal. It installs uv, Python and Claude Code before the last question. Key checks never
+    block: 401 is invalid; a network error, 402 or 403 is unknown.
+- **The marker** `coreslopper.workspace.json`:
+  - holds version 1, the runtime version (the CLI's at init, the runtime's at update), created, the first project,
+    updated, and the baseline;
+  - is committed with the workspace;
+  - is the first test of `isWorkspace`, which falls back to a package named `coreslopper` with a project template.
+- **Update.**
+  - It decides each runtime file by baseline, workspace and new runtime:
+    - an untouched file is updated or removed;
+    - a file only the user changed is kept, and counted;
+    - a file both sides changed gets a conflict copy `<file>.coreslopper-new`, or is overwritten with `--force`;
+    - a file deleted locally stays deleted, except `package-lock.json`.
+  - User-owned:
+    - `.env*`, `.mcp.json`, `GETTING_STARTED.md` and the marker are never written;
+    - `projects/`, `series/` and `library/` are add-only;
+    - canons still in `series/` are skipped.
+  - It refuses a downgrade without `--force`, a non-workspace, and the source repository. It warns about a dirty git
+    tree and a missing baseline.
+  - The new baseline is upstream's hash of every file, conflicts included.
+  - It installs only when something changed.
+- **Migrate-layout.**
+  - It moves `series/<slug>/` with a `series.yaml` to `projects/<slug>/`, and rewrites relative and absolute paths
+    and library labels in text files up to 32 MB.
+  - A taken slug stops it before any change. It writes the paths before it moves.
+- **The runtime build.**
+  - It classifies `git ls-files` into shipped, shipped from `workspace/` and not shipped. An unclassified file or a
+    collision stops it.
+  - It makes the runtime's `package.json` private and drops `bin`, `files`, `publishConfig` and seven build scripts.
+  - `.github/` ships, except `release.yml`.
+- **The container.**
+  - Image: `node:22-bookworm-slim` with ffmpeg, tini, Chrome's libraries and fonts; no Python.
+  - The entrypoint runs as root, installs into the `node_modules` volume when the lock file's hash changed, runs
+    `remotion browser ensure`, then drops to the workspace owner's uid and gid.
+  - Compose: `127.0.0.1:4848`, `TZ=${TZ:-UTC}`, the media mount, a healthcheck on `/api/production`, the fixed image
+    name `coreslopper-board`.
+- **History.**
+  - The npx CLI, init, onboarding, doctor and update are from 2026-11-08 (`2393370`, `1d10ffd`). The runtime
+    classification and the sandbox (`24f2420`), the container (`e7c2599`) and migrate-layout (`3ac49cc`) are from
+    2026-11-21.
+  - Hotspots: `workspace/AGENTS.md` (40 commits), `ci.yml` (11), `doctor.ts` (10).
+  - There are no reverts and no TODOs.
+
+## Domain model (decided by recommendation)
+
+- **Context:** `BC-Workspace` – Workspace.
+- **Aggregates (both `as-is`):**
+  - `AGG-WorkspaceMarker`:
+    - the baseline as upstream's last offer;
+    - three states per file;
+    - the user's paths;
+    - no canon copy in the legacy layout;
+    - `--force` for downgrades and overwrites;
+    - conflicts visible until resolved;
+    - one runtime version;
+    - the marker as identity.
+  - `AGG-RuntimeSnapshot`:
+    - every file classified;
+    - `workspace/` as root, the engineering layer never shipped;
+    - a private package;
+    - no render stack in the npx CLI;
+    - only what a workspace can run.
+- **Commands:**
+  - create a workspace;
+  - update the workspace;
+  - install the dependencies;
+  - migrate the layout;
+  - build the runtime;
+  - create the sandbox;
+  - start the board container.
+- **Policy:** an update that changed something installs the dependencies.
+- **Read models:** the doctor report, the update report.
+- **Flows:** `FLOW-Onboarding`, `FLOW-WorkspaceUpdate`. **External systems:** npm registry, tool installers, Docker
+  (plus the providers' key checks).
+- **Glossary:**
+  - New: **Workspace Marker**, **Conflict Copy**, **Onboarding**, **Doctor**, **Legacy Layout**, **Board Container**.
+  - Sharpened: **Baseline** (upstream's last offer, also for files not installed); **Runtime Snapshot** (_Avoid_
+    runtime assets).
+- **ADR:** 0047 (Proposed), which amends 0010 and 0012.
+
+## Package documentation written
+
+- `.claude/rules/workspace.md` – the path-scoped slice doc. Nothing is left `[OPEN]`.
+- `docs/engineering/conventions.md` – the two CLIs and the bundle, classifying a new path, shipped tests importing
+  only shipped files, the three skip lists, how the marker is written, the user-owned paths, four seams.
+- `docs/architecture/data-model.md` – the two aggregates, a workflow file's lifecycle at update, the workspace in the
+  overview.
+- `docs/domain/context-map.as-is.md` – `BC-Workspace` and its edges to Pipeline, Series, the character library,
+  Publishing, the providers, the npm registry, Docker and the tool installers.
+
+## Contradictions found and how they were resolved
+
+| Contradiction | Resolution |
+|---|---|
+| The glossary: the baseline "as last installed", versus upstream's hash recorded also for conflicts, local changes and deletions | the baseline is upstream's last offer (glossary fixed) |
+| ADR 0012: a conflict copy for a manual merge, versus the next update keeping the unmerged file silently | conflicts visible until resolved (G-181) |
+| `docs/onboarding.md`: `update --force` once without a baseline, versus a plain update recording it | a plain update (G-186) |
+| ADR 0010 and `docs/architecture.md`: update by `init --force`, Suno in `.mcp.json` | amended by ADR 0047; text fix (G-186) |
+| ADR 0012: only `projects/**` user-owned, versus `series/` and `library/` too; nothing on the refusals, the legacy skip, the install | amended by ADR 0047 |
+| The glossary: a workspace is created by init, versus `isWorkspace` accepting a package name | the marker is the identity (G-185) |
+| `init` and `update` record different versions | the runtime's own (G-187) |
+| ADR 0036: the payload is what a workspace gets, versus the upstream CI that cannot run there | only what a workspace can run (G-183) |
+| The workspace CLI's `init`, versus no runtime in a workspace | npx owns init and update (G-188) |
+| Onboarding: "No files were written", versus tools already installed | tools after the last question (G-189) |
+| `workspace/CLAUDE.md`'s hook matcher, three doctor descriptions, three next-step texts, onboarding for music videos only | text fix (G-186) |
+| `docs/board.md`: rebuild the image after an update changed `docker/`, versus update saying nothing | update says so (G-184) |
+
+## Rules and checks
+
+| Rule | Enforcement | State |
+|---|---|---|
+| An unmerged conflict is kept silently by the next update, its copy left | `tests/workspace-characterization.test.ts` | green |
+| A local change identical to upstream is taken silently | `tests/workspace-characterization.test.ts` | green |
+| init records the CLI's version, update the runtime's | `tests/workspace-characterization.test.ts` | green |
+| A package named `coreslopper` with a project template is a workspace without a marker | `tests/workspace-characterization.test.ts` | green |
+| The upstream CI and the templates ship, the release workflow does not | `tests/runtime-files.test.ts` (not shipped) | green |
+| The three-way update, dry run, no baseline, downgrade, legacy layout, init's files, key checks, the layout migration, every tracked file classified, hooks and skills shipped | existing `tests/init.test.ts`, `update.test.ts`, `migrate-layout.test.ts`, `runtime-files.test.ts` | green |
+| The npx bundle without Remotion | CI pack smoke test (`.github/workflows/ci.yml`) | green in CI |
+| Conflicts visible, local changes named, only runnable files shipped, the docker hint and image per workspace, the marker as identity, one version, one CLI for init, tools after the last question, one skip list, moves before rewrites | documentation until stories build them (G-181–G-192) | – |
+
+## Gap register (candidates – stories only with --stories)
+
+12 candidates, G-181 to G-192, in `docs/domain/gap-register.md`:
+- 8 *exist but contradict*. The highest are G-181 (a conflict reported once), G-183 (the upstream CI ships) and
+  G-186 (drifted texts), all medium. G-185, G-187, G-188, G-189 and G-190 are low.
+- 4 are *missing*, all low: G-182, G-184, G-191, G-192.
+- None is *dead*.
+
+## Deliberately left alone
+
+- Production code, the skills, and ADRs 0010, 0012, 0031 and 0036, which are accepted. ADR 0047 amends 0010 and 0012.
+  Only the glossary was corrected.
+- `doctor`'s publish and autopilot rows, the container's time zone (G-167) and the watchdog round: publish slice.
+- The board server and its routes in `release-board.ts`: release, pipeline and character slices.
+- The board's shell (`board/app.js`, `lib.js`, `index.html`, `board.css`) and the board write guard: no slice owns
+  them yet.
+- `.mcp.json` as a user-owned file: init no longer writes one, but a user may add one, and `update` must keep it.
+- `config/channel.yaml` in `NOT_SHIPPED` while untracked: a guard for a workspace's own channel, kept.
+- The floating Docker base tag `node:22-bookworm-slim` and the uv install by `curl | sh`: dated facts of the setup,
+  not decisions of this slice.
+
+## Open hotspots
+
+None. HS-205 to HS-221 are resolved, seven of them partly by the user's answers.
+
+## Next slice
+
+`bench` per the adoption plan: the model bench (`bench.ts`, `bench-report.ts`, `bench/`, ADR 0020). After it, the
+board's shell (`board/app.js`, `lib.js`, `index.html`, `board.css` and the server's own parts of `release-board.ts`)
+is the one area left without a slice. It is small and could be adopted with `bench` or on its own.
+
+## Decision log
+
+| # | Decision | How | Written to |
+|---|---|---|---|
+| HS-209 | A conflict stays visible until resolved; update and doctor name every conflict copy | user (edits workflow files and carries them upstream; updates with update) and recommendation; medium | `AGG-WorkspaceMarker`, ADR 0047, G-181 |
+| HS-211 | Only what a workspace can run ships; the upstream CI and templates stay upstream | user (the workspace is their repository) and recommendation; medium | `AGG-RuntimeSnapshot`, ADR 0047, G-183 |
+| HS-214 | Drifted texts fixed together; ADR 0047 amends 0010 and 0012 | user (updates from the docs) and recommendation; medium | glossary, G-186 |
+| HS-210 | Update names the workspace's own changes | user (carries edits upstream) and recommendation; low | `CMD-UpdateWorkspace`, ADR 0047, G-182 |
+| HS-212 | Update says when `docker/` changed; an image per workspace | user (wants the board container) and recommendation; low | `CMD-UpdateWorkspace`, `CMD-StartBoardContainer`, ADR 0047, G-184 |
+| HS-217 | Tools only after the user confirmed the workspace; the budget minimum from the defaults | user (created the workspace with npx init) and recommendation; low | `CMD-CreateWorkspace`, ADR 0047, G-189 |
+| HS-219 | Commit first stays the undo; moves before rewritten paths | user (runs migrate-layout themselves) and recommendation; low | `CMD-MigrateLayout`, ADR 0047, G-191 |
+| HS-205 | One context, Workspace, with the runtime build as its upstream half | recommendation | `BC-Workspace` |
+| HS-206 | Two as-is aggregates; the layout migration and the container are commands | recommendation | the two aggregates |
+| HS-207 | Workspace Marker, Conflict Copy, Onboarding, Doctor, Legacy Layout, Board Container | recommendation | glossary |
+| HS-208 | The baseline is upstream's last offer | recommendation | glossary, `AGG-WorkspaceMarker` |
+| HS-213 | The marker is the identity; the upstream repository is not a workspace | recommendation; low | `AGG-WorkspaceMarker`, ADR 0047, G-185 |
+| HS-215 | One runtime version, the runtime's | recommendation; low | `AGG-WorkspaceMarker`, ADR 0047, G-187 |
+| HS-216 | The npx CLI owns init and update; the workspace CLI drops init | recommendation; low | ADR 0047, conventions, G-188 |
+| HS-218 | One skip list and one `.env` filter | recommendation; low | conventions, G-190 |
+| HS-220 | Five characterization tests now, the rest a gap | recommendation; low | `tests/workspace-characterization.test.ts`, `tests/runtime-files.test.ts`, G-192 |
+| HS-221 | ADR 0047 | recommendation | `docs/adr/0047-workspace-marker-and-visible-conflicts.md` |

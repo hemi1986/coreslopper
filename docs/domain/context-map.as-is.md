@@ -3,7 +3,7 @@
 > Recovered from code by `/adopt` on 2026-11-21 at b195086. This is **not a target**.
 > Target: [context-map.md](context-map.md) · Gap register: [gap-register.md](gap-register.md).
 
-Adopted slices: project and stage pipeline; human review; art-director verdicts and the generation queue (decided by recommendation); song timing and lyrics (decided by recommendation, four answers from the user); the storyboard (decided by recommendation, four answers from the user); generation and the provider adapters (decided by recommendation, four answers from the user); series budget, script, takes and the episode track (decided by recommendation, four answers from the user); the bibles, user references and the character library (decided by recommendation, four answers from the user); render, Shorts, composed images and the media directory (decided by recommendation, four answers from the user); the release package, calendar, release board and approval (decided by recommendation, four answers from the user); publishing – the publish command, the release autopilot, the platform credentials and the watchdog round (decided by recommendation, four answers from the user). Other areas – the workspace, model bench – appear only as neighbours until their own slice is adopted.
+Adopted slices: project and stage pipeline; human review; art-director verdicts and the generation queue (decided by recommendation); song timing and lyrics (decided by recommendation, four answers from the user); the storyboard (decided by recommendation, four answers from the user); generation and the provider adapters (decided by recommendation, four answers from the user); series budget, script, takes and the episode track (decided by recommendation, four answers from the user); the bibles, user references and the character library (decided by recommendation, four answers from the user); render, Shorts, composed images and the media directory (decided by recommendation, four answers from the user); the release package, calendar, release board and approval (decided by recommendation, four answers from the user); publishing – the publish command, the release autopilot, the platform credentials and the watchdog round (decided by recommendation, four answers from the user); the workspace – init, onboarding, update, doctor, the layout migration, the runtime build and the board container (decided by recommendation, four answers from the user). Other areas – the model bench, the board's shell – appear only as neighbours until their own slice is adopted.
 
 ```mermaid
 flowchart LR
@@ -60,6 +60,14 @@ flowchart LR
   BC-Release -->|WAV, cover and the form fields, uploaded by hand| Distributor[Distributor - external]
   BC-Release -->|WAV, canvas and teaser cut, songs converted| FFmpeg
   BC-Release -->|announcement, story and feed images composed from the cover's recipe| BC-Render
+  BC-Workspace -->|init copies the demo projects; update only adds missing files to projects/| BC-Pipeline
+  BC-Workspace -->|migrate-layout moves series canons into projects/; update skips their copies until then| BC-Series
+  BC-Workspace -->|update only adds missing files to library/| BC-CharacterLibrary
+  BC-Workspace -->|the board container runs board --watch, the watchdog round| BC-Publish
+  BC-Workspace -->|provider keys checked and stored in .env| Providers
+  BC-Workspace -->|the npx CLI and runtime; the dependencies| NpmRegistry[npm registry - external]
+  BC-Workspace -->|the board image and container| Docker[Docker - external]
+  BC-Workspace -->|uv, Python, ffmpeg, Claude Code| ToolInstallers[Tool installers - external]
 ```
 
 ## Contexts
@@ -414,3 +422,27 @@ Boundaries:
   operating system's scheduler.
 - The publish log and `.env` take no lock (HS-189); never twice is missing for YouTube uploads and TikTok (HS-187);
   the board container plans in UTC without a named time zone (HS-194).
+
+### BC-Workspace – Workspace
+Purpose (as recovered, decided by recommendation HS-205): gives the user a private, self-contained workspace and
+keeps it current – init and its onboarding copy the runtime snapshot, store the provider keys and record the
+baseline; update merges a newer runtime against the baseline without losing the user's own edits; doctor checks the
+workspace; migrate-layout moves an old layout; the board container runs the board and its watchdog. Upstream, the
+runtime build decides what ships (ADR 0010, ADR 0012, ADR 0031, ADR 0036, ADR 0047 proposed).
+Core terms: Workspace, Runtime Snapshot, Baseline, Workspace Marker, Conflict Copy, Onboarding, Doctor, Legacy
+Layout, Board Container; engineering: Workspace Payload, Engineering Layer, Sandbox Workspace.
+Evidence:
+- the marker `coreslopper.workspace.json`, written whole by `initWorkspace` and `updateWorkspace`
+  (`packages/cli/src/workspace.ts:6-17`; `init.ts:167-176,276-351`; `update.ts:192-353`)
+- the three-way decision per runtime file and the user-owned paths (`update.ts:17-56,229-292`)
+- the runtime from `git ls-files` through `planRuntime` (`scripts/runtime-files.mjs`; `scripts/build-runtime.mjs`);
+  the npx CLI bundled from `packages/cli/src/npx.ts` (`tsup.config.ts`)
+- the board container (`docker/Dockerfile`, `docker/entrypoint.sh`, `compose.yaml`)
+Boundaries:
+- Writes the runtime's files, `.env` (provider keys), `GETTING_STARTED.md` and the marker; into `projects/`,
+  `series/` and `library/` only missing files. `migrate-layout` is the one writer that moves projects.
+- The board server, its routes and the watchdog round belong to the release, publish and pipeline slices; the
+  container only runs them.
+- Outside: the npm registry, the tool installers, the providers' key checks, Docker.
+- A conflict is reported once (HS-209); the upstream CI ships and cannot pass in a workspace (HS-211); `update` says
+  nothing about a changed `docker/` (HS-212).

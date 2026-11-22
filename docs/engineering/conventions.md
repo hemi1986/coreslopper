@@ -1,6 +1,6 @@
 # Engineering conventions – coreslopper
 
-> How the code is built here, recovered by `/adopt` (slices: project and stage pipeline; human review; generation queue and verdicts; timing; storyboard; generation – 2026-11-21; series; bibles and the character library; render; release; publishing – 2026-11-22). The ADRs
+> How the code is built here, recovered by `/adopt` (slices: project and stage pipeline; human review; generation queue and verdicts; timing; storyboard; generation – 2026-11-21; series; bibles and the character library; render; release; publishing; the workspace – 2026-11-22). The ADRs
 > decide WHAT; this file says HOW. Sections other slices own are marked as such. When code and this file
 > disagree, raise it – don't silently follow either.
 
@@ -12,7 +12,7 @@
 | `packages/providers/src/` | generation, publish and post adapters, the cache/manifest runner | core |
 | `packages/remotion/src/` | Remotion compositions and motion components: pure functions of props and frame, no file access | core: runtime values from `@coreslopper/core/browser` only; `import type` from `@coreslopper/core` is erased and allowed |
 | `packages/cli/src/` | every command (`index.ts` wires them), the board server and its static page (`board/*.js`), the watchdog | core, providers, remotion |
-| `scripts/` | Python helpers (audio analysis, review player) and the runtime build | – |
+| `scripts/` | Python helpers (audio analysis, review player), the runtime build and its file classification (`runtime-files.mjs`), the sandbox | – |
 | `workspace/` | the workspace root: media skills, agents, commands, hook | – |
 
 Packages resolve each other through `tsconfig.json` `paths` and the matching `resolve.alias` in
@@ -24,6 +24,20 @@ npm workspaces (`packages/*`), but no package builds or tests on its own: `npm t
 `tests/**/*.test.ts`) and `npm run typecheck` (`tsc --noEmit`) run over the whole repository, and CI runs the
 same. There is no affected-test selection. `runtime/` is build output (`npm run build`), gitignored; never read
 it as source. The generated overview is `docs/architecture/repo-map.md`.
+
+Distribution (workspace slice):
+- Two CLIs share one source tree. `packages/cli/src/npx.ts`, bundled by tsup into `dist/cli.js`, is what
+  `npx coreslopper` runs: `init`, `update`, `doctor [dir]`, `new`, `status`, `validate`. `index.ts`, run with tsx as
+  `npm run cli` inside a workspace, is the full CLI. `update` exists only in the npx CLI, `migrate-layout` only in
+  the workspace CLI. Decided: npx owns `init` and `update`; the workspace CLI drops its `init` (HS-216, G-188).
+- The bundle inlines core and providers and keeps only `commander`, `yaml`, `zod` and `@clack/prompts` external.
+  Remotion and React are development dependencies, so nothing in the npx path may import them. Only the CI pack
+  smoke test checks this (G-192).
+- A new tracked path ships or stays upstream by `scripts/runtime-files.mjs`; classify it in the same change.
+  `workspace/` becomes the workspace root. A test that ships may import only shipped files, so a test of
+  `scripts/runtime-files.mjs` lives in `tests/runtime-files.test.ts`, which does not ship.
+- The skipped directories and the `.env` filter exist three times: `runtime-files.mjs`, `update.ts`, and `init.ts`.
+  Change all three until they are one (G-190).
 
 ## Architecture enforcement
 
@@ -122,6 +136,11 @@ state in memory), one core transition (`setStageRunning`, `setStageDone`, `setSt
   the YouTube upload and TikTok do not mark yet (G-168).
 - Secrets: tokens live in `.env` only; write them through `saveEnvValue`, mask every message with `redactSecrets`
   before it is logged or written. `review/publish.json` and `.env` take no lock today (G-169).
+- Workspace: `init` and `update` write `coreslopper.workspace.json` whole, as the last step before the install;
+  `update` decides each runtime file against the baseline in one pass and installs file by file, so an
+  interrupted update is repaired by running it again. Paths that `update` never overwrites are listed in
+  `USER_OWNED_FILES` and `USER_OWNED_PREFIXES` (`packages/cli/src/update.ts`); add a user-owned path there and in
+  `docs/onboarding.md` together. Tools install best effort, and a failure is a warning (`tools.ts`).
 - User-owned files (`timing.overrides.json`, `lyrics.txt`, imported stems, `project.yaml`) are never replaced by
   a tool; a command that would do so is a hard stop. The one exception: fixing a proposed release day writes
   `release.release_date` into `project.yaml`, keeping every comment (`setReleaseDate`,
@@ -205,5 +224,9 @@ directory. `tests/helpers/release-fixture.ts` builds release projects.
 | Publish | `publishProject({ projectDir, adapters, probe, now })` with `MockPublisher` or an adapter on a fake `fetchImpl` | integration | `tests/publish.test.ts` |
 | Post adapter | `XPublisher`, `LinkedInPublisher`, `InstagramPublisher` with a fake `fetchImpl` router | unit | `tests/publish-x.test.ts`, `tests/publish-linkedin.test.ts`, `tests/publish-instagram.test.ts` |
 | Timer | `timerPlan({ root, kind, env, home, nodeBin })` – the files and commands, nothing installed | unit | `tests/release-autopilot.test.ts` |
+| Workspace init and update | `initWorkspace({ targetDir, runtimeDir, install: false, git: false })` and `updateWorkspace({ targetDir, runtimeDir, install: false })` on a runtime fixture in a temp folder (`package.json`, `config/defaults.yaml`, `templates/project`) | integration | `tests/update.test.ts`, `tests/workspace-characterization.test.ts` |
+| Layout migration | `migrateLayout(root, { dryRun })` on a temp workspace with `series/<slug>/` | integration | `tests/migrate-layout.test.ts` |
+| Runtime classification | `runtimePath`, `planRuntime` on paths or `git ls-files` (not shipped) | unit | `tests/runtime-files.test.ts` |
+| Provider key check | `validateFalKey`, `validateHiggsfieldKey` with a fake `fetchImpl` | unit | `tests/init.test.ts` |
 | Remotion render | a real still or JPEG; opt-in with `CORESLOPPER_RENDER_TESTS=1` (needs Chrome) | integration | `tests/thumbnail-render.test.ts` |
 | Agent instruction | not testable deterministically | – | `workspace/.claude/commands/video-next.md` |

@@ -70,6 +70,10 @@ flowchart LR
     CMD_RenderUploadText["Render the upload text"]:::cmd
     CMD_CheckRelease["Check the release package"]:::cmd
     CMD_InstallTimer["Install the timer"]:::cmd
+    CMD_MigrateLayout["Migrate the layout"]:::cmd
+    CMD_CreateSandbox["Create the sandbox workspace"]:::cmd
+    CMD_StartBoardContainer["Start the board container"]:::cmd
+    CMD_InstallDependencies["Install the dependencies"]:::cmd
     subgraph BC_Timing["Timing"]
         CMD_WriteLyrics["Write lyrics"]:::cmd
         CMD_AnalyzeSong["Analyze song"]:::cmd
@@ -237,6 +241,20 @@ flowchart LR
         EVT_PostForced["Post forced"]:::evt
         EVT_TimerInstalled["Timer installed"]:::evt
     end
+    subgraph BC_Workspace["Workspace"]
+        CMD_CreateWorkspace["Create a workspace"]:::cmd
+        CMD_UpdateWorkspace["Update the workspace"]:::cmd
+        CMD_BuildRuntime["Build the runtime"]:::cmd
+        EVT_WorkspaceCreated["Workspace created"]:::evt
+        EVT_ProviderKeyStored["Provider key stored"]:::evt
+        EVT_ToolInstalled["Tool installed"]:::evt
+        EVT_DependenciesInstalled["Dependencies installed"]:::evt
+        EVT_WorkspaceUpdated["Workspace updated"]:::evt
+        EVT_ConflictCopyWritten["Conflict copy written"]:::evt
+        EVT_LayoutMigrated["Layout migrated"]:::evt
+        EVT_RuntimeBuilt["Runtime built"]:::evt
+        EVT_BoardContainerStarted["Board container started"]:::evt
+    end
     ACT_User(["User"]):::act
     ACT_Orchestrator(["Orchestrator"]):::act
     ACT_SetupSkill(["Setup skill"]):::act
@@ -259,6 +277,9 @@ flowchart LR
     EXT_LinkedIn[["LinkedIn Posts API"]]:::ext
     EXT_FalStorage[["fal.ai storage"]]:::ext
     EXT_OsScheduler[["Operating system scheduler"]]:::ext
+    EXT_NpmRegistry[["npm registry"]]:::ext
+    EXT_ToolInstallers[["Tool installers"]]:::ext
+    EXT_Docker[["Docker"]]:::ext
     POL_RunNextStage{{"Run the next autonomous stage"}}:::pol
     POL_HardStop{{"A hard stop fails the stage and halts the pipeline"}}:::pol
     POL_AnswerOpenRounds{{"Open review rounds are answered before the next autonomous stage"}}:::pol
@@ -275,6 +296,7 @@ flowchart LR
     POL_MarkPostedEventDone{{"A posted calendar event is marked done"}}:::pol
     POL_PostsWaitForMainVideo{{"Posts that link to the main video follow it"}}:::pol
     POL_CommentWhenPublic{{"The main video gets its comment when it is public"}}:::pol
+    POL_InstallAfterUpdate{{"An update that changed something installs the dependencies"}}:::pol
     RM_Status[("Status")]:::rm
     RM_NextAction[("Next action")]:::rm
     RM_ProductionView[("Production view")]:::rm
@@ -308,6 +330,8 @@ flowchart LR
     RM_AutopilotPlan[("Autopilot plan")]:::rm
     RM_PublishPlan[("Publish plan")]:::rm
     RM_PlatformReadiness[("Platform readiness")]:::rm
+    RM_DoctorReport[("Doctor report")]:::rm
+    RM_UpdateReport[("Update report")]:::rm
     ACT_SetupSkill --> CMD_CreateProject
     CMD_CreateProject --> EVT_ProjectCreated
     ACT_Orchestrator --> CMD_StartStage
@@ -522,6 +546,26 @@ flowchart LR
     CMD_ForceCalendarEvent --> EVT_PostForced
     ACT_User --> CMD_InstallTimer
     CMD_InstallTimer --> EVT_TimerInstalled
+    ACT_User --> CMD_CreateWorkspace
+    CMD_CreateWorkspace --> EVT_WorkspaceCreated
+    CMD_CreateWorkspace --> EVT_ProviderKeyStored
+    CMD_CreateWorkspace --> EVT_ToolInstalled
+    CMD_CreateWorkspace --> EVT_DependenciesInstalled
+    ACT_User --> CMD_UpdateWorkspace
+    CMD_UpdateWorkspace --> EVT_WorkspaceUpdated
+    CMD_UpdateWorkspace --> EVT_ConflictCopyWritten
+    ACT_User --> CMD_MigrateLayout
+    CMD_MigrateLayout --> EVT_LayoutMigrated
+    ACT_User --> CMD_BuildRuntime
+    CMD_BuildRuntime --> EVT_RuntimeBuilt
+    ACT_User --> CMD_CreateSandbox
+    CMD_CreateSandbox --> EVT_RuntimeBuilt
+    CMD_CreateSandbox --> EVT_WorkspaceCreated
+    CMD_CreateSandbox --> EVT_WorkspaceUpdated
+    ACT_User --> CMD_StartBoardContainer
+    CMD_StartBoardContainer --> EVT_BoardContainerStarted
+    ACT_User --> CMD_InstallDependencies
+    CMD_InstallDependencies --> EVT_DependenciesInstalled
     EVT_StageCompleted --> POL_RunNextStage
     EVT_StageSkipped --> POL_RunNextStage
     POL_RunNextStage --> CMD_StartStage
@@ -562,6 +606,8 @@ flowchart LR
     EVT_VideoWentPublic --> POL_CommentWhenPublic
     EVT_CalendarEventMarkedDone --> POL_CommentWhenPublic
     POL_CommentWhenPublic --> CMD_PostPinnedComment
+    EVT_WorkspaceUpdated --> POL_InstallAfterUpdate
+    POL_InstallAfterUpdate --> CMD_InstallDependencies
     EVT_StageStarted -.-> RM_Status
     EVT_StageCompleted -.-> RM_Status
     EVT_StageFailed -.-> RM_Status
@@ -732,6 +778,15 @@ flowchart LR
     EVT_PlatformAuthorized -.-> RM_PlatformReadiness
     EVT_TokenRotated -.-> RM_PlatformReadiness
     RM_PlatformReadiness -.-> ACT_User
+    EVT_WorkspaceCreated -.-> RM_DoctorReport
+    EVT_WorkspaceUpdated -.-> RM_DoctorReport
+    EVT_ProviderKeyStored -.-> RM_DoctorReport
+    EVT_ToolInstalled -.-> RM_DoctorReport
+    EVT_LayoutMigrated -.-> RM_DoctorReport
+    RM_DoctorReport -.-> ACT_User
+    EVT_WorkspaceUpdated -.-> RM_UpdateReport
+    EVT_ConflictCopyWritten -.-> RM_UpdateReport
+    RM_UpdateReport -.-> ACT_User
     classDef evt fill:#a3391f,stroke:#e65100,color:#fff
     classDef cmd fill:#64b5f6,stroke:#0d47a1,color:#000
     classDef pol fill:#ce93d8,stroke:#4a148c,color:#000
@@ -1265,6 +1320,70 @@ flowchart LR
     classDef hs fill:#e57373,stroke:#b71c1c,color:#fff
 ```
 
+### From npx to the first project
+
+```mermaid
+flowchart LR
+    ACT_User(["User"]):::act
+    CMD_CreateWorkspace["Create a workspace"]:::cmd
+    EVT_ProviderKeyStored["Provider key stored"]:::evt
+    EVT_ToolInstalled["Tool installed"]:::evt
+    EVT_WorkspaceCreated["Workspace created"]:::evt
+    EVT_DependenciesInstalled["Dependencies installed"]:::evt
+    RM_DoctorReport[("Doctor report")]:::rm
+    ACT_User --> CMD_CreateWorkspace
+    CMD_CreateWorkspace --> EVT_ProviderKeyStored
+    EVT_ProviderKeyStored --> EVT_ToolInstalled
+    EVT_ToolInstalled --> EVT_WorkspaceCreated
+    EVT_WorkspaceCreated --> EVT_DependenciesInstalled
+    EVT_DependenciesInstalled --> RM_DoctorReport
+    classDef evt fill:#a3391f,stroke:#e65100,color:#fff
+    classDef cmd fill:#64b5f6,stroke:#0d47a1,color:#000
+    classDef pol fill:#ce93d8,stroke:#4a148c,color:#000
+    classDef rm fill:#81c784,stroke:#1b5e20,color:#000
+    classDef act fill:#a3751f,stroke:#f57f17,color:#000
+    classDef ext fill:#f48fb1,stroke:#880e4f,color:#000
+    classDef agg fill:#ffe082,stroke:#ff6f00,color:#000
+    classDef hs fill:#e57373,stroke:#b71c1c,color:#fff
+```
+
+### From a new release to a current workspace
+
+```mermaid
+flowchart LR
+    ACT_User(["User"]):::act
+    CMD_UpdateWorkspace["Update the workspace"]:::cmd
+    EVT_ConflictCopyWritten["Conflict copy written"]:::evt
+    EVT_WorkspaceUpdated["Workspace updated"]:::evt
+    RM_UpdateReport[("Update report")]:::rm
+    POL_InstallAfterUpdate{{"An update that changed something installs the dependencies"}}:::pol
+    CMD_InstallDependencies["Install the dependencies"]:::cmd
+    EVT_DependenciesInstalled["Dependencies installed"]:::evt
+    CMD_MigrateLayout["Migrate the layout"]:::cmd
+    EVT_LayoutMigrated["Layout migrated"]:::evt
+    CMD_StartBoardContainer["Start the board container"]:::cmd
+    EVT_BoardContainerStarted["Board container started"]:::evt
+    ACT_User --> CMD_UpdateWorkspace
+    CMD_UpdateWorkspace --> EVT_ConflictCopyWritten
+    EVT_ConflictCopyWritten --> EVT_WorkspaceUpdated
+    EVT_WorkspaceUpdated --> RM_UpdateReport
+    RM_UpdateReport --> POL_InstallAfterUpdate
+    POL_InstallAfterUpdate --> CMD_InstallDependencies
+    CMD_InstallDependencies --> EVT_DependenciesInstalled
+    EVT_DependenciesInstalled --> CMD_MigrateLayout
+    CMD_MigrateLayout --> EVT_LayoutMigrated
+    EVT_LayoutMigrated --> CMD_StartBoardContainer
+    CMD_StartBoardContainer --> EVT_BoardContainerStarted
+    classDef evt fill:#a3391f,stroke:#e65100,color:#fff
+    classDef cmd fill:#64b5f6,stroke:#0d47a1,color:#000
+    classDef pol fill:#ce93d8,stroke:#4a148c,color:#000
+    classDef rm fill:#81c784,stroke:#1b5e20,color:#000
+    classDef act fill:#a3751f,stroke:#f57f17,color:#000
+    classDef ext fill:#f48fb1,stroke:#880e4f,color:#000
+    classDef agg fill:#ffe082,stroke:#ff6f00,color:#000
+    classDef hs fill:#e57373,stroke:#b71c1c,color:#fff
+```
+
 ## Bounded Contexts & Aggregates
 
 | Context | Purpose | Aggregates | Events |
@@ -1281,6 +1400,7 @@ flowchart LR
 | Render (`BC-Render`) | Turns a validated project into its videos and images – a render per format from one composition, previews for checks, Shorts cut from the 9:16 render, and composed images (thumbnails, covers, feed images) from a generated image and the style bible – and keeps a project's media in the media directory | Render, Short, Composed image | Preview rendered, Passage rendered, Format rendered, Still rendered, Render failed, Short cut, Short refused, Image composed, Image composition refused, Project media linked, Determinism checked |
 | Release (`BC-Release`) | Turns a finished project into everything its release needs – the release folder with its manifest, the platform texts laid out and checked against the limits, the release calendar planned across the workspace, and the release board where the user ticks off what went live and gives the one release approval | Release package, Release calendar, Release status | Upload data written, Release package built, Release rules broken, Upload text rendered, Release calendar planned, Release day fixed, Calendar event marked done, Live URL recorded, Release approved, Approval withdrawn, Approval refused, Release checked, Calendar event taken over, Calendar event given back |
 | Publishing (`BC-Publish`) | Gets an approved release onto the platforms – the publish command uploads by hand, privately or as drafts; the release autopilot posts every calendar event a platform API can post at its time once the user approved the release, without ever posting twice; the platform credentials and the watchdog round that runs it every few minutes | Publish log, Autopilot log, Autopilot round, Platform credentials | Platform authorized, Token rotated, Publish planned, Video uploaded, Upload failed, Autopilot round run, Post claimed, Calendar event posted, Calendar event uploaded, Video went public, Post attempt failed, Pinned comment posted, Spotify link appended, Microsite page deployed, Retry requested, Post forced, Timer installed |
+| Workspace (`BC-Workspace`) | Gives the user a private, self-contained workspace and keeps it current – init and its onboarding copy the runtime snapshot, store the provider keys and record the baseline; update merges a newer runtime against the baseline without losing the user's own edits; doctor checks the workspace, tools and keys; migrate-layout moves an old layout; the board container runs the board and its watchdog. Upstream, the runtime build decides what ships | Workspace marker, Runtime snapshot | Workspace created, Provider key stored, Tool installed, Dependencies installed, Workspace updated, Conflict copy written, Layout migrated, Runtime built, Board container started |
 
 ## Aggregates
 
@@ -1313,3 +1433,5 @@ flowchart LR
 | Autopilot log (`AGG-AutopilotLog`) | Publishing | as-is | review/autopilot.json, appended only under the project's release lock review/.release.lock; the claim plans again from the fresh release status and log and appends the running entry in the same lock (packages/cli/src/autopilot-state.ts:46-65; packages/cli/src/release-autopilot.ts:258-273; packages/core/src/schema.ts:1087-1132)<br>the autopilot state of every calendar event, a pure function of the release status, the log, the settings, the readiness and the clock (packages/core/src/autopilot.ts:147-211) |
 | Autopilot round (`AGG-AutopilotRound`) | Publishing | as-is | .cache/release-run.lock, a holder lock with pid, host and time, stale after two hours, and .cache/release-run.last with the time and interval of the last round (packages/cli/src/release-autopilot.ts:173-212; packages/cli/src/file-lock.ts:45-81; packages/cli/src/autopilot-state.ts:28-42) |
 | Platform credentials (`AGG-PlatformCredentials`) | Publishing | as-is | the workspace's .env (mode 0600), written by saveEnvValue from publish-auth and from the adapters when a token rotates (packages/cli/src/publish-auth.ts:24-34; packages/cli/src/social-auth.ts:51-127; packages/providers/src/publish/x.ts:227-232; tiktok.ts:253-257); readiness from autopilotReadiness (packages/cli/src/autopilot-state.ts:68-91) |
+| Workspace marker (`AGG-WorkspaceMarker`) | Workspace | as-is | coreslopper.workspace.json at the workspace root – version, runtime version, created, the first project, the last update and the baseline (SHA-256 per runtime file) – written whole by init and by every update that is not a dry run (packages/cli/src/workspace.ts:6-17; packages/cli/src/init.ts:167-176,324; packages/cli/src/update.ts:96-99,308-315)<br>updateWorkspace classifies every runtime file against the baseline and the workspace in one pass, then writes the new baseline (update.ts:192-353) |
+| Runtime snapshot (`AGG-RuntimeSnapshot`) | Workspace | as-is | runtime/, built whole from the tracked files by build-runtime.mjs through planRuntime, which classifies every tracked path as shipped, shipped from workspace/ or not shipped (scripts/runtime-files.mjs:20-149; scripts/build-runtime.mjs:19-80)<br>the npm package carries dist/cli.js and runtime/ (package.json bin and files; tsup.config.ts) |

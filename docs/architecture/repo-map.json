@@ -537,6 +537,7 @@
       "terms": [
         "auth",
         "autopilot",
+        "characterization",
         "instagram",
         "linkedin",
         "publish",
@@ -548,6 +549,7 @@
         "packages/cli/src/publish-setup.ts",
         "packages/cli/src/publish.ts",
         "tests/publish-autopilot-adapters.test.ts",
+        "tests/publish-characterization.test.ts",
         "tests/publish-instagram.test.ts",
         "tests/publish-linkedin.test.ts",
         "tests/publish-x.test.ts",
@@ -565,7 +567,7 @@
       "reasons": [
         "2 layers: cli, tests",
         "2 packages",
-        "8 files"
+        "9 files"
       ],
       "adopted": true,
       "adoptedAt": "2026-11-22"
@@ -629,7 +631,7 @@
         "4 files"
       ],
       "adopted": true,
-      "adoptedAt": "2026-11-21"
+      "adoptedAt": "2026-11-22"
     },
     {
       "name": "init",
@@ -908,6 +910,20 @@
     },
     {
       "name": "series",
+      "terms": [],
+      "tables": [],
+      "files": [],
+      "packages": [],
+      "layers": [],
+      "score": 0,
+      "reasons": [
+        "marked adopted manually"
+      ],
+      "adopted": true,
+      "adoptedAt": "2026-11-22"
+    },
+    {
+      "name": "workspace",
       "terms": [],
       "tables": [],
       "files": [],

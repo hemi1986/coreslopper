@@ -34,6 +34,8 @@
 | GAP-AGG-AutopilotLog | as-is boundary | [AGG-AutopilotLog](events.yaml) | [BC-Publish](context-map.as-is.md#bc-publish--publishing) | – | review/autopilot.json, appended only under the project's release lock review/.release.lock; the claim plans again from the fresh release status and log and appends the running entry in the same lock (packages/cli/src/autopilot-state.ts:46-65; packages/cli/src/release-autopilot.ts:258-273; packages/core/src/schema.ts:1087-1132)<br>the autopilot state of every calendar event, a pure function of the release status, the log, the settings, the readiness and the clock (packages/core/src/autopilot.ts:147-211) | Decide the target boundary |
 | GAP-AGG-AutopilotRound | as-is boundary | [AGG-AutopilotRound](events.yaml) | [BC-Publish](context-map.as-is.md#bc-publish--publishing) | – | .cache/release-run.lock, a holder lock with pid, host and time, stale after two hours, and .cache/release-run.last with the time and interval of the last round (packages/cli/src/release-autopilot.ts:173-212; packages/cli/src/file-lock.ts:45-81; packages/cli/src/autopilot-state.ts:28-42) | Decide the target boundary |
 | GAP-AGG-PlatformCredentials | as-is boundary | [AGG-PlatformCredentials](events.yaml) | [BC-Publish](context-map.as-is.md#bc-publish--publishing) | – | the workspace's .env (mode 0600), written by saveEnvValue from publish-auth and from the adapters when a token rotates (packages/cli/src/publish-auth.ts:24-34; packages/cli/src/social-auth.ts:51-127; packages/providers/src/publish/x.ts:227-232; tiktok.ts:253-257); readiness from autopilotReadiness (packages/cli/src/autopilot-state.ts:68-91) | Decide the target boundary |
+| GAP-AGG-WorkspaceMarker | as-is boundary | [AGG-WorkspaceMarker](events.yaml) | [BC-Workspace](context-map.as-is.md#bc-workspace--workspace) | – | coreslopper.workspace.json at the workspace root – version, runtime version, created, the first project, the last update and the baseline (SHA-256 per runtime file) – written whole by init and by every update that is not a dry run (packages/cli/src/workspace.ts:6-17; packages/cli/src/init.ts:167-176,324; packages/cli/src/update.ts:96-99,308-315)<br>updateWorkspace classifies every runtime file against the baseline and the workspace in one pass, then writes the new baseline (update.ts:192-353) | Decide the target boundary |
+| GAP-AGG-RuntimeSnapshot | as-is boundary | [AGG-RuntimeSnapshot](events.yaml) | [BC-Workspace](context-map.as-is.md#bc-workspace--workspace) | – | runtime/, built whole from the tracked files by build-runtime.mjs through planRuntime, which classifies every tracked path as shipped, shipped from workspace/ or not shipped (scripts/runtime-files.mjs:20-149; scripts/build-runtime.mjs:19-80)<br>the npm package carries dist/cli.js and runtime/ (package.json bin and files; tsup.config.ts) | Decide the target boundary |
 <!-- kataster:gap-register:end -->
 
 ## Gaps found by the adoption of the project and stage pipeline (2026-11-21)
@@ -472,3 +474,44 @@ Decisions (by recommendation, not reviewed by the user):
 
   ADR 0046 (proposed) records them.
 - The approval, done marks and live URLs are the release slice's; the production scan is the pipeline's.
+
+## Gaps found by the adoption of the workspace slice (2026-11-22)
+
+Candidates only – no stories until the user asks (`/adopt <scope> --stories`). Priority is a suggestion. The user
+created their workspace with `npx coreslopper init`, takes new versions with `update`, sometimes edits workflow files
+there with Claude and carries them upstream, and means to run the board in the container. Their next `update` is the
+first one after 0.8.0: it brings the payload split, series in `projects/` and the board container at once.
+
+| # | Class | Gap | Evidence | Source | Priority |
+|---|---|---|---|---|---|
+| G-181 | Exists but contradicts | A conflict is reported once: the baseline takes upstream's hash of the conflicted file, so the next update takes the unmerged file for a local change and keeps it silently; the conflict copy is never named again, and neither `doctor` nor `update` looks for leftover copies | `packages/cli/src/update.ts:232,251-263`; `tests/workspace-characterization.test.ts` | HS-209 | medium |
+| G-182 | Missing | `update` counts the workspace's own changes to workflow files (`keptLocal`) but names none, also in a dry run; nothing lists what to carry upstream | `update.ts:251-255,363` | HS-210 | low |
+| G-183 | Exists but contradicts | The upstream CI and the issue and pull request templates ship into every workspace; `ci.yml` runs on a push to main and calls `npm run build` and `npm pack`, which the runtime's `package.json` removed, so a workspace on GitHub runs a red CI (inference, not run) | `scripts/runtime-files.mjs:60`; `.github/workflows/ci.yml:104-118`; `scripts/build-runtime.mjs:66-68`; `tests/runtime-files.test.ts` | HS-211 | medium |
+| G-184 | Missing | `update` never says that it changed `docker/` and the board image needs `docker compose build` (only `docs/board.md` says so); every workspace's container uses the one image name `coreslopper-board` | `compose.yaml:7-8`; `update.ts:355-381`; `docs/board.md` | HS-212 | low |
+| G-185 | Exists but contradicts | A package named `coreslopper` with `templates/project` is a workspace without a marker: a half-finished init passes and `update` then runs without a baseline; the upstream repository passes too, and `doctor` there fails its required `.claude/skills/video-brief` check | `packages/cli/src/workspace.ts:27-32`; `doctor.ts:216`; `tests/workspace-characterization.test.ts` | HS-213 | low |
+| G-186 | Exists but contradicts | Drifted texts: `docs/architecture.md` (update by `init --force`, the npx commands, the keys); ADR 0010 (Suno in `.mcp.json`, `init --force`); ADR 0012 (only `projects/**`; nothing on the refusals, the legacy skip, the install); `docs/onboarding.md` (`update --force` once without a baseline overwrites local edits, a plain update records it; `series/` missing among the user's folders; a deleted `package-lock.json` comes back); `workspace/CLAUDE.md`'s hook matcher; three doctor descriptions; three next-step texts; onboarding texts for music videos only; shipped characterization tests citing `docs/domain/`, which does not ship | `docs/architecture.md:225`; `docs/adr/0010-npx-onboarding.md`; `docs/adr/0012-workspace-update.md`; `docs/onboarding.md:176-199`; `workspace/CLAUDE.md`; `npx.ts:59,130`; `index.ts:1376`; `init-command.ts:43`; `init.ts:207`; `onboarding.ts:331,354` | HS-214 | medium |
+| G-187 | Exists but contradicts | `init` records the CLI's own version in the marker, `update` the runtime's | `init.ts:170`; `update.ts:161-168,310`; `tests/workspace-characterization.test.ts` | HS-215 | low |
+| G-188 | Exists but contradicts | Two CLIs: the workspace CLI's `init` cannot find a runtime in a workspace, its `doctor` takes no directory, the init options are written twice; npx's `--runtime` is dropped in the interactive init (see also G-84) | `npx.ts:63-100,128`; `index.ts:494-529,1375`; `workspace.ts:73-76`; `init-command.ts:62-87` | HS-216 | low |
+| G-189 | Exists but contradicts | Onboarding installs uv, Python and Claude Code before "Create the workspace now?" and then says "No files were written"; the first project's budget minimum is hard-coded to 5 beside `defaults.budget.minimum_usd` | `onboarding.ts:119-164,446-449,499-507`; `new-project.ts:85` | HS-217 | low |
+| G-190 | Exists but contradicts | Three lists of skipped directories and three `.env` filters: the runtime build (8, top level), `update` (11, any depth), `init` (update's list, but only `.env` and `.env/…`); latent, no tracked path hits the difference | `scripts/runtime-files.mjs:94-109`; `update.ts:18-56`; `init.ts:111-118` | HS-218 | low |
+| G-191 | Missing | `migrate-layout` writes the rewritten paths before it moves the folders; a failure in between leaves paths pointing at folders that are not there yet | `migrate-layout.ts:141-142` | HS-219 | low |
+| G-192 | Missing | No test of `runDoctor`, onboarding, the init guards, `init --force` into a non-empty directory, the `.env` mode, the Topview key check, `update`'s refusal of the source repository and its install trigger, the runtime's `package.json`, the sandbox, the container's entrypoint; nothing but the CI pack smoke test keeps Remotion out of the npx bundle | `tests/init.test.ts`; `tests/update.test.ts`; `.github/workflows/ci.yml:104-118` | HS-220 | low |
+
+Decisions (by recommendation, not reviewed by the user):
+
+- GAP-AGG-WorkspaceMarker and GAP-AGG-RuntimeSnapshot: the boundaries stay as recovered (`as-is`).
+- Exists and is intended:
+  - a workspace as a private copy of the runtime, created by `npx coreslopper init` and kept current by `update`
+    (user: both are their path);
+  - the three-way update against the baseline: untouched files follow upstream, the user's edits stay, a file both
+    changed gets a conflict copy, a file carried upstream byte for byte is taken silently (user: edits workflow files
+    with Claude and carries them upstream);
+  - `projects/`, `series/` and `library/` add-only; `.env`, `.mcp.json`, `GETTING_STARTED.md` and the marker never
+    written by `update`; `package-lock.json` always upstream's;
+  - no downgrade and no overwrite without `--force`; the legacy layout skipped until `migrate-layout` ran;
+  - every tracked file classified, the engineering layer never shipped (ADR 0036);
+  - the board container: the workspace mounted, the dependencies in a volume, the loopback port, the workspace
+    owner's user (user: wants the board in the container).
+
+  ADR 0047 (proposed) records them.
+- The container's time zone stays G-167 (publish slice); `doctor`'s publish and autopilot rows are the publish slice's.

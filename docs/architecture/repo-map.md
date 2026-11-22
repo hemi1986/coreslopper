@@ -44,7 +44,7 @@ Files that share a concept stem or a table across layers. These are suggestions 
 | bench | cli, core, tests | 4 | – | 3 layers: cli, core, tests; 3 packages; 4 files | – |
 | media | cli, remotion, tests | 4 | – | 3 layers: cli, remotion, tests; 3 packages; 4 files | yes |
 | board | cli, tests | 7 | – | 2 layers: cli, tests; 2 packages; 7 files | – |
-| publish | cli, tests | 8 | – | 2 layers: cli, tests; 2 packages; 8 files | yes |
+| publish | cli, tests | 9 | – | 2 layers: cli, tests; 2 packages; 9 files | yes |
 | sery | cli, tests | 5 | – | 2 layers: cli, tests; 2 packages; 5 files | – |
 | character | cli, tests | 4 | – | 2 layers: cli, tests; 2 packages; 4 files | yes |
 | init | cli, tests | 3 | – | 2 layers: cli, tests; 2 packages; 3 files | – |
@@ -60,6 +60,7 @@ Files that share a concept stem or a table across layers. These are suggestions 
 | storyboard | – | 0 | – | marked adopted manually | yes |
 | generation | – | 0 | – | marked adopted manually | yes |
 | series | – | 0 | – | marked adopted manually | yes |
+| workspace | – | 0 | – | marked adopted manually | yes |
 
 Adopt a concept slice with:
 
