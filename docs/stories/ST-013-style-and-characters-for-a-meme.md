@@ -8,7 +8,7 @@ size: null
 risk: null
 depends_on: [ST-007, ST-010]
 labels: [feature:meme]
-status: in-progress
+status: done
 ---
 
 ## Task
@@ -21,7 +21,7 @@ skills `style-bible` and `character-bible` (workspace payload; load `writing-for
 - Completing the stage takes new characters into the character library (POL-ImportFinishedCharacters, also for memes).
 
 ## Acceptance Criteria
-- [ ] Both skills say what a meme reads and writes, and that the stage never asks the user
-- [ ] `stage-done <meme> style-character` imports the meme's new characters into the library (test)
-- [ ] `validate <meme>` after the stage checks every speaker against the character bible (test)
-- [ ] Tried in a sandbox workspace: one library character plus one invented character
+- [x] Both skills say what a meme reads and writes, and that the stage never asks the user
+- [x] `stage-done <meme> style-character` imports the meme's new characters into the library (test)
+- [x] `validate <meme>` after the stage checks every speaker against the character bible (test)
+- [x] Tried in a sandbox workspace: one library character plus one invented character
