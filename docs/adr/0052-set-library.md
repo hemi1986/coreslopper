@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed — 2026-11-22. Extends [ADR 0034](0034-character-library.md) to sets. Builds on
+Accepted — 2026-11-22. Extends [ADR 0034](0034-character-library.md) to sets. Builds on
 [ADR 0025](0025-plates-props-character-states.md) and [ADR 0043](0043-bibles-and-character-identity.md).
 
 ## Context
