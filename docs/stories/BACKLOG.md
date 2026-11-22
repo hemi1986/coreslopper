@@ -2,9 +2,9 @@
 
 > Generated from `docs/stories/ST-*.md` – **do not edit manually**. Change the story files instead.
 
-**Progress: 3 of 20 domain stories done** · scenarios 12 of 68
+**Progress: 3 of 21 domain stories done** · scenarios 12 of 71
 
-**35 stories** · In Progress: 0 · Ready: 27 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 8 · Superseded: 0
+**39 stories** · In Progress: 0 · Ready: 27 · Ready for Human Review: 4 · In Review: 0 · Draft: 0 · Done: 8 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
 
@@ -39,6 +39,15 @@ Within each section: by priority, then by story ID, with dependencies pulled in 
 | [ST-034](ST-034-setup-skills-offer-library-sets.md) | The setup skills offer library sets while grilling | task | – | should | – | – | ST-028 |
 | [ST-018](ST-018-the-boards-sounds-view.md) | The board's Sounds view | task | – | could | – | – | ST-001, ST-002, ST-003, ST-006 |
 | [ST-019](ST-019-spike-tiktok-trending-audio.md) | Spike: can a meme use TikTok's trending audio? | spike | – | could | – | – | – |
+
+## Ready for Human Review
+
+| ID | Title | Type | Context | Priority | Size | Risk | Depends on |
+|---|---|---|---|---|---|---|---|
+| [ST-036](ST-036-an-internal-project-gets-no-release-package.md) | An internal project gets no release package | domain | Release | must | – | – | – |
+| [ST-037](ST-037-internal-projects-end-after-qa.md) | Internal projects are created as such and end after QA | task | – | must | – | – | ST-036 |
+| [ST-038](ST-038-local-lip-sync-by-default-in-comfyui-projects.md) | ComfyUI projects lip-sync locally by default | task | – | must | – | – | – |
+| [ST-039](ST-039-restart-comfyui-only-when-stuck.md) | Restart ComfyUI only when it is stuck | task | – | should | – | – | – |
 
 ## Done
 
