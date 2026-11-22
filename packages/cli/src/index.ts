@@ -38,6 +38,7 @@ import { generateBatch } from './generate.js';
 import { runQa } from './qa.js';
 import { reviewImage } from './review-image.js';
 import { patchImage } from './patch.js';
+import { CLIP_AUDIO_LUFS, clipAudioTake } from './clip-audio.js';
 import { formatVerdicts, summarizeVerdicts } from './verdicts.js';
 import { formatMediaInfo, makeSheet, mediaInfo } from './image-ops.js';
 import { comfyRestart, comfyStatus, formatComfyStatus } from './comfy.js';
@@ -961,6 +962,30 @@ program
   );
 
 program
+  .command('clip-audio [project]')
+  .description(
+    'Episode: replace the take of an sfx line with the sound of the clips that play during it (cut at the clip positions, ' +
+      'levelled, registered like import-takes); run episode-track afterwards.',
+  )
+  .requiredOption('--line <id>', 'The sfx line, e.g. l07')
+  .option('--shots <ids>', 'Shots whose clip sound is used (default: every clip shot that overlaps the line)')
+  .option('--lufs <n>', `Target loudness of the take (default ${CLIP_AUDIO_LUFS})`)
+  .action((project: string | undefined, options: { line: string; shots?: string; lufs?: string }) =>
+    run(async () => {
+      const result = await clipAudioTake(projectDirFromArg(project), {
+        line: options.line,
+        shots: parseCsv(options.shots),
+        lufs: options.lufs === undefined ? undefined : Number(options.lufs),
+      });
+      for (const piece of result.pieces) {
+        console.log(`  ${piece.shot}: ${piece.length.toFixed(2)} s at +${piece.offset.toFixed(2)} s from clip ${piece.from.toFixed(2)} s`);
+      }
+      for (const note of result.skipped) console.log(`  skipped ${note}`);
+      console.log(`${result.line}: ${result.file} (${result.duration.toFixed(2)} s) from ${result.pieces.length} clip(s)`);
+    }),
+  );
+
+program
   .command('episode-track [project]')
   .description('Episode: place the takes, write timing.json, and mix audio/episode.wav and the speaker stems.')
   .action((project: string | undefined) =>
@@ -1033,19 +1058,22 @@ program
 
 program
   .command('frame [project]')
-  .description('Extract the first, middle, or last frame of a clip for review or frame chaining.')
-  .requiredOption('--input <path>', 'Source clip')
+  .description('Extract the first, middle, or last frame of a clip or render, or the frame at a time, for review or frame chaining.')
+  .requiredOption('--input <path>', 'Source clip or render')
   .option('--position <position>', 'first | middle | last', 'last')
+  .option('--at <seconds>', 'Frame at this time in seconds instead of --position')
   .option('--out <path>', 'Override the output path')
-  .action((project: string | undefined, options: { input: string; position: string; out?: string }) =>
+  .action((project: string | undefined, options: { input: string; position: string; at?: string; out?: string }) =>
     run(async () => {
       if (!['first', 'middle', 'last'].includes(options.position)) {
         throw new ValidationError('Position must be first, middle, or last.');
       }
+      const at = options.at === undefined ? undefined : Number(options.at);
+      if (at !== undefined && !Number.isFinite(at)) throw new ValidationError('--at takes seconds, e.g. 12.5.');
       await extractFrame(
         projectDirFromArg(project),
         options.input,
-        options.position as 'first' | 'middle' | 'last',
+        at ?? (options.position as 'first' | 'middle' | 'last'),
         options.out,
       );
     }),

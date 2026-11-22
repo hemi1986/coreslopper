@@ -118,7 +118,10 @@ describe('bench files', () => {
     // Upstream ships generic examples only: they need no fixtures from a private project (ADR 0048).
     expect(cases.length).toBeGreaterThanOrEqual(1);
     expect(selectBenchCases(cases, { set: 'smoke' }).length).toBeGreaterThanOrEqual(1);
-    for (const benchCase of cases) expect([benchCase.id, benchCase.fixtures, benchCase.source]).toEqual([benchCase.id, {}, undefined]);
+    // A workspace keeps its own cases at update; only the shipped example-* cases must be generic.
+    const examples = cases.filter((benchCase) => benchCase.id.startsWith('example-'));
+    expect(examples.length).toBeGreaterThanOrEqual(1);
+    for (const benchCase of examples) expect([benchCase.id, benchCase.fixtures, benchCase.source]).toEqual([benchCase.id, {}, undefined]);
     const targets = await loadBenchTargets(paths);
     expect(Object.keys(targets)).toContain('local');
     expect(Object.keys(targets)).toContain('mock');

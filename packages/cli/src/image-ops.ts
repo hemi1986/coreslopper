@@ -44,6 +44,39 @@ function ffmpeg(args: string[]): void {
   execFileSync(resolveBinary('ffmpeg'), ['-y', '-v', 'error', '-threads', '6', ...args], { stdio: ['ignore', 'ignore', 'inherit'] });
 }
 
+/** Aspect ratios edit models accept (Nano Banana, Qwen, Seedream); a crop is snapped to one of them. */
+export const EDIT_ASPECTS: ReadonlyArray<readonly [number, number]> = [
+  [1, 1], [4, 5], [5, 4], [3, 4], [4, 3], [2, 3], [3, 2], [9, 16], [16, 9], [21, 9],
+];
+
+/**
+ * Grow a box to the nearest standard aspect ratio, centred on the old box and
+ * kept inside the image, so a cloud edit model returns the crop's shape and the
+ * patch pastes back without distortion. Returns the box and its ratio (`w:h`).
+ */
+export function snapBoxAspect(box: Box, image: { width: number; height: number }): { box: Box; ratio: string } {
+  const current = box.width / box.height;
+  const fits = EDIT_ASPECTS.filter(([w, h]) => {
+    const r = w / h;
+    return r >= current ? Math.round(box.height * r) <= image.width : Math.round(box.width / r) <= image.height;
+  });
+  const [w, h] = (fits.length > 0 ? fits : EDIT_ASPECTS).reduce((best, next) =>
+    Math.abs(Math.log(next[0] / next[1] / current)) < Math.abs(Math.log(best[0] / best[1] / current)) ? next : best,
+  );
+  const ratio = w / h;
+  const even = (n: number) => Math.max(2, Math.floor(n / 2) * 2);
+  let width = box.width;
+  let height = box.height;
+  if (ratio >= current) width = Math.min(image.width, even(box.height * ratio));
+  else height = Math.min(image.height, even(box.width / ratio));
+  const place = (start: number, size: number, grown: number, limit: number) =>
+    Math.max(0, Math.min(limit - grown, Math.round(start - (grown - size) / 2)));
+  return {
+    box: { x: place(box.x, box.width, width, image.width), y: place(box.y, box.height, height, image.height), width, height },
+    ratio: `${w}:${h}`,
+  };
+}
+
 /** The size an edit model should see for a crop: the long side scaled to `target`, in multiples of 16. */
 export function editSize(box: Pick<Box, 'width' | 'height'>, target = 1024): { width: number; height: number } {
   const factor = target / Math.max(box.width, box.height);
@@ -66,8 +99,8 @@ export async function cropImage(
 }
 
 /**
- * The filtergraph that scales a patch to its box and overlays it on the base
- * with a feathered edge. A side of the box that lies on the image border is not
+ * The filtergraph that scales a patch to cover its box (centre-cropped, never
+ * stretched) and overlays it on the base with a feathered edge. A side of the box that lies on the image border is not
  * feathered: there is nothing to blend into.
  */
 export function pasteFilter(box: Box, image: { width: number; height: number }, feather: number): string {
@@ -82,7 +115,7 @@ export function pasteFilter(box: Box, image: { width: number; height: number }, 
   const ramp = sides.reduce((acc, side) => (acc ? `min(${acc},${side})` : side), '');
   const alpha = ramp ? `255*clip(${ramp},0,1)` : '255';
   return (
-    `[1:v]scale=${box.width}:${box.height}:flags=lanczos,format=rgba,` +
+    `[1:v]scale=${box.width}:${box.height}:force_original_aspect_ratio=increase:flags=lanczos,crop=${box.width}:${box.height},format=rgba,` +
     `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${alpha}'[patch];` +
     `[0:v][patch]overlay=${box.x}:${box.y}:format=rgb`
   );

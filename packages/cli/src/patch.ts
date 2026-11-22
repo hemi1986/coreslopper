@@ -1,10 +1,10 @@
 import { existsSync } from 'node:fs';
 import { appendFile, copyFile } from 'node:fs/promises';
 import { basename, dirname, extname, join, relative, resolve } from 'node:path';
-import { ValidationError, ensureDir, loadProject, loadSeries, type ProviderKind } from '@coreslopper/core';
+import { ValidationError, ensureDir, loadProject, loadSeries, providerForRole, type ProviderKind } from '@coreslopper/core';
 import { imageSize } from './clip-options.js';
 import { BatchSchema, projectTarget, runBatch, seriesTarget, type BatchTarget } from './generate.js';
-import { cropImage, editSize, parseBox, pasteBack, type Box } from './image-ops.js';
+import { cropImage, editSize, parseBox, pasteBack, snapBoxAspect, type Box } from './image-ops.js';
 import { latestVerdicts } from './verdicts.js';
 
 export interface PatchOptions {
@@ -67,7 +67,9 @@ export async function patchImage(projectDir: string, options: PatchOptions): Pro
   for (const reference of references) if (!existsSync(reference)) throw new ValidationError(`Missing reference image: ${reference}`);
 
   const size = imageSize(image);
-  const box = parseBox(options.box, size);
+  // Snap to a standard aspect: cloud edit models return one of these, and a
+  // result of another shape would be cropped on paste-back.
+  const { box, ratio } = snapBoxAspect(parseBox(options.box, size), size);
   const extension = extname(image) || '.png';
   const stem = basename(image, extension);
   const verdicts = join(target.paths.assets, 'review', 'verdicts.jsonl');
@@ -82,15 +84,19 @@ export async function patchImage(projectDir: string, options: PatchOptions): Pro
   if (options.edit) {
     edit = await options.edit(crop, options.prompt);
   } else {
+    const role = options.role ?? 'image.edit';
+    const provider = options.provider ?? providerForRole(target.config, role);
+    const local = provider === 'comfyui' || provider === 'mock';
     const batch = BatchSchema.parse([
       {
         operation: 'editImage',
-        role: options.role ?? 'image.edit',
+        role,
         id: `patch:${stem}-a${attempt}`,
         prompt: options.prompt,
         references: [crop, ...references].map((path) => relative(root, path)),
         ...(options.seed !== undefined ? { seed: options.seed } : {}),
-        ...(options.workflow ? { params: { workflow: options.workflow } } : {}),
+        // Local workflows take the size from the crop; cloud models need the ratio.
+        ...(local ? (options.workflow ? { params: { workflow: options.workflow } } : {}) : { params: { aspect_ratio: ratio } }),
       },
     ]);
     const [done] = await runBatch(target, batch, { provider: options.provider });

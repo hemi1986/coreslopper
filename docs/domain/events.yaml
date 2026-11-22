@@ -308,7 +308,7 @@ aggregates:
     context: BC-Series
     status: as-is
     evidence:
-      - takes.json of an episode, written whole and sorted by saveTakes (packages/cli/src/takes.ts:51-57); its writers are voice-track and import-takes (packages/cli/src/voice-track.ts:99-200; media.ts:395-460)
+      - takes.json of an episode, written whole and sorted by saveTakes (packages/cli/src/takes.ts:51-57); its writers are voice-track, import-takes and clip-audio (packages/cli/src/voice-track.ts:99-200; media.ts:395-460; clip-audio.ts)
       - every take's status follows from its file, the registered file hash and the text hash of its script line (takes.ts:65-87; packages/core/src/episode.ts:139-153)
     invariants:
       - Every audible script line (spoken and sfx) has one take and every scene with an ambience prompt one ambience; chat and pause lines have none (the code does this, episode.ts:135-137; voice-track.ts)
@@ -1677,6 +1677,15 @@ commands:
     aggregate: AGG-TakeRegistry
     produces: [EVT-TakeImported]
     description: "import-takes [--lines] after the user put recordings into audio/lines/"
+  - id: CMD-TakeSoundFromClips
+    name: Take an effect's sound from its clips
+    actor: ACT-StageRunner
+    aggregate: AGG-TakeRegistry
+    produces: [EVT-TakeImported]
+    description: "clip-audio --line [--shots] once the clips under an sfx line exist; the take is registered through import-takes (packages/cli/src/clip-audio.ts)"
+    rules:
+      - Only an sfx line; the sound of every clip shot that overlaps the line (or --shots), cut at the clip's on-screen position and levelled to -20 LUFS (clip-audio.ts)
+      - The take is then an imported take, so voice-track never generates over it; episode-track runs again afterwards
   - id: CMD-BuildEpisodeTrack
     name: Build the episode track
     actor: ACT-StageRunner
