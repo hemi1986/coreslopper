@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { stringify } from 'yaml';
+import { parse, stringify } from 'yaml';
 import { StateSchema, TakesSchema, readJsonFile } from '@coreslopper/core';
 import { createProject } from '../packages/cli/src/new-project.ts';
 import { resolveBinary } from '../packages/cli/src/media.ts';
@@ -31,7 +32,7 @@ function hasFfmpeg(): boolean {
 }
 
 /** A workspace with the meme "office-prank" whose script has the sound line "reveal-boom" naming "vine-boom". */
-async function officePrank(): Promise<{ workspace: string; projectDir: string }> {
+async function officePrank(lines: Record<string, unknown>[] = [{ id: 'reveal-boom', kind: 'sfx', sound: 'vine-boom' }]): Promise<{ workspace: string; projectDir: string }> {
   const workspace = await mkdtemp(join(tmpdir(), 'coreslopper-meme-voice-'));
   temporary.push(workspace);
   await cp(join(root, 'config'), join(workspace, 'config'), { recursive: true });
@@ -42,7 +43,7 @@ async function officePrank(): Promise<{ workspace: string; projectDir: string }>
   const script = {
     version: 1,
     title: 'Office Prank',
-    scenes: [{ id: 's01_office', set: 'office', description: 'The sign on the coffee machine.', lines: [{ id: 'reveal-boom', kind: 'sfx', sound: 'vine-boom' }] }],
+    scenes: [{ id: 's01_office', set: 'office', description: 'The sign on the coffee machine.', lines }],
   };
   await writeFile(join(projectDir, 'script.yaml'), stringify(script), 'utf8');
   return { workspace, projectDir };
@@ -67,6 +68,8 @@ describe.skipIf(!hasFfmpeg())('the voice track takes library sounds into a meme'
     const take = (await takesOf(projectDir)).takes['reveal-boom'];
     expect(take).toMatchObject({ source: 'library:vine-boom' });
     expect(take!.duration).toBeCloseTo(1.0, 2);
+    // Nothing went through the generation path: no manifest entry, no spend.
+    expect(existsSync(join(projectDir, 'assets', 'manifest.jsonl'))).toBe(false);
     const state = await readJsonFile(join(projectDir, 'state.json'), StateSchema);
     expect(state.budget.spentUsd).toBe(0);
     // The take is current for the track, too.
@@ -111,5 +114,36 @@ describe.skipIf(!hasFfmpeg())('the voice track takes library sounds into a meme'
       details: [expect.stringMatching(/"reveal-boom".*no library sound "vine-boom"/)],
     });
     expect((await takesOf(projectDir).catch(() => TakesSchema.parse({}))).takes['reveal-boom']).toBeUndefined();
+  });
+
+  it('stops on a second line naming a removed sound that has no take of its own', async () => {
+    const { workspace, projectDir } = await officePrank();
+    await addVineBoom(workspace);
+    await voiceTrack(projectDir);
+    await rm(soundDir(workspace, 'vine-boom'), { recursive: true });
+    const scriptPath = join(projectDir, 'script.yaml');
+    const script = parse(await readFile(scriptPath, 'utf8'));
+    script.scenes[0].lines.push({ id: 'second-boom', kind: 'sfx', sound: 'vine-boom' });
+    await writeFile(scriptPath, stringify(script), 'utf8');
+
+    for (const run of [voiceTrack, episodeTrack]) {
+      await expect(run(projectDir)).rejects.toMatchObject({ details: expect.arrayContaining([expect.stringMatching(/no library sound "vine-boom"/)]) });
+    }
+  });
+
+  it('copies a sound line whose imported take was deleted with the hash of the sound', async () => {
+    const { workspace, projectDir } = await officePrank();
+    await addVineBoom(workspace);
+    await voiceTrack(projectDir);
+    const takes = await takesOf(projectDir);
+    takes.takes['reveal-boom'] = { ...takes.takes['reveal-boom']!, source: 'imported' };
+    await writeFile(join(projectDir, 'takes.json'), JSON.stringify(takes), 'utf8');
+    await rm(join(projectDir, 'audio', 'lines', 'reveal-boom.wav'));
+
+    await voiceTrack(projectDir);
+    const copied = await readFile(join(projectDir, 'takes.json'), 'utf8');
+    expect(JSON.parse(copied).takes['reveal-boom'].source).toBe('library:vine-boom');
+    await voiceTrack(projectDir);
+    expect(await readFile(join(projectDir, 'takes.json'), 'utf8')).toBe(copied);
   });
 });

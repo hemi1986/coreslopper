@@ -204,8 +204,9 @@ export function isAudibleLine(line: ScriptLine): boolean {
 /**
  * What a line's take is checked against (AGG-TakeRegistry): an imported take
  * against its line, a sound line's other take against the library sound's file
- * and trim (POL-TakeChosenLibrarySounds). `undefined` means the take keeps what
- * it was made from: its library sound is gone, which only warns (HS-260).
+ * and trim (POL-TakeChosenLibrarySounds). `undefined` means the line's own copy
+ * of a library sound that is gone keeps what it was made from: it only warns
+ * (HS-260).
  */
 export function expectedTakeSource(
   line: ScriptLine,
@@ -214,7 +215,8 @@ export function expectedTakeSource(
 ): Record<string, unknown> | undefined {
   if (line.kind !== 'sfx' || line.sound === undefined || take?.source === 'imported') return takeSource(line);
   const sound = sounds[line.sound];
-  return sound ? takeSource(line, sound) : undefined;
+  if (sound) return takeSource(line, sound);
+  return take?.source === `library:${line.sound}` ? undefined : takeSource(line);
 }
 
 /**

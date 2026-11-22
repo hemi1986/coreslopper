@@ -228,7 +228,7 @@ export function convertAudio(source: string, destination: string, channels: 1 | 
     throw new ValidationError(`Cannot convert ${source} onto itself.`);
   }
   const ffmpeg = resolveBinary('ffmpeg');
-  const window = trim ? ['-ss', String(trim.start), '-t', String(Number((trim.end - trim.start).toFixed(6)))] : [];
+  const window = trim ? ['-ss', trim.start.toFixed(6), '-t', (trim.end - trim.start).toFixed(6)] : [];
   execFileSync(
     ffmpeg,
     ['-y', '-loglevel', 'error', '-i', source, ...window, '-ar', '48000', '-ac', String(channels), '-c:a', 'pcm_s16le', '-bitexact', destination],

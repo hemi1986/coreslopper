@@ -5,6 +5,7 @@ import {
   LIBRARY_SOUND_FILE,
   LibrarySoundSchema,
   librarySoundTakeSource,
+  takeSource,
   librarySoundSeconds,
   readYamlFile,
   scriptLines,
@@ -13,7 +14,7 @@ import {
   type Script,
   type ScriptCanon,
 } from '@coreslopper/core';
-import { lineTakePath, takeStatus } from './takes.js';
+import { lineTakePath, takeStatus, textHash } from './takes.js';
 import { findWorkspaceRoot } from './workspace.js';
 
 /** The workspace a project belongs to: the marked root above it, or the folder above `projects/`. */
@@ -50,18 +51,31 @@ export async function scriptSounds(projectDir: string, script: Script): Promise<
 
 /**
  * The sounds a meme's script names that the library no longer holds but the
- * meme already took (HS-260): a line naming the sound has its registered copy,
- * of source `library:<id>`. By id, with the take's seconds.
+ * meme still has (HS-260), by id, with the take's seconds: every line naming
+ * the sound has its own current take – its registered copy (`library:<id>`)
+ * or the user's import. One line without one leaves the sound out, so
+ * validateScript stops on it.
  */
 export async function keptSounds(project: LoadedProject, script: Script, library: Record<string, LibrarySound>): Promise<Record<string, number>> {
   const kept: Record<string, number> = {};
+  const lost = new Set<string>();
   for (const { line } of scriptLines(script)) {
-    if (line.kind !== 'sfx' || line.sound === undefined || library[line.sound] || kept[line.sound] !== undefined) continue;
+    if (line.kind !== 'sfx' || line.sound === undefined || library[line.sound] || lost.has(line.sound)) continue;
     const take = project.takes?.takes[line.id];
-    if (take?.source !== librarySoundTakeSource(line.sound)) continue;
-    if ((await takeStatus(take, lineTakePath(project, line.id), take.text_hash)) === 'current') kept[line.sound] = take.duration;
+    const expected = take?.source === librarySoundTakeSource(line.sound) ? take.text_hash : take?.source === 'imported' ? textHash(takeSource(line)) : undefined;
+    if (take && expected && (await takeStatus(take, lineTakePath(project, line.id), expected)) === 'current') {
+      kept[line.sound] ??= take.duration;
+    } else {
+      lost.add(line.sound);
+      delete kept[line.sound];
+    }
   }
   return kept;
+}
+
+/** The library entries a project's script names: a meme's, or none for an episode. */
+export async function projectLibrarySounds(project: LoadedProject & { script: Script }): Promise<Record<string, LibrarySound>> {
+  return project.config.kind === 'meme' ? scriptLibrarySounds(project.paths.root, project.script) : {};
 }
 
 /**

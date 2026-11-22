@@ -31,7 +31,7 @@ import {
   textHash,
   type EpisodeProject,
 } from './takes.js';
-import { scriptCanon, scriptLibrarySounds } from './script-canon.js';
+import { projectLibrarySounds, scriptCanon } from './script-canon.js';
 
 const SAMPLE_RATE = 48_000;
 /** Energy frames like the music-video analysis: 512-sample hop, 2048-sample window. */
@@ -180,7 +180,7 @@ async function checkTakes(project: EpisodeProject, library: Record<string, Libra
     const file = lineTakePath(project, line.id);
     const take = takes.takes[line.id];
     const source = expectedTakeSource(line, take, library);
-    const status = await takeStatus(take, file, source ? textHash(source) : take!.text_hash);
+    const status = await takeStatus(take, file, source ? textHash(source) : take?.text_hash ?? '');
     if (status === 'current') durations[line.id] = probeDuration(file);
     else issues.push(blockingReason(status, take, `Line "${line.id}"`) ?? `Line "${line.id}": take is ${status}; run voice-track.`);
   }
@@ -206,7 +206,7 @@ async function checkTakes(project: EpisodeProject, library: Record<string, Libra
  */
 export async function episodeTrack(projectDir: string): Promise<Timing> {
   const project = requireEpisode(await loadProject(projectDir), 'episode-track');
-  const library = project.config.kind === 'meme' ? await scriptLibrarySounds(project.paths.root, project.script) : {};
+  const library = await projectLibrarySounds(project);
   validateScript(project.script, await scriptCanon(project, project.script, library));
   const durations = await checkTakes(project, library);
   const placement = placeLines(project.script, durations);

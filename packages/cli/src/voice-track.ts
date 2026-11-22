@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import {
   ValidationError,
@@ -14,6 +15,7 @@ import {
   providerForRole,
   resolveModelRole,
   scriptLines,
+  takeSource,
   validateScript,
   type LibrarySound,
   type ScriptLine,
@@ -32,7 +34,7 @@ import {
   textHash,
   type EpisodeProject,
 } from './takes.js';
-import { librarySoundWav, scriptCanon, scriptLibrarySounds } from './script-canon.js';
+import { librarySoundWav, projectLibrarySounds, scriptCanon } from './script-canon.js';
 
 export interface VoiceTrackOptions {
   dryRun?: boolean;
@@ -96,8 +98,10 @@ async function registerGenerated(source: string, destination: string, hash: stri
 
 /** EVT-LibrarySoundTaken: copy the trimmed library sound to its take path as 48 kHz mono WAV, without cost. */
 async function takeLibrarySound(project: EpisodeProject, sound: LibrarySound, destination: string, hash: string): Promise<Take> {
+  const file = librarySoundWav(project.paths.root, sound.id);
+  if (!existsSync(file)) throw new ValidationError(`The library sound "${sound.id}" has no audio file (${file}). Add it again with sound add.`);
   await ensureDir(join(destination, '..'));
-  convertAudio(librarySoundWav(project.paths.root, sound.id), destination, 1, sound.trim);
+  convertAudio(file, destination, 1, sound.trim);
   return {
     source: librarySoundTakeSource(sound.id),
     duration: Number(probeDuration(destination).toFixed(3)),
@@ -113,7 +117,7 @@ async function takeLibrarySound(project: EpisodeProject, sound: LibrarySound, de
  */
 export async function voiceTrack(projectDir: string, options: VoiceTrackOptions = {}): Promise<void> {
   const project = requireEpisode(await loadProject(projectDir), 'voice-track');
-  const library = project.config.kind === 'meme' ? await scriptLibrarySounds(projectDir, project.script) : {};
+  const library = await projectLibrarySounds(project);
   validateScript(project.script, await scriptCanon(project, project.script, library));
   const takes = loadTakes(project);
   const blocked: string[] = [];
@@ -127,8 +131,8 @@ export async function voiceTrack(projectDir: string, options: VoiceTrackOptions 
     if (!isAudibleLine(line)) continue;
     const take = takes.takes[line.id];
     const source = expectedTakeSource(line, take, library);
-    // A take whose library sound is gone keeps what it was made from (HS-260).
-    const hash = source ? textHash(source) : take!.text_hash;
+    // The line's own copy of a library sound that is gone keeps what it was made from (HS-260).
+    const hash = source ? textHash(source) : take?.text_hash ?? '';
     const status = await takeStatus(take, lineTakePath(project, line.id), hash);
     const reason = blockingReason(status, take, `Line "${line.id}"`);
     if (reason) {
@@ -136,12 +140,18 @@ export async function voiceTrack(projectDir: string, options: VoiceTrackOptions 
       continue;
     }
     if (status === 'current') {
-      if (!source && line.kind === 'sfx') console.warn(`! Line "${line.id}": the library sound "${line.sound}" is no longer in the library; its take stays.`);
+      if (line.kind === 'sfx' && line.sound !== undefined && !library[line.sound]) {
+        console.warn(`! Line "${line.id}": the library sound "${line.sound}" is no longer in the library; its take stays.`);
+      }
       current += 1;
       continue;
     }
     if (line.kind === 'sfx' && line.sound !== undefined) {
-      copies.push({ line, hash, sound: library[line.sound]! });
+      const sound = library[line.sound];
+      // validateScript stops a gone sound unless every line naming it still has its take.
+      if (!sound) throw new ValidationError(`Line "${line.id}": the library sound "${line.sound}" is not in the library.`);
+      // What the copy is made from is the sound now, whatever the take it replaces was made from.
+      copies.push({ line, hash: textHash(takeSource(line, sound)), sound });
       continue;
     }
     if (line.kind === 'sfx' && line.duration !== undefined && sfxMax !== undefined && line.duration > sfxMax) {
