@@ -113,3 +113,22 @@ describe('board shell (characterization)', () => {
     expect(JSON.parse(activity.body)).toEqual({ stalled: [], events: [] });
   });
 });
+
+describe('the guide view’s docs', () => {
+  it('serves a top-level page and an image of docs/, and nothing else', async () => {
+    const ws = await workspace();
+    await cp(join(root, 'docs', 'board-guide.md'), join(ws, 'docs', 'board-guide.md'));
+    await cp(join(root, 'docs', 'assets', 'board', 'en', 'new.webp'), join(ws, 'docs', 'assets', 'board', 'en', 'new.webp'));
+    await writeFile(join(ws, 'docs', '.secret.md'), 'no');
+    const handler = boardHandler({ root: ws, refresh: async () => undefined });
+
+    const page = await call(handler, 'GET', '/docs/board-guide.md', BOARD);
+    expect(page.status).toBe(200);
+    expect(page.body).toContain('# Board guide');
+    expect((await call(handler, 'GET', '/docs/assets/board/en/new.webp', BOARD)).status).toBe(200);
+
+    for (const refused of ['/docs/.secret.md', '/docs/../package.json', '/docs/%2e%2e%2fpackage.json', '/docs/adr/0030-board-as-hub.md', '/docs/assets/board/en/missing.webp']) {
+      expect((await call(handler, 'GET', refused, BOARD)).status, refused).toBe(404);
+    }
+  });
+});

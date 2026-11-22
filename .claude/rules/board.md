@@ -36,19 +36,21 @@ release view only. "Page", "screen" and "sidebar" are not terms; "tab" is only t
 - `boardHandler` (`packages/cli/src/release-board.ts`) is one request handler, kept apart from `startBoard` so tests
   call it directly. The order is:
   - `trustedWrite` for every request that is not a GET;
-  - the page (`/`, `/board/<lower-case>.js|css`);
+  - the page (`/`, `/board/<lower-case>.js|css`) and the guide view's docs (`/docs/…`);
   - production and activity, review, the library, the wizard, the files, the channel, then the release routes,
     the calendar, `/calendar.ics` and `/media`;
   - 404 for anything else.
 - Errors: a `ValidationError` is 400, anything else 500, both as `{ error }` with the message.
 - File serving goes through `serveMedia`: `nosniff`, a sandboxing CSP, and single byte ranges.
-  - Whitelists: `PROJECT_FILES`, `SERIES_FILES`, `PAGE_FILE`.
+  - Whitelists: `PROJECT_FILES`, `SERIES_FILES`, `PAGE_FILE`, `DOC_FILE` (the guide view's top-level docs and
+    `docs/assets/` images).
   - `/media` checks only that the path stays inside the release folder.
 - Two sets of projects. `projectDirs`/`seriesDirs` (every project and series) serve production, review, files and
   the wizard. `boardProjectDirs` (a release folder or a calendar) serves the release routes and `/media`, and the
   autopilot reads it too.
 - The page (`packages/cli/src/board/`) is static ES modules with no build step:
   - `app.js` holds the hash routes, the navigation and the user's refresh (no poll, ADR 0049);
+  - `guide.js` shows a page of the workspace's `docs/` with its own small markdown renderer, built as DOM nodes;
   - `lib.js` holds the DOM helper, `api`/`post`/`upload`, the string tables (`addStrings`/`t`/`setLang`), dates,
     and a project's tabs;
   - each view registers its own strings.

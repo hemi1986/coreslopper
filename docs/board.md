@@ -2,7 +2,7 @@
 
 The board is the workspace's local page: the production of every project and series, and the release view of every finished one ([ADR 0030](adr/0030-board-as-hub.md)). Claude Code runs the pipeline in its own sessions; the board shows where each project stands and the command to type next.
 
-New to the board? Start with the [board guide](board-guide.md), a tour with screenshots ([Deutsch](board-guide.de.md)).
+New to the board? Start with the [board guide](board-guide.md), a tour with screenshots ([Deutsch](board-guide.de.md)). The board shows it too: **Guide** in the navigation opens it in your browser's language, read from the workspace's `docs/`.
 
 ## Start it
 

@@ -297,11 +297,11 @@ The workspace's local page (`board`; `release-board` is only an old alias of the
 _Avoid_: dashboard, studio, release board (one view of it)
 
 **Board View**:
-One view of the board, chosen by the address after `#`: the production view (the overview, a project, a series), a project's review and release views, the release calendar, the character library, and the wizard. A project's views are its tabs. The release view speaks the project's language, every other view the browser's.
+One view of the board, chosen by the address after `#`: the production view (the overview, a project, a series), a project's review and release views, the release calendar, the character library, the wizard, and the guide (the board guide and the other top-level pages of the workspace's `docs/`). A project's views are its tabs. The release view speaks the project's language, every other view the browser's.
 _Avoid_: page, screen, tab (only the switch between a project's views)
 
 **Board Navigation**:
-The board's left column: production, the release calendar, characters, **+ New**, then every project with its production phase and current stage (once done, its release day and done marks) and every series with its episodes. A project whose files do not load shows its error instead of disappearing.
+The board's left column: production, the release calendar, characters, **+ New**, the guide, then every project with its production phase and current stage (once done, its release day and done marks; a released one folds into **Released**) and every series with its episodes. A project whose files do not load shows its error instead of disappearing.
 _Avoid_: sidebar, menu
 
 **Write Guard**:
