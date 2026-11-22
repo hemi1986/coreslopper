@@ -73,7 +73,6 @@ addStrings({
   }
 });
 
-const view = { key: null, json: null };
 let activity = { events: [], stalled: [] };
 const RENDER_STALE_MIN = 15;
 
@@ -298,28 +297,17 @@ function renderSeries(s) {
   }))]));
 }
 
-/** A playing video keeps its page: a refresh would restart it. */
-function playing() {
-  return Array.prototype.some.call(document.querySelectorAll('#main video'), function (video) { return !video.paused; });
-}
-
-/** Show (or refresh) a production page: `overview`, `project:<slug>`, or `series:<slug>`. Re-renders only when the data changed. */
-export function showProduction(key, refresh) {
+/** Show a production page: `overview`, `project:<slug>`, or `series:<slug>`. */
+export function showProduction(key) {
   setLang(null);
   const parts = key.split(':');
   const path = parts[0] === 'overview' ? '/api/production' : '/api/production/' + (parts[0] === 'series' ? 'series/' : 'projects/') + encodeURIComponent(parts[1]);
   return Promise.all([api(path), api('/api/activity').catch(function () { return { events: [], stalled: [] }; })]).then(function (both) {
     const data = both[0];
     activity = both[1];
-    const json = JSON.stringify(both);
-    if (refresh && (view.key !== key || view.json === json || playing())) return data;
-    view.key = key; view.json = json;
     if (parts[0] === 'overview') renderOverview(data);
     else if (parts[0] === 'series') renderSeries(data);
     else renderProject(data);
     return data;
-  }).catch(function (error) { if (!refresh) showError(error); });
+  }).catch(showError);
 }
-
-export function currentProductionKey() { return view.key; }
-export function forgetProduction() { view.key = null; view.json = null; }

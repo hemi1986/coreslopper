@@ -164,8 +164,9 @@ state in memory), one core transition (`setStageRunning`, `setStageDone`, `setSt
 
 Pure functions over loaded files: `stageViews`, `productionPhase`, `projectNextAction`, `seriesNextAction`
 (`packages/core/src/production.ts`); `status` (`packages/cli/src/status.ts`); the board's production view
-(`packages/cli/src/board-production.ts`), which reads files and never writes. The board polls every 10 s today;
-decided: the user refreshes by hand (HS-244, G-207).
+(`packages/cli/src/board-production.ts`), which reads files and never writes. The page does not poll:
+the user refreshes with the button in the navigation, which keeps a view with a playing video or an edited field
+(ADR 0049).
 The release board's view is `boardProject` (`packages/cli/src/release-board-data.ts`), a pure read of the release
 folder's manifest, `upload.yaml`, the calendar and the status; whether an approval holds is `approvalHolds`
 (`packages/core/src/autopilot.ts`) wherever it is read (G-159).

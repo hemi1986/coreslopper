@@ -2201,10 +2201,10 @@ commands:
     name: Refresh the board
     actor: ACT-User
     produces: [EVT-BoardRefreshed]
-    description: "The user refreshes the board by hand when they want to see the pipeline's progress (user, 2026-11-22, HS-244); as-is the page polls every 10 s while the tab is visible (app.js:19,82-86 – gap register)"
+    description: "The user refreshes the board by hand when they want to see the pipeline's progress (user, 2026-11-22, HS-244); the Refresh button in the navigation reloads it (app.js refresh)"
     rules:
-      - The board does not refresh by itself; the user refreshes it (user, 2026-11-22, HS-244; it polls every 10 s – gap register)
-      - A refresh never restarts a playing video and never discards what the user is typing (the code does this for the production view, production.js:301-315; decided 2026-11-22, HS-244)
+      - The board does not refresh by itself; the user refreshes it (user, 2026-11-22, HS-244; the code does this, app.js)
+      - A refresh never restarts a playing video and never discards what the user is typing – it keeps a view with a playing video or an edited field and reloads only the navigation (decided 2026-11-22, HS-244; the code does this, app.js busy)
   - id: CMD-OpenBoardFile
     name: Open a file on the board
     actor: ACT-User

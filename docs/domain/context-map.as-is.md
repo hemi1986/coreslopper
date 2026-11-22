@@ -504,7 +504,7 @@ Boundaries:
 - Two sets of projects: the production, review and file routes see every project; the release routes and `/media`
   only those with a release folder or a calendar (`boardProjectDirs`, also read by the autopilot).
 - Only the board's own page writes (the write guard); reads answer any Host today (HS-247).
-- The user refreshes by hand (HS-244); the page polls every 10 s today.
+- The user refreshes by hand (HS-244); the page does not poll.
 - Routes are inline for production, review, release and autopilot, delegated for the wizard and the library
   (HS-251).
 

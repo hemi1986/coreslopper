@@ -572,7 +572,7 @@ that rebinds its domain.
 
 | # | Class | Gap | Evidence | Source | Priority |
 |---|---|---|---|---|---|
-| G-207 | Exists but contradicts | The page polls every 10 s while the tab is visible (the navigation always, the production view when its data changed); the user refreshes by hand and wants no automatic refresh, and a refresh must never discard what they type | `packages/cli/src/board/app.js:19,82-86`; `production.js:301-315`; ADR 0030; `docs/board.md` (Production) | HS-244 | medium |
+| G-207 | Exists but contradicts | The page polls every 10 s while the tab is visible (the navigation always, the production view when its data changed); the user refreshes by hand and wants no automatic refresh, and a refresh must never discard what they type | `packages/cli/src/board/app.js:19,82-86`; `production.js:301-315`; ADR 0030; `docs/board.md` (Production) | HS-244 | closed 2026-11-22: no poll; a Refresh button keeps a playing video and unsaved input |
 | G-208 | Missing | The board navigation lists every project and series in one flat column; nothing folds away finished or released projects | `app.js:32-50` | HS-245 | low |
 | G-209 | Exists but contradicts | Reads answer any `Host`: only writes pass the write guard, so a web page that rebinds its own domain to 127.0.0.1 can read projects, lyrics and unreleased renders (pinned by `tests/board-shell-characterization.test.ts`) | `release-board.ts:343-346` | HS-247 | medium |
 | G-210 | Exists but contradicts | `/media` serves any file under the release folder, dot files included; only the containment check applies, while `/files` refuses dot and `..` segments (ADR 0030) | `release-board.ts:134,406-408,503` | HS-248 | low |

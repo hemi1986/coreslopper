@@ -48,7 +48,7 @@ release view only. "Page", "screen" and "sidebar" are not terms; "tab" is only t
   the wizard. `boardProjectDirs` (a release folder or a calendar) serves the release routes and `/media`, and the
   autopilot reads it too.
 - The page (`packages/cli/src/board/`) is static ES modules with no build step:
-  - `app.js` holds the hash routes, the navigation and the 10 s poll;
+  - `app.js` holds the hash routes, the navigation and the user's refresh (no poll, ADR 0049);
   - `lib.js` holds the DOM helper, `api`/`post`/`upload`, the string tables (`addStrings`/`t`/`setLang`), dates,
     and a project's tabs;
   - each view registers its own strings.
@@ -68,7 +68,8 @@ release view only. "Page", "screen" and "sidebar" are not terms; "tab" is only t
 
 ## Typical pitfalls
 
-- The page polls every 10 s, but the user wants to refresh by hand (G-207, medium).
+- Do not bring back a poll or a timer that redraws a view: the user refreshes by hand. A refresh keeps a view with a
+  playing video or a field marked `data-edited` (`app.js` `busy`).
 - Reads answer any `Host`, so a rebinding page can read unreleased renders (G-209, medium). Writes are guarded.
 - `/media` serves dot files (G-210).
 - A malformed body or address is a 500, an unknown slug a 400 (G-211). `--watch` is checked after the server listens.
