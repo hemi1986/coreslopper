@@ -2,6 +2,9 @@
 
 > **As-is** for the adopted slices, recovered from `packages/core/src/schema.ts` (Zod is the source, ADR 0004).
 > Slices: project and stage pipeline (2026-11-21); human review (2026-11-21); generation queue and verdicts (2026-11-21, decided by recommendation); timing, storyboard and generation (2026-11-21), series, bibles and the character library, render (2026-11-22), each decided by recommendation with four answers from the user. Open points are hotspots in `docs/domain/events.yaml`.
+> **Target** additions from feature `meme` (user, 2026-11-22; ADR 0051, proposed): the project kind `meme` and its
+> pitch, the script's sound line, the library take, and `AGG-LibrarySound`. No code exists for them yet.
+> Script, take registry and episode track belong to BC-ScriptedAudio since HS-258; their sections stay where they are.
 
 ## Aggregates
 
@@ -18,7 +21,7 @@ a stage runner) and the control plane `state.json`. The consistency boundary in 
 | Slug | ProjectSlug | yes | EVT-ProjectCreated |
 | Title | Text | yes | EVT-ProjectCreated |
 | Created | Date | yes | EVT-ProjectCreated |
-| Project kind | `music-video` \| `episode` | default `music-video` | EVT-ProjectCreated |
+| Project kind | `music-video` \| `episode` \| `meme` (target) | default `music-video` | EVT-ProjectCreated, EVT-MemeCreated |
 | Review mode | `auto` \| `final` | default `auto` | EVT-ProjectCreated (HS-8) |
 | Budget | Money (USD, > 0) | yes | EVT-ProjectCreated (HS-5) |
 | Batch cap | Money (USD) | no – default 30 % of the remaining budget | read by CMD-RecordSpend's pre-check |
@@ -27,12 +30,24 @@ a stage runner) and the control plane `state.json`. The consistency boundary in 
 | Workflow version | Version | yes | EVT-ProjectCreated |
 | Formats, brand, models, providers | – | outside this slice | – |
 
+**Meme (target, kind `meme`)** – created whole by `CMD-CreateMeme`; setup is done at creation.
+
+| Attribute | Type | Required | Source |
+|---|---|---|---|
+| Slug, Title, Budget, Providers | as above; budget default 10 USD, at least the configured minimum | yes | EVT-MemeCreated |
+| Formats | the master format 9:16, and no other | yes | EVT-MemeCreated (CMD-CreateMeme rule) |
+| Pitch | Document `pitch.md`: the idea (required) and the setting (optional) in the user's words | yes | EVT-MemeCreated |
+| Library characters | list of library character ids, possibly empty; copied into the meme's character bible by character use, so the project keeps no list of its own | no | EVT-MemeCreated, EVT-LibraryCharacterUsed |
+
+The pitch is a starting point, never checked against the script. The track's limit of 30 seconds has no attribute
+yet (HS-264).
+
 **Control plane (`state.json`)**
 
 | Attribute | Type | Required | Source |
 |---|---|---|---|
 | Project | ProjectSlug | yes | EVT-ProjectCreated |
-| Project kind | `music-video` \| `episode` | no – filled from `project.yaml` on load | EVT-ProjectCreated |
+| Project kind | `music-video` \| `episode` \| `meme` (target) | no – filled from `project.yaml` on load | EVT-ProjectCreated, EVT-MemeCreated |
 | Workflow version | Version | yes | EVT-ProjectCreated |
 | Current stage | StageId | yes | EVT-StageStarted, EVT-StageCompleted, EVT-StageSkipped, EVT-StageReset |
 | Overall status | StageStatus | yes | derived from all stage states |
@@ -56,7 +71,8 @@ a stage runner) and the control plane `state.json`. The consistency boundary in 
 **Stage definition (value, fixed per project kind in code)** – ID, label, skills, outputs, interactive flag,
 mechanical flag (no reader). Music video: `setup`✋ `brief`✋ `treatment`✋ `audio-analysis` `style-character`
 `storyboard` `assets` `assembly` `qa-export`. Episode: `setup`✋ `script`✋ `voice-track` `episode-track`
-`storyboard` `assets` `assembly` `qa-export`. Order is list order; there are no other dependencies.
+`storyboard` `assets` `assembly` `qa-export`. Meme (target): `setup`✋ `script`✋ `style-character` `voice-track`
+`episode-track` `storyboard` `assets` `assembly` `qa-export`. Order is list order; there are no other dependencies.
 
 ### AGG-ProjectReview – Project review (as-is)
 
@@ -322,7 +338,7 @@ canon spend − episode budgets), computed by `seriesBudget` on every read.
 
 ### AGG-Script – Script (as-is)
 
-`script.yaml` of an episode (`ScriptSchema`, `packages/core/src/schema.ts:587-657`), parsed whole by `loadProject`
+`script.yaml` of an episode, and of a meme (target) (`ScriptSchema`, `packages/core/src/schema.ts:587-657`), parsed whole by `loadProject`
 and checked whole against the canon by `validateScript` (`packages/core/src/episode.ts:59-104`). Written only by
 the agent (HS-121).
 
@@ -335,9 +351,12 @@ the agent (HS-121).
 | Spoken line fields | speaker (a canon character), `text_de` (TTS rule), `text_en` (subtitle), `direction` (unused today, HS-112) | speaker and text yes | EVT-ScriptWritten |
 | Chat line fields | speaker, `text_de` (shown on screen), `text_en` | yes | EVT-ScriptWritten |
 | Sfx line fields | prompt, duration, optional `text_en` (on-screen text) | prompt, duration yes | EVT-ScriptWritten |
+| Sfx line source (target) | exactly one of: `sound` – a Library sound id, no duration (the length is the sound's trim); or `prompt` with a duration, as above | one of the two | EVT-ScriptWritten (CMD-WriteMemeScript rule), EVT-LibrarySoundTaken |
 | Pause line fields | duration | yes | EVT-ScriptWritten |
 
-`with` (overlap) is parsed and always refused.
+`with` (overlap) is parsed and always refused, also for a sound line (HS-257). A sound line's sound cue is reached
+through the anchor `line:<id>:cue`. A meme's script is the same model; what its scenes and speakers refer to before
+its bibles exist is HS-262.
 
 ### AGG-TakeRegistry – Take registry (as-is)
 
@@ -347,12 +366,14 @@ the agent (HS-121).
 
 | Attribute | Type | Required | Source |
 |---|---|---|---|
-| Take (per audible line id) | source `generated` \| `imported`, duration (s), text hash, file hash | yes, file hash optional | EVT-TakeGenerated, EVT-TakeImported |
+| Take (per audible line id) | source `generated` \| `imported` \| `library:<id>` (target), duration (s), text hash, file hash | yes, file hash optional | EVT-TakeGenerated, EVT-TakeImported, EVT-LibrarySoundTaken |
 | Ambience (per scene id) | the same fields; the hash covers the prompt only | yes | EVT-AmbienceGenerated |
 
 **Take status** (computed, `takes.ts:65-76`): `current`, `missing`, `stale`, `replaced`, `unregistered`. The text
 hash covers kind, speaker and spoken text, or an effect's prompt and length; the reference voice and the direction
-are to join it (HS-111, HS-112).
+are to join it (HS-111, HS-112). A library take (target) is a copy of the trimmed library sound: its hash covers
+the library sound's file hash and trim, so a changed sound makes it stale and it is copied again; a removed library
+sound leaves it current with a warning (HS-260). It costs nothing.
 
 ### AGG-EpisodeTrack – Episode track (as-is)
 
@@ -699,6 +720,30 @@ not validated; EVT-RatingsExported), `out/<target>/<case>/s<n>/` and `index.html
 | Spent | Money, the planned cost of every paid generation | yes | EVT-BenchSpendRecorded |
 | Batch cap | Money, `batch_cap_usd`; the whole remaining budget for the run, 30 % for each generation today (HS-230) | no | configuration |
 
+### AGG-LibrarySound – Library sound (target)
+
+`library/sounds/<id>/sound.yaml` and one WAV beside it (BC-SoundLibrary); the WAV is gitignored, `sound.yaml`
+tracked. Written by `sound add|edit|remove|check` and by the user's own edit of `sound.yaml`, which the hook
+validates. Update and init never overwrite it.
+
+| Attribute | Type | Required | Source |
+|---|---|---|---|
+| Id | Library sound id; from the title unless given; equals the folder name, unique | yes | EVT-LibrarySoundAdded |
+| Title | Text, never empty | yes | EVT-LibrarySoundAdded, EVT-LibrarySoundUpdated |
+| Use when | Text, never empty – what the sound is typically used for | yes | EVT-LibrarySoundAdded, EVT-LibrarySoundUpdated |
+| Tags | list of Text | default empty | EVT-LibrarySoundAdded, EVT-LibrarySoundUpdated |
+| Length | Duration (seconds), measured from the file | yes | EVT-LibrarySoundAdded, EVT-LibrarySoundRemeasured |
+| Loudness | Loudness (LUFS), measured, never normalised into the file | yes | EVT-LibrarySoundAdded, EVT-LibrarySoundRemeasured |
+| Sound cue | Duration (seconds from the trimmed start), inside the trim | no | EVT-LibrarySoundAdded, EVT-LibrarySoundUpdated |
+| Trim | Time span start–end (seconds), inside the length | no – the whole sound | EVT-LibrarySoundAdded, EVT-LibrarySoundUpdated |
+| Source | Text (where the sound came from) | no | EVT-LibrarySoundAdded, EVT-LibrarySoundUpdated |
+| Licence | Text; `unknown` unless the user names one | default `unknown` | EVT-LibrarySoundAdded, EVT-LibrarySoundUpdated |
+| Credit | Text the platform texts carry for a licence that asks for attribution | no | EVT-LibrarySoundAdded, EVT-LibrarySoundUpdated |
+| File hash | Hash of the WAV's content; unique across the library | yes | EVT-LibrarySoundAdded, EVT-LibrarySoundRemeasured |
+
+**Derived**: used in – the memes whose takes have source `library:<id>` (RM-SoundLibrary). A licence that asks for
+attribution without a credit is a release TODO (HS-265).
+
 ### The board shell – no aggregate
 
 The board's shell (`BC-Board`) owns no stored data. It reads every project and series through the other contexts'
@@ -790,6 +835,20 @@ stateDiagram-v2
   Conflict --> Untouched: the user takes the conflict copy
   Deleted --> Deleted: stays deleted (package-lock.json comes back)
 ```
+
+### A library sound (sound library, target)
+
+```mermaid
+stateDiagram-v2
+  [*] --> listed: Library sound added
+  listed --> listed: Library sound updated (metadata only)
+  listed --> listed: Library sound remeasured (the user swapped the file)
+  listed --> listed: Library sound taken (a meme copies it as a take)
+  listed --> [*]: Library sound removed (takes in memes stay)
+```
+
+A refused add (id taken, same content, not audio, cue or trim outside) leaves nothing behind; a refused edit of
+`sound.yaml` leaves the entry as it was.
 
 ### A bench result (model bench)
 
@@ -907,4 +966,16 @@ erDiagram
   AUTOPILOT_ENTRY }o--o| PUBLISH_ENTRY : "YouTube and TikTok through"
   RELEASE_STATUS ||--o{ TAKE_OVER : "per event"
   RELEASE_SCHEDULE ||--|| AUTOPILOT_SETTINGS : "autopilot:"
+  PROJECT ||--o| PITCH : "pitch.md (meme)"
+  PROJECT ||--o| SCRIPT : "script.yaml (episode, meme)"
+  SCRIPT ||--|{ SCENE : "in playing order"
+  SCENE ||--|{ SCRIPT_LINE : "strictly sequential"
+  PROJECT ||--o| TAKE_REGISTRY : "takes.json"
+  TAKE_REGISTRY ||--o{ TAKE : "one per audible line"
+  TAKE }o--|| SCRIPT_LINE : "of"
+  SCRIPT_LINE }o--o| LIBRARY_SOUND : "sound line names"
+  TAKE }o--o| LIBRARY_SOUND : "copied from (library take)"
+  PROJECT ||--o| EPISODE_TRACK : "audio/episode.wav, timing.json"
+  EPISODE_TRACK }o--|{ TAKE : "mixed from"
+  WORKSPACE ||--o{ LIBRARY_SOUND : "library/sounds/"
 ```

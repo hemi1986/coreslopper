@@ -1,7 +1,7 @@
 # coreslopper
 
-A Claude Code-native workflow that produces music videos for an existing song, and episodes of a series from a
-script, from setup to the release package. Creative work is agent work; mechanical work is tested scripts.
+A Claude Code-native workflow that produces music videos for an existing song, episodes of a series from a
+script, and memes from a pitch, from setup to the release package. Creative work is agent work; mechanical work is tested scripts.
 
 ## Language
 
