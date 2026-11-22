@@ -1,0 +1,12 @@
+# The template of a meme (ADR 0051). `new --kind meme` and the board's wizard take
+# the kind and the format from here and fill in slug, title, budget, and providers.
+version: 1
+kind: meme
+formats:
+  # A meme has one format, 9:16, and no derivatives.
+  master:
+    aspect: "9:16"
+    width: 1080
+    height: 1920
+    fps: 30
+  derivatives: []

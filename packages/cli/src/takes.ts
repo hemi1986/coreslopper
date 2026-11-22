@@ -5,6 +5,7 @@ import {
   ValidationError,
   hashFile,
   hashObject,
+  isScriptedKind,
   writeJsonAtomic,
   type LoadedProject,
   type Script,
@@ -14,7 +15,7 @@ import {
   type Takes,
 } from '@coreslopper/core';
 
-/** A loaded episode with everything the take commands need. */
+/** A loaded episode or meme with everything the take commands need. */
 export interface EpisodeProject extends LoadedProject {
   script: Script;
   characters: CharacterBible;
@@ -23,12 +24,14 @@ export interface EpisodeProject extends LoadedProject {
 
 export function requireEpisode(project: LoadedProject, command: string): EpisodeProject {
   const { config, paths, script, characters, sets } = project;
-  if (config.kind !== 'episode') {
-    throw new ValidationError(`${command} works on episode projects; ${paths.root} is a ${config.kind}.`);
+  if (!isScriptedKind(config.kind)) {
+    throw new ValidationError(`${command} works on episode and meme projects; ${paths.root} is a ${config.kind}.`);
   }
   if (!script) throw new ValidationError(`script.yaml is missing in ${paths.root}. Finish the script stage first.`);
-  if (!characters) throw new ValidationError(`characters.yaml is missing in the series canon ${paths.series}.`);
-  if (!sets) throw new ValidationError(`sets.yaml is missing in the series canon ${paths.series}.`);
+  // An episode's bibles are the series canon; a meme's are its own, written by style-character.
+  const where = config.kind === 'meme' ? `${paths.root}. Finish the style-character stage first.` : `the series canon ${paths.series}.`;
+  if (!characters) throw new ValidationError(`characters.yaml is missing in ${where}`);
+  if (!sets) throw new ValidationError(`sets.yaml is missing in ${where}`);
   return { ...project, script, characters, sets };
 }
 

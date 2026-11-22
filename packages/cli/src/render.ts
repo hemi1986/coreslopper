@@ -10,6 +10,7 @@ import {
   ensureDir,
   formatId,
   hashFileStream,
+  isScriptedKind,
   loadProject,
   saveState,
   loadBrand,
@@ -147,7 +148,7 @@ export async function buildVideoProps(
   const hasAudio = existsSync(audioPath);
   if (options.requireAudio && !hasAudio) {
     throw new ValidationError(
-      `Missing ${audioPath}. ${project.config.kind === 'episode' ? 'Run episode-track' : 'Import the song'} before rendering.`,
+      `Missing ${audioPath}. ${isScriptedKind(project.config.kind) ? 'Run episode-track' : 'Import the song'} before rendering.`,
     );
   }
   const audioSrc = hasAudio ? publicAsset(audioPath, paths.root, root) : undefined;
@@ -172,7 +173,7 @@ export async function buildVideoProps(
     characters: project.characters!,
     timing: project.effectiveTiming!,
     shots: withPublicAssets(resolved.shots, paths.root, root),
-    ...(project.config.kind === 'episode' ? { chat: chatProps(project) } : {}),
+    ...(isScriptedKind(project.config.kind) ? { chat: chatProps(project) } : {}),
     ...(subtitles ? { subtitles } : {}),
   };
   props.fonts = await brandFonts(paths.root, project.config.brand, root);

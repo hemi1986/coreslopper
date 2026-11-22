@@ -2,9 +2,11 @@ import { existsSync } from 'node:fs';
 import { readFile, readdir, stat } from 'node:fs/promises';
 import { join, sep } from 'node:path';
 import {
+  isScriptedKind,
   loadProject,
   productionPhase,
   projectNextAction,
+  projectTemplate,
   queueCounts,
   seriesNextAction,
   stageViews,
@@ -254,7 +256,7 @@ const DOCUMENTS: Array<[string, string]> = [
 async function written(projectDir: string, file: string, config: { kind?: ProjectKind; title: string; slug: string; series?: string; episode?: number }): Promise<boolean> {
   const text = await readFile(join(projectDir, file), 'utf8').catch(() => undefined);
   if (text === undefined || !text.trim()) return false;
-  const templateDir = join(projectDir, '..', '..', 'templates', config.kind === 'episode' ? 'episode' : 'project');
+  const templateDir = join(projectDir, '..', '..', 'templates', projectTemplate(config.kind));
   const template = await readFile(join(templateDir, file), 'utf8').catch(() => undefined);
   if (template === undefined) return true;
   const fresh = template
@@ -272,7 +274,7 @@ async function collect(projectDir: string, detail: boolean): Promise<ProductionD
   const hasRelease = existsSync(join(paths.renders, 'release', 'manifest.json'));
   const status = await loadStatus(projectDir).catch(() => undefined);
   const approved = Boolean(status?.approval);
-  const song = config.kind === 'episode' ? undefined : await readJsonLoose<{ artist?: unknown }>(paths.song);
+  const song = isScriptedKind(config.kind) ? undefined : await readJsonLoose<{ artist?: unknown }>(paths.song);
   const queueItems = (await loadQueue(paths.assets)) ?? [];
   const hasQueue = existsSync(join(paths.assets, 'queue.json'));
   const verdicts = await latestVerdicts(join(paths.assets, 'review', 'verdicts.jsonl'));

@@ -519,7 +519,7 @@ program
 program
   .command('new <slug>')
   .description('Create a new project from templates/project, or an episode from templates/episode.')
-  .option('--kind <kind>', 'music-video | episode', 'music-video')
+  .option('--kind <kind>', 'music-video | episode | meme', 'music-video')
   .option('--series <slug>', 'Episode: the series in projects/<slug>/')
   .option('--episode <n>', 'Episode: the episode number', (value) => Number(value))
   .option('--title <title>')
@@ -544,7 +544,7 @@ program
       },
     ) =>
       run(async () => {
-        const kind = validateChoice(options.kind, ['music-video', 'episode'] as const, 'project kind');
+        const kind = validateChoice(options.kind, ['music-video', 'episode', 'meme'] as const, 'project kind');
         const visuals = ['mock', 'fal', 'higgsfield', 'topview'] as const;
         const visual = validateChoice(options.visual ?? 'mock', visuals, 'visual provider');
         const imageProvider = options.imageProvider

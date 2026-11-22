@@ -25,6 +25,7 @@ import {
   type ModelsConfig,
   type Format,
   type ProjectConfig,
+  type ProjectKind,
   type Script,
   type Series,
   type SeriesState,
@@ -114,9 +115,21 @@ export function projectPaths(projectDir: string, config?: Pick<ProjectConfig, 'k
   };
 }
 
-/** The project's audio relative to the project: the song or the episode track. */
+/** The project's audio relative to the project: the song, or the episode track of an episode or a meme. */
 export function projectAudioPath(config: Pick<ProjectConfig, 'kind'>): string {
-  return config.kind === 'episode' ? 'audio/episode.wav' : 'audio/song.wav';
+  return isScriptedKind(config.kind) ? 'audio/episode.wav' : 'audio/song.wav';
+}
+
+/** Kinds whose audio is built from a script, takes, and an episode track instead of a song. */
+export function isScriptedKind(kind: ProjectKind | undefined): boolean {
+  return kind === 'episode' || kind === 'meme';
+}
+
+/** The folder under `templates/` a project of this kind is created from. */
+export function projectTemplate(kind: ProjectKind | undefined): string {
+  if (kind === 'episode') return 'episode';
+  if (kind === 'meme') return 'meme';
+  return 'project';
 }
 
 /** Format ID for an aspect ratio, as used in render file names: "9:16" -> "9x16". */
@@ -249,8 +262,14 @@ export async function loadProject(projectDir: string): Promise<LoadedProject> {
 
   const sets = paths.sets && pathExists(paths.sets) ? await readYamlFile(paths.sets, SetBibleSchema) : undefined;
 
-  if (config.kind !== 'episode') {
+  if (!isScriptedKind(config.kind)) {
     return { config, state, timing, overrides, effectiveTiming, storyboard, style, characters, sets, paths };
+  }
+  const script = pathExists(paths.script) ? await readYamlFile(paths.script, ScriptSchema) : undefined;
+  const takes = pathExists(paths.takes) ? await readJsonFile(paths.takes, TakesSchema) : undefined;
+  if (config.kind === 'meme') {
+    // A meme has no series: its bibles are its own, written after the script.
+    return { config, state, timing, overrides, effectiveTiming, storyboard, style, characters, sets, script, takes, paths };
   }
 
   if (!paths.seriesConfig || !pathExists(paths.seriesConfig)) {
@@ -259,8 +278,6 @@ export async function loadProject(projectDir: string): Promise<LoadedProject> {
     );
   }
   const series = await readYamlFile(paths.seriesConfig, SeriesSchema);
-  const script = pathExists(paths.script) ? await readYamlFile(paths.script, ScriptSchema) : undefined;
-  const takes = pathExists(paths.takes) ? await readJsonFile(paths.takes, TakesSchema) : undefined;
 
   return {
     config,

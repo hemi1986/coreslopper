@@ -6,12 +6,14 @@ import {
   ensureDir,
   hashFile,
   isAudibleLine,
+  isScriptedKind,
   loadProject,
   repoRoot,
   scriptLines,
   takeSource,
   ValidationError,
   writeJsonAtomic,
+  type ProjectKind,
 } from '@coreslopper/core';
 import { lineTakePath, loadTakes, requireEpisode, saveTakes, textHash } from './takes.js';
 import { backingSpans, muteFilter, segmentMutes, type Span } from './lipsync-audio.js';
@@ -68,19 +70,19 @@ export function probeDuration(path: string): number {
 
 /**
  * The audio a lip-sync segment is cut from: an explicit source, else the
- * speaker stem of an episode character, else the lead-vocal stem of a music
+ * speaker stem of an episode or meme character, else the lead-vocal stem of a music
  * video when one exists (`audio/stems/lead.wav`, without backing vocals), else
  * its vocal stem.
  */
 export function segmentSource(
-  kind: 'music-video' | 'episode',
+  kind: ProjectKind,
   options: { source?: string; character?: string },
   hasLeadStem = false,
 ): string {
   if (options.source) return options.source;
-  if (kind === 'episode') {
+  if (isScriptedKind(kind)) {
     if (!options.character) {
-      throw new ValidationError('An episode cuts lip-sync audio from a speaker stem. Pass --character <id> or --source <path>.');
+      throw new ValidationError(`A${kind === 'meme' ? ' meme' : 'n episode'} cuts lip-sync audio from a speaker stem. Pass --character <id> or --source <path>.`);
     }
     return `audio/stems/${options.character}.wav`;
   }

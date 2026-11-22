@@ -30,7 +30,7 @@ const ScriptIdSchema = z
   .regex(/^[a-z0-9][a-z0-9_-]*$/, 'id must be lowercase letters, digits, dashes, and underscores');
 
 /** What a project produces. A missing kind means `music-video`. */
-export const ProjectKindSchema = z.enum(['music-video', 'episode']);
+export const ProjectKindSchema = z.enum(['music-video', 'episode', 'meme']);
 
 export const ProvidersSchema = z
   .object({
@@ -130,6 +130,16 @@ export const ProjectConfigSchema = z
       }
     }
   });
+
+/** `templates/meme/project.yaml`: what every meme starts with – its kind and its one 9:16 format. */
+export const MemeTemplateSchema = z.object({
+  version: z.literal(1),
+  kind: z.literal('meme'),
+  formats: z.object({
+    master: FormatSchema.refine((format) => format.aspect === '9:16', 'a meme is 9:16'),
+    derivatives: z.array(FormatSchema).max(0, 'a meme has one format and no derivatives').default([]),
+  }),
+});
 
 export const StageStatusSchema = z.enum(['pending', 'running', 'done', 'failed', 'skipped']);
 

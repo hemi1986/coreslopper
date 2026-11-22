@@ -9,7 +9,8 @@ export interface StageDefinition {
   mechanical: boolean;
   /**
    * Interactive stages run in the main session with the user (the
-   * `new-video` or `new-episode` skill), never in an autonomous stage runner.
+   * `new-video`, `new-episode`, or `new-meme` skill), never in an autonomous
+   * stage runner.
    */
   interactive: boolean;
 }
@@ -151,6 +152,44 @@ export const EPISODE_STAGES: StageDefinition[] = [
   },
 ];
 
+const stageOf = (list: StageDefinition[], id: string): StageDefinition => list.find((stage) => stage.id === id)!;
+
+/**
+ * The stages of a meme (ADR 0051): no song and no series. Its style and
+ * characters come after the script, and its audio is built like an episode's.
+ */
+export const MEME_STAGES: StageDefinition[] = [
+  {
+    id: 'setup',
+    label: 'Meme setup & pitch',
+    skills: ['new-meme'],
+    outputs: ['project.yaml', 'pitch.md'],
+    mechanical: false,
+    interactive: true,
+  },
+  {
+    id: 'script',
+    label: 'Script',
+    skills: ['grilling', 'new-meme'],
+    outputs: ['script.yaml'],
+    mechanical: false,
+    interactive: true,
+  },
+  {
+    ...stageOf(MUSIC_VIDEO_STAGES, 'style-character'),
+    label: 'Style, set & character bible',
+    outputs: ['style.yaml', 'characters.yaml', 'sets.yaml'],
+  },
+  stageOf(EPISODE_STAGES, 'voice-track'),
+  stageOf(EPISODE_STAGES, 'episode-track'),
+  ...MUSIC_VIDEO_STAGES.filter((stage) => SHARED_STAGE_IDS.includes(stage.id)),
+  stageOf(EPISODE_STAGES, 'assembly'),
+  stageOf(MUSIC_VIDEO_STAGES, 'qa-export'),
+];
+
+/** A meme lasts at most this many seconds; episode-track refuses a longer track (HS-264). */
+export const MEME_MAX_SECONDS = 30;
+
 /**
  * A stage's outputs for a project: `{master}` becomes the master format ID
  * (`renders/16x9.mp4` for a 16:9 master) and `{slug}` the project slug.
@@ -165,7 +204,9 @@ export function stageOutputs(
 
 /** The stage list of a project kind. A missing kind means `music-video`. */
 export function stagesFor(kind: ProjectKind | undefined): StageDefinition[] {
-  return kind === 'episode' ? EPISODE_STAGES : MUSIC_VIDEO_STAGES;
+  if (kind === 'episode') return EPISODE_STAGES;
+  if (kind === 'meme') return MEME_STAGES;
+  return MUSIC_VIDEO_STAGES;
 }
 
 export const STAGE_IDS = STAGES.map((stage) => stage.id);

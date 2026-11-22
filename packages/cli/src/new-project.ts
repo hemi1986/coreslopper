@@ -4,10 +4,13 @@ import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import {
   ConfigError,
+  MemeTemplateSchema,
   SeriesSchema,
   ValidationError,
   createInitialState,
+  isScriptedKind,
   loadDefaults,
+  projectTemplate,
   readYamlFile,
   repoRoot,
   seriesDir,
@@ -95,7 +98,10 @@ export async function createProject(options: NewProjectOptions): Promise<string>
   }
   const series = kind === 'episode' ? await loadEpisodeSeries(projectDir, options) : undefined;
 
-  const templateDir = join(root, 'templates', kind === 'episode' ? 'episode' : 'project');
+  const templateDir = join(root, 'templates', projectTemplate(kind));
+  // A meme's template holds its project.yaml: the kind and the one 9:16 format.
+  const memeTemplate =
+    kind === 'meme' ? await readYamlFile(join(templateDir, 'project.yaml'), MemeTemplateSchema) : undefined;
   await cp(templateDir, projectDir, { recursive: true, errorOnExist: true });
 
   const planned = series?.episodes.find((entry) => entry.episode === options.episode);
@@ -118,7 +124,9 @@ export async function createProject(options: NewProjectOptions): Promise<string>
     // change an existing episode's cache keys or costs.
     formats: series
       ? structuredClone(series.formats)
-      : {
+      : memeTemplate
+        ? memeTemplate.formats
+        : {
           master: defaults.formats.master,
           derivatives: defaults.formats.derivatives.map((format) => ({
             ...format,
@@ -165,13 +173,15 @@ export async function createProject(options: NewProjectOptions): Promise<string>
   const directories =
     kind === 'episode'
       ? ['audio', 'assets', 'renders', 'review']
-      : ['audio', 'assets', 'characters', 'renders', 'review', 'brand'];
+      : kind === 'meme'
+        ? ['audio', 'assets', 'characters', 'renders', 'review']
+        : ['audio', 'assets', 'characters', 'renders', 'review', 'brand'];
   for (const directory of directories) {
     await mkdir(join(projectDir, directory), { recursive: true });
     await writeFile(join(projectDir, directory, '.gitkeep'), '');
   }
   await mkdir(join(projectDir, 'audio', 'stems'), { recursive: true });
-  if (kind === 'episode') await mkdir(join(projectDir, 'audio', 'lines'), { recursive: true });
+  if (isScriptedKind(kind)) await mkdir(join(projectDir, 'audio', 'lines'), { recursive: true });
 
   // Validate the project shell. Timing and storyboard are intentionally absent
   // at this point; only the project config and state are checked.
@@ -190,6 +200,10 @@ export async function createProject(options: NewProjectOptions): Promise<string>
   if (series) {
     console.log(`Series: ${series.title} (${series.slug}), episode ${config.episode}; formats, providers, and brand copied from series.yaml.`);
     console.log(`Next: write script.yaml (scenes and script lines) for episode ${config.episode}.`);
+    return projectDir;
+  }
+  if (kind === 'meme') {
+    console.log(`Next: write the idea into pitch.md, then run /new-meme ${slug} in Claude Code to grill it into script.yaml.`);
     return projectDir;
   }
   const audio = relativeToRoot(join(projectDir, 'audio'), root);
