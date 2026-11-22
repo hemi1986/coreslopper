@@ -12,7 +12,7 @@ risk: null
 events: [EVT-LibrarySetFileRemoved]
 depends_on: [ST-025]
 labels: [feature:set-library]
-status: ready-for-human-review
+status: ready
 ---
 
 ## Story

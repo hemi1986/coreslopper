@@ -12,7 +12,7 @@ risk: null
 events: [EVT-LibrarySetCreated, EVT-LibrarySetExtended]
 depends_on: [ST-026]
 labels: [feature:set-library]
-status: ready-for-human-review
+status: ready
 ---
 
 ## Story

@@ -8,7 +8,7 @@ size: null
 risk: null
 depends_on: [ST-024, ST-025, ST-026, ST-028, ST-029, ST-030, ST-031]
 labels: [feature:set-library]
-status: ready-for-human-review
+status: ready
 ---
 
 ## Task
