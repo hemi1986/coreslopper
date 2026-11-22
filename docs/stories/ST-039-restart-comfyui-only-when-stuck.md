@@ -8,7 +8,7 @@ size: null
 risk: null
 depends_on: []
 labels: [feature:comfyui-watchdog]
-status: ready
+status: in-progress
 ---
 
 ## Task
