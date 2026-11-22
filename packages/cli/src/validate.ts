@@ -73,11 +73,16 @@ export async function validateProject(projectDir: string, options: { write?: boo
   assertKindMatches(project.state, config);
   const episodeContext = episode ? validateEpisode(project, await lipsyncMaxDuration(config)) : undefined;
   // A meme's script against the sound library and, once style-character wrote them, its own bibles (HS-262).
+  // After that stage the bibles must exist, so every speaker and set is checked against them (ST-013).
+  if (config.kind === 'meme' && project.state.stages['style-character']?.status === 'done') {
+    if (!characters) throw new ValidationError(`characters.yaml is missing in ${paths.root}, but the style-character stage is done.`);
+    if (!project.sets) throw new ValidationError(`sets.yaml is missing in ${paths.root}, but the style-character stage is done.`);
+  }
   if (config.kind === 'meme' && project.script) validateScript(project.script, await scriptCanon(project, project.script));
 
   if (!effectiveTiming) {
     throw new ValidationError(
-      `timing.json is missing in ${paths.root}. Run the ${episode ? 'episode-track' : 'audio-analysis'} stage before validating the storyboard.`,
+      `timing.json is missing in ${paths.root}. Run the ${episode || config.kind === 'meme' ? 'episode-track' : 'audio-analysis'} stage before validating the storyboard.`,
     );
   }
   if (!storyboard) throw new ValidationError(`storyboard.yaml is missing in ${paths.root}.`);

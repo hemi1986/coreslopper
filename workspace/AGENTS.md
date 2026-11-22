@@ -117,7 +117,7 @@ Partly built ([ADR 0051](docs/adr/0051-memes-and-the-sound-library.md), proposed
 |---|---|---|---|
 | 1 | `setup` ✋ | board wizard, `new-meme` | `project.yaml` (kind `meme`, the one 9:16 format), `pitch.md`, chosen library characters, user references |
 | 2 | `script` ✋ | `grilling`, `new-meme` | `script.yaml` |
-| 3 | `style-character` | `style-bible`, `character-bible` | style and set bible from pitch and script; invented characters into the library |
+| 3 | `style-character` | `style-bible`, `character-bible` | style, set, and character bible from pitch and script, without asking; every speaker in the character bible; invented characters into the library |
 | 4–5 | `voice-track`, `episode-track` | as for episodes | takes (generated or copied from the sound library), `timing.json`, `audio/episode.wav`; a track over 30 seconds is a hard stop |
 | 6–9 | `storyboard`, `assets`, `assembly`, `qa-export` | as above | one 9:16 video, a 1080x1920 cover, TikTok, Shorts, and Reels texts |
 
@@ -186,7 +186,7 @@ npm run schema
 | `npm run cli -- lyrics <project> --file <txt> [--propose]` | Write `lyrics.txt` once every line sits under a section tag; `--propose` prints proposed tags (repeated blocks become `[Chorus]`). |
 | `npm run cli -- reference list\|add\|link\|remove [<project> \| --series <s>]` | The user references (`references.yaml`, files in `assets/references/`): mood boards, photos, storyboards, concepts, footage, voices, links, with kind, subject, and note. |
 | `npm run cli -- migrate-layout [--dry-run]` | Move series canons from the old `series/<slug>/` to `projects/<slug>/` and rewrite the paths into them (ADR 0035); the user runs it once per old workspace. |
-| `npm run cli -- character list\|import\|new\|add-file\|use\|remove` | The workspace character library (`library/characters/<id>/`): `import <project> [--series] [--id] [--into]` takes characters in (runs by itself at `stage-done … style-character`); `use <project> <id> [--series] [--states <ids>\|all]` copies one into a music video or canon with `library: <id>`. |
+| `npm run cli -- character list\|import\|new\|add-file\|use\|remove` | The workspace character library (`library/characters/<id>/`): `import <project> [--series] [--id] [--into]` takes characters in (runs by itself at `stage-done … style-character`); `use <project> <id> [--series] [--states <ids>\|all]` copies one into a music video, meme, or canon with `library: <id>`. |
 | `npm run cli -- import-song <project>` | Register `audio/song.wav` and `audio/stems/vocals.wav` in `song.json`; converts other formats. |
 | `npm run cli -- normalize-audio <project> --input <file>` | Normalize audio to −14 LUFS / −1 dBTP. |
 | `npm run cli -- footage <project> --input <file> --name <name>` | Normalize a footage proxy. |

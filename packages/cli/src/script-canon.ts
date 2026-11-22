@@ -81,12 +81,15 @@ export async function projectLibrarySounds(project: LoadedProject & { script: Sc
 /**
  * What a project's script is validated against: its kind, its bibles and, for
  * a meme, the library sounds it names – a removed one the meme already took
- * counts with its take's length.
+ * counts with its take's length. A meme's bibles count once style-character has
+ * started: before, characters.yaml holds just the library characters taken at
+ * setup, and the script's other speakers are ids that stage invents (HS-262).
  */
 export async function scriptCanon(project: LoadedProject, script: Script, library?: Record<string, LibrarySound>): Promise<ScriptCanon> {
-  const { config, characters, sets, paths } = project;
+  const { config, characters, sets, paths, state } = project;
   if (config.kind !== 'meme') return { kind: config.kind, characters, sets };
   const held = library ?? (await scriptLibrarySounds(paths.root, script));
   const sounds = Object.fromEntries(Object.entries(held).map(([id, sound]) => [id, librarySoundSeconds(sound)]));
-  return { kind: 'meme', characters, sets, sounds: { ...(await keptSounds(project, script, held)), ...sounds } };
+  const bibles = (state.stages['style-character']?.status ?? 'pending') === 'pending' ? {} : { characters, sets };
+  return { kind: 'meme', ...bibles, sounds: { ...(await keptSounds(project, script, held)), ...sounds } };
 }
