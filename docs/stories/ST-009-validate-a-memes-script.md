@@ -12,7 +12,7 @@ risk: null
 events: [EVT-ScriptValidated]
 depends_on: [ST-001, ST-007]
 labels: [feature:meme]
-status: in-progress
+status: done
 ---
 
 ## Story
