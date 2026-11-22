@@ -111,7 +111,7 @@ A project with `kind: episode` is one episode of a series ([ADR 0016](docs/adr/0
 
 ### Memes
 
-Partly built ([ADR 0051](docs/adr/0051-memes-and-the-sound-library.md), proposed): the `meme` kind with its stages, the board wizard's meme form and `new <slug> --kind meme --idea "…" [--setting "…"]` (from `templates/meme/`, `pitch.md` written and setup done), and the `sound` command exist; the `new-meme` skill, copying library sounds in `voice-track`, and the meme's subtitle and release rules do not yet. `status` and the board already name `/new-meme <slug>` while an interactive stage is open. A project with `kind: meme` is a standalone 9:16 video of about 15 seconds (at most 30) with German speech and German subtitles burned in. The board's wizard writes the user's idea and setting to `pitch.md`, the starting point of the grilling; `new-meme` grills from it to the punchline. A sound line (`kind: sfx`) names exactly one of a library sound from the workspace's sound library (`library/sounds/<id>/`, `sound: <id>`, no duration: the sound's trim is its length) or a `prompt` with a `duration`; `voice-track` is to copy a library sound into the meme as a take (until then it stops on such a line: put the sound at `audio/lines/<line-id>.wav` and run `import-takes`). The hook checks every edit of `script.yaml` against the library and the 30 seconds the known lengths (pauses, effects, sounds) may fill; speakers and sets are ids until `style-character` writes the meme's bibles, then they must be in them.
+Partly built ([ADR 0051](docs/adr/0051-memes-and-the-sound-library.md), proposed): the `meme` kind with its stages, the board wizard's meme form and `new <slug> --kind meme --idea "…" [--setting "…"]` (from `templates/meme/`, `pitch.md` written and setup done), the `new-meme` skill, and the `sound` command exist; copying library sounds in `voice-track`, and the meme's subtitle and release rules do not yet. `status` and the board name `/new-meme <slug>` while an interactive stage is open. A project with `kind: meme` is a standalone 9:16 video of about 15 seconds (at most 30) with German speech and German subtitles burned in. The board's wizard writes the user's idea and setting to `pitch.md`, the starting point of the grilling; `new-meme` grills from it to the punchline. A sound line (`kind: sfx`) names exactly one of a library sound from the workspace's sound library (`library/sounds/<id>/`, `sound: <id>`, no duration: the sound's trim is its length) or a `prompt` with a `duration`; `voice-track` is to copy a library sound into the meme as a take (until then it stops on such a line: put the sound at `audio/lines/<line-id>.wav` and run `import-takes`). The hook checks every edit of `script.yaml` against the library and the 30 seconds the known lengths (pauses, effects, sounds) may fill; speakers and sets are ids until `style-character` writes the meme's bibles, then they must be in them.
 
 | # | Stage ID | Skill(s) | Output |
 |---|---|---|---|
@@ -212,11 +212,11 @@ npm run schema
 | `npx coreslopper doctor` | Check a workspace from outside it. |
 | `npx coreslopper new <slug> --budget <usd>` | Create a project inside a workspace. |
 
-In Claude Code: `/new-video`, `/new-series`, and `/new-episode` (skills), `/video-next`, `/video-status`, `/series-status`.
+In Claude Code: `/new-video`, `/new-series`, `/new-episode`, and `/new-meme` (skills), `/video-next`, `/video-status`, `/series-status`.
 
 ## Skills
 
-Own skills: `new-video`, `video-brief`, `video-treatment`, `audio-analysis`, `style-bible`, `character-bible`, `storyboard`, `remotion-motion`, `ai-clips`, `footage`, `assembly-render`, `video-qa`, and for series and episodes `new-series`, `new-episode`, `voice-track`, `episode-track`. Outside the pipeline: `model-bench` compares models and servers before a model switch; `release-backfill` brings an existing or already published project into the release board and calendar.
+Own skills: `new-video`, `video-brief`, `video-treatment`, `audio-analysis`, `style-bible`, `character-bible`, `storyboard`, `remotion-motion`, `ai-clips`, `footage`, `assembly-render`, `video-qa`, and for series and episodes `new-series`, `new-episode`, `voice-track`, `episode-track`, and for memes `new-meme`. Outside the pipeline: `model-bench` compares models and servers before a model switch; `release-backfill` brings an existing or already published project into the release board and calendar.
 
 Vendored from Matt Pocock (MIT, see `docs/THIRD_PARTY.md`): `grill-me`, `grilling`.
 
