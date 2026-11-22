@@ -4,15 +4,9 @@
 
 **Progress: 3 of 20 domain stories done** · scenarios 12 of 68
 
-**35 stories** · In Progress: 1 · Ready: 27 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 7 · Superseded: 0
+**35 stories** · In Progress: 0 · Ready: 27 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 8 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
-
-## In Progress
-
-| ID | Title | Type | Context | Priority | Size | Risk | Depends on |
-|---|---|---|---|---|---|---|---|
-| [ST-035](ST-035-level-speech-takes-in-the-episode-track.md) | The episode track levels speech takes to one loudness | task | – | must | – | – | – |
 
 ## Ready
 
@@ -57,3 +51,4 @@ Within each section: by priority, then by story ID, with dependencies pulled in 
 | [ST-007](ST-007-project-kind-meme.md) | Project kind meme with its stages | tech-task | – | must | – | – | – |
 | [ST-021](ST-021-wizard-leads-to-the-project.md) | The wizard's last step leads to the new project or series | chore | – | must | – | – | – |
 | [ST-022](ST-022-board-shows-loading-and-busy-buttons.md) | The board shows when it loads and when a button is working | chore | – | must | – | – | – |
+| [ST-035](ST-035-level-speech-takes-in-the-episode-track.md) | The episode track levels speech takes to one loudness | task | – | must | – | – | – |
