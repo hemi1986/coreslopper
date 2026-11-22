@@ -489,7 +489,7 @@ aggregates:
       - A failed upload keeps the uploads before it, and the next run tries it again (the code does this, publish.ts:457-467)
       - The publish command never makes a video public – YouTube private or scheduled, TikTok an inbox draft; only the autopilot's direct TikTok mode posts (the code does this, packages/cli/src/index.ts:467-477; release-autopilot.ts:391)
       - A batch over the YouTube quota of the Pacific day stops before the first upload (the code does this, publish.ts:230-235,337-342), and every YouTube call the autopilot makes counts against it (decided 2026-11-22, HS-192; polling, description and comment calls are not counted – gap register)
-      - Every write takes the project's release lock (decided 2026-11-22, HS-189; written without a lock – gap register)
+      - Every write takes the project's release lock (decided 2026-11-22, HS-189; the code does this – appendPublishEntry re-reads the log under the lock)
   - id: AGG-AutopilotLog
     name: Autopilot log
     context: BC-Publish
@@ -530,7 +530,7 @@ aggregates:
       - A rotated refresh token is saved at once – X's is single-use (the code does this, x.ts:227-232)
       - A long-running watchdog reads .env again before every round, so a token renewed on the computer reaches the container (the code does this, packages/cli/src/production-watch.ts:129-152)
       - A platform is ready by one rule, the same for doctor, the board and the plan, and a token that can be refreshed counts as ready (decided 2026-11-22, HS-196; doctor and the plan differ, LinkedIn with a refresh token is blocked – gap register)
-      - Every write of .env is atomic and under a lock (decided 2026-11-22, HS-189; plain read and write, no lock – gap register)
+      - Every write of .env is atomic and under a lock (decided 2026-11-22, HS-189; the code does this – saveEnvValue, lock file .env.lock)
   - id: AGG-WorkspaceMarker
     name: Workspace marker
     context: BC-Workspace

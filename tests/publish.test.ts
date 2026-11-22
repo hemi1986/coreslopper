@@ -21,6 +21,7 @@ import {
   type PublishItem,
 } from '../packages/providers/src/index.ts';
 import {
+  appendPublishEntry,
   buildPublishPlan,
   publishProject,
   quotaDay,
@@ -30,7 +31,7 @@ import {
 import { renderUploadText, writeUploadText } from '../packages/cli/src/upload-text.ts';
 import { parseUploadText, uploadTextProblems } from '../packages/cli/src/release-files.ts';
 import { checkUploadData } from '../packages/cli/src/qa.ts';
-import { publishAuth } from '../packages/cli/src/publish-auth.ts';
+import { publishAuth, saveEnvValue } from '../packages/cli/src/publish-auth.ts';
 import { publishChecks } from '../packages/cli/src/doctor.ts';
 import { validateChangedFile } from '../packages/cli/src/validate-file.ts';
 
@@ -336,6 +337,28 @@ describe('an upload that may have gone out', () => {
     Object.defineProperty(mock, 'mock', { value: false });
     const forced = await publishProject({ projectDir: dir, only: 'main', platform: 'youtube', force: true, probe, adapters: { youtube: mock, tiktok: forbidden.tiktok }, now, log: quiet });
     expect(forced.entries.map((entry) => entry.status)).toEqual(['uploaded']);
+  });
+});
+
+describe('writers at the same time', () => {
+  it('keeps every entry when publish and the autopilot append to the publish log at once', async () => {
+    const dir = await fixture();
+    const logPath = join(dir, 'review', 'publish.json');
+    const entry = (item: string) => ({ platform: 'youtube' as const, item, file: 'renders/16x9.mp4', file_hash: 'a'.repeat(64), status: 'uploaded' as const, mock: false, warnings: [], at: '2026-11-16T12:00:00Z' });
+    await Promise.all(['main', 'N1-intro', 'N2-chorus', 'N3'].map((item) => appendPublishEntry(logPath, entry(item))));
+    expect((await readLog(dir)).entries.map((e) => e.item).sort()).toEqual(['N1-intro', 'N2-chorus', 'N3', 'main']);
+  });
+
+  it('keeps every value when two writers save into .env at once', async () => {
+    const dir = await fixture();
+    const envPath = join(dir, '.env');
+    await writeFile(envPath, 'FAL_KEY=kept\n');
+    await Promise.all([saveEnvValue('X_REFRESH_TOKEN', 'rotated', envPath), saveEnvValue('TIKTOK_REFRESH_TOKEN', 'new', envPath)]);
+    const content = await readFile(envPath, 'utf8');
+    expect(content).toContain('FAL_KEY=kept');
+    expect(content).toContain('X_REFRESH_TOKEN=rotated');
+    expect(content).toContain('TIKTOK_REFRESH_TOKEN=new');
+    expect(existsSync(`${envPath}.lock`)).toBe(false);
   });
 });
 

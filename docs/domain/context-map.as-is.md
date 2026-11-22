@@ -433,7 +433,7 @@ Boundaries:
 - The production scan in the same round is BC-Pipeline's; the round only calls it.
 - Outside: the platform APIs, fal.ai storage for Instagram's files, the microsite's directory and command, the
   operating system's scheduler.
-- The publish log and `.env` take no lock (HS-189);
+- The publish log takes the release lock and `.env` its own lock for every write (HS-189);
   the board container plans in UTC without a named time zone (HS-194).
 
 ### BC-Workspace – Workspace

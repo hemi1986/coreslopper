@@ -67,8 +67,9 @@ All are in `docs/glossary.md`. A publish upload never goes public; a post does.
 - An adapter's error after the last byte of a file was sent is uncertain (YouTube's `uploadChunks`, TikTok's last
   chunk and status polls in direct mode). Keep the mark when wrapping an error: `publishProject` rethrows it with
   `markUncertain` and writes `uncertain` into `review/publish.json`.
-- `review/publish.json` and `.env` are written without a lock. The container and the computer both write them, and
-  X's refresh token is single-use (G-169, medium).
+- Write `review/publish.json` only through `appendPublishEntry` (fresh read under the release lock) and `.env` only
+  through `saveEnvValue` (lock and atomic rename): the container and the computer both write them, and X's refresh
+  token is single-use.
 - `planEvent` derives running, stuck, pending and done before it checks the approval: a withdrawal stops only what
   has not gone out. A scheduled YouTube upload still goes public; the board says so.
 - The board container plans in UTC when the release schedule names no time zone (G-167).
