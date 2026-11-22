@@ -2091,6 +2091,7 @@ commands:
     produces: [EVT-ReleasePackageBuilt, EVT-ReleaseRulesBroken, EVT-ReleaseCalendarPlanned]
     description: "release <project> [--no-render] [--canvas-from <time>] [--canvas-seconds <n>] [--replan], in qa-export or by the user; the board runs it without renders and stills after a live URL or an approval (POL-RefreshAfterStatusChange) (packages/cli/src/index.ts:321-334; release.ts:207-447)"
     rules:
+      - A project with distribution internal gets no release folder and no release calendar; release says so and exits cleanly, and an earlier folder or calendar is left alone (user, 2026-11-22, ST-036)
       - A meme's release folder holds its one 9:16 video, a 1080x1920 cover and the texts for TikTok, YouTube Shorts and Instagram Reels; no Shorts, WAV, canvas, lyrics or announcement – no announcement images and no announcement in the release calendar (user, 2026-11-22, feature meme)
       - Every used library sound that needs a credit gets its credit text into the platform texts (user, 2026-11-22)
       - A missing or stale format is rendered first; with --no-render it is a TODO (the code does this, release.ts:254-261)

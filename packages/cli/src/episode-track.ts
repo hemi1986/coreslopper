@@ -37,6 +37,10 @@ const ENERGY_HOP = 512;
 /** Mix levels of the beds under the takes. */
 const AMBIENCE_GAIN = 0.3;
 const MUSIC_GAIN = 0.25;
+/** The form every input enters the mix in: a mono take plays as dual mono, about 3 LU louder than the file reads. */
+const MIX_FORMAT = `aformat=sample_rates=${SAMPLE_RATE}:channel_layouts=stereo`;
+/** Integrated loudness needs 400 ms blocks; a shorter take is measured as played back to back for at least this long. */
+const MIN_MEASURE_SECONDS = 3;
 
 interface MixInput {
   file: string;
@@ -64,7 +68,7 @@ function mix(inputs: MixInput[], duration: number, destination: string, loudness
     args.push('-i', input.file);
     const label = `[a${index + 1}]`;
     filters.push(
-      `[${index + 1}:a]aformat=sample_rates=${SAMPLE_RATE}:channel_layouts=stereo,` +
+      `[${index + 1}:a]${MIX_FORMAT},` +
         `atrim=0:${input.length.toFixed(3)},asetpts=PTS-STARTPTS,volume=${input.gain ?? 1},` +
         `adelay=${Math.round(input.start * 1000)}:all=1${label}`,
     );
@@ -72,7 +76,9 @@ function mix(inputs: MixInput[], duration: number, destination: string, loudness
   }
   filters.push(`${labels.join('')}amix=inputs=${labels.length}:duration=first:normalize=0:dropout_transition=0[mix]`);
   filters.push(`[mix]${exactLength(duration)}[out]`);
-  args.push('-filter_complex', filters.join(';'), '-map', '[out]', '-ar', String(SAMPLE_RATE), '-ac', '2', '-c:a', 'pcm_s16le', '-bitexact', raw);
+  // The raw mix stays float: boosted takes may sum above full scale until levelToTarget limits them.
+  const codec = loudness ? 'pcm_f32le' : 'pcm_s16le';
+  args.push('-filter_complex', filters.join(';'), '-map', '[out]', '-ar', String(SAMPLE_RATE), '-ac', '2', '-c:a', codec, '-bitexact', raw);
   execFileSync(ffmpeg, args, { stdio: 'inherit' });
   if (loudness) {
     levelToTarget(raw, duration, destination, loudness);
@@ -90,10 +96,12 @@ function exactLength(duration: number): string {
  * Integrated loudness of a file in LUFS, from ffmpeg's loudnorm analysis.
  * `loops` plays the file that many extra times first: integrated loudness
  * needs 400 ms, so a short sound is measured as played back to back.
+ * `filter` runs before the analysis, e.g. to measure a take in its mix format.
  */
-export function measureLoudness(file: string, loops = 0): { lufs: number; truePeak: number } {
+export function measureLoudness(file: string, loops = 0, filter?: string): { lufs: number; truePeak: number } {
   const ffmpeg = resolveBinary('ffmpeg');
-  const result = spawnSync(ffmpeg, ['-hide_banner', '-nostats', ...(loops > 0 ? ['-stream_loop', String(loops)] : []), '-i', file, '-af', 'loudnorm=print_format=json', '-f', 'null', '-'], {
+  const analysis = `${filter ? `${filter},` : ''}loudnorm=print_format=json`;
+  const result = spawnSync(ffmpeg, ['-hide_banner', '-nostats', ...(loops > 0 ? ['-stream_loop', String(loops)] : []), '-i', file, '-af', analysis, '-f', 'null', '-'], {
     encoding: 'utf8',
     maxBuffer: 64 * 1024 * 1024,
   });
@@ -136,6 +144,17 @@ function levelToTarget(raw: string, duration: number, destination: string, targe
     if (Math.abs(error) <= 0.2) break;
     gain += error;
   }
+}
+
+/**
+ * The linear gain that brings a speech take to `target` LUFS, measured in its
+ * mix format. A silent take (loudness not measurable) keeps gain 1.
+ */
+function speechGain(file: string, duration: number, target: number): { lufs: number; gain: number } {
+  const loops = duration > 0 && duration < MIN_MEASURE_SECONDS ? Math.ceil(MIN_MEASURE_SECONDS / duration) - 1 : 0;
+  const lufs = measureLoudness(file, loops, MIX_FORMAT).lufs;
+  if (!Number.isFinite(lufs)) return { lufs, gain: 1 };
+  return { lufs, gain: Math.pow(10, (target - lufs) / 20) };
 }
 
 /** Mono samples of a WAV, decoded by ffmpeg. */
@@ -208,17 +227,25 @@ export async function episodeTrack(projectDir: string): Promise<Timing> {
     );
   }
 
-  // Inputs from the effective timing.
+  // Inputs from the effective timing. Speech takes are levelled to one loudness
+  // through their mix gain; the take files stay untouched. sfx keep gain 1.
+  const defaults = await loadDefaults();
+  const speechLevels: string[] = [];
   const lineInputs: Array<MixInput & { speaker?: string }> = [];
   for (const { line } of scriptLines(project.script)) {
     if (!isAudibleLine(line)) continue;
     const timed = effective.lines.find((candidate) => candidate.id === line.id)!;
-    lineInputs.push({
-      file: lineTakePath(project, line.id),
-      start: timed.start,
-      length: timed.end - timed.start,
-      ...(isSpokenLine(line) ? { speaker: line.speaker } : {}),
-    });
+    const file = lineTakePath(project, line.id);
+    const input: MixInput & { speaker?: string } = { file, start: timed.start, length: timed.end - timed.start };
+    if (isSpokenLine(line)) {
+      const { lufs, gain } = speechGain(file, durations[line.id]!, defaults.render.speech_lufs);
+      input.speaker = line.speaker;
+      input.gain = gain;
+      speechLevels.push(
+        `  ${line.id} (${line.speaker}): ${Number.isFinite(lufs) ? `${lufs.toFixed(1)} LUFS` : 'silent'} → ${formatDb(20 * Math.log10(gain))}`,
+      );
+    }
+    lineInputs.push(input);
   }
   const beds: MixInput[] = [];
   for (const scene of project.script.scenes) {
@@ -235,7 +262,6 @@ export async function episodeTrack(projectDir: string): Promise<Timing> {
   const music = join(project.paths.root, 'audio', 'music.wav');
   if (existsSync(music)) beds.push({ file: music, start: 0, length: effective.audio.duration, gain: MUSIC_GAIN });
 
-  const defaults = await loadDefaults();
   const episodeWav = join(project.paths.root, base.audio.path);
   await ensureDir(join(project.paths.root, 'audio', 'stems'));
   mix([...beds, ...lineInputs], effective.audio.duration, episodeWav, {
@@ -257,9 +283,14 @@ export async function episodeTrack(projectDir: string): Promise<Timing> {
   };
   await writeJsonAtomic(project.paths.timing, timing);
   await writeJsonAtomic(project.paths.effectiveTiming, mergeTiming(timing, project.overrides));
+  if (speechLevels.length > 0) console.log(`Speech takes levelled to ${defaults.render.speech_lufs} LUFS:\n${speechLevels.join('\n')}`);
   console.log(
     `✔ ${base.audio.path}: ${placement.duration.toFixed(3)} s, ${placement.sections.length} scene(s), ${placement.lines.length} line(s); stems: ${speakers.join(', ') || 'none'}`,
   );
   console.log(`Timing written to ${project.paths.timing}`);
   return timing;
+}
+
+function formatDb(db: number): string {
+  return `${db >= 0 ? '+' : ''}${db.toFixed(1)} dB`;
 }
