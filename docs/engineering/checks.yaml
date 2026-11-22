@@ -1,0 +1,17 @@
+# Project checks – what runs at edit time and at stop/CI.
+# `paths` narrows a check to matching changed files (globs). `advisory: true` reports without blocking.
+version: 1
+checks:
+  - name: architecture-boundaries
+    command: node .claude/skills/adopt/scripts/boundary-check.ts --changed
+    phase: edit
+    paths:
+      - packages/**
+    timeout: 30
+    advisory: false
+  - name: architecture-boundaries-full
+    command: node .claude/skills/adopt/scripts/boundary-check.ts
+    phase: stop
+    paths: []
+    timeout: 120
+    advisory: false

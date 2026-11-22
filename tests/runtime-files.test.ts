@@ -38,6 +38,14 @@ describe('runtimePath', () => {
     expect(runtimePath('docs/adr/0001-example.md')).toBe('docs/adr/0001-example.md');
   });
 
+  // Characterization from the adoption of the workspace slice (2026-11-22): it pins what ships today, not what
+  // should ship – the upstream CI runs a build the workspace does not have.
+  it('ships the upstream CI and the issue templates into a workspace, but not the release workflow', () => {
+    expect(runtimePath('.github/workflows/ci.yml')).toBe('.github/workflows/ci.yml');
+    expect(runtimePath('.github/PULL_REQUEST_TEMPLATE.md')).toBe('.github/PULL_REQUEST_TEMPLATE.md');
+    expect(runtimePath('.github/workflows/release.yml')).toBeNull();
+  });
+
   it('leaves a path no list covers unclassified', () => {
     expect(runtimePath('docs/new-page.md')).toBeUndefined();
     expect(runtimePath('new-top-level-file.md')).toBeUndefined();
