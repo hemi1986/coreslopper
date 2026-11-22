@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { existsSync } from 'node:fs';
 import { basename, join, relative, resolve } from 'node:path';
-import { Command } from 'commander';
+import { Command, Option } from 'commander';
 import {
   ValidationError,
   effectiveBatchCap,
@@ -744,7 +744,7 @@ character
 
 const sound = program
   .command('sound')
-  .description('The workspace sound library (library/sounds/<id>/): add.');
+  .description('The workspace sound library (library/sounds/<id>/): add, edit.');
 
 sound
   .command('add <file>')
@@ -764,6 +764,27 @@ sound
       const root = repoRoot();
       const entry = await addLibrarySound(root, { file, ...options });
       console.log(`✔ ${entry.id} in ${relative(process.cwd(), soundDir(root, entry.id)) || '.'}: ${entry.length} s, ${entry.loudness} LUFS, licence ${entry.licence}`);
+    }),
+  );
+
+sound
+  .command('edit <id>')
+  .description("Change a library sound's metadata, never its file; an empty value clears an optional field. Length and loudness are measured, never typed.")
+  .option('--title <title>', 'What the sound is called')
+  .option('--use-when <text>', 'What it is typically used for')
+  .option('--tags <list>', 'Comma-separated words for finding the sound (replaces the tags)')
+  .option('--cue <seconds>', 'Where the sound lands, in seconds from its (trimmed) start')
+  .option('--trim <a-b>', 'The part to use, in seconds: 0.1-1.2')
+  .option('--source <url>', 'Where the sound came from')
+  .option('--licence <licence>', 'Its licence (empty: unknown)')
+  .option('--credit <text>', 'The credit text its licence asks for')
+  .addOption(new Option('--length <seconds>').hideHelp())
+  .addOption(new Option('--loudness <lufs>').hideHelp())
+  .action((id: string, options: Record<string, string | undefined>) =>
+    run(async () => {
+      const { updateLibrarySound } = await import('./sound-library.js');
+      const entry = await updateLibrarySound(repoRoot(), id, options);
+      console.log(`✔ ${entry.id} updated: ${entry.title} – ${entry.use_when}${entry.tags.length ? ` [${entry.tags.join(', ')}]` : ''}`);
     }),
   );
 

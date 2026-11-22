@@ -222,3 +222,61 @@ export async function addLibrarySound(root: string, input: NewLibrarySound, now 
     await rm(incoming, { recursive: true, force: true });
   }
 }
+
+/** What `sound edit` may change; undefined keeps a field, an empty value clears an optional one. */
+export interface LibrarySoundChanges {
+  title?: unknown;
+  useWhen?: unknown;
+  tags?: unknown;
+  cue?: unknown;
+  /** `{ start, end }` in seconds, or `"<a>-<b>"`. */
+  trim?: unknown;
+  source?: unknown;
+  licence?: unknown;
+  credit?: unknown;
+  /** Measured from the file, never typed: any value is refused. */
+  length?: unknown;
+  /** Measured from the file, never typed: any value is refused. */
+  loudness?: unknown;
+}
+
+const cleared = (value: unknown) => value === null || value === '';
+
+/**
+ * CMD-UpdateLibrarySound (`sound edit`): change a library sound's metadata,
+ * never its file (EVT-LibrarySoundUpdated). Title and use when stay filled; a
+ * cue and a trim stay inside the sound, the cue inside the trim; length and
+ * loudness are measured and cannot be typed. A refused edit leaves the entry
+ * as it was.
+ */
+export async function updateLibrarySound(root: string, id: string, changes: LibrarySoundChanges): Promise<LibrarySound> {
+  for (const measured of ['length', 'loudness'] as const) {
+    if (changes[measured] !== undefined) throw new SoundRefused(`the ${measured} is measured from the file and cannot be typed`, 'invalid', undefined, id);
+  }
+  const current = await loadLibrarySound(root, id);
+  const required = (value: unknown, field: string, name: string, max: number, keep: string) => {
+    if (value === undefined) return keep;
+    if (typeof value === 'string' && !value.trim()) throw new SoundRefused(`a library sound needs ${name}`, 'invalid', undefined, id);
+    return text(value, field, max, true)!;
+  };
+  const optional = <T>(value: unknown, keep: T | undefined, parse: (value: unknown) => T | undefined) => (value === undefined ? keep : cleared(value) ? undefined : parse(value));
+
+  const next = {
+    title: required(changes.title, 'title', 'a title', 200, current.title),
+    use_when: required(changes.useWhen, 'use when', 'a use when', 1000, current.use_when),
+    tags: changes.tags === undefined ? current.tags : parseTags(changes.tags),
+    cue: optional(changes.cue, current.cue, (value) => seconds(value, 'cue')),
+    trim: optional(changes.trim, current.trim, parseTrim),
+    source: optional(changes.source, current.source, (value) => text(value, 'source', 2000)),
+    licence: optional(changes.licence, current.licence, (value) => text(value, 'licence', 200)) ?? 'unknown',
+    credit: optional(changes.credit, current.credit, (value) => text(value, 'credit', 1000)),
+  };
+  const problems = librarySoundTimeProblems({ length: current.length, cue: next.cue, trim: next.trim });
+  if (problems.length) throw new SoundRefused(problems.map((problem) => problem.message).join('; '), 'outside', undefined, id);
+
+  const sound: Record<string, unknown> = { ...current, ...next };
+  for (const field of ['cue', 'trim', 'source', 'credit'] as const) if (next[field] === undefined) delete sound[field];
+  const updated = LibrarySoundSchema.parse(sound);
+  await writeSound(soundFile(root, id), updated);
+  return updated;
+}

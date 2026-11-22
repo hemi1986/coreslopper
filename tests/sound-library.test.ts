@@ -5,7 +5,8 @@ import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { resolveBinary } from '../packages/cli/src/media.ts';
-import { addLibrarySound, loadLibrarySound, soundDir, SoundRefused } from '../packages/cli/src/sound-library.ts';
+import { hashFileStream } from '../packages/core/src/index.ts';
+import { addLibrarySound, loadLibrarySound, soundDir, SoundRefused, updateLibrarySound } from '../packages/cli/src/sound-library.ts';
 
 const temporary: string[] = [];
 afterEach(async () => {
@@ -131,5 +132,77 @@ describe.skipIf(!hasFfmpeg())('sound add', () => {
     const kept = await addLibrarySound(root, { file: boom, title: 'Vine Boom', useWhen: 'a reveal', trim: '0.2-0.6', cue: 0.3 });
     expect(kept).toMatchObject({ trim: { start: 0.2, end: 0.6 }, cue: 0.3 });
     expect(await sounds(root)).toEqual(['vine-boom']);
+  });
+});
+
+describe.skipIf(!hasFfmpeg())('sound edit', () => {
+  async function vineBoom(trim?: string) {
+    const { root, files } = await workspace();
+    await addLibrarySound(root, { file: tone(join(files, 'boom.mp3'), 1.4), title: 'Vine Boom', useWhen: 'a dramatic reveal', ...(trim ? { trim } : {}) });
+    return root;
+  }
+
+  it('ST-002: The use when and the tags are changed', async () => {
+    const root = await vineBoom();
+    const wav = join(soundDir(root, 'vine-boom'), 'sound.wav');
+    const before = await hashFileStream(wav);
+
+    const updated = await updateLibrarySound(root, 'vine-boom', { useWhen: 'a shocking twist', tags: 'reveal,shock' });
+
+    expect(updated).toMatchObject({ use_when: 'a shocking twist', tags: ['reveal', 'shock'] });
+    expect(await loadLibrarySound(root, 'vine-boom')).toMatchObject({ title: 'Vine Boom', use_when: 'a shocking twist', tags: ['reveal', 'shock'], hash: before });
+    expect(await hashFileStream(wav)).toBe(before);
+  });
+
+  it('ST-002: An empty use when is refused', async () => {
+    const root = await vineBoom();
+
+    const refused = await updateLibrarySound(root, 'vine-boom', { useWhen: '  ' }).catch((error: unknown) => error);
+
+    expect(refused).toBeInstanceOf(SoundRefused);
+    expect((refused as Error).message).toMatch(/needs a use when/);
+    expect((await loadLibrarySound(root, 'vine-boom')).use_when).toBe('a dramatic reveal');
+  });
+
+  it('ST-002: A cue outside the trim is refused', async () => {
+    const root = await vineBoom('0.0-1.0');
+
+    const refused = await updateLibrarySound(root, 'vine-boom', { cue: '1.2' }).catch((error: unknown) => error);
+
+    expect(refused).toBeInstanceOf(SoundRefused);
+    expect(refused).toMatchObject({ reason: 'outside' });
+    expect((refused as Error).message).toMatch(/cue 1.2 lies outside the trim/);
+    expect((await loadLibrarySound(root, 'vine-boom')).cue).toBeUndefined();
+  });
+
+  it('ST-002: The length cannot be typed', async () => {
+    const root = await vineBoom();
+
+    const refused = await updateLibrarySound(root, 'vine-boom', { length: '3' }).catch((error: unknown) => error);
+
+    expect(refused).toBeInstanceOf(SoundRefused);
+    expect((refused as Error).message).toMatch(/length is measured from the file/);
+    expect((await loadLibrarySound(root, 'vine-boom')).length).toBeCloseTo(1.4, 1);
+  });
+
+  it('clears optional fields with an empty value and keeps the rest', async () => {
+    const root = await vineBoom('0.1-1.0');
+    await updateLibrarySound(root, 'vine-boom', { cue: 0.3, source: 'https://example.com', licence: 'CC-BY', credit: 'someone' });
+
+    const cleared = await updateLibrarySound(root, 'vine-boom', { trim: '', cue: '', source: '', licence: '', credit: '' });
+
+    expect(cleared).toMatchObject({ title: 'Vine Boom', use_when: 'a dramatic reveal', licence: 'unknown' });
+    expect(cleared).not.toHaveProperty('trim');
+    expect(cleared).not.toHaveProperty('cue');
+    expect(cleared).not.toHaveProperty('source');
+    expect(cleared).not.toHaveProperty('credit');
+  });
+
+  it('refuses the loudness, an empty title and an unknown sound', async () => {
+    const root = await vineBoom();
+
+    await expect(updateLibrarySound(root, 'vine-boom', { loudness: '-10' })).rejects.toThrow(/loudness is measured from the file/);
+    await expect(updateLibrarySound(root, 'vine-boom', { title: '' })).rejects.toThrow(/needs a title/);
+    await expect(updateLibrarySound(root, 'no-such-sound', { title: 'x' })).rejects.toThrow(/no library sound "no-such-sound"/);
   });
 });
