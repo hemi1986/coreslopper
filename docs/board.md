@@ -2,6 +2,8 @@
 
 The board is the workspace's local page: the production of every project and series, and the release view of every finished one ([ADR 0030](adr/0030-board-as-hub.md)). Claude Code runs the pipeline in its own sessions; the board shows where each project stands and the command to type next.
 
+New to the board? Start with the [board guide](board-guide.md), a tour with screenshots ([Deutsch](board-guide.de.md)). The board shows it too: **Guide** in the navigation opens it in your browser's language, read from the workspace's `docs/`.
+
 ## Start it
 
 Either on the computer:
@@ -54,7 +56,7 @@ On a character's page, **Use in** copies it into a music video or series canon: 
 
 The start page groups the projects: **your turn** (a command to run in Claude Code, or a release to approve), **running**, the **series**, and the projects whose release is approved. A card shows the stages as a strip, the current stage, the budget, the generation queue, failed art-director reviews, renders in progress, and the next step with a copy button. A project that is done and released (every release event ticked off, or its release day past) folds into **Released** at the end of the navigation. The group opens when you open one of its projects. The page does not refresh itself: **Refresh** at the top of the navigation reloads the navigation and the current view. It keeps the view while a video plays or a field holds unsaved input, so it never restarts a video or discards what you typed.
 
-A project page lists every stage with its attempts, times, and errors, the budget, the written documents (brief, treatment, lyrics or script, timing report, storyboard, QA report), the renders with a player, the contact sheet, the queue items, and the reviewed images, failed ones first. A series page shows its canon with the gaps that keep episodes from starting, the series budget, and its planned and created episodes.
+A project page lists every stage with its attempts, times, and errors, the budget, the written documents (brief, treatment, lyrics or script, timing report, storyboard, QA report), which open formatted on the board with the file one click away, the renders with a player, the contact sheet, the queue items, and the reviewed images, failed ones first. A series page shows its canon with the gaps that keep episodes from starting, the series budget, and its planned and created episodes.
 
 The next step follows the stages: an open interactive stage is `/new-video <slug>` or `/new-episode <slug>`; an open or failed stage after that is `/video-next <slug>`; a finished project goes to its release view. A series asks for `/new-series <slug>` until every on-screen character and set has a reference and every speaking character a reference voice, then for `/new-episode`.
 

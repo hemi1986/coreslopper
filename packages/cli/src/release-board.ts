@@ -17,7 +17,8 @@ import { releaseDir } from './release.js';
 // view shows, per platform, which file goes where, the texts to paste with
 // their limits, the settings to check, and the calendar; the user ticks off
 // what is posted and enters the live URL, which lands in
-// review/release-status.json. Writes come only from its own page (see
+// review/release-status.json. The guide view reads the workspace's docs/
+// (DOC_FILE). Writes come only from its own page (see
 // trustedWrite): the status files, the approval, and the autopilot's retry and
 // takeover marks (and, on approval of a proposed date,
 // release.release_date in project.yaml), the wizard's new projects and
@@ -68,6 +69,8 @@ const PROJECT_FILES = /^(renders|review|assets|characters|sets|props)\/|^(brief\
 const SERIES_FILES = /^(characters|sets|props|assets|review)\/|^(bible\.md)$/;
 /** The page's own files in ./board/. */
 const PAGE_FILE = /^[a-z][a-z0-9-]*\.(js|css)$/;
+/** The workspace's docs the board shows: a top-level page, or an image under docs/assets/. */
+const DOC_FILE = /^([a-z][a-z0-9-]*(?:\.de)?\.md|assets\/(?:[a-z0-9_-]+\/)*[a-z0-9_-]+\.(?:webp|png|jpe?g|svg))$/;
 const pageDir = fileURLToPath(new URL('./board/', import.meta.url));
 
 /** Project directories of the workspace that have a release folder or a calendar. */
@@ -352,6 +355,11 @@ export function boardHandler(options: BoardOptions = {}) {
         if (!PAGE_FILE.test(pageMatch[1]!)) return send(res, 404, 'not found', 'text/plain');
         const file = await readFile(join(pageDir, pageMatch[1]!), 'utf8').catch(() => undefined);
         return file === undefined ? send(res, 404, 'not found', 'text/plain') : send(res, 200, file, MIME[extname(pageMatch[1]!)]);
+      }
+      const docMatch = /^\/docs\/(.+)$/.exec(path);
+      if (req.method === 'GET' && docMatch) {
+        if (!DOC_FILE.test(docMatch[1]!)) return send(res, 404, 'not found', 'text/plain');
+        return serveMedia(req, res, join(root, 'docs'), docMatch[1]!);
       }
       if (req.method === 'GET' && path === '/api/production') return json(res, await productionOverview(root));
       if (req.method === 'GET' && path === '/api/activity') {
