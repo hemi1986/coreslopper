@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { stringify } from 'yaml';
 import { resolveBinary } from '../packages/cli/src/media.ts';
 import { hashFileStream } from '../packages/core/src/index.ts';
-import { addLibrarySound, loadLibrarySound, soundDir, SoundRefused, updateLibrarySound } from '../packages/cli/src/sound-library.ts';
+import { addLibrarySound, listLibrarySounds, loadLibrarySound, soundDir, soundListLines, SoundRefused, updateLibrarySound } from '../packages/cli/src/sound-library.ts';
 import { validateChangedFile } from '../packages/cli/src/validate-file.ts';
 
 const temporary: string[] = [];
@@ -331,5 +331,82 @@ describe('a hand edit of sound.yaml', () => {
     expect(await refusal(entry)).toMatch(/the cue 2 lies outside the sound's length/);
     await save(entry, { use_when: '  ' });
     expect(await refusal(entry)).toMatch(/a library sound needs a use when/);
+  });
+});
+
+describe('sound list', () => {
+  const entry = (id: string, fields: Record<string, unknown>) => ({
+    version: 1,
+    id,
+    length: 1.4,
+    loudness: -18.5,
+    licence: 'unknown',
+    hash: (id === 'vine-boom' ? 'a' : 'b').repeat(64),
+    added: '2026-11-22T10:00:00.000Z',
+    ...fields,
+  });
+
+  /** Two library sounds and the meme "office-prank", whose take "reveal-boom" came from "vine-boom". */
+  async function fixture(): Promise<string> {
+    const { root } = await workspace();
+    const sounds = {
+      'vine-boom': entry('vine-boom', { title: 'Vine Boom', use_when: 'a dramatic reveal', tags: ['reveal', 'impact'], cue: 0.12, trim: { start: 0, end: 1.2 } }),
+      'record-scratch': entry('record-scratch', { title: 'Record Scratch', use_when: 'everything stops', tags: ['stop'], length: 0.9, licence: 'CC-BY 4.0', credit: 'by someone' }),
+    };
+    for (const [id, sound] of Object.entries(sounds)) {
+      await mkdir(soundDir(root, id), { recursive: true });
+      await writeFile(join(soundDir(root, id), 'sound.yaml'), stringify(sound));
+    }
+    const meme = join(root, 'projects', 'office-prank');
+    await mkdir(meme, { recursive: true });
+    await writeFile(join(meme, 'project.yaml'), 'version: 1\nslug: office-prank\n');
+    const takes = {
+      version: 1,
+      takes: {
+        'reveal-boom': { source: 'library:vine-boom', duration: 1.2, text_hash: 'x' },
+        'boss-line': { source: 'generated', duration: 2, text_hash: 'y' },
+      },
+      ambience: {},
+    };
+    await writeFile(join(meme, 'takes.json'), JSON.stringify(takes));
+    return root;
+  }
+
+  it('prints one row per library sound, sorted by id', async () => {
+    const root = await fixture();
+    const lines = soundListLines(await listLibrarySounds(root));
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toMatch(/^record-scratch\s+Record Scratch – everything stops · 0\.9 s · -18\.5 LUFS · licence CC-BY 4\.0 · tags: stop$/);
+    expect(lines[1]).toMatch(/^vine-boom\s+Vine Boom – a dramatic reveal · 1\.4 s · -18\.5 LUFS · cue 0\.12 · trim 0-1\.2 · licence unknown · tags: reveal, impact · used in office-prank$/);
+  });
+
+  it('prints a hint to sound add for an empty library', async () => {
+    const { root } = await workspace();
+    expect(soundListLines(await listLibrarySounds(root))).toEqual(['The library has no sounds yet. `sound add <file> --title <title> --use-when <text>` adds one.']);
+  });
+
+  it('lists only the sounds with the tag', async () => {
+    const root = await fixture();
+    const { sounds } = await listLibrarySounds(root, { tag: 'reveal' });
+    expect(sounds.map((sound) => sound.id)).toEqual(['vine-boom']);
+    expect(soundListLines(await listLibrarySounds(root, { tag: 'nothing' }), 'nothing')).toEqual(['No library sound has the tag "nothing".']);
+  });
+
+  it('gives every field of the read model, with the memes that took a sound', async () => {
+    const root = await fixture();
+    const { sounds, errors } = await listLibrarySounds(root);
+    expect(errors).toEqual([]);
+    expect(sounds[1]).toMatchObject({ id: 'vine-boom', title: 'Vine Boom', use_when: 'a dramatic reveal', tags: ['reveal', 'impact'], length: 1.4, loudness: -18.5, cue: 0.12, trim: { start: 0, end: 1.2 }, licence: 'unknown', used_in: ['office-prank'] });
+    expect(sounds[0]).toMatchObject({ id: 'record-scratch', licence: 'CC-BY 4.0', credit: 'by someone', used_in: [] });
+  });
+
+  it('names an entry that does not load and still lists the others', async () => {
+    const root = await fixture();
+    await mkdir(soundDir(root, 'broken'), { recursive: true });
+    await writeFile(join(soundDir(root, 'broken'), 'sound.yaml'), 'version: 1\nid: broken\n');
+    const listing = await listLibrarySounds(root);
+    expect(listing.sounds.map((sound) => sound.id)).toEqual(['record-scratch', 'vine-boom']);
+    expect(listing.errors.map((error) => error.id)).toEqual(['broken']);
+    expect(soundListLines(listing).at(-1)).toMatch(/^✖ broken: /);
   });
 });
