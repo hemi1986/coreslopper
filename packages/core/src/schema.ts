@@ -1508,7 +1508,9 @@ export type LibrarySound = z.infer<typeof LibrarySoundSchema>;
 export function librarySoundTimeProblems(sound: { length: number; cue?: number; trim?: { start: number; end: number } }): { field: 'cue' | 'trim'; message: string }[] {
   const problems: { field: 'cue' | 'trim'; message: string }[] = [];
   const { length, cue, trim } = sound;
-  if (trim && !(trim.start < trim.end && trim.end <= length)) {
+  if (trim && !(trim.start < trim.end)) {
+    problems.push({ field: 'trim', message: `the trim ${trim.start}-${trim.end} must start before it ends` });
+  } else if (trim && trim.end > length) {
     problems.push({ field: 'trim', message: `the trim ${trim.start}-${trim.end} lies outside the sound's length of ${length} s` });
   }
   const span = trim ? trim.end - trim.start : length;

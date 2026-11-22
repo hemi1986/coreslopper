@@ -57,9 +57,10 @@ export async function loadLibrarySound(root: string, id: string): Promise<Librar
   return readYamlFile(file, LibrarySoundSchema);
 }
 
+/** Write an entry its caller has parsed with LibrarySoundSchema. */
 async function writeSound(file: string, sound: LibrarySound): Promise<void> {
   const header = '# A sound of the workspace library; its audio is sound.wav next to this file. See docs/adr/0051-memes-and-the-sound-library.md.\n';
-  await writeTextAtomic(file, header + stringify(LibrarySoundSchema.parse(sound)));
+  await writeTextAtomic(file, header + stringify(sound));
 }
 
 /** Every readable entry's id and hashes; a broken entry is skipped here and reported by `sound check`. */
@@ -96,12 +97,12 @@ export interface NewLibrarySound {
 
 function text(value: unknown, field: string, max: number, required = false): string | undefined {
   if (value === undefined || value === null || value === '') {
-    if (required) throw new SoundRefused(`${field} is required`, 'invalid');
+    if (required) throw new SoundRefused(`a library sound needs a ${field}`, 'invalid');
     return undefined;
   }
   if (typeof value !== 'string' || value.length > max) throw new SoundRefused(`${field} must be text up to ${max} characters`, 'invalid');
   const trimmed = value.trim();
-  if (!trimmed && required) throw new SoundRefused(`${field} is required`, 'invalid');
+  if (!trimmed && required) throw new SoundRefused(`a library sound needs a ${field}`, 'invalid');
   return trimmed || undefined;
 }
 
@@ -221,4 +222,65 @@ export async function addLibrarySound(root: string, input: NewLibrarySound, now 
   } finally {
     await rm(incoming, { recursive: true, force: true });
   }
+}
+
+/** What `sound edit` may change; undefined keeps a field, an empty value clears an optional one. */
+export interface LibrarySoundChanges {
+  title?: unknown;
+  useWhen?: unknown;
+  tags?: unknown;
+  cue?: unknown;
+  /** `{ start, end }` in seconds, or `"<a>-<b>"`. */
+  trim?: unknown;
+  source?: unknown;
+  licence?: unknown;
+  credit?: unknown;
+  /** Measured from the file, never typed: any value is refused. */
+  length?: unknown;
+  /** Measured from the file, never typed: any value is refused. */
+  loudness?: unknown;
+}
+
+const cleared = (value: unknown) => value === null || value === '';
+
+/**
+ * CMD-UpdateLibrarySound (`sound edit`): change a library sound's metadata,
+ * never its file (EVT-LibrarySoundUpdated). Title and use when stay filled; a
+ * cue and a trim stay inside the sound, the cue inside the trim; length and
+ * loudness are measured and cannot be typed. A refused edit, or one that
+ * changes nothing, leaves the entry as it was and writes nothing.
+ */
+export async function updateLibrarySound(root: string, id: string, changes: LibrarySoundChanges): Promise<{ sound: LibrarySound; changed: boolean }> {
+  for (const measured of ['length', 'loudness'] as const) {
+    if (changes[measured] !== undefined) throw new SoundRefused(`the ${measured} is measured from the file and cannot be typed`, 'invalid', undefined, id);
+  }
+  const current = await loadLibrarySound(root, id);
+  const required = (value: unknown, field: string, max: number, keep: string) => (value === undefined ? keep : text(value, field, max, true)!);
+  const optional = <T>(value: unknown, keep: T | undefined, parse: (value: unknown) => T | undefined) => (value === undefined ? keep : cleared(value) ? undefined : parse(value));
+
+  const next = {
+    title: required(changes.title, 'title', 200, current.title),
+    use_when: required(changes.useWhen, 'use when', 1000, current.use_when),
+    tags: changes.tags === undefined ? current.tags : parseTags(changes.tags),
+    cue: optional(changes.cue, current.cue, (value) => seconds(value, 'cue')),
+    trim: optional(changes.trim, current.trim, parseTrim),
+    source: optional(changes.source, current.source, (value) => text(value, 'source', 2000)),
+    licence: optional(changes.licence, current.licence, (value) => text(value, 'licence', 200)) ?? 'unknown',
+    credit: optional(changes.credit, current.credit, (value) => text(value, 'credit', 1000)),
+  };
+  // The cue counts from the trim's start: a new trim without a new cue keeps the moment the sound lands in the file.
+  if (changes.trim !== undefined && changes.cue === undefined && current.cue !== undefined) {
+    const cue = Math.round((current.cue + (current.trim?.start ?? 0) - (next.trim?.start ?? 0)) * 1000) / 1000;
+    if (cue < 0) throw new SoundRefused(`the cue lands at ${current.cue + (current.trim?.start ?? 0)} s of the file, before the trim; give a new --cue`, 'outside', undefined, id);
+    next.cue = cue;
+  }
+  const problems = librarySoundTimeProblems({ length: current.length, cue: next.cue, trim: next.trim });
+  if (problems.length) throw new SoundRefused(problems.map((problem) => problem.message).join('; '), 'outside', undefined, id);
+
+  const sound: Record<string, unknown> = { ...current, ...next };
+  for (const field of ['cue', 'trim', 'source', 'credit'] as const) if (next[field] === undefined) delete sound[field];
+  const updated = LibrarySoundSchema.parse(sound);
+  if (JSON.stringify(updated) === JSON.stringify(current)) return { sound: current, changed: false };
+  await writeSound(soundFile(root, id), updated);
+  return { sound: updated, changed: true };
 }

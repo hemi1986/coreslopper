@@ -12,7 +12,7 @@ risk: null
 events: [EVT-LibrarySoundUpdated]
 depends_on: [ST-001]
 labels: [feature:meme]
-status: ready
+status: done
 ---
 
 ## Story
@@ -24,6 +24,9 @@ never the file. Hand edits of `sound.yaml` are validated by the hook (ST-005).
 
 Invariants (AGG-LibrarySound): title and use when are never empty; a cue and a trim lie inside the length, a cue
 inside the trim; length and loudness are measured, never typed.
+
+The cue counts from the trim's start; a trim changed without a new cue keeps the moment the sound lands in the
+file, and an edit that would put that moment before the trim is refused (user, 2026-11-22, code review of ST-002).
 
 A changed trim or cue makes the takes copied from the sound stale (POL-TakeChosenLibrarySounds, ST-011).
 
