@@ -4,7 +4,7 @@
 
 **Progress: 3 of 20 domain stories done** · scenarios 12 of 68
 
-**34 stories** · In Progress: 0 · Ready: 29 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 5 · Superseded: 0
+**34 stories** · In Progress: 0 · Ready: 28 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 6 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
 
@@ -12,7 +12,6 @@ Within each section: by priority, then by story ID, with dependencies pulled in 
 
 | ID | Title | Type | Context | Priority | Size | Risk | Depends on |
 |---|---|---|---|---|---|---|---|
-| [ST-006](ST-006-list-the-sound-library.md) | List the sound library for the meme skill | task | – | must | – | – | ST-001 |
 | [ST-007](ST-007-project-kind-meme.md) | Project kind meme with its stages | tech-task | – | must | – | – | – |
 | [ST-008](ST-008-create-a-meme-in-the-wizard.md) | Create a meme in the board's wizard | domain | Pipeline | must | – | – | ST-007 |
 | [ST-009](ST-009-validate-a-memes-script.md) | Validate a meme's script with library sounds | domain | Scripted audio | must | – | – | ST-001, ST-007 |
@@ -49,5 +48,6 @@ Within each section: by priority, then by story ID, with dependencies pulled in 
 | [ST-001](ST-001-add-a-library-sound.md) | Add a library sound | domain | Sound library | must | – | – | – |
 | [ST-002](ST-002-edit-a-library-sound.md) | Edit a library sound's description | domain | Sound library | must | – | – | ST-001 |
 | [ST-005](ST-005-validate-hand-edited-sound-entries.md) | Validate a hand-edited sound entry | domain | Sound library | must | – | – | ST-001 |
+| [ST-006](ST-006-list-the-sound-library.md) | List the sound library for the meme skill | task | – | must | – | – | ST-001 |
 | [ST-021](ST-021-wizard-leads-to-the-project.md) | The wizard's last step leads to the new project or series | chore | – | must | – | – | – |
 | [ST-022](ST-022-board-shows-loading-and-busy-buttons.md) | The board shows when it loads and when a button is working | chore | – | must | – | – | – |

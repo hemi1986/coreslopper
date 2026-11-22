@@ -744,7 +744,20 @@ character
 
 const sound = program
   .command('sound')
-  .description('The workspace sound library (library/sounds/<id>/): add, edit.');
+  .description('The workspace sound library (library/sounds/<id>/): list, add, edit.');
+
+sound
+  .command('list')
+  .description('Every library sound, sorted by id, with what it is used for, its measurements, licence, and the memes that took it.')
+  .option('--tag <tag>', 'Only sounds with this tag')
+  .option('--json', 'Print every field as JSON (for the new-meme skill)')
+  .action((options: { tag?: string; json?: boolean }) =>
+    run(async () => {
+      const { listLibrarySounds, soundListLines } = await import('./sound-library.js');
+      const listing = await listLibrarySounds(repoRoot(), { tag: options.tag });
+      console.log(options.json ? JSON.stringify(listing, null, 2) : soundListLines(listing, options.tag).join('\n'));
+    }),
+  );
 
 sound
   .command('add <file>')

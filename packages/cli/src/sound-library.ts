@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, statSync } from 'node:fs';
-import { mkdir, mkdtemp, readdir, rename, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rename, rm } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 import { stringify } from 'yaml';
 import {
@@ -14,6 +14,7 @@ import {
   writeTextAtomic,
   type LibrarySound,
 } from '@coreslopper/core';
+import { projectDirs } from './board-production.js';
 import { measureLoudness } from './episode-track.js';
 import { probeDuration, resolveBinary } from './media.js';
 
@@ -310,4 +311,79 @@ export async function updateLibrarySound(root: string, id: string, changes: Libr
   if (JSON.stringify(updated) === JSON.stringify(current)) return { sound: current, changed: false };
   await writeSound(soundFile(root, id), updated);
   return { sound: updated, changed: true };
+}
+
+/** RM-SoundLibrary: a library sound and the projects whose takes came from it. */
+export interface LibrarySoundListing extends LibrarySound {
+  /** Slugs of the memes whose take registry has a take of source `library:<id>`, sorted. */
+  used_in: string[];
+}
+
+/** Every project whose takes.json has a take copied from a library sound, by sound id. */
+export async function soundUses(root: string): Promise<Map<string, string[]>> {
+  const uses = new Map<string, Set<string>>();
+  for (const dir of await projectDirs(root)) {
+    const file = join(dir, 'takes.json');
+    if (!existsSync(file)) continue;
+    const raw = await readFile(file, 'utf8')
+      .then((content) => JSON.parse(content) as { takes?: Record<string, { source?: unknown }> } | null)
+      // An unreadable takes.json is the voice track's business; here it uses nothing.
+      .catch(() => null);
+    for (const take of Object.values(raw?.takes ?? {})) {
+      const match = typeof take?.source === 'string' ? /^library:(.+)$/.exec(take.source) : null;
+      if (!match) continue;
+      const slugs = uses.get(match[1]!) ?? new Set<string>();
+      slugs.add(basename(dir));
+      uses.set(match[1]!, slugs);
+    }
+  }
+  return new Map([...uses].map(([id, slugs]) => [id, [...slugs].sort()]));
+}
+
+/**
+ * RM-SoundLibrary (`sound list`): every library sound, sorted by id, with the
+ * memes that took it; `tag` keeps only the sounds with that tag (any case).
+ * An entry that does not load is skipped and named in `errors`.
+ */
+export async function listLibrarySounds(root: string, options: { tag?: string } = {}): Promise<{ sounds: LibrarySoundListing[]; errors: { id: string; error: string }[] }> {
+  const dir = soundLibraryRoot(root);
+  const names = existsSync(dir) ? (await readdir(dir)).filter((name) => ID.test(name) && existsSync(soundFile(root, name))).sort() : [];
+  const uses = await soundUses(root);
+  const tag = options.tag?.trim().toLowerCase();
+  const sounds: LibrarySoundListing[] = [];
+  const errors: { id: string; error: string }[] = [];
+  for (const name of names) {
+    try {
+      const sound = await loadLibrarySound(root, name);
+      if (tag && !sound.tags.some((candidate) => candidate.toLowerCase() === tag)) continue;
+      sounds.push({ ...sound, used_in: uses.get(sound.id) ?? [] });
+    } catch (error) {
+      errors.push({ id: name, error: (error as Error).message });
+    }
+  }
+  return { sounds, errors };
+}
+
+/** The table of `sound list`: one row per sound, then one per entry that did not load; a hint when nothing is there. */
+export function soundListLines(listing: { sounds: LibrarySoundListing[]; errors: { id: string; error: string }[] }, tag?: string): string[] {
+  if (!listing.sounds.length && !listing.errors.length) {
+    return [tag ? `No library sound has the tag "${tag}".` : 'The library has no sounds yet. `sound add <file> --title <title> --use-when <text>` adds one.'];
+  }
+  return [
+    ...listing.sounds.map((sound) =>
+      [
+        `${sound.id.padEnd(20)} ${sound.title} – ${sound.use_when}`,
+        `${sound.length} s`,
+        `${sound.loudness} LUFS`,
+        sound.cue !== undefined ? `cue ${sound.cue}` : '',
+        sound.trim ? `trim ${sound.trim.start}-${sound.trim.end}` : '',
+        `licence ${sound.licence}`,
+        sound.tags.length ? `tags: ${sound.tags.join(', ')}` : '',
+        sound.used_in.length ? `used in ${sound.used_in.join(', ')}` : '',
+      ]
+        .filter(Boolean)
+        .join(' · '),
+    ),
+    ...listing.errors.map((error) => `✖ ${error.id}: ${error.error}`),
+  ];
 }
