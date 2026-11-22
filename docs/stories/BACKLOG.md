@@ -4,15 +4,20 @@
 
 **Progress: 7 of 24 domain stories done** · scenarios 27 of 80
 
-**42 stories** · In Progress: 0 · Ready: 26 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 16 · Superseded: 0
+**42 stories** · In Progress: 1 · Ready: 25 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 16 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
+
+## In Progress
+
+| ID | Title | Type | Context | Priority | Size | Risk | Depends on |
+|---|---|---|---|---|---|---|---|
+| [ST-013](ST-013-style-and-characters-for-a-meme.md) | The style-character stage of a meme | task | – | must | – | – | ST-007, ST-010 |
 
 ## Ready
 
 | ID | Title | Type | Context | Priority | Size | Risk | Depends on |
 |---|---|---|---|---|---|---|---|
-| [ST-013](ST-013-style-and-characters-for-a-meme.md) | The style-character stage of a meme | task | – | must | – | – | ST-007, ST-010 |
 | [ST-015](ST-015-a-memes-release-folder.md) | A meme's release folder | domain | Release | must | – | – | ST-007 |
 | [ST-016](ST-016-licence-todo-for-library-sounds.md) | The release check flags sounds of unknown licence | domain | Release | must | – | – | ST-015 |
 | [ST-004](ST-004-check-the-sound-library.md) | Check the sound library after hand edits | domain | Sound library | should | – | – | ST-001 |
