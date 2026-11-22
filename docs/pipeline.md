@@ -109,6 +109,14 @@ npm run cli -- estimate --role image.keyframe --units 8 --project projects/my-vi
 npm run cli -- generate projects/my-video --batch assets/batches/scene-01.json
 ```
 
+A motion figure that moves like a person in a reference clip plays a pose track instead of keyed motion ([ADR 0054](adr/0054-pose-tracks-from-reference-clips.md)). The clip is a motion source only:
+
+```bash
+npm run cli -- pose-extract projects/my-video --input assets/references/dance.mp4 --name dance-a --from 0:12 --to 0:26 --preview
+```
+
+It writes `assets/poses/dance-a.json` (COCO-17 keypoints of one tracked person per frame, normalized, with confidence) and prints a quality report: detection rate, confidence per limb, jitter, people in frame, camera cuts, and gaps. The first run installs the Python engine in `scripts/pose/` and downloads the RTMPose models into `.cache/pose/models/`.
+
 Roles resolve to the project's provider. A Higgsfield project uses the `alternatives.higgsfield` entries in `config/models.yaml`; lip-sync runs on Higgsfield Speak v2 unless `providers.lipsync` names another provider (fal.ai OmniHuman is cheaper for short lines, see [providers.md](providers.md#lip-sync)). With `providers.video: comfyui`, clips and lip-sync render locally from `comfyui/workflows/` at $0 ([comfyui/README.md](../comfyui/README.md), [ADR 0053](adr/0053-local-lipsync-by-default.md)); `new` writes `providers.lipsync` into `project.yaml`, so set it to `fal` there to lip-sync in the cloud.
 
 Completion: every shot has its source asset or a documented reason; every character shot used references; a shot with `refs.plate` has a keyframe edited from its plate, with its states and props as references; manifest and budget reconciled; art-director passes.

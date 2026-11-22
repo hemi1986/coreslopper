@@ -604,6 +604,10 @@ _Avoid_: render
 Material the user hands over for the grilling and the bibles: mood boards, photos of people, places, their own storyboards, video concepts, footage, voice recordings, and links. Listed in `references.yaml` of a project or series canon (kind, subject, note), with the files in `assets/references/`; added in the board's wizard or with `reference add|link`. Not to be confused with the generated references of characters, sets, and props.
 _Avoid_: moodboard (one kind of it), input files
 
+**Pose Track**:
+The moves of one person in a reference clip as data: per frame of a chosen window, the 17 body keypoints (COCO order) normalized to the source frame, each with a confidence, plus a quality report. Written by `pose-extract` to `assets/poses/<id>.json`; a motion component plays it on a cut-out figure. A motion source only: it holds no image or sound of the clip, and its preview video is for review, never for a render.
+_Avoid_: mocap, skeleton (the drawing of one), motion capture
+
 **Review Note**:
 A user's free-text remark on one frame or a range of frames of a render, saved by the board's review view in `review/notes/<video-stem>.json` with its frame and time. A note without a round is a draft note (not a publishing **Draft**); a sent note never changes.
 _Avoid_: annotation, comment, feedback

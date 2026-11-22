@@ -33,6 +33,15 @@ license: MIT
 6. Run `npm run typecheck` and the relevant tests.
 7. Record any new component in the storyboard documentation and, if it is reusable, in the Remotion package README.
 
+## Pose tracks
+
+A figure that dances like a real person plays a pose track (`assets/poses/<id>.json`, from `pose-extract`; see the `footage` skill). Pass its workspace-relative path in the shot's `motion.props` (e.g. `track: projects/<slug>/assets/poses/<id>.json`); `render` stages it with the other referenced files. In the component:
+
+- Load it once with `fetch(staticFile(path))` inside `delayRender`/`continueRender`, and check it with `parsePoseTrack` from `@coreslopper/core/browser`.
+- Sample it at `frame / fps` (plus an offset into the track) with `samplePoseTrack(track, seconds, { loop })`: keypoints interpolated linearly, null below the confidence gate (default 0.3) or where the person was lost; hold the last good pose for a null limb.
+- Retarget, don't copy positions: `relativePose` gives joints from mid-hip in torso lengths (the source aspect undone), so a big-head small-body figure scales by its own torso and places its own root; `poseBoneAngles` gives each bone's angle in screen radians for rotating cut-out parts around their joints.
+- The track is a motion source only; never show the source clip or the preview.
+
 ## Completion criteria
 
 - The component renders at the target resolution and does not clip text.

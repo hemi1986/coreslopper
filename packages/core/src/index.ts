@@ -18,3 +18,4 @@ export * from './production.js';
 export * from './watch.js';
 export * from './review.js';
 export * from './lyrics.js';
+export * from './pose.js';

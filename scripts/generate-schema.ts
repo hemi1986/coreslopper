@@ -31,6 +31,7 @@ import {
   UploadDataSchema,
 } from '../packages/core/src/schema.js';
 import { BenchCaseSchema, BenchConfigSchema, BenchTargetsFileSchema } from '../packages/core/src/bench.js';
+import { PoseTrackSchema } from '../packages/core/src/pose.js';
 
 const schemas = {
   project: ProjectConfigSchema,
@@ -63,6 +64,7 @@ const schemas = {
   'bench-case': BenchCaseSchema,
   'bench-targets': BenchTargetsFileSchema,
   'bench-config': BenchConfigSchema,
+  'pose-track': PoseTrackSchema,
 };
 
 const outputDir = join(process.cwd(), 'schema');
