@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { createReadStream, existsSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
-import { extname, isAbsolute, join, relative, resolve } from 'node:path';
+import { dirname, extname, isAbsolute, join, relative, resolve } from 'node:path';
 import {
   ConfigError,
   PublishLogSchema,
@@ -21,6 +21,7 @@ import {
   TikTokPublisher,
   YOUTUBE_QUOTA,
   YouTubePublisher,
+  markUncertain,
   redactSecrets,
   resolveTikTokCredentials,
   resolveYouTubeCredentials,
@@ -29,6 +30,7 @@ import {
   type PublishAdapter,
   type PublishItem,
 } from '@coreslopper/providers';
+import { withReleaseLock } from './release-calendar.js';
 import { loadUploadData, uploadPaths } from './upload-text.js';
 
 /** YouTube limits that `publish` checks before an upload. */
@@ -221,9 +223,11 @@ export function findPrevious(
   hash: string,
   mock: boolean,
 ): PublishEntry | undefined {
-  return log.entries
-    .filter((entry) => entry.platform === platform && entry.item === item && entry.file_hash === hash && entry.mock === mock && entry.status !== 'failed')
-    .at(-1);
+  const same = log.entries.filter((entry) => entry.platform === platform && entry.item === item && entry.file_hash === hash && entry.mock === mock);
+  // The last attempt may have gone out: it holds until the user checks the platform and forces a new upload.
+  const last = same.at(-1);
+  if (last?.status === 'failed' && last.uncertain) return last;
+  return same.filter((entry) => entry.status !== 'failed').at(-1);
 }
 
 /** YouTube units spent on the current quota day; a failed attempt counts as an insert, to stay on the safe side. */
@@ -361,7 +365,9 @@ export function formatPlan(plan: PublishPlan, title: string, dryRun: boolean): s
     const shape = step.probe ? `${step.probe.width}x${step.probe.height} ${formatDuration(step.probe.duration)}` : 'not probed';
     const what =
       step.action === 'skip'
-        ? `skip    already ${step.previous!.status} ${step.previous!.at}${step.previous!.remote_id ? ` (${step.previous!.remote_id})` : ''}`
+        ? step.previous!.status === 'failed'
+          ? `skip    may have gone out ${step.previous!.at}: check ${step.platform}, then --force to upload again`
+          : `skip    already ${step.previous!.status} ${step.previous!.at}${step.previous!.remote_id ? ` (${step.previous!.remote_id})` : ''}`
         : `upload  ${shape}${step.item.thumbnail ? ' + thumbnail' : ''}`;
     lines.push(`  ${step.platform.padEnd(8)} ${step.item.name.padEnd(14)} ${step.file}`);
     lines.push(`  ${''.padEnd(8)} ${''.padEnd(14)} ${what}`);
@@ -406,6 +412,20 @@ function printManualSteps(print: (line: string) => void, steps: string[]): void 
 }
 
 /**
+ * Append one entry to the publish log (`<project>/review/publish.json`): read it fresh under the project's release
+ * lock, then write it atomically. `publish` and the autopilot may run at once (HS-189).
+ */
+export async function appendPublishEntry(logPath: string, entry: PublishEntry): Promise<PublishLog> {
+  return withReleaseLock(dirname(dirname(logPath)), async () => {
+    const log = await readPublishLog(logPath);
+    log.entries.push(entry);
+    const parsed = PublishLogSchema.parse(log);
+    await writeJsonAtomic(logPath, parsed);
+    return parsed;
+  });
+}
+
+/**
  * Upload the release package: validate, plan, check quota, then upload each
  * item that is not in the publish log with the same file hash. Every upload
  * is private or a draft. The log is written after each item.
@@ -416,7 +436,7 @@ export async function publishProject(options: PublishOptions): Promise<PublishSu
   const now = options.now ?? (() => new Date());
   const data = await loadUploadData(projectDir);
   const logPath = uploadPaths(projectDir).log;
-  const log = await readPublishLog(logPath);
+  let log = await readPublishLog(logPath);
   const plan = await buildPublishPlan(projectDir, data, log, options);
   for (const line of formatPlan(plan, data.main.title, Boolean(options.dryRun))) print(line);
 
@@ -449,22 +469,26 @@ export async function publishProject(options: PublishOptions): Promise<PublishSu
         ...(result.quotaUnits !== undefined ? { quota_units: result.quotaUnits } : {}),
         at: now().toISOString(),
       };
-      log.entries.push(entry);
+      log = await appendPublishEntry(logPath, entry);
       entries.push(entry);
-      await writeJsonAtomic(logPath, PublishLogSchema.parse(log));
       print(`✔ ${step.platform} ${step.item.name}: ${entry.status}${entry.url ? ` ${entry.url}` : ` (${entry.remote_id})`}`);
       for (const warning of result.warnings) print(`  ! ${warning}`);
       const related = relatedStep(step, entry, log);
       for (const manual of [...result.manualSteps, ...(related ? [related] : [])]) manualSteps.push(`${step.platform} ${step.item.name}: ${manual}`);
     } catch (error) {
       const message = redactSecrets(error instanceof Error ? error.message : String(error), secrets());
-      const entry: PublishEntry = { ...base, status: 'failed', warnings: [], error: message, at: now().toISOString() };
-      log.entries.push(entry);
+      const uncertain = Boolean((error as { uncertain?: boolean }).uncertain);
+      const entry: PublishEntry = { ...base, status: 'failed', warnings: [], error: message, ...(uncertain ? { uncertain } : {}), at: now().toISOString() };
+      log = await appendPublishEntry(logPath, entry);
       entries.push(entry);
-      await writeJsonAtomic(logPath, PublishLogSchema.parse(log));
       printManualSteps(print, manualSteps);
       if (error instanceof ConfigError) throw new ConfigError(message);
-      throw new Error(`${step.platform} ${step.item.name}: ${message} (logged in review/publish.json; uploads before it are kept)`);
+      const failure = new Error(
+        `${step.platform} ${step.item.name}: ${message} (logged in review/publish.json; uploads before it are kept` +
+          (uncertain ? `; it may have gone out: check ${step.platform} before publishing it again with --force)` : ')'),
+      );
+      // The autopilot reads the mark and asks the user instead of retrying (never twice).
+      throw uncertain ? markUncertain(failure) : failure;
     }
   }
   printManualSteps(print, manualSteps);

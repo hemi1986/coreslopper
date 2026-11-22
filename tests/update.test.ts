@@ -126,6 +126,38 @@ describe('workspace update', () => {
     expect(again.changes).toEqual([]);
   });
 
+  it('only adds missing files to the bench settings and cases, and keeps the README current', async () => {
+    const v1 = await runtimeFixture('9.9.0', {
+      'bench/README.md': 'v1\n',
+      'bench/bench.yaml': 'budget v1\n',
+      'bench/targets.yaml': 'targets v1\n',
+      'bench/cases/example.yaml': 'v1\n',
+      'bench/cases/leaves-upstream.yaml': 'v1\n',
+    });
+    const target = await workspaceFrom(v1);
+    // The model-bench skill edits the targets and the budget, and the user adds a case of their own.
+    await writeFile(join(target, 'bench/targets.yaml'), 'targets mine\n');
+    await put(target, 'bench/cases/my-scene.yaml', 'mine\n');
+
+    const v2 = await runtimeFixture('9.10.0', {
+      'bench/README.md': 'v2\n',
+      'bench/bench.yaml': 'budget v2\n',
+      'bench/targets.yaml': 'targets v2\n',
+      'bench/cases/example.yaml': 'v2\n',
+      'bench/cases/new-example.yaml': 'v2\n',
+    });
+    const result = await updateWorkspace({ targetDir: target, runtimeDir: v2, install: false });
+
+    expect(actions(result.changes)).toEqual({ 'bench/README.md': 'updated', 'bench/cases/new-example.yaml': 'added' });
+    expect(await read(target, 'bench/README.md')).toBe('v2\n');
+    expect(await read(target, 'bench/bench.yaml')).toBe('budget v1\n');
+    expect(await read(target, 'bench/targets.yaml')).toBe('targets mine\n');
+    expect(await read(target, 'bench/cases/example.yaml')).toBe('v1\n');
+    expect(await read(target, 'bench/cases/leaves-upstream.yaml')).toBe('v1\n');
+    expect(await read(target, 'bench/cases/my-scene.yaml')).toBe('mine\n');
+    expect(existsSync(join(target, 'bench/targets.yaml.coreslopper-new'))).toBe(false);
+  });
+
   it('writes nothing in a dry run', async () => {
     const v1 = await runtimeFixture('9.9.0', { 'skills/a.md': 'v1\n' });
     const target = await workspaceFrom(v1);

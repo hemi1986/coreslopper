@@ -166,11 +166,9 @@ function planEvent(event: CalendarEvent, context: AutopilotContext): AutopilotEv
   const due = action.kind === 'youtube' ? at - settings.youtube_ahead_hours * HOUR : at;
   const dueAt = new Date(due).toISOString();
   const withDue = { ...plan, dueAt };
-  // An approval holds for the day the user approved: a moved release asks again.
-  if (!approvalHolds(status, context.calendar)) return { ...withDue, state: 'unapproved' };
-  // Missing credentials show from the approval on; they need the user once the post is due.
-  if (context.ready && context.ready[platform] === false) return { ...withDue, state: 'blocked', block: 'credentials', needsUser: now.getTime() >= due };
+  const approved = approvalHolds(status, context.calendar);
 
+  // What was sent, or may have been, shows also without an approval: withdrawing stops only what has not gone out.
   const latest = entries.at(-1);
   if (latest?.status === 'running') {
     const stuck = now.getTime() - Date.parse(latest.at) > (context.stuckMinutes ?? 60) * 60_000;
@@ -178,12 +176,18 @@ function planEvent(event: CalendarEvent, context: AutopilotContext): AutopilotEv
   }
   if (latest && ['uploaded', 'scheduled', 'draft'].includes(latest.status)) {
     // A private YouTube upload waits for Studio unless the audited project scheduled it; a Premiere always waits for Studio; a draft waits for the app.
+    // A scheduled upload still goes public without the approval, unless the user changes it in Studio.
     const main = action.kind === 'youtube' && action.item === 'main';
-    const waitsForUser = latest.status === 'draft' || latest.status === 'uploaded' || (main && Boolean(context.premiere));
+    const waitsForUser = latest.status === 'draft' || latest.status === 'uploaded' || (main && Boolean(context.premiere)) || (!approved && latest.status === 'scheduled');
     return { ...withDue, state: 'pending', needsUser: waitsForUser };
   }
   if (latest?.status === 'posted') return { ...withDue, state: 'done' };
   if (latest?.status === 'failed' && latest.uncertain) return { ...withDue, state: 'stuck', needsUser: true };
+
+  // An approval holds for the day the user approved: a moved release asks again.
+  if (!approved) return { ...withDue, state: 'unapproved' };
+  // Missing credentials show from the approval on; they need the user once the post is due.
+  if (context.ready && context.ready[platform] === false) return { ...withDue, state: 'blocked', block: 'credentials', needsUser: now.getTime() >= due };
   if (latest?.status === 'failed' && latest.fatal) return { ...withDue, state: 'failed', needsUser: true };
   if (attempts >= settings.retries) return { ...withDue, state: 'failed', needsUser: true };
 

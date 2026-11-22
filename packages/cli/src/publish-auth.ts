@@ -1,4 +1,4 @@
-import { chmod, readFile, writeFile } from 'node:fs/promises';
+import { chmod, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { ConfigError, repoRoot, type PublishPlatform } from '@coreslopper/core';
@@ -17,6 +17,7 @@ import {
   youtubeAuthUrl,
   type FetchLike,
 } from '@coreslopper/providers';
+import { withFileLock } from './file-lock.js';
 import { upsertEnv } from './init.js';
 import { findWorkspaceRoot } from './workspace.js';
 
@@ -25,11 +26,24 @@ export function workspaceEnvPath(): string {
   return join(findWorkspaceRoot() ?? repoRoot(), '.env');
 }
 
-/** Write one value into `.env` (mode 0600) and into the running process. The value is never printed. */
+/**
+ * Write one value into `.env` (mode 0600) and into the running process. The value is never printed. The board
+ * container and the computer both write `.env` (a rotated single-use refresh token, `publish-auth`): each write
+ * re-reads the file under a lock and replaces it atomically, so no writer loses another's value.
+ */
 export async function saveEnvValue(key: string, value: string, envPath = workspaceEnvPath()): Promise<void> {
-  const content = existsSync(envPath) ? await readFile(envPath, 'utf8') : '# Local secrets. This file is gitignored.\n';
-  await writeFile(envPath, upsertEnv(content, key, value), { encoding: 'utf8', mode: 0o600 });
-  await chmod(envPath, 0o600).catch(() => undefined);
+  await withFileLock(`${envPath}.lock`, async () => {
+    const content = existsSync(envPath) ? await readFile(envPath, 'utf8') : '# Local secrets. This file is gitignored.\n';
+    const temporary = `${envPath}.tmp-${process.pid}-${Date.now()}`;
+    try {
+      await writeFile(temporary, upsertEnv(content, key, value), { encoding: 'utf8', mode: 0o600 });
+      await chmod(temporary, 0o600).catch(() => undefined);
+      await rename(temporary, envPath);
+    } catch (error) {
+      await rm(temporary, { force: true });
+      throw error;
+    }
+  });
   process.env[key] = value;
 }
 

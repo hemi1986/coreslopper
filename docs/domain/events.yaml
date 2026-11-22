@@ -489,7 +489,7 @@ aggregates:
       - A failed upload keeps the uploads before it, and the next run tries it again (the code does this, publish.ts:457-467)
       - The publish command never makes a video public – YouTube private or scheduled, TikTok an inbox draft; only the autopilot's direct TikTok mode posts (the code does this, packages/cli/src/index.ts:467-477; release-autopilot.ts:391)
       - A batch over the YouTube quota of the Pacific day stops before the first upload (the code does this, publish.ts:230-235,337-342), and every YouTube call the autopilot makes counts against it (decided 2026-11-22, HS-192; polling, description and comment calls are not counted – gap register)
-      - Every write takes the project's release lock (decided 2026-11-22, HS-189; written without a lock – gap register)
+      - Every write takes the project's release lock (decided 2026-11-22, HS-189; the code does this – appendPublishEntry re-reads the log under the lock)
   - id: AGG-AutopilotLog
     name: Autopilot log
     context: BC-Publish
@@ -501,13 +501,13 @@ aggregates:
       - An event's autopilot state is derived, never stored – from the release status, the log since the user's last retry, the settings, the readiness and the clock (the code does this, autopilot.ts:151-211)
       - A done mark and a take-over win over every other state; nothing else is claimed for a release whose approval does not hold for the calendar's day (the code does this, autopilot.ts:160-170; tests/publish-characterization.test.ts)
       - An event is claimed once – the running entry is appended under the release lock after planning again from fresh files (the code does this, release-autopilot.ts:258-273)
-      - Never twice – a send that may have gone out is stuck and waits for the user, on every platform; it is never tried again by itself (the code does this for X, LinkedIn and Instagram, packages/providers/src/publish/http.ts:79-83; decided 2026-11-22 for YouTube uploads and TikTok, HS-187 – gap register)
+      - Never twice – a send that may have gone out is stuck and waits for the user, on every platform; it is never tried again by itself (the code does this – X, LinkedIn and Instagram through markUncertain in packages/providers/src/publish/http.ts; a YouTube upload and a TikTok direct post after the last byte of the file, and publishProject keeps the mark in review/publish.json – HS-187, fixed 2026-11-22)
       - A plain failure is tried again after attempts × 10 minutes until retries failed attempts; a configuration or validation failure waits for the user at once (the code does this, autopilot.ts:186-188,205-209; release-autopilot.ts:362-368; tests/publish-characterization.test.ts)
       - A post more than late_hours past its calendar time with no attempt is missed, also a YouTube upload that was due a day earlier; only the user's Post now sends it (the code does this, autopilot.ts:192-196; tests/publish-characterization.test.ts)
       - A post that links to the main video waits until the main video is done with its live URL (the code does this, autopilot.ts:198-200)
       - A running attempt older than an hour is stuck (the code does this, autopilot.ts:175-178)
       - Try again and Post now are accepted only for an event of the calendar, in a state the board offers them for (decided 2026-11-22, HS-193; any id in any state – gap register)
-      - What may still go out or may be live is shown also when the approval no longer holds (decided 2026-11-22, HS-190; a running or stuck attempt shows as unapproved – gap register)
+      - What may still go out or may be live is shown also when the approval no longer holds (decided 2026-11-22, HS-190; the code does this – planEvent derives running, stuck, pending and done before the approval, and the board names a scheduled upload that still goes public)
   - id: AGG-AutopilotRound
     name: Autopilot round
     context: BC-Publish
@@ -530,7 +530,7 @@ aggregates:
       - A rotated refresh token is saved at once – X's is single-use (the code does this, x.ts:227-232)
       - A long-running watchdog reads .env again before every round, so a token renewed on the computer reaches the container (the code does this, packages/cli/src/production-watch.ts:129-152)
       - A platform is ready by one rule, the same for doctor, the board and the plan, and a token that can be refreshed counts as ready (decided 2026-11-22, HS-196; doctor and the plan differ, LinkedIn with a refresh token is blocked – gap register)
-      - Every write of .env is atomic and under a lock (decided 2026-11-22, HS-189; plain read and write, no lock – gap register)
+      - Every write of .env is atomic and under a lock (decided 2026-11-22, HS-189; the code does this – saveEnvValue, lock file .env.lock)
   - id: AGG-WorkspaceMarker
     name: Workspace marker
     context: BC-Workspace
@@ -572,7 +572,7 @@ aggregates:
       - Rubric criteria have unique ids and a weight of at least 1 (the code does this, core/src/bench.ts:45-49,126-128)
       - A case's id is its file name (the code does this, core/src/bench.ts:252-254)
       - Params in a case are portable; ComfyUI node ids belong in a target (the code does this for the tracked cases only, tests/bench.test.ts:115-129; ADR 0020)
-      - A case names its source project by slug, and its fixtures by paths inside that project – so it belongs to the workspace that holds the project (decided 2026-11-22, HS-226; the tracked cases ship upstream to every workspace – gap register)
+      - A case names its source project by slug, and its fixtures by paths inside that project – so it belongs to the workspace that holds the project (decided 2026-11-22, HS-226; the code does this – upstream tracks only the example-* cases, which need no fixtures)
   - id: AGG-BenchRun
     name: Bench run
     context: BC-Bench
@@ -2201,10 +2201,10 @@ commands:
     name: Refresh the board
     actor: ACT-User
     produces: [EVT-BoardRefreshed]
-    description: "The user refreshes the board by hand when they want to see the pipeline's progress (user, 2026-11-22, HS-244); as-is the page polls every 10 s while the tab is visible (app.js:19,82-86 – gap register)"
+    description: "The user refreshes the board by hand when they want to see the pipeline's progress (user, 2026-11-22, HS-244); the Refresh button in the navigation reloads it (app.js refresh)"
     rules:
-      - The board does not refresh by itself; the user refreshes it (user, 2026-11-22, HS-244; it polls every 10 s – gap register)
-      - A refresh never restarts a playing video and never discards what the user is typing (the code does this for the production view, production.js:301-315; decided 2026-11-22, HS-244)
+      - The board does not refresh by itself; the user refreshes it (user, 2026-11-22, HS-244; the code does this, app.js)
+      - A refresh never restarts a playing video and never discards what the user is typing – it keeps a view with a playing video or an edited field and reloads only the navigation (decided 2026-11-22, HS-244; the code does this, app.js busy)
   - id: CMD-OpenBoardFile
     name: Open a file on the board
     actor: ACT-User
@@ -2322,7 +2322,7 @@ read_models:
     fed_by: [EVT-StageStarted, EVT-StageCompleted, EVT-StageFailed, EVT-StageSkipped, EVT-StageReset]
     used_by: [ACT-User]
     fields: [Where, Command, Reason, Stage]
-    description: "Precedence: a running stage (wait), an open interactive stage (setup skill), open review rounds, an open autonomous stage (/video-next, resume when failed); all stages done without a release folder means reset qa-export, then /video-next; then the release view"
+    description: "Precedence: a running stage (wait), an open interactive stage (setup skill), open review rounds, an open autonomous stage (/video-next, resume when failed); all stages done without a release folder means reset qa-export, then /video-next – /video-next resets it itself, and the board says the release folder is missing (fixed 2026-11-22, G-5); then the release view"
   - id: RM-ProductionView
     name: Production view
     fed_by: [EVT-ProjectCreated, EVT-StageStarted, EVT-StageCompleted, EVT-StageFailed, EVT-StageSkipped, EVT-StageReset, EVT-SpendRecorded]
@@ -2613,7 +2613,7 @@ hotspots:
     question: "When every stage is done but no release exists, the board tells the user to run /video-next for qa-export, while status says done and /video-next stops. What is the next action?"
     refs: [RM-NextAction]
     status: resolved
-    resolution: "The release folder is an output of qa-export, so the next action is: reset qa-export, then /video-next. The board's current advice is a gap. (user, 2026-11-21)"
+    resolution: "The release folder is an output of qa-export, so the next action is: reset qa-export, then /video-next. The board's current advice is a gap. (user, 2026-11-21) Fixed 2026-11-22: /video-next resets qa-export when status prints no Release: line, and the board's next action names the missing release folder."
   - id: HS-14
     question: "The next action puts an open interactive stage before open review rounds; /video-next answers review rounds before it checks for an interactive stage. Which comes first?"
     refs: [RM-NextAction]
@@ -3428,7 +3428,7 @@ hotspots:
     question: "Upstream ships German jurisdiction notes (Impressum, § 5 DDG) in both languages, a de/en switch in five places, a German channel example, a Berlin ISRC example and time-zone comment, and tests pinned to Europe/Berlin and German. The upstream repository stays generic. Rule?"
     refs: [BC-Release]
     status: resolved
-    resolution: "English is the one built-in language and other languages are data; jurisdiction notes come from the channel config, not the code; examples are neutral; the tests do not assume one time zone or language. Gap, medium – the repository is the workflow others fork (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+    resolution: "English is the one built-in language and other languages are data; jurisdiction notes come from the channel config, not the code; examples are neutral; the tests do not assume one time zone or language. Gap, medium – the repository is the workflow others fork (recommendation, not reviewed by the user – delegated, 2026-11-22) Deferred by the user 2026-11-22: it affects only other users; the narrow cut (legal note from the channel config, neutral examples, tests) comes first, languages as data only with a third language."
   - id: HS-177
     question: "The conventions say a tool never replaces a user-owned file such as project.yaml; the approval writes release.release_date into it. Exception?"
     refs: [CMD-ApproveRelease]
@@ -3484,7 +3484,7 @@ hotspots:
     question: "Never twice holds for X, LinkedIn and Instagram, which mark a send that may have gone out as uncertain. The YouTube upload and TikTok never mark it, the publish command drops the flag when it rethrows, and TikTok's init and status calls are retried five times – a direct TikTok post could go out twice. Rule?"
     refs: [AGG-AutopilotLog]
     status: resolved
-    resolution: "Never twice on every platform: a send that may have gone out is stuck and waits for the user; the publish command keeps the flag. Gap, medium – the user wants every platform automated, TikTok's direct mode included (user, 2026-11-22) (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+    resolution: "Never twice on every platform: a send that may have gone out is stuck and waits for the user; the publish command keeps the flag. Gap, medium – the user wants every platform automated, TikTok's direct mode included (user, 2026-11-22) (recommendation, not reviewed by the user – delegated, 2026-11-22) Fixed 2026-11-22 (G-168): a retried TikTok init or status query cannot post twice, because a publish ID without its file never goes live; the risk is an error after the last chunk, which is now uncertain, as is a YouTube error after the last byte."
   - id: HS-188
     question: "TikTok's direct mode has two switches: autopilot.tiktok_direct in the release schedule, and TIKTOK_DIRECT_POST in .env, read as 1/true/yes for the scopes but only as '1' by the runner. docs/publishing.md says the env value affects publish, which never passes the mode. Rule?"
     refs: [CMD-PostCalendarEvent]

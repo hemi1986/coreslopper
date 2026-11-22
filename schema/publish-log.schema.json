@@ -75,6 +75,9 @@
           "error": {
             "type": "string"
           },
+          "uncertain": {
+            "type": "boolean"
+          },
           "quota_units": {
             "type": "integer",
             "minimum": 0,

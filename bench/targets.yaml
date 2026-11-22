@@ -23,7 +23,7 @@ targets:
       generateAudio: {}
 
   local-hq:
-    description: Local ComfyUI as used for Zukunft auf Kredit (17-step Qwen sigmas, LTX at 1.9 MP)
+    description: Local ComfyUI at final quality (17-step Qwen sigmas, LTX at 1.9 MP)
     provider: comfyui
     operations:
       generateImage:
@@ -81,7 +81,7 @@ targets:
       imageToVideo: { as: referenceToVideo }
 
   minimax-cloud:
-    description: Topview MiniMax H3 image-to-video at 768P (as in seite-b), billed at least 5 s
+    description: Topview MiniMax H3 image-to-video at 768P, billed at least 5 s
     provider: topview
     operations:
       imageToVideo:

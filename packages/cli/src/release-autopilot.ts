@@ -24,6 +24,7 @@ import {
   InstagramPublisher,
   LinkedInPublisher,
   XPublisher,
+  markUncertain,
   redactSecrets,
   YouTubePublisher,
   type SocialAdapter,
@@ -394,7 +395,10 @@ async function act(dir: string, item: AutopilotEventPlan, context: Context, deps
     });
     const entry = summary.entries.find((candidate) => candidate.platform === platform) ?? summary.plan.steps.find((step) => step.platform === platform)?.previous;
     if (!entry) throw new ValidationError(`publish planned no ${platform} upload for ${action.item}`);
-    if (entry.status === 'failed') throw new Error(entry.error ?? `the ${platform} upload failed`);
+    if (entry.status === 'failed') {
+      const failure = new Error(entry.error ?? `the ${platform} upload failed`);
+      throw entry.uncertain ? markUncertain(failure) : failure;
+    }
     if (platform === 'tiktok') {
       const directMode = settings.tiktok_direct || deps.env.TIKTOK_DIRECT_POST === '1';
       // A direct post goes live by itself, also one TikTok is still processing: never an inbox step for it.

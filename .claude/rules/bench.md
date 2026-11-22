@@ -54,10 +54,9 @@ Strip, Rubric, Bench Score, Rating, Bench Budget (`docs/glossary.md`).
 
 ## Typical pitfalls
 
-- The tracked cases are the maintainer's scenes and ship to every workspace. Elsewhere every fixture is missing
-  (G-193, medium).
-- `update` merges `bench.yaml`, `targets.yaml` and the cases like any runtime file. A case removed upstream is deleted
-  from the workspace (G-194, medium).
+- Never track a case from a real project upstream: only `example-*` cases without fixtures ship. `update` only adds
+  missing files to `bench.yaml`, `targets.yaml` and `cases/` (`USER_OWNED_PREFIXES` in `update.ts`), so a case
+  removed upstream stays in the workspace.
 - A rerun with the run id runs every item again, and an ok result can be replaced by an error (G-195).
   `--repeat`'s second render is cached across invocations (G-196).
 - Without `batch_cap_usd`, each generation falls back to 30 % of the remaining budget, although the whole run passed.

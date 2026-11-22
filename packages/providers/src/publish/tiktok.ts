@@ -1,7 +1,7 @@
 import { stat } from 'node:fs/promises';
 import { ConfigError } from '@coreslopper/core';
 import { delay, mimeForPath, type FetchLike } from '../http.js';
-import { fetchWithRetry, httpError, PublishError, readChunk, readJson, redactSecrets } from './http.js';
+import { fetchWithRetry, httpError, markUncertain, PublishError, readChunk, readJson, redactSecrets } from './http.js';
 import { RefreshingToken } from './oauth.js';
 import type { PublishAdapter, PublishItem, PublishLogger, PublishRequest, PublishResult } from './types.js';
 
@@ -319,8 +319,17 @@ export class TikTokPublisher implements PublishAdapter {
       },
       source_info: { source: 'FILE_UPLOAD', video_size: size, chunk_size: chunkSize, total_chunk_count: count },
     });
-    const publishId = await this.uploadTo(init, item.file, size);
-    const { status, postId } = await this.waitForPost(publishId);
+    // A direct post goes live once its last chunk arrived. Retried inits and status queries cannot post twice (a
+    // publish ID without its file never goes live), but an error after the last chunk may hide a live post.
+    const publishId = await this.uploadTo(init, item.file, size, true);
+    let posted: Awaited<ReturnType<TikTokPublisher['waitForPost']>>;
+    try {
+      posted = await this.waitForPost(publishId);
+    } catch (error) {
+      throw markUncertain(error);
+    }
+    if (posted.status === 'failed') throw new PublishError(`TikTok could not publish the post: ${posted.reason}.`);
+    const { status, postId } = posted;
     const profile = creator.username ? `https://www.tiktok.com/@${creator.username}` : undefined;
     const url = postId && creator.username ? `${profile}/video/${postId}` : profile;
     return {
@@ -346,8 +355,8 @@ export class TikTokPublisher implements PublishAdapter {
     };
   }
 
-  /** Send the file in the chunks the init announced; returns the publish ID. */
-  private async uploadTo(init: Record<string, unknown>, file: string, size: number): Promise<string> {
+  /** Send the file in the chunks the init announced; returns the publish ID. `live`: an error on the last chunk is uncertain. */
+  private async uploadTo(init: Record<string, unknown>, file: string, size: number, live = false): Promise<string> {
     const publishId = typeof init.publish_id === 'string' ? init.publish_id : undefined;
     const uploadUrl = typeof init.upload_url === 'string' ? init.upload_url : undefined;
     if (!publishId || !uploadUrl) throw new PublishError('TikTok returned no publish_id or upload_url.');
@@ -356,24 +365,38 @@ export class TikTokPublisher implements PublishAdapter {
       const start = index * chunkSize;
       const end = index === count - 1 ? size : start + chunkSize;
       const chunk = await readChunk(file, start, end - start);
-      const response = await fetchWithRetry(
-        this.fetchImpl,
-        uploadUrl,
-        {
-          method: 'PUT',
-          headers: {
-            'content-type': mimeForPath(file),
-            'content-length': String(chunk.length),
-            'content-range': `bytes ${start}-${end - 1}/${size}`,
-          },
-          body: chunk,
-        },
-        { secrets: [...this.secrets, uploadUrl], sleep: this.sleep, timeoutMs: 600_000 },
-      );
-      if (!response.ok) throw httpError(`TikTok chunk ${index + 1}/${count}`, response.status, await readJson(response), [...this.secrets, uploadUrl]);
-      await response.body?.cancel().catch(() => undefined);
+      const last = index === count - 1;
+      try {
+        await this.sendChunk(uploadUrl, file, chunk, { start, end, size, index, count });
+      } catch (error) {
+        throw live && last ? markUncertain(error) : error;
+      }
     }
     return publishId;
+  }
+
+  private async sendChunk(
+    uploadUrl: string,
+    file: string,
+    chunk: Buffer<ArrayBuffer>,
+    { start, end, size, index, count }: { start: number; end: number; size: number; index: number; count: number },
+  ): Promise<void> {
+    const response = await fetchWithRetry(
+      this.fetchImpl,
+      uploadUrl,
+      {
+        method: 'PUT',
+        headers: {
+          'content-type': mimeForPath(file),
+          'content-length': String(chunk.length),
+          'content-range': `bytes ${start}-${end - 1}/${size}`,
+        },
+        body: chunk,
+      },
+      { secrets: [...this.secrets, uploadUrl], sleep: this.sleep, timeoutMs: 600_000 },
+    );
+    if (!response.ok) throw httpError(`TikTok chunk ${index + 1}/${count}`, response.status, await readJson(response), [...this.secrets, uploadUrl]);
+    await response.body?.cancel().catch(() => undefined);
   }
 
   /** POST to the Content Posting API; refresh the token once on access_token_invalid. */
@@ -440,8 +463,8 @@ export class TikTokPublisher implements PublishAdapter {
       await this.sleep(this.pollIntervalMs);
     }
   }
-  /** Poll a Direct Post until it is live; returns the post ID once TikTok publishes one. */
-  private async waitForPost(publishId: string): Promise<{ status: 'uploaded' | 'processing'; postId?: string }> {
+  /** Poll a Direct Post until it is live; returns the post ID once TikTok publishes one, or TikTok's reason it failed. */
+  private async waitForPost(publishId: string): Promise<{ status: 'uploaded' | 'processing'; postId?: string } | { status: 'failed'; reason: string }> {
     const deadline = this.now() + this.pollTimeoutMs;
     while (true) {
       const { data, raw } = await this.apiRaw('post/publish/status/fetch/', { publish_id: publishId });
@@ -452,7 +475,7 @@ export class TikTokPublisher implements PublishAdapter {
         const postId = /"publica?ly_available_post_id"\s*:\s*\[\s*"?(\d+)/.exec(raw)?.[1];
         return { status: 'uploaded', ...(postId ? { postId } : {}) };
       }
-      if (status === 'FAILED') throw new PublishError(`TikTok could not publish the post: ${String(data.fail_reason ?? 'unknown reason')}.`);
+      if (status === 'FAILED') return { status: 'failed', reason: String(data.fail_reason ?? 'unknown reason') };
       if (this.now() >= deadline) return { status: 'processing' };
       await this.sleep(this.pollIntervalMs);
     }

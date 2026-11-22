@@ -69,7 +69,7 @@ describe('production next action', () => {
   it('goes to the release once every stage is done, and waits after the approval', () => {
     const all = done(state(), ...stageViews(state()).map((stage) => stage.id));
     expect(productionPhase(stageViews(all))).toBe('done');
-    expect(projectNextAction(facts(all))).toMatchObject({ command: '/video-next neon', stage: 'qa-export' });
+    expect(projectNextAction(facts(all))).toMatchObject({ command: '/video-next neon', reason: 'release-missing', stage: 'qa-export' });
     expect(projectNextAction(facts(all, { hasRelease: true }))).toEqual({ where: 'board', reason: 'release' });
     expect(projectNextAction(facts(all, { hasRelease: true, approved: true }))).toEqual({ where: 'none', reason: 'released' });
   });

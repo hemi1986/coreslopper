@@ -21,6 +21,7 @@ import {
   type PublishItem,
 } from '../packages/providers/src/index.ts';
 import {
+  appendPublishEntry,
   buildPublishPlan,
   publishProject,
   quotaDay,
@@ -30,7 +31,7 @@ import {
 import { renderUploadText, writeUploadText } from '../packages/cli/src/upload-text.ts';
 import { parseUploadText, uploadTextProblems } from '../packages/cli/src/release-files.ts';
 import { checkUploadData } from '../packages/cli/src/qa.ts';
-import { publishAuth } from '../packages/cli/src/publish-auth.ts';
+import { publishAuth, saveEnvValue } from '../packages/cli/src/publish-auth.ts';
 import { publishChecks } from '../packages/cli/src/doctor.ts';
 import { validateChangedFile } from '../packages/cli/src/validate-file.ts';
 
@@ -315,6 +316,52 @@ describe('publish run and idempotency', () => {
   });
 });
 
+describe('an upload that may have gone out', () => {
+  it('keeps the uncertain mark, never uploads it again by itself, and uploads again with --force', async () => {
+    const dir = await fixture();
+    const now = () => new Date('2026-11-16T12:00:00Z');
+    const lost = Object.assign(new Error('YouTube upload failed: fetch failed'), { uncertain: true });
+    const youtube: PublishAdapter = { platform: 'youtube', mock: false, publish: () => Promise.reject(lost) };
+    const error = await publishProject({ projectDir: dir, only: 'main', platform: 'youtube', probe, adapters: { youtube, tiktok: forbidden.tiktok }, now, log: quiet })
+      .then((): Error & { uncertain?: boolean } => new Error('no error'), (caught: unknown) => caught as Error & { uncertain?: boolean });
+    expect(error.uncertain).toBe(true);
+    expect(error.message).toMatch(/may have gone out: check youtube/);
+    expect((await readLog(dir)).entries[0]).toMatchObject({ platform: 'youtube', item: 'main', status: 'failed', uncertain: true });
+
+    const lines: string[] = [];
+    const next = await publishProject({ projectDir: dir, only: 'main', platform: 'youtube', probe, adapters: forbidden, now, log: (line) => void lines.push(line) });
+    expect(next.plan.steps.map((step) => step.action)).toEqual(['skip']);
+    expect(lines.join('\n')).toMatch(/may have gone out .*--force/);
+
+    const mock = new MockPublisher('youtube');
+    Object.defineProperty(mock, 'mock', { value: false });
+    const forced = await publishProject({ projectDir: dir, only: 'main', platform: 'youtube', force: true, probe, adapters: { youtube: mock, tiktok: forbidden.tiktok }, now, log: quiet });
+    expect(forced.entries.map((entry) => entry.status)).toEqual(['uploaded']);
+  });
+});
+
+describe('writers at the same time', () => {
+  it('keeps every entry when publish and the autopilot append to the publish log at once', async () => {
+    const dir = await fixture();
+    const logPath = join(dir, 'review', 'publish.json');
+    const entry = (item: string) => ({ platform: 'youtube' as const, item, file: 'renders/16x9.mp4', file_hash: 'a'.repeat(64), status: 'uploaded' as const, mock: false, warnings: [], at: '2026-11-16T12:00:00Z' });
+    await Promise.all(['main', 'N1-intro', 'N2-chorus', 'N3'].map((item) => appendPublishEntry(logPath, entry(item))));
+    expect((await readLog(dir)).entries.map((e) => e.item).sort()).toEqual(['N1-intro', 'N2-chorus', 'N3', 'main']);
+  });
+
+  it('keeps every value when two writers save into .env at once', async () => {
+    const dir = await fixture();
+    const envPath = join(dir, '.env');
+    await writeFile(envPath, 'FAL_KEY=kept\n');
+    await Promise.all([saveEnvValue('X_REFRESH_TOKEN', 'rotated', envPath), saveEnvValue('TIKTOK_REFRESH_TOKEN', 'new', envPath)]);
+    const content = await readFile(envPath, 'utf8');
+    expect(content).toContain('FAL_KEY=kept');
+    expect(content).toContain('X_REFRESH_TOKEN=rotated');
+    expect(content).toContain('TIKTOK_REFRESH_TOKEN=new');
+    expect(existsSync(`${envPath}.lock`)).toBe(false);
+  });
+});
+
 describe('quota', () => {
   const entry = (at: string, units = 1650) => ({
     platform: 'youtube' as const,
@@ -469,6 +516,26 @@ describe('YouTube adapter', () => {
     expect(error.message).not.toContain('ya29.leaky-token');
     expect(error.message).not.toContain('refresh-token-value');
     expect(() => new YouTubePublisher({ clientId: 'a', clientSecret: 'b', refreshToken: undefined })).toThrow(/publish-auth youtube/);
+  });
+
+  it('marks an error after the last byte as uncertain, and an error before it as certain', async () => {
+    const video = await bytesFile(10);
+    const token = (url: string) => (url.startsWith('https://oauth2') ? json({ access_token: 'ya29.t', expires_in: 3600 }) : undefined);
+    // Every byte was sent, then the answers are lost: the video may exist.
+    const lost: FetchLike = async (url) =>
+      token(url) ?? (url.includes('uploadType=resumable') ? new Response(null, { status: 200, headers: { location: 'https://upload.example/s' } }) : new Response('busy', { status: 503 }));
+    const after = await new YouTubePublisher({ ...credentials, fetchImpl: lost, sleep: noSleep })
+      .publish({ item: item(video) })
+      .then((): Error & { uncertain?: boolean } => new Error('no error'), (caught: unknown) => caught as Error & { uncertain?: boolean });
+    expect(after.uncertain).toBe(true);
+
+    // The session never opened: nothing was uploaded.
+    const refused: FetchLike = async (url) => token(url) ?? json({ error: { message: 'bad request' } }, 400);
+    const before = await new YouTubePublisher({ ...credentials, fetchImpl: refused, sleep: noSleep })
+      .publish({ item: item(video) })
+      .then((): Error & { uncertain?: boolean } => new Error('no error'), (caught: unknown) => caught as Error & { uncertain?: boolean });
+    expect(before.message).toContain('HTTP 400');
+    expect(before.uncertain).toBeFalsy();
   });
 
   it('validates an OAuth client without a user', async () => {

@@ -1,7 +1,7 @@
 import { stat } from 'node:fs/promises';
 import { ConfigError } from '@coreslopper/core';
 import { delay, mimeForPath, type FetchLike } from '../http.js';
-import { fetchWithRetry, httpError, PublishError, readChunk, readJson, redactSecrets } from './http.js';
+import { fetchWithRetry, httpError, markUncertain, PublishError, readChunk, readJson, redactSecrets } from './http.js';
 import { RefreshingToken } from './oauth.js';
 import type { PublishAdapter, PublishLogger, PublishRequest, PublishResult } from './types.js';
 
@@ -233,7 +233,7 @@ export class YouTubePublisher implements PublishAdapter {
     const session = await this.startSession(metadata, size, mimeForPath(item.file));
     const video = await this.uploadChunks(session, item.file, size);
     const id = typeof video.id === 'string' ? video.id : undefined;
-    if (!id) throw new PublishError(`YouTube accepted the upload of ${item.name} but returned no video ID.`);
+    if (!id) throw markUncertain(new PublishError(`YouTube accepted the upload of ${item.name} but returned no video ID; check YouTube Studio.`));
 
     const warnings: string[] = [];
     let quotaUnits: number = YOUTUBE_QUOTA.insert;
@@ -384,17 +384,31 @@ export class YouTubePublisher implements PublishAdapter {
     return location;
   }
 
-  /** Upload in chunks; after a network error or 5xx, ask the session how far it got and resume there. */
+  /**
+   * Upload in chunks; after a network error or 5xx, ask the session how far it got and resume there. Once the last
+   * byte was sent, the video may exist even when no answer arrives, so a later error is uncertain (never twice).
+   */
   private async uploadChunks(session: string, file: string, size: number): Promise<Record<string, unknown>> {
+    const sent = { last: false };
+    try {
+      return await this.sendChunks(session, file, size, sent);
+    } catch (error) {
+      throw sent.last ? markUncertain(error) : error;
+    }
+  }
+
+  private async sendChunks(session: string, file: string, size: number, sent: { last: boolean }): Promise<Record<string, unknown>> {
     let offset = 0;
     let failures = 0;
     while (true) {
       let response: Response;
       try {
         if (offset >= size) {
+          sent.last = true;
           response = await this.put(session, { 'content-range': `bytes */${size}` });
         } else {
           const chunk = await readChunk(file, offset, Math.min(this.chunkBytes, size - offset));
+          if (offset + chunk.length >= size) sent.last = true;
           response = await this.put(
             session,
             { 'content-length': String(chunk.length), 'content-range': `bytes ${offset}-${offset + chunk.length - 1}/${size}` },

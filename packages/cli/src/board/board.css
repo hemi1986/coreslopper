@@ -195,3 +195,5 @@ ol.sections { margin: 4px 0 0 20px; padding: 0; font-size: 13px; }
 .state-checks { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 6px 0; font-size: 12px; }
 .state-check { display: inline-flex; align-items: center; gap: 3px; cursor: pointer; }
 .back-link, .ref-body a, .char-pick a { color: var(--accent); }
+aside .refresh { display: block; margin: 0 4px 10px; }
+aside .refresh-kept { margin: -4px 6px 10px; font-size: 12px; color: var(--muted); }

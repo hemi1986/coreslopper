@@ -179,7 +179,7 @@ npx coreslopper@latest update
 
 Merge each `.coreslopper-new` file into the original and delete it. `--force` overwrites changed files instead.
 
-`projects/` and `library/` belong to you: `update` adds new upstream files there but never overwrites or deletes anything. `.env`, `.mcp.json` (if you added one), and `GETTING_STARTED.md` are never touched. `package-lock.json` always follows upstream. Afterwards `update` runs `npm install` and `uv sync`; pass `--no-install` to skip them.
+`projects/`, `library/`, and the model bench's `bench/bench.yaml`, `bench/targets.yaml` and `bench/cases/` belong to you: `update` adds new upstream files there but never overwrites or deletes anything. `.env`, `.mcp.json` (if you added one), and `GETTING_STARTED.md` are never touched. `package-lock.json` always follows upstream. Afterwards `update` runs `npm install` and `uv sync`; pass `--no-install` to skip them.
 
 | Flag | Effect |
 |---|---|

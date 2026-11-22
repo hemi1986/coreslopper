@@ -433,7 +433,7 @@ Boundaries:
 - The production scan in the same round is BC-Pipeline's; the round only calls it.
 - Outside: the platform APIs, fal.ai storage for Instagram's files, the microsite's directory and command, the
   operating system's scheduler.
-- The publish log and `.env` take no lock (HS-189); never twice is missing for YouTube uploads and TikTok (HS-187);
+- The publish log takes the release lock and `.env` its own lock for every write (HS-189);
   the board container plans in UTC without a named time zone (HS-194).
 
 ### BC-Workspace – Workspace
@@ -480,8 +480,8 @@ Boundaries:
   manifest and cache key extras (ADR 0041). It shares the workspace's generation cache (HS-234).
 - Reads the workspace's projects only through `bench import` (HS-225).
 - The art director scores bench results by the rubric; a bench score is not a verdict and files nothing (HS-224).
-- The tracked cases cite the maintainer's projects and ship to every workspace (HS-226); `update` merges `bench/`
-  like any runtime file (HS-227).
+- Upstream ships two generic example cases without fixtures (HS-226); `update` only adds missing files to
+  `bench.yaml`, `targets.yaml` and `cases/` (HS-227).
 
 ### BC-Board – Board
 Purpose (as recovered, decided by recommendation HS-242): the workspace's local page that hosts the views of the
@@ -504,7 +504,7 @@ Boundaries:
 - Two sets of projects: the production, review and file routes see every project; the release routes and `/media`
   only those with a release folder or a calendar (`boardProjectDirs`, also read by the autopilot).
 - Only the board's own page writes (the write guard); reads answer any Host today (HS-247).
-- The user refreshes by hand (HS-244); the page polls every 10 s today.
+- The user refreshes by hand (HS-244); the page does not poll.
 - Routes are inline for production, review, release and autopilot, delegated for the wizard and the library
   (HS-251).
 

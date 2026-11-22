@@ -12,6 +12,6 @@ sets:
   core:
     description: Every case; the full comparison of a new model or server
   portrait:
-    description: 9:16 episode shots (seite-b robot scenes) for reference-to-video and image-to-video in portrait
+    description: 9:16 shots for reference-to-video and image-to-video in portrait (add your own cases)
   smoke:
-    description: Four quick cases (still, edit, i2v, lip-sync) to check that a target works at all
+    description: Quick cases to check that a target works at all

@@ -52,7 +52,7 @@ On a character's page, **Use in** copies it into a music video or series canon: 
 
 ## Production
 
-The start page groups the projects: **your turn** (a command to run in Claude Code, or a release to approve), **running**, the **series**, and the projects whose release is approved. A card shows the stages as a strip, the current stage, the budget, the generation queue, failed art-director reviews, renders in progress, and the next step with a copy button. The page refreshes itself every ten seconds while it is open.
+The start page groups the projects: **your turn** (a command to run in Claude Code, or a release to approve), **running**, the **series**, and the projects whose release is approved. A card shows the stages as a strip, the current stage, the budget, the generation queue, failed art-director reviews, renders in progress, and the next step with a copy button. The page does not refresh itself: **Refresh** at the top of the navigation reloads the navigation and the current view. It keeps the view while a video plays or a field holds unsaved input, so it never restarts a video or discards what you typed.
 
 A project page lists every stage with its attempts, times, and errors, the budget, the written documents (brief, treatment, lyrics or script, timing report, storyboard, QA report), the renders with a player, the contact sheet, the queue items, and the reviewed images, failed ones first. A series page shows its canon with the gaps that keep episodes from starting, the series budget, and its planned and created episodes.
 

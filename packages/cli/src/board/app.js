@@ -1,25 +1,25 @@
-// The board's shell: navigation, routes, and the refresh of the production pages.
+// The board's shell: navigation, routes, and the user's refresh.
 //   #/               production overview      #/calendar               release calendar
 //   #/p/<slug>       a project's production   #/p/<slug>/release[/<platform>[/<event>]]
 //   #/p/<slug>/review[/<render>]             the review player
 //   #/s/<slug>       a series                #/new[/video|series|episode[/<slug>]]  the wizard
 //   #/characters[/<id>]                     the character library
 import { addStrings, api, el, go, showError, t } from './lib.js';
-import { currentProductionKey, forgetProduction, showProduction } from './production.js';
+import { showProduction } from './production.js';
 import { onReleaseChange, showCalendar, showRelease } from './release.js';
 import { showReview } from './review.js';
 import { showWizard } from './wizard.js';
 import { showCharacters } from './characters.js';
 
 addStrings({
-  de: { board: 'Board', navProduction: 'Produktion', navCalendar: 'Release-Kalender', navCharacters: 'Figuren', navNew: '+ Neu' },
-  en: { board: 'Board', navProduction: 'Production', navCalendar: 'Release calendar', navCharacters: 'Characters', navNew: '+ New' },
+  de: { board: 'Board', navProduction: 'Produktion', navCalendar: 'Release-Kalender', navCharacters: 'Figuren', navNew: '+ Neu', refresh: 'Aktualisieren', refreshKept: 'Ansicht behalten: ein Video läuft oder eine Eingabe ist nicht gespeichert.' },
+  en: { board: 'Board', navProduction: 'Production', navCalendar: 'Release calendar', navCharacters: 'Characters', navNew: '+ New', refresh: 'Refresh', refreshKept: 'View kept: a video is playing or an input is not saved.' },
 });
 
-const REFRESH_MS = 10000;
 let active = 'overview';
 let overview = { projects: [], series: [] };
 let releases = {};
+let kept = false;
 
 function navButton(text, sub, selected, hash, dot) {
   return el('button', { class: 'nav-item' + (selected ? ' active' : ''), onclick: function () { go(hash); } }, [
@@ -31,6 +31,8 @@ function renderNav() {
   document.getElementById('board-title').textContent = t('board');
   const nav = document.getElementById('nav');
   nav.innerHTML = '';
+  nav.appendChild(el('button', { class: 'small refresh', text: '↻ ' + t('refresh'), onclick: refresh }));
+  if (kept) nav.appendChild(el('p', { class: 'sub refresh-kept', text: t('refreshKept') }));
   nav.appendChild(navButton(t('navProduction'), null, active === 'overview', '#/'));
   nav.appendChild(navButton(t('navCalendar'), null, active === 'calendar', '#/calendar'));
   nav.appendChild(navButton(t('navCharacters'), null, active === 'characters', '#/characters'));
@@ -58,13 +60,14 @@ function loadNav() {
 }
 
 function route() {
+  kept = false;
   const hash = decodeURIComponent(location.hash || '#/');
   let match;
-  if ((match = /^#\/new(?:\/(video|series|episode)(?:\/([a-z0-9-]+))?)?\/?$/.exec(hash))) { active = 'new'; forgetProduction(); showWizard(match[1], match[2]); }
-  else if (hash === '#/calendar') { active = 'calendar'; forgetProduction(); showCalendar(); }
-  else if ((match = /^#\/characters(?:\/([a-z0-9][a-z0-9_-]*))?\/?$/.exec(hash))) { active = 'characters'; forgetProduction(); showCharacters(match[1]); }
-  else if ((match = /^#\/p\/([a-z0-9-]+)\/release(?:\/([a-z]+))?(?:\/(.+))?$/.exec(hash))) { active = 'release:' + match[1]; forgetProduction(); showRelease(match[1], match[2], match[3]); }
-  else if ((match = /^#\/p\/([a-z0-9-]+)\/review(?:\/(.+))?$/.exec(hash))) { active = 'review:' + match[1]; forgetProduction(); showReview(match[1], match[2]); }
+  if ((match = /^#\/new(?:\/(video|series|episode)(?:\/([a-z0-9-]+))?)?\/?$/.exec(hash))) { active = 'new'; showWizard(match[1], match[2]); }
+  else if (hash === '#/calendar') { active = 'calendar'; showCalendar(); }
+  else if ((match = /^#\/characters(?:\/([a-z0-9][a-z0-9_-]*))?\/?$/.exec(hash))) { active = 'characters'; showCharacters(match[1]); }
+  else if ((match = /^#\/p\/([a-z0-9-]+)\/release(?:\/([a-z]+))?(?:\/(.+))?$/.exec(hash))) { active = 'release:' + match[1]; showRelease(match[1], match[2], match[3]); }
+  else if ((match = /^#\/p\/([a-z0-9-]+)\/review(?:\/(.+))?$/.exec(hash))) { active = 'review:' + match[1]; showReview(match[1], match[2]); }
   else if ((match = /^#\/p\/([a-z0-9-]+)\/([a-z]+)$/.exec(hash))) { go('#/p/' + match[1] + '/release/' + match[2]); return; } // the release board's old links
   else if ((match = /^#\/p\/([a-z0-9-]+)\/?$/.exec(hash))) { active = 'project:' + match[1]; showProduction(active); }
   else if ((match = /^#\/s\/([a-z0-9-]+)\/?$/.exec(hash))) { active = 'series:' + match[1]; showProduction(active); }
@@ -78,11 +81,20 @@ api('/api/channel').then(function (channel) {
   if (channel.motto) { document.getElementById('motto').textContent = channel.motto; document.body.classList.add('has-motto'); }
 }).catch(function () {});
 
-// The pipeline runs elsewhere (Claude Code, the queue, renders): poll while the page is visible.
-setInterval(function () {
-  if (document.visibilityState !== 'visible') return;
-  loadNav();
-  if (currentProductionKey() === active) showProduction(active, true);
-}, REFRESH_MS);
+// The pipeline runs elsewhere (Claude Code, the queue, renders), and the page does not poll (ADR 0049): the user
+// refreshes. A refresh reloads the navigation and the current view, but keeps a view with a playing video or an
+// edited field, so it never restarts the video or discards what the user typed.
+const main = document.getElementById('main');
+main.addEventListener('input', function (event) { if (event.target && event.target.setAttribute) event.target.setAttribute('data-edited', ''); });
+
+function busy() {
+  const playing = Array.prototype.some.call(main.querySelectorAll('video'), function (video) { return !video.paused && !video.ended; });
+  return playing || main.querySelector('[data-edited]') !== null;
+}
+
+function refresh() {
+  if (busy()) { kept = true; loadNav(); return; }
+  loadNav().then(route);
+}
 
 loadNav().then(route);

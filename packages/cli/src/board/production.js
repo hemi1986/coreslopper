@@ -18,7 +18,7 @@ addStrings({
       retry: function (s) { return s + ' ist fehlgeschlagen. Erneut starten:'; },
       review: 'Review-Runde an den Agenten gesendet. Abarbeiten lassen:',
       running: function (s) { return s + ' läuft gerade. Nichts zu tun.'; },
-      release: 'Fertig. Weiter im Release-Tab.', released: 'Release freigegeben: der Autopilot postet.',
+      release: 'Fertig. Weiter im Release-Tab.', 'release-missing': 'Alle Stages fertig, aber der Release-Ordner fehlt. qa-export neu bauen lassen:', released: 'Release freigegeben: der Autopilot postet.',
       canon: 'Canon fertigstellen:', episode: 'Nächste geplante Episode anlegen:', 'series-done': 'Alle geplanten Episoden sind angelegt.'
     },
     drafts: function (n) { return n + ' Notiz(en) noch nicht an den Agenten gesendet'; }, wizard: 'oder im Assistenten',
@@ -52,7 +52,7 @@ addStrings({
       retry: function (s) { return s + ' failed. Run it again:'; },
       review: 'A review round is waiting for the agent. Let it work through it:',
       running: function (s) { return s + ' is running. Nothing to do.'; },
-      release: 'Done. Continue in the release tab.', released: 'Release approved: the autopilot posts.',
+      release: 'Done. Continue in the release tab.', 'release-missing': 'Every stage is done, but the release folder is missing. Let qa-export build it again:', released: 'Release approved: the autopilot posts.',
       canon: 'Finish the canon:', episode: 'Create the next planned episode:', 'series-done': 'Every planned episode exists.'
     },
     drafts: function (n) { return n + ' note(s) not sent to the agent yet'; }, wizard: 'or in the wizard',
@@ -73,7 +73,6 @@ addStrings({
   }
 });
 
-const view = { key: null, json: null };
 let activity = { events: [], stalled: [] };
 const RENDER_STALE_MIN = 15;
 
@@ -298,28 +297,17 @@ function renderSeries(s) {
   }))]));
 }
 
-/** A playing video keeps its page: a refresh would restart it. */
-function playing() {
-  return Array.prototype.some.call(document.querySelectorAll('#main video'), function (video) { return !video.paused; });
-}
-
-/** Show (or refresh) a production page: `overview`, `project:<slug>`, or `series:<slug>`. Re-renders only when the data changed. */
-export function showProduction(key, refresh) {
+/** Show a production page: `overview`, `project:<slug>`, or `series:<slug>`. */
+export function showProduction(key) {
   setLang(null);
   const parts = key.split(':');
   const path = parts[0] === 'overview' ? '/api/production' : '/api/production/' + (parts[0] === 'series' ? 'series/' : 'projects/') + encodeURIComponent(parts[1]);
   return Promise.all([api(path), api('/api/activity').catch(function () { return { events: [], stalled: [] }; })]).then(function (both) {
     const data = both[0];
     activity = both[1];
-    const json = JSON.stringify(both);
-    if (refresh && (view.key !== key || view.json === json || playing())) return data;
-    view.key = key; view.json = json;
     if (parts[0] === 'overview') renderOverview(data);
     else if (parts[0] === 'series') renderSeries(data);
     else renderProject(data);
     return data;
-  }).catch(function (error) { if (!refresh) showError(error); });
+  }).catch(showError);
 }
-
-export function currentProductionKey() { return view.key; }
-export function forgetProduction() { view.key = null; view.json = null; }
