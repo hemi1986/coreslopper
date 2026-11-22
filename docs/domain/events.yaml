@@ -3428,7 +3428,7 @@ hotspots:
     question: "Upstream ships German jurisdiction notes (Impressum, § 5 DDG) in both languages, a de/en switch in five places, a German channel example, a Berlin ISRC example and time-zone comment, and tests pinned to Europe/Berlin and German. The upstream repository stays generic. Rule?"
     refs: [BC-Release]
     status: resolved
-    resolution: "English is the one built-in language and other languages are data; jurisdiction notes come from the channel config, not the code; examples are neutral; the tests do not assume one time zone or language. Gap, medium – the repository is the workflow others fork (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+    resolution: "English is the one built-in language and other languages are data; jurisdiction notes come from the channel config, not the code; examples are neutral; the tests do not assume one time zone or language. Gap, medium – the repository is the workflow others fork (recommendation, not reviewed by the user – delegated, 2026-11-22) Deferred by the user 2026-11-22: it affects only other users; the narrow cut (legal note from the channel config, neutral examples, tests) comes first, languages as data only with a third language."
   - id: HS-177
     question: "The conventions say a tool never replaces a user-owned file such as project.yaml; the approval writes release.release_date into it. Exception?"
     refs: [CMD-ApproveRelease]
