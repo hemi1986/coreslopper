@@ -3,7 +3,7 @@
  * Claude Code PostToolUse hook.
  *
  * Reads the hook payload from stdin, finds the edited file, and validates
- * project and series canon artifacts (below `projects/`), library characters (`library/characters/<id>/character.yaml`), and `config/channel.yaml` with the same CLI the user runs. Exit code 2 blocks the
+ * project and series canon artifacts (below `projects/`), library characters (`library/characters/<id>/character.yaml`), library sounds (`library/sounds/<id>/sound.yaml`), and `config/channel.yaml` with the same CLI the user runs. Exit code 2 blocks the
  * tool call and shows stderr to the agent.
  */
 import { execFileSync } from 'node:child_process';

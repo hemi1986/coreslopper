@@ -72,7 +72,13 @@ export function isLibrarySoundFile(file: string): boolean {
 export async function validateLibrarySoundEntry(file: string): Promise<LibrarySound> {
   const path = resolve(file);
   const folder = basename(dirname(path));
-  const sound = await readYamlFile(path, LibrarySoundSchema);
+  let sound: LibrarySound;
+  try {
+    sound = await readYamlFile(path, LibrarySoundSchema);
+  } catch (error) {
+    if (!(error instanceof ValidationError)) throw error;
+    throw new SoundRefused([error.message, ...error.details].join('; '), 'invalid', undefined, folder);
+  }
   if (sound.id !== folder) throw new SoundRefused(`sound.yaml says id "${sound.id}", but the id must be the folder name "${folder}"`, 'invalid', undefined, folder);
   if (!existsSync(join(dirname(path), LIBRARY_SOUND_FILE))) throw new SoundRefused(`library sound ${folder}: ${LIBRARY_SOUND_FILE} does not exist next to its sound.yaml`, 'invalid', undefined, folder);
   return sound;
