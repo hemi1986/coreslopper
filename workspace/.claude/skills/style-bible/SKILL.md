@@ -1,6 +1,6 @@
 ---
 name: style-bible
-description: Use when defining or revising a project's palette, typography, look references, motion rules, and its sets with plates and prop references, or when the art director reports inconsistent stills or set geometry.
+description: Use when defining or revising a project's palette, typography, look references, motion rules, and its sets with plates and prop references (a meme's included), or when the art director reports inconsistent stills or set geometry.
 license: MIT
 ---
 
@@ -44,7 +44,13 @@ A **plate** is an empty frame of a set from one fixed camera angle; a **prop ref
 3. List the recurring objects as `props`: `id`, `name`, a `description` concrete enough to draw it the same way twice (shape, colour, material, size, what is attached and where), and an optional `prompt`.
 4. Generate each plate empty, with no character, in the set's light and the style's look, at the master format's size; generate each prop alone on a neutral ground. File plates under `sets/<set>/plates/<id>.png` and props under `props/<id>/` through each item's `out` path (in an episode `../<series>/sets/…`), and record the paths in `ref` and `refs`.
 5. Every plate and prop is reviewed before any shot uses it: queue it as a hand-written item with `out` and `review` (`.claude/skills/ai-clips/SKILL.md`, steps 3–6), with `"review": {"ref": "plate:<set>/<plate>"}` (or `"prop:<id>"`). The queue regenerates what fails with its `fix_prompt` and files only approved images. Compare the plates of one set side by side with `npm run cli -- sheet <project> --images <a.png>,<b.png>`.
+## A meme
 
+A meme (`kind: meme`) has no brief, no treatment, and no canon: its `style-character` stage writes its own bibles after the script, autonomously. Decide every open choice from the files below and record it in the bibles; the stage never asks the user.
+
+- **Reads** `pitch.md`, `script.yaml` (each scene's `set` and `description`), and the user references in `references.yaml` of kind `look` and `location`, in place of the brief and treatment.
+- **Writes** `style.yaml` for the one 9:16 format and always `sets.yaml`: one set per `set` id the script names, with exactly that id. One or two sets is typical. Give each set the plates its scenes frame more than once, and a prop for every object the punchline hinges on.
+- The character bible comes next (`.claude/skills/character-bible/SKILL.md`, **A meme**); mark the stage done with `--outputs style.yaml,characters.yaml,sets.yaml` once both are ready.
 
 ## Completion criteria
 
@@ -54,6 +60,7 @@ A **plate** is an empty frame of a set from one fixed camera angle; a **prop ref
 - Fonts and references have a recorded license.
 - The style works at 16:9, 9:16, and 1:1.
 - Every plate and prop in `sets.yaml` has a reference image the art director passed.
+- A meme: every `set` id of `script.yaml` is a set in `sets.yaml`.
 
 ## Common failures
 

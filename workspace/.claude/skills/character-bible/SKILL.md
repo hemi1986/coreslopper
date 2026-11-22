@@ -1,6 +1,6 @@
 ---
 name: character-bible
-description: Use when a video has recurring characters and needs consistent reference images, character sheets, character states, and per-character prompt rules before AI shot generation.
+description: Use when a video has recurring characters, or a meme has speakers, and needs consistent reference images, character sheets, character states, reference voices, and per-character prompt rules before AI shot generation.
 license: MIT
 ---
 
@@ -34,6 +34,17 @@ license: MIT
 ## Library characters
 
 A character with `library: <id>` in `characters.yaml` is a copy from `library/characters/<id>/` (ADR 0034). Its sheet, references, and voice passed review in an earlier production: build on them as they are. Keep its `description` and `prompt`, and add what this video needs as new states or outfit references derived from its sheet, reviewed like any other. A state the library has but the project lacks comes in with `character use <project> <id> --states <state>`.
+## A meme
+
+A meme (`kind: meme`) has no treatment and no canon: its `style-character` stage writes the character bible after the script, autonomously, right after the style and set bible (`.claude/skills/style-bible/SKILL.md`, **A meme**). Decide every open choice from the files below; the stage never asks the user.
+
+- **Reads** `pitch.md`, `script.yaml` (every `speaker` and what its lines say about it), `characters.yaml` with the library characters chosen at setup (`library: <id>`, taken by `character use`), and the user references of kind `character` and `voice`.
+- **Library characters** stay as they came in (see **Library characters**): a scene's look comes as a new state from their sheet.
+- **Every other speaker** gets an entry with exactly its script id: `name`, `description`, `prompt`, and `face` (`voice-only` for a narrator or an announcement nobody sees). An on-screen character gets its sheet and references through the generation queue, judged by the art director (Process, steps 2–5).
+- **A reference voice** for every speaker without one, a library character included: a user reference of kind `voice` whose `subject` names the character, or else an `audio.voice_design` take ("(voice description)Text", German text) queued as an audio item with `"out": "characters/<id>/voice.wav"`. Record `voice.ref` and the exact `voice.transcript`.
+- `stage-done … style-character` takes the invented characters into the library as new entries; a library character only adds what is new to its entry.
+
+Done when `npm run cli -- validate-file projects/<slug>/script.yaml` passes: every speaker and set of the script is in the bibles.
 
 ## Character states
 
@@ -48,6 +59,7 @@ A **character state** is a named look the story puts a character in from some sh
 ## Completion criteria
 
 - Every recurring character has a sheet and at least one reference image.
+- A meme: every speaker of `script.yaml` is in `characters.yaml`, and every spoken one has a reference voice.
 - `characters.yaml` validates against `schema/characters.schema.json`.
 - Every character shot in the storyboard references a character that exists.
 - The art-director critic passes the sheet.
