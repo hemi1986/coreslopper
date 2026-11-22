@@ -18,6 +18,7 @@ import {
   writeJsonAtomic,
   writeTextAtomic,
   type ProjectConfig,
+  type Distribution,
   type ProjectKind,
   type Series,
   type ImageProviderKind,
@@ -43,6 +44,8 @@ export interface NewProjectOptions {
   series?: string;
   /** Episode only: the episode number. */
   episode?: number;
+  /** `internal`: never released publicly; written to `project.yaml`. Unset writes nothing (public). */
+  distribution?: Distribution;
   /** Workspace root. Defaults to the repository root discovered from cwd. */
   root?: string;
 }
@@ -123,6 +126,7 @@ export async function createProject(options: NewProjectOptions): Promise<string>
       ...(workflowCommit(root) ? { commit: workflowCommit(root) } : {}),
     },
     budget_usd: options.budget,
+    ...(options.distribution === 'internal' ? { distribution: 'internal' as const } : {}),
     review_mode: 'auto',
     // An episode gets copies of the series defaults; later series edits do not
     // change an existing episode's cache keys or costs.

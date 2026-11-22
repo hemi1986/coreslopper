@@ -8,6 +8,7 @@ import {
   projectNextAction,
   projectTemplate,
   queueCounts,
+  releasedPublicly,
   seriesNextAction,
   stageViews,
   type NextAction,
@@ -52,7 +53,10 @@ export interface ProductionProject {
   queue?: Record<string, number>;
   /** Subjects whose last art-director verdict failed. */
   failedReviews: number;
+  /** A release folder exists and the project is released publicly; an internal project never has a release tab. */
   hasRelease: boolean;
+  /** `distribution: internal`: not released publicly. */
+  internal: boolean;
   approved: boolean;
   releaseDate?: string;
   /** When state.json last changed. */
@@ -271,7 +275,8 @@ async function collect(projectDir: string, detail: boolean): Promise<ProductionD
   const project = await loadProject(projectDir);
   const { config, state, paths } = project;
   const stages = stageViews(state);
-  const hasRelease = existsSync(join(paths.renders, 'release', 'manifest.json'));
+  const internal = !releasedPublicly(config);
+  const hasRelease = !internal && existsSync(join(paths.renders, 'release', 'manifest.json'));
   const status = await loadStatus(projectDir).catch(() => undefined);
   const approved = Boolean(status?.approval);
   const song = isScriptedKind(config.kind) ? undefined : await readJsonLoose<{ artist?: unknown }>(paths.song);
@@ -293,11 +298,12 @@ async function collect(projectDir: string, detail: boolean): Promise<ProductionD
     stages,
     ...((running ?? open) ? { current: (running ?? open)!.id } : {}),
     budget: { ...state.budget },
-    next: projectNextAction({ slug: config.slug, kind: config.kind, stages, hasRelease, approved, openRounds: review.open }),
+    next: projectNextAction({ slug: config.slug, kind: config.kind, stages, hasRelease, approved, openRounds: review.open, internal }),
     renders: await listRenders(projectDir),
     ...(hasQueue ? { queue: queueCounts(queueItems) } : {}),
     failedReviews: verdicts.filter((verdict) => verdict.verdict === 'fail').length,
     hasRelease,
+    internal,
     approved,
     ...(config.release?.release_date ? { releaseDate: config.release.release_date } : {}),
     ...(stateInfo ? { updatedAt: stateInfo.mtime.toISOString() } : {}),

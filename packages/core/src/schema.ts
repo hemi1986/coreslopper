@@ -1330,6 +1330,7 @@ export const ReleaseManifestSchema = z.object({
 
 export type ProjectConfig = z.infer<typeof ProjectConfigSchema>;
 export type ProjectKind = z.infer<typeof ProjectKindSchema>;
+export type Distribution = z.infer<typeof DistributionSchema>;
 export type DisplayRule = z.infer<typeof DisplayRuleSchema>;
 export type SetDefinition = z.infer<typeof SetSchema>;
 export type Plate = z.infer<typeof PlateSchema>;

@@ -31,9 +31,9 @@ license: MIT
    - Character consistency: the same character looks like the same character.
 5. Run the determinism check: render the same still frame twice and compare SHA-256 hashes. They must match.
 6. Render all formats: 16:9 master, 9:16, 1:1, and 4:5 if configured.
-7. Once the master and the 9:16 render pass, build the release package with [release.md](release.md): three thumbnails, three Shorts with their own vertical thumbnails, the streaming cover, `review/upload.yaml` with every platform's texts, and `renders/release/` with the release calendar, assembled by `release`.
+7. Read `distribution` in `project.yaml`. For `internal` the project is never released publicly: skip this step entirely (no thumbnails, Shorts, cover, `upload.yaml`, or `release`) and go on with step 8. Otherwise, once the master and the 9:16 render pass, build the release package with [release.md](release.md): three thumbnails, three Shorts with their own vertical thumbnails, the streaming cover, `review/upload.yaml` with every platform's texts, and `renders/release/` with the release calendar, assembled by `release`.
 8. Run `npm run cli -- qa projects/<slug>` and complete `review/report.md` with a pass/fail line per check, the warnings that remain, and the exact render, thumbnail, and Short paths.
-9. Update the state with `npm run cli -- stage-done <project> qa-export --outputs review/report.md,review/upload.yaml,renders/release`. The stage ends here; uploading is the user's work (or their `publish` command).
+9. Update the state with `npm run cli -- stage-done <project> qa-export --outputs review/report.md,review/upload.yaml,renders/release` (an internal project: `--outputs review/report.md`). The stage ends here; uploading is the user's work (or their `publish` command).
 
 ## Episodes
 
@@ -47,7 +47,7 @@ license: MIT
 - Every check has a pass/fail result and evidence.
 - Sync, readability, determinism, coverage, and budget reconciliation pass, or the exceptions are documented.
 - All configured formats are rendered.
-- The release package is complete: `qa` reports no FAIL, `Release texts` is PASS, the remaining TODOs are facts only the user can give, and the six thumbnails and the cover passed the art director.
+- A public project's release package is complete (an internal project has none): `qa` reports no FAIL, `Release texts` is PASS, the remaining TODOs are facts only the user can give, and the six thumbnails and the cover passed the art director.
 - `review/report.md` is current.
 - No secrets, copyrighted media, or generated assets are staged for commit.
 

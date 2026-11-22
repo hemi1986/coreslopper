@@ -58,6 +58,10 @@ describe('music-video wizard', () => {
     const dir = await createVideoProject(ws, VIDEO);
     expect(JSON.parse(await readFile(join(dir, 'song.json'), 'utf8'))).toEqual({ title: 'Glass Harbor', artist: 'Test Artist', language: 'en', license: 'all rights reserved', rights: 'own song' });
     await expect(createVideoProject(ws, { ...VIDEO, slug: 'Bad Slug' })).rejects.toThrow(/lowercase/);
+    expect((await loadProject(dir)).config).not.toHaveProperty('distribution');
+    const internal = await createVideoProject(ws, { ...VIDEO, slug: 'glass-harbor-teaser', internal: true });
+    expect((await loadProject(internal)).config.distribution).toBe('internal');
+    await expect(createVideoProject(ws, { ...VIDEO, slug: 'other', internal: 'yes' })).rejects.toThrow(/internal is true or false/);
     await expect(createVideoProject(ws, { ...VIDEO, slug: 'other', language: 'English' })).rejects.toThrow(/ISO code/);
     expect((await videoWizardState(dir)).missing).toEqual(['lyrics', 'song']);
     await expect(finishSetup(dir)).rejects.toThrow(/still missing: lyrics, song/);
@@ -128,6 +132,9 @@ describe('series and episode wizard', () => {
     const episodeDir = await createEpisode(ws, { series: 'night-ferry', episode: 1, slug: 'night-ferry-01', budget: 10 });
     const project = await loadProject(episodeDir);
     expect(project.config).toMatchObject({ kind: 'episode', series: 'night-ferry', episode: 1 });
+    expect(project.config).not.toHaveProperty('distribution');
+    const internal = await createEpisode(ws, { series: 'night-ferry', episode: 2, slug: 'night-ferry-02', budget: 10, internal: true });
+    expect((await loadProject(internal)).config.distribution).toBe('internal');
     expect(project.state.stages.setup?.status).toBe('done');
     expect(project.state.stage).toBe('script');
   });

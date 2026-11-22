@@ -10,7 +10,7 @@ addStrings({
   de: {
     newTitle: 'Neu anlegen', newVideo: 'Musikvideo', newVideoSub: 'Zu einem fertigen Song: Projektdaten, Lyrics, Song, Referenzen, Figuren.',
     newSeries: 'Serie', newSeriesSub: 'Der Canon einer Serie: Daten und Referenzen für Figuren, Sets, Look.', newEpisode: 'Episode', newEpisodeSub: 'Eine Episode einer Serie, deren Canon fertig ist.',
-    title: 'Titel', artist: 'Artist', slug: 'Slug', budget: 'Budget (USD)', imageProvider: 'Bilder', videoProvider: 'Clips', audioProvider: 'Stimmen und Sounds',
+    title: 'Titel', artist: 'Artist', slug: 'Slug', budget: 'Budget (USD)', internal: 'Nur intern (nicht öffentlich, kein Release-Paket)', imageProvider: 'Bilder', videoProvider: 'Clips', audioProvider: 'Stimmen und Sounds',
     language: 'Gesungene Sprache (ISO, z. B. de)', rights: 'Rechte (wem gehört der Song?)', license: 'Lizenz', format: 'Hauptformat',
     create: 'Anlegen', noKey: '(kein Zugang in .env)', minimum: function (v) { return 'mindestens $' + v; }, taken: 'Diesen Slug gibt es schon.',
     stepData: 'Projekt', stepLyrics: 'Lyrics', stepSong: 'Song und Vocal-Stem', stepRefs: 'Referenzen', stepChars: 'Figuren aus der Bibliothek', stepDone: 'Fertig',
@@ -30,7 +30,7 @@ addStrings({
   en: {
     newTitle: 'Create', newVideo: 'Music video', newVideoSub: 'For a finished song: project data, lyrics, song, references, characters.',
     newSeries: 'Series', newSeriesSub: 'A series canon: data and references for characters, sets, and look.', newEpisode: 'Episode', newEpisodeSub: 'An episode of a series whose canon is complete.',
-    title: 'Title', artist: 'Artist', slug: 'Slug', budget: 'Budget (USD)', imageProvider: 'Images', videoProvider: 'Clips', audioProvider: 'Voices and sounds',
+    title: 'Title', artist: 'Artist', slug: 'Slug', budget: 'Budget (USD)', internal: 'Internal only (not released publicly, no release package)', imageProvider: 'Images', videoProvider: 'Clips', audioProvider: 'Voices and sounds',
     language: 'Sung language (ISO, e.g. en)', rights: 'Rights (who owns the song?)', license: 'License', format: 'Master format',
     create: 'Create', noKey: '(no access in .env)', minimum: function (v) { return 'at least $' + v; }, taken: 'This slug exists already.',
     stepData: 'Project', stepLyrics: 'Lyrics', stepSong: 'Song and vocal stem', stepRefs: 'References', stepChars: 'Characters from the library', stepDone: 'Done',
@@ -54,6 +54,12 @@ let options = null;
 
 function main() { const node = document.getElementById('main'); node.innerHTML = ''; return node; }
 function slugify(text) { return text.normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/ß/g, 'ss').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60); }
+/** The "not released publicly" box: `distribution: internal` in project.yaml. */
+function internalBox() {
+  const box = el('input', { type: 'checkbox' });
+  return { box: box, node: el('label', { class: 'form-field' }, [el('span', {}, [box, ' ' + t('internal')])]) };
+}
+
 function field(label, input, hint) { return el('label', { class: 'form-field' }, [el('span', { text: label }), input, hint ? el('span', { class: 'sub', text: hint }) : null]); }
 function input(attrs) { return el('input', Object.assign({ class: 'text' }, attrs)); }
 function select(values, labels, selected) {
@@ -139,6 +145,7 @@ function videoForm() {
   const image = providerSelect(providers, best), video = providerSelect(providers, options.providers.comfyui ? 'comfyui' : best);
   const language = input({ value: navigator.language ? navigator.language.slice(0, 2) : 'en' });
   const rights = input({}), license = input({});
+  const internal = internalBox();
   let slugEdited = false;
   title.oninput = function () { if (!slugEdited) slug.value = slugify(title.value); };
   slug.oninput = function () { slugEdited = true; };
@@ -147,11 +154,11 @@ function videoForm() {
     el('div', { class: 'form-row' }, [field(t('title'), title), field(t('artist'), artist), field(t('slug'), slug)]),
     el('div', { class: 'form-row' }, [field(t('budget'), budget, t('minimum')(options.minimumBudgetUsd)), field(t('imageProvider'), image), field(t('videoProvider'), video)]),
     el('div', { class: 'form-row' }, [field(t('language'), language), field(t('rights'), rights), field(t('license'), license)]),
-    error, el('button', { class: 'primary', type: 'submit', text: t('create') })
+    internal.node, error, el('button', { class: 'primary', type: 'submit', text: t('create') })
   ]);
   form.onsubmit = pending(function () {
     if (options.slugs.indexOf(slug.value) >= 0) { error.textContent = t('taken'); return; }
-    return post('/api/new/video', { title: title.value, artist: artist.value, slug: slug.value, budget: Number(budget.value), imageProvider: image.value, videoProvider: video.value, language: language.value, rights: rights.value, license: license.value })
+    return post('/api/new/video', { title: title.value, artist: artist.value, slug: slug.value, budget: Number(budget.value), imageProvider: image.value, videoProvider: video.value, language: language.value, rights: rights.value, license: license.value, internal: internal.box.checked })
       .then(function (r) { go('#/new/video/' + r.slug); })
       .catch(function (e) { error.textContent = e.message; });
   });
@@ -275,6 +282,7 @@ function episodeForm() {
   const number = input({ type: 'number', min: 1, step: '1' }), slug = input({ pattern: '[a-z0-9][a-z0-9-]*' }), budget = input({ type: 'number', min: 1, step: '1', value: '10' });
   const info = el('p', { class: 'meta' });
   const error = el('p', { class: 'error' });
+  const internal = internalBox();
   const fill = function () {
     const s = options.series.filter(function (x) { return x.slug === series.value; })[0];
     number.value = s.next ? s.next.episode : (Math.max.apply(null, [0].concat(s.created)) + 1);
@@ -287,10 +295,10 @@ function episodeForm() {
   fill();
   const form = el('form', { class: 'card form' }, [
     el('div', { class: 'form-row' }, [field(t('series'), series), field(t('episode'), number), field(t('slug'), slug), field(t('budget'), budget)]),
-    info, error, el('button', { class: 'primary', type: 'submit', text: t('create') })
+    internal.node, info, error, el('button', { class: 'primary', type: 'submit', text: t('create') })
   ]);
   form.onsubmit = pending(function () {
-    return post('/api/new/episode', { series: series.value, episode: Number(number.value), slug: slug.value, budget: Number(budget.value) })
+    return post('/api/new/episode', { series: series.value, episode: Number(number.value), slug: slug.value, budget: Number(budget.value), internal: internal.box.checked })
       .then(function (r) { go('#/new/episode/' + r.slug); })
       .catch(function (e) { error.textContent = e.message; });
   });

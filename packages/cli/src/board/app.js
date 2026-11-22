@@ -15,8 +15,8 @@ import { showCharacters } from './characters.js';
 import { showGuide } from './guide.js';
 
 addStrings({
-  de: { board: 'Board', navProduction: 'Produktion', navCalendar: 'Release-Kalender', navCharacters: 'Figuren', navNew: '+ Neu', navGuide: 'Anleitung', refresh: 'Aktualisieren', refreshKept: 'Ansicht behalten: ein Video läuft oder eine Eingabe ist nicht gespeichert.', navReleased: 'Veröffentlicht' },
-  en: { board: 'Board', navProduction: 'Production', navCalendar: 'Release calendar', navCharacters: 'Characters', navNew: '+ New', navGuide: 'Guide', refresh: 'Refresh', refreshKept: 'View kept: a video is playing or an input is not saved.', navReleased: 'Released' },
+  de: { board: 'Board', navProduction: 'Produktion', navCalendar: 'Release-Kalender', navCharacters: 'Figuren', navNew: '+ Neu', navGuide: 'Anleitung', refresh: 'Aktualisieren', refreshKept: 'Ansicht behalten: ein Video läuft oder eine Eingabe ist nicht gespeichert.', navReleased: 'Fertig' },
+  en: { board: 'Board', navProduction: 'Production', navCalendar: 'Release calendar', navCharacters: 'Characters', navNew: '+ New', navGuide: 'Guide', refresh: 'Refresh', refreshKept: 'View kept: a video is playing or an input is not saved.', navReleased: 'Finished' },
 });
 
 let active = 'overview';
@@ -43,12 +43,14 @@ function renderNav() {
   nav.appendChild(navButton(t('navNew'), null, active === 'new', '#/new'));
   nav.appendChild(navButton(t('navGuide'), null, active === 'guide', '#/guide'));
   if (overview.projects.length) nav.appendChild(el('h2', { text: t('projects') }));
-  // A released project folds away below the others (G-208): done, and every release event ticked off or the
+  // A finished project folds away below the others (G-208): released – done, and every release event ticked off or the
   // release day past – the user may post by hand without ticking.
   const released = [];
   const now = new Date();
   const today = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
   function isReleased(project, release) {
+    // An internal project is never released publicly: finished, it folds away at once.
+    if (project.next && project.next.reason === 'internal-done') return true;
     if (project.phase !== 'done' || !release) return false;
     return Boolean((release.total && release.done === release.total) || (release.releaseDate && release.releaseDate < today));
   }
@@ -56,7 +58,7 @@ function renderNav() {
     if (project.error) { nav.appendChild(el('div', { class: 'nav-item error', text: project.slug + ': ' + project.error })); return; }
     const release = releases[project.slug];
     const current = project.stages.filter(function (s) { return s.id === project.current; })[0];
-    const sub = release && release.total && project.phase === 'done' ? (release.releaseDate || '—') + ' · ' + release.done + '/' + release.total : current ? current.label : t('phases')[project.phase];
+    const sub = release && release.total && project.phase === 'done' && !project.internal ? (release.releaseDate || '—') + ' · ' + release.done + '/' + release.total : current ? current.label : t('phases')[project.phase];
     const selected = active === 'project:' + project.slug || active === 'release:' + project.slug || active === 'review:' + project.slug;
     const button = navButton(project.title, sub, selected, '#/p/' + project.slug, project.phase);
     if (isReleased(project, release)) released.push({ button: button, selected: selected });

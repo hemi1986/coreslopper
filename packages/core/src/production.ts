@@ -31,6 +31,8 @@ export interface NextAction {
     | 'release'
     | 'release-missing'
     | 'released'
+    /** Every stage is done and the project is not released publicly (`distribution: internal`). */
+    | 'internal-done'
     | 'canon'
     | 'episode'
     | 'series-done';
@@ -82,6 +84,8 @@ export interface ProductionFacts {
   approved?: boolean;
   /** Review rounds the user sent and the agent has not answered. */
   openRounds?: number;
+  /** `distribution: internal`: never released publicly, so finished once every stage is done. */
+  internal?: boolean;
 }
 
 export function productionPhase(stages: StageView[]): ProductionPhase {
@@ -98,7 +102,8 @@ export function productionPhase(stages: StageView[]): ProductionPhase {
  * failed or pending autonomous stage are `/video-next`, which answers the
  * round first; a finished project goes to the release. A finished project
  * without a release folder is `/video-next` too: it resets qa-export, whose
- * output the folder is, and builds it again (HS-13).
+ * output the folder is, and builds it again (HS-13). An internal project has
+ * no release folder and ends there.
  */
 export function projectNextAction(facts: ProductionFacts): NextAction {
   const running = facts.stages.find((stage) => stage.status === 'running');
@@ -107,6 +112,7 @@ export function projectNextAction(facts: ProductionFacts): NextAction {
   if (open?.interactive) return { where: 'claude', command: `/${setupSkill(facts.kind)} ${facts.slug}`, reason: 'interactive', stage: open.id };
   if (facts.openRounds) return { where: 'claude', command: `/video-next ${facts.slug}`, reason: 'review' };
   if (open) return { where: 'claude', command: `/video-next ${facts.slug}`, reason: open.status === 'failed' ? 'retry' : 'pipeline', stage: open.id };
+  if (facts.internal) return { where: 'none', reason: 'internal-done' };
   if (!facts.hasRelease) return { where: 'claude', command: `/video-next ${facts.slug}`, reason: 'release-missing', stage: 'qa-export' };
   return facts.approved ? { where: 'none', reason: 'released' } : { where: 'board', reason: 'release' };
 }

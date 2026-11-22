@@ -28,7 +28,7 @@ Das Board aktualisiert sich nicht von selbst. Klicke oben in der Navigation auf 
 - **Läuft**: Claude Code oder ein Render arbeitet daran.
 - Der farbige Streifen zeigt die Stages. Darunter stehen die aktuelle Stage und das Budget.
 
-Die Navigation links listet alle Projekte und Serien. Ein veröffentlichtes Projekt klappt am Ende in **Veröffentlicht** ein.
+Die Navigation links listet alle Projekte und Serien. Ein fertiges Projekt klappt am Ende in **Fertig** ein: ein veröffentlichtes, und ein internes Projekt (**Fertig – nicht öffentlich**), sobald alle Stages fertig sind.
 
 ## Ein Musikvideo anlegen
 
