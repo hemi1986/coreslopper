@@ -85,7 +85,10 @@ One round (`npm run cli -- watch`) runs the release autopilot (`release-run`, se
 - a stage started, finished, or failed;
 - a render is ready, failed, or stopped moving (no progress for 15 minutes);
 - a stage is **stalled**: it is running, but no file of the project changed for an hour, which usually means the Claude Code session ended;
-- queue items wait for a fix; the budget passed 80 %.
+- queue items wait for a fix; the budget passed 80 %;
+- ComfyUI was restarted because it was stuck.
+
+When `COMFYUI_RESTART_COMMAND` is set in `.env`, each round also checks the ComfyUI server, as `comfy restart --if-stuck` does (see [comfyui/README.md](../comfyui/README.md#stuck-queue)). It restarts the server only when every check of a 3-minute window found it stuck, and logs the restart under **Activity**. A healthy server ends the check at once; a stuck one makes the round up to 3 minutes longer. Without the variable the round skips the check.
 
 The container runs a round every five minutes (`board --watch 5`); on the computer, `release-timer install` runs `watch` on a timer, or run it by hand. `watch --every <minutes>` keeps it running in a terminal.
 

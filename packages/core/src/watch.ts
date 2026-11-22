@@ -51,10 +51,12 @@ export type WatchEventKind =
   | 'stalled'
   | 'needs-fix'
   | 'budget'
-  | 'unreadable';
+  | 'unreadable'
+  | 'comfyui-restarted';
 
 export interface WatchEvent {
   at: string;
+  /** The project's slug; empty for an event of the workspace (a ComfyUI restart). */
   project: string;
   kind: WatchEventKind;
   stage?: string;

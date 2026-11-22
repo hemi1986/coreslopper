@@ -8,7 +8,7 @@ size: null
 risk: null
 depends_on: []
 labels: [feature:comfyui-watchdog]
-status: ready
+status: done
 ---
 
 ## Task
@@ -27,11 +27,11 @@ round calls the same check when `COMFYUI_RESTART_COMMAND` is set. Its stall repo
 exists already. Decided by the user (2026-11-22).
 
 ## Acceptance Criteria
-- [ ] `comfy restart --if-stuck` restarts only when every check across the 3-minute window is stuck, and prints which rule held; one healthy check ends it with "not stuck" and no restart
-- [ ] A single slow or failed `/queue` answer followed by a healthy one never restarts
-- [ ] The `watch` round runs the check when `COMFYUI_RESTART_COMMAND` is set and logs a restart as a production event; without the variable it skips the check
-- [ ] `CMD-RestartComfyUI` in `docs/domain/events.yaml` gets the rule; `comfyui/README.md` and `docs/board.md` describe `--if-stuck` and the watch round
-- [ ] Tests with a fake fetch and clock cover: down for the whole window, a pending prompt that never starts, a slow answer that recovers, a running prompt; `npm test` and `npm run typecheck` are green
+- [x] `comfy restart --if-stuck` restarts only when every check across the 3-minute window is stuck, and prints which rule held; one healthy check ends it with "not stuck" and no restart
+- [x] A single slow or failed `/queue` answer followed by a healthy one never restarts
+- [x] The `watch` round runs the check when `COMFYUI_RESTART_COMMAND` is set and logs a restart as a production event; without the variable it skips the check
+- [x] `CMD-RestartComfyUI` in `docs/domain/events.yaml` gets the rule; `comfyui/README.md` and `docs/board.md` describe `--if-stuck` and the watch round
+- [x] Tests with a fake fetch and clock cover: down for the whole window, a pending prompt that never starts, a slow answer that recovers, a running prompt; `npm test` and `npm run typecheck` are green
 
 ## Out of Scope
 - Detecting a hung running prompt (the queue run's hung timeout covers it)

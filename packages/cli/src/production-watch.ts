@@ -93,10 +93,18 @@ export async function scanProduction(options: { root: string; now?: Date; every?
 }
 
 /**
- * One watchdog round: the release autopilot, then the production scan. A
- * failing autopilot does not stop the scan, and the other way round.
+ * One watchdog round: the release autopilot, the production scan, and – when
+ * `COMFYUI_RESTART_COMMAND` is set – the ComfyUI check, which restarts the
+ * server only when it is stuck. A failing part does not stop the others.
  */
-export async function watchRound(options: { root: string; every?: number; log?: (line: string) => void; autopilot?: boolean }): Promise<{ events: WatchEvent[]; errors: string[] }> {
+export async function watchRound(options: {
+  root: string;
+  every?: number;
+  log?: (line: string) => void;
+  autopilot?: boolean;
+  /** The ComfyUI check; a test passes a fake. Defaults to `comfyRestartIfStuck`. */
+  comfyCheck?: (log: (line: string) => void) => Promise<{ restarted: boolean; message: string }>;
+}): Promise<{ events: WatchEvent[]; errors: string[] }> {
   const log = options.log ?? ((line: string) => console.log(line));
   const errors: string[] = [];
   let events: WatchEvent[] = [];
@@ -120,6 +128,21 @@ export async function watchRound(options: { root: string; every?: number; log?: 
     log(`${stamp} production: ${Object.keys(snapshot.projects).length} project(s), ${events.length} event(s)${stalled.length ? `, stalled: ${stalled.join(', ')}` : ''}`);
   } catch (error) {
     errors.push(`production: ${(error as Error).message}`);
+  }
+  const { comfyRestartCommand, comfyRestartIfStuck } = await import('./comfy.js');
+  if (comfyRestartCommand()) {
+    try {
+      const check = options.comfyCheck ?? ((line: (text: string) => void) => comfyRestartIfStuck({ log: line }));
+      const result = await check((line) => log(`${stamp} comfyui: ${line}`));
+      if (result.restarted) {
+        const event: WatchEvent = { at: new Date().toISOString(), project: '', kind: 'comfyui-restarted', detail: result.message };
+        await mkdir(watchDir(options.root), { recursive: true });
+        await appendEvents(options.root, [event]);
+        events = [...events, event];
+      }
+    } catch (error) {
+      errors.push(`comfyui: ${(error as Error).message}`);
+    }
   }
   for (const error of errors) log(`${stamp} ${error}`);
   return { events, errors };

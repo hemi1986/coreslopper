@@ -41,7 +41,7 @@ import { patchImage } from './patch.js';
 import { CLIP_AUDIO_LUFS, clipAudioTake } from './clip-audio.js';
 import { formatVerdicts, summarizeVerdicts } from './verdicts.js';
 import { formatMediaInfo, makeSheet, mediaInfo } from './image-ops.js';
-import { comfyRestart, comfyStatus, formatComfyStatus } from './comfy.js';
+import { comfyRestart, comfyRestartIfStuck, comfyStatus, formatComfyStatus } from './comfy.js';
 import {
   acceptItem,
   addToQueue,
@@ -1300,9 +1300,15 @@ comfy
 comfy
   .command('restart')
   .description('Restart ComfyUI with the command in COMFYUI_RESTART_COMMAND (.env).')
-  .action(() =>
+  .option('--if-stuck', 'Watch the server first (a check every 30 s for 3 minutes) and restart only when every check finds it stuck')
+  .action((options: { ifStuck?: boolean }) =>
     run(async () => {
-      await comfyRestart();
+      if (options.ifStuck) {
+        const result = await comfyRestartIfStuck();
+        if (!result.restarted) return;
+      } else {
+        await comfyRestart();
+      }
       console.log(formatComfyStatus(await comfyStatus()));
     }),
   );

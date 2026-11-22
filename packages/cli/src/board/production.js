@@ -35,7 +35,8 @@ addStrings({
       'stage-failed': function (e) { return e.stage + ' fehlgeschlagen'; }, 'render-ready': function (e) { return 'Render fertig: ' + e.file; },
       'render-failed': function (e) { return 'Render fehlgeschlagen: ' + e.file; }, 'render-interrupted': function (e) { return 'Render bleibt stehen: ' + e.file; },
       stalled: function (e) { return (e.stage || 'Stage') + ' hängt (keine Dateiänderung)'; }, 'needs-fix': function (e) { return e.detail + ' Queue-Element(e) brauchen einen Fix'; },
-      budget: function (e) { return e.detail + ' des Budgets ausgegeben'; }, unreadable: function (e) { return 'nicht lesbar: ' + e.detail; }
+      budget: function (e) { return e.detail + ' des Budgets ausgegeben'; }, unreadable: function (e) { return 'nicht lesbar: ' + e.detail; },
+      'comfyui-restarted': function (e) { return 'neu gestartet, ' + e.detail; }
     }
   },
   en: {
@@ -69,7 +70,8 @@ addStrings({
       'stage-failed': function (e) { return e.stage + ' failed'; }, 'render-ready': function (e) { return 'Render ready: ' + e.file; },
       'render-failed': function (e) { return 'Render failed: ' + e.file; }, 'render-interrupted': function (e) { return 'Render stopped moving: ' + e.file; },
       stalled: function (e) { return (e.stage || 'A stage') + ' is stalled (no file changes)'; }, 'needs-fix': function (e) { return e.detail + ' queue item(s) need a fix'; },
-      budget: function (e) { return e.detail + ' of the budget spent'; }, unreadable: function (e) { return 'unreadable: ' + e.detail; }
+      budget: function (e) { return e.detail + ' of the budget spent'; }, unreadable: function (e) { return 'unreadable: ' + e.detail; },
+      'comfyui-restarted': function (e) { return 'restarted, ' + e.detail; }
     }
   }
 });
@@ -126,7 +128,7 @@ function eventLine(e) {
   const words = t('events')[e.kind];
   return el('li', {}, [
     el('span', { class: 'when', text: local(e.at) + ' · ' }),
-    el('a', { href: '#/p/' + e.project, text: e.project }), ': ' + (words ? words(e) : e.kind)
+    e.project ? el('a', { href: '#/p/' + e.project, text: e.project }) : 'ComfyUI', ': ' + (words ? words(e) : e.kind)
   ]);
 }
 
