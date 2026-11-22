@@ -8,7 +8,7 @@ size: null
 risk: null
 depends_on: [ST-001]
 labels: [feature:meme]
-status: in-progress
+status: done
 ---
 
 ## Task
@@ -17,7 +17,7 @@ tags, length, loudness, cue, trim, licence, and the memes whose takes came from 
 reads the JSON to propose one to three candidates per moment of a script (ST-010); the user reads the table.
 
 ## Acceptance Criteria
-- [ ] `sound list` prints one row per library sound, sorted by id; an empty library prints a hint to `sound add`
-- [ ] `--tag reveal` lists only sounds with that tag
-- [ ] `--json` prints every field of RM-SoundLibrary, including "used in" from the memes' take registries
-- [ ] Covered by a test on a fixture library with two sounds and one meme that took one of them
+- [x] `sound list` prints one row per library sound, sorted by id; an empty library prints a hint to `sound add`
+- [x] `--tag reveal` lists only sounds with that tag
+- [x] `--json` prints every field of RM-SoundLibrary, including "used in" from the memes' take registries
+- [x] Covered by a test on a fixture library with two sounds and one meme that took one of them
