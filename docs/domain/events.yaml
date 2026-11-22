@@ -443,7 +443,7 @@ aggregates:
     invariants:
       - Every file a run writes is in the manifest with size, hash, specification and source; a file an earlier run wrote and this run did not is removed, anything else in the folder is left alone (the code does this, release.ts:146-175,433-437)
       - Each format in the folder is the current recorded render of that format – a missing or stale one is rendered again first (the code does this, release.ts:237-269; when a render is current is the render slice's rule, HS-147)
-      - A file is never removed from the folder because a run could not refresh it – a run that skips a stale format or a dated image keeps the earlier copy and reports a TODO (decided 2026-11-22, HS-167; the board's refresh unlinks it – gap register)
+      - A video is never removed from the folder because a run could not refresh it – a run that skips a stale format keeps the earlier copy and reports a TODO (decided 2026-11-22, HS-167; release.ts keep). A dated image whose date or title no longer matches leaves the folder, so it is never posted; the post falls back to the cover (2026-11-22)
       - Release facts are never invented – a missing fact is a TODO; the channel's release defaults fill gaps and the project wins (the code does this, packages/core/src/release.ts:187-259)
       - A TODO never fails the package or QA; a broken platform limit or invalid chapters is an error (the code does this, release.ts:223-225,570-572; packages/cli/src/release-qa.ts:50-55)
       - Assembly is idempotent – the same inputs leave the folder untouched (the code does this, release.ts:146-170; tests/release-folder.test.ts "is idempotent")
@@ -2279,7 +2279,7 @@ policies:
     name: The release folder follows a live URL and an approval
     when: [EVT-LiveUrlRecorded, EVT-ReleaseApproved]
     then: [CMD-BuildReleasePackage]
-    description: "The board runs release in the background without renders and new stills, one at a time per project in its process (packages/cli/src/release-board.ts:37-40,158-167,448-462); a stale format or a changed dated image then leaves the folder (HS-167)"
+    description: "The board runs release in the background without renders and new stills, one at a time per project in its process (packages/cli/src/release-board.ts:37-40,158-167,448-462); a stale format keeps its earlier copy, a changed dated image leaves the folder (HS-167)"
 
   - id: POL-MarkPostedEventDone
     name: A posted calendar event is marked done
@@ -3383,7 +3383,7 @@ hotspots:
     question: "The board's background release runs without renders and stills. A stale format or a changed dated image is skipped, and the clean-up then deletes the earlier video or image from the release folder (release.ts:255-258,433-437,497-502). Rule?"
     refs: [AGG-ReleasePackage, POL-RefreshAfterStatusChange]
     status: resolved
-    resolution: "A run never removes a file because it could not refresh it: it keeps the earlier copy in the folder and the manifest and reports the TODO. Gap, high – entering a live URL on the board, the user's way to release, can take the video out of the folder they upload from (user, 2026-11-22) (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+    resolution: "A run never removes a file because it could not refresh it: it keeps the earlier copy in the folder and the manifest and reports the TODO. Gap, high – entering a live URL on the board, the user's way to release, can take the video out of the folder they upload from (user, 2026-11-22) (recommendation, not reviewed by the user – delegated, 2026-11-22) Narrowed 2026-11-22 while fixing G-151: the rule holds for videos; a dated image with a stale date or title still leaves the folder, because posting it would announce the wrong day."
   - id: HS-168
     question: "The board disables Approve release without a release folder, upload data or a calendar; the API and release-approve approve anyway. And does an approval cover the content at that moment?"
     refs: [AGG-ReleaseStatus, CMD-ApproveRelease]
