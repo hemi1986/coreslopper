@@ -1,0 +1,25 @@
+# An example case: it needs no fixtures, so it runs in a fresh workspace.
+id: example-voice-numbers
+title: Speech with written-out numbers
+sets:
+  - core
+  - smoke
+focus: "Speech generation: every word present, numbers spoken as written."
+operation: generateAudio
+role: audio.voice_design
+seed: 2077
+expectText: On the twenty-third of May at eleven fifteen the loan costs two thousand and seventy-seven dollars, for
+  example for a used car.
+prompt: (calm, deep male voice, clear, news anchor)On the twenty-third of May at eleven fifteen the loan costs two
+  thousand and seventy-seven dollars, for example for a used car.
+rubric:
+  - id: complete
+    check: Every word of the text is spoken, none dropped or repeated (use --transcribe for the word error rate).
+    weight: 3
+  - id: numbers
+    check: The written-out numbers are spoken correctly with natural stress.
+    weight: 2
+  - id: voice
+    check: Calm, deep, clear male voice as described.
+  - id: clean
+    check: No artifacts, clicks, or music.

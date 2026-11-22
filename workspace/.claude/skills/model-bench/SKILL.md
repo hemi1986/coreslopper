@@ -6,7 +6,7 @@ license: MIT
 
 # Model bench
 
-The bench renders fixed **bench cases** (critical scenes from past projects: dancing, several people, hands, lip-sync, text, identity) on several **bench targets** and scores each result against the case's rubric. Cases and targets are tracked in `bench/`; fixtures, runs, and spend stay local. Rationale: [ADR 0020](../../../docs/adr/0020-model-bench.md).
+The bench renders fixed **bench cases** (critical scenes from the user's past projects: dancing, several people, hands, lip-sync, text, identity; two generic examples ship, the rest are the workspace's own) on several **bench targets** and scores each result against the case's rubric. Cases and targets are tracked in `bench/`; fixtures, runs, and spend stay local. Rationale: [ADR 0020](../../../docs/adr/0020-model-bench.md).
 
 ## Inputs
 

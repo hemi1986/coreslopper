@@ -480,8 +480,8 @@ Boundaries:
   manifest and cache key extras (ADR 0041). It shares the workspace's generation cache (HS-234).
 - Reads the workspace's projects only through `bench import` (HS-225).
 - The art director scores bench results by the rubric; a bench score is not a verdict and files nothing (HS-224).
-- The tracked cases cite the maintainer's projects and ship to every workspace (HS-226); `update` merges `bench/`
-  like any runtime file (HS-227).
+- Upstream ships two generic example cases without fixtures (HS-226); `update` only adds missing files to
+  `bench.yaml`, `targets.yaml` and `cases/` (HS-227).
 
 ### BC-Board – Board
 Purpose (as recovered, decided by recommendation HS-242): the workspace's local page that hosts the views of the

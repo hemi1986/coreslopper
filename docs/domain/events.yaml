@@ -572,7 +572,7 @@ aggregates:
       - Rubric criteria have unique ids and a weight of at least 1 (the code does this, core/src/bench.ts:45-49,126-128)
       - A case's id is its file name (the code does this, core/src/bench.ts:252-254)
       - Params in a case are portable; ComfyUI node ids belong in a target (the code does this for the tracked cases only, tests/bench.test.ts:115-129; ADR 0020)
-      - A case names its source project by slug, and its fixtures by paths inside that project – so it belongs to the workspace that holds the project (decided 2026-11-22, HS-226; the tracked cases ship upstream to every workspace – gap register)
+      - A case names its source project by slug, and its fixtures by paths inside that project – so it belongs to the workspace that holds the project (decided 2026-11-22, HS-226; the code does this – upstream tracks only the example-* cases, which need no fixtures)
   - id: AGG-BenchRun
     name: Bench run
     context: BC-Bench

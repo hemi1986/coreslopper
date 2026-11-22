@@ -1,12 +1,12 @@
 # Model bench
 
-Fixed scenes from past videos, rendered on several models or servers and compared side by side. Use it before switching a workflow (Qwen Image vs. Turbo, an int8 LTX checkpoint), a GPU server, or a paid provider. Rationale: [ADR 0020](../docs/adr/0020-model-bench.md). In Claude Code, the `model-bench` skill runs the whole comparison.
+Fixed scenes from your past videos, rendered on several models or servers and compared side by side. Use it before switching a workflow (Qwen Image vs. Turbo, an int8 LTX checkpoint), a GPU server, or a paid provider. Rationale: [ADR 0020](../docs/adr/0020-model-bench.md). In Claude Code, the `model-bench` skill runs the whole comparison.
 
 | Path | Tracked | Purpose |
 |---|---|---|
 | `bench.yaml` | yes | Bench budget, batch cap, default output size, set descriptions |
 | `targets.yaml` | yes | Bench targets: provider, workflow or model per operation, params, server |
-| `cases/<id>.yaml` | yes | Bench cases: prompt, seed, inputs, known good result, rubric |
+| `cases/<id>.yaml` | yes | Bench cases: prompt, seed, inputs, known good result, rubric. Two examples ship; the rest are yours |
 | `fixtures/` | no | Case media copied by `bench import` |
 | `runs/<id>/` | no | `run.json`, outputs, frame strips, `scores/`, `ratings.json`, `index.html` |
 | `state.json`, `manifest.jsonl`, `timings.jsonl` | no | Bench spend, every generation call, generation times |
@@ -22,6 +22,33 @@ npm run cli -- bench report                                  # rebuild the lates
 ```
 
 `bench run` options: `--cases <ids>`, `--seeds <n>` (case seed, +101, +202, ...), `--repeat` (render the first seed twice uncached and compare bytes), `--fresh` (ignore the cache and measure time again), `--transcribe` (speech word error rate via faster-whisper), `--id <name>` (extend or resume a run).
+
+`bench.yaml`, `targets.yaml` and `cases/` belong to the workspace: `update` adds new upstream files there but never overwrites or removes one.
+
+## Adding a case
+
+A case is a critical shot of one of your projects: a dance, several people, hands, lip-sync, text, an identity. Copy the shot's prompt and seed into `cases/<id>.yaml`, name the source project, and list the files it needs as fixtures, relative to `projects/`:
+
+```yaml
+id: singer-turn
+title: Singer turns to the window
+sets: [core]
+focus: Identity from one reference while the head turns.
+source: { project: my-video, shot: shot-007 }
+operation: imageToVideo
+role: video.image_to_video
+seed: 4242
+prompt: ...
+fixtures:
+  start: { from: my-video/assets/image/keyframe/<hash>-0.png }
+  golden: { from: my-video/assets/video/clip/<hash>-0.mp4 }
+inputs: { references: [start] }
+golden: golden
+rubric:
+  - { id: identity, check: The singer keeps the face of the start frame through the turn., weight: 3 }
+```
+
+`bench import` copies the fixtures into `fixtures/<id>/`. The two `example-*` cases need no fixtures, so they run in a fresh workspace.
 
 ## Adding a target
 

@@ -115,8 +115,10 @@ describe('bench files', () => {
   it('parses every tracked case and target', async () => {
     const paths = benchPaths();
     const cases = await loadBenchCases(paths);
-    expect(cases.length).toBeGreaterThanOrEqual(20);
-    expect(selectBenchCases(cases, { set: 'smoke' }).length).toBeGreaterThanOrEqual(3);
+    // Upstream ships generic examples only: they need no fixtures from a private project (ADR 0048).
+    expect(cases.length).toBeGreaterThanOrEqual(1);
+    expect(selectBenchCases(cases, { set: 'smoke' }).length).toBeGreaterThanOrEqual(1);
+    for (const benchCase of cases) expect([benchCase.id, benchCase.fixtures, benchCase.source]).toEqual([benchCase.id, {}, undefined]);
     const targets = await loadBenchTargets(paths);
     expect(Object.keys(targets)).toContain('local');
     expect(Object.keys(targets)).toContain('mock');

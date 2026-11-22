@@ -40,9 +40,10 @@ const ALWAYS_UPSTREAM_FILES = new Set(['package-lock.json']);
 
 /**
  * Upstream files below these prefixes are added when missing but never
- * overwritten or removed: projects, series canons, and the character library belong to the user.
+ * overwritten or removed: projects, series canons, the character library, and the model bench's
+ * settings and cases belong to the user (the bench's README follows upstream).
  */
-const USER_OWNED_PREFIXES = ['projects/', 'series/', 'library/'];
+const USER_OWNED_PREFIXES = ['projects/', 'series/', 'library/', 'bench/bench.yaml', 'bench/targets.yaml', 'bench/cases/'];
 
 export function isRuntimePath(path: string): boolean {
   if (!path) return true;

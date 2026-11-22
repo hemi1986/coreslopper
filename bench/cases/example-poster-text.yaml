@@ -1,0 +1,26 @@
+# An example case: it needs no fixtures, so it runs in a fresh workspace. Add your own cases from your projects'
+# critical shots (see bench/README.md, "Adding a case").
+id: example-poster-text
+title: Poster with two readable words
+sets:
+  - core
+  - smoke
+focus: "Text rendering: two short English words spelled correctly and legibly in the image."
+operation: generateImage
+role: image.keyframe
+seed: 8642
+prompt: 'A vintage screen-printed concert poster pasted on a weathered grey concrete wall, photographed straight on in
+  flat overcast daylight. The poster shows a lone guitar silhouette, across the top in huge bold condensed capital
+  letters the single word "NIGHT", and along the bottom in smaller bold capitals the word "SHIFT". Limited palette:
+  poster red, ink black, beige paper. Flat colour planes, halftone dots, slight misregistration, torn paper edges.
+  Photoreal photo of the poster, no other text, no logos, no symbols.'
+rubric:
+  - id: spelling
+    check: '"NIGHT" and "SHIFT" are spelled exactly, every letter correct.'
+    weight: 3
+  - id: legibility
+    check: Both words read at thumbnail size; letters are clean, not melted.
+  - id: no-extra-text
+    check: No other words, pseudo-glyphs, logos, or symbols.
+  - id: style
+    check: Screen-printed poster look in red, black, and beige on a concrete wall.
