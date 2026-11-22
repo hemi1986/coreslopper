@@ -587,8 +587,8 @@ roles:
       references[0] is <Picture 1>. The prompt follows the Flex schema (give
       "flex" in the batch item, see comfyui/README.md);
       non_diegetic_music is always "none", music that plays in the scene goes in
-      overall_soundscape. Aspect from the project kind: 16:9 music video, 9:16
-      episode. 24 fps, frames rounded up to 17n+5, the clip keeps its sound.
+      overall_soundscape. Aspect from the project's master format: 16:9 or
+      9:16. 24 fps, frames rounded up to 17n+5, the clip keeps its sound.
       Sampler, sigmas, LoRA, and models are fixed; no Turbo/Lightning LoRAs.
       Default for every clip without lip-sync, in music videos and episodes: pass
       the keyframe as references[0] and the clip keeps its framing (model bench
@@ -689,7 +689,7 @@ roles:
           audioStartSeconds + durationSeconds). The clip length comes from the
           audio and rounds up to 17n+5 frames at 24 fps; the tail after the
           vocal is silent. Sizes come from the graph (~0.98 MP, aspect from the
-          project kind); the LTX params above only apply to the LTX fallback:
+          master format); the LTX params above only apply to the LTX fallback:
           params.workflow: ltx25-lipsync-flf2v (start frame, end frame, 8n+1
           frames rounded down, 0.8 MP draft, megapixels 1.9 final, plain prompt).
 
