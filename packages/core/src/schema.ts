@@ -1459,6 +1459,61 @@ export const LibraryCharacterSchema = z
   })
   .superRefine((entry, ctx) => duplicateIds(entry.states, ctx, ['states'], 'state'));
 
+/** The one audio file of a library sound, next to its `sound.yaml`. */
+export const LIBRARY_SOUND_FILE = 'sound.wav';
+
+const SecondsSchema = z.number().finite().nonnegative();
+
+/**
+ * `library/sounds/<id>/sound.yaml`: a sound of the workspace's sound library
+ * (AGG-LibrarySound, ADR 0051), next to its one WAV (`sound.wav`). Length and
+ * loudness are measured from the file, never typed. The cue is the moment the
+ * sound lands, in seconds from its (trimmed) start; a trim and a cue lie
+ * inside the sound.
+ */
+export const LibrarySoundSchema = z
+  .object({
+    version: z.literal(1),
+    id: ScriptIdSchema,
+    title: z.string().trim().min(1),
+    /** What the sound is typically used for; the meme skill picks by it. */
+    use_when: z.string().trim().min(1),
+    tags: z.array(z.string().min(1)).default([]),
+    /** Seconds, measured from `sound.wav`. */
+    length: z.number().finite().positive(),
+    /** Integrated loudness in LUFS, measured from `sound.wav`; the file is never normalised. */
+    loudness: z.number().finite(),
+    cue: SecondsSchema.optional(),
+    trim: z.object({ start: SecondsSchema, end: SecondsSchema }).optional(),
+    /** Where the sound came from: a URL or free words. */
+    source: z.string().min(1).optional(),
+    licence: z.string().trim().min(1).default('unknown'),
+    /** The credit text a licence that asks for attribution needs (HS-265). */
+    credit: z.string().min(1).optional(),
+    /** sha256 of `sound.wav`: one sound, one entry. */
+    hash: z.string().regex(/^[a-f0-9]{64}$/),
+    added: z.string().min(1),
+  })
+  .superRefine((sound, ctx) => {
+    for (const problem of librarySoundTimeProblems(sound)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: [problem.field], message: problem.message });
+  });
+
+export type LibrarySound = z.infer<typeof LibrarySoundSchema>;
+
+/** Where a cue or a trim leaves the sound: a trim inside the length, a cue inside the (trimmed) sound. */
+export function librarySoundTimeProblems(sound: { length: number; cue?: number; trim?: { start: number; end: number } }): { field: 'cue' | 'trim'; message: string }[] {
+  const problems: { field: 'cue' | 'trim'; message: string }[] = [];
+  const { length, cue, trim } = sound;
+  if (trim && !(trim.start < trim.end && trim.end <= length)) {
+    problems.push({ field: 'trim', message: `the trim ${trim.start}-${trim.end} lies outside the sound's length of ${length} s` });
+  }
+  const span = trim ? trim.end - trim.start : length;
+  if (cue !== undefined && cue > span) {
+    problems.push({ field: 'cue', message: trim ? `the cue ${cue} lies outside the trim of ${span} s` : `the cue ${cue} lies outside the sound's length of ${length} s` });
+  }
+  return problems;
+}
+
 export const ReferenceKindSchema = z.enum(['look', 'character', 'location', 'storyboard', 'concept', 'footage', 'voice', 'other']);
 
 /**
