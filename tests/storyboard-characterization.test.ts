@@ -134,14 +134,18 @@ describe('storyboard characterization – shot sources', () => {
 });
 
 describe('storyboard characterization – highlights and chaining', () => {
-  it('requires highlights to be part of the text, ignoring case', () => {
+  it('requires a highlight to be a word or a run of words of the text, ignoring case', () => {
     expect(() => resolve(covering(motionShot('shot-001', 0, 2, { highlights: ['run'] })))).toThrow(
       'Shot "shot-001" has highlights but no text.',
     );
     expect(() => resolve(covering(motionShot('shot-001', 0, 2, { text: 'We run', highlights: ['fly'] })))).toThrow(
-      'Shot "shot-001" highlight "fly" is not part of its text.',
+      'Shot "shot-001" highlight "fly" is not a word or a run of words of its text.',
+    );
+    expect(() => resolve(covering(motionShot('shot-001', 0, 2, { text: 'We run all night', highlights: ['e ru'] })))).toThrow(
+      'highlight "e ru" is not a word or a run of words',
     );
     expect(() => resolve(covering(motionShot('shot-001', 0, 2, { text: 'We RUN', highlights: ['run'] })))).not.toThrow();
+    expect(() => resolve(covering(motionShot('shot-001', 0, 2, { text: 'We run (all night)', highlights: ['all night'] })))).not.toThrow();
   });
 
   it('requires a chained shot to name an existing shot that ends before it starts', () => {

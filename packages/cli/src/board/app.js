@@ -12,14 +12,15 @@ import { showWizard } from './wizard.js';
 import { showCharacters } from './characters.js';
 
 addStrings({
-  de: { board: 'Board', navProduction: 'Produktion', navCalendar: 'Release-Kalender', navCharacters: 'Figuren', navNew: '+ Neu', refresh: 'Aktualisieren', refreshKept: 'Ansicht behalten: ein Video läuft oder eine Eingabe ist nicht gespeichert.' },
-  en: { board: 'Board', navProduction: 'Production', navCalendar: 'Release calendar', navCharacters: 'Characters', navNew: '+ New', refresh: 'Refresh', refreshKept: 'View kept: a video is playing or an input is not saved.' },
+  de: { board: 'Board', navProduction: 'Produktion', navCalendar: 'Release-Kalender', navCharacters: 'Figuren', navNew: '+ Neu', refresh: 'Aktualisieren', refreshKept: 'Ansicht behalten: ein Video läuft oder eine Eingabe ist nicht gespeichert.', navReleased: 'Veröffentlicht' },
+  en: { board: 'Board', navProduction: 'Production', navCalendar: 'Release calendar', navCharacters: 'Characters', navNew: '+ New', refresh: 'Refresh', refreshKept: 'View kept: a video is playing or an input is not saved.', navReleased: 'Released' },
 });
 
 let active = 'overview';
 let overview = { projects: [], series: [] };
 let releases = {};
 let kept = false;
+let releasedOpen = false;
 
 function navButton(text, sub, selected, hash, dot) {
   return el('button', { class: 'nav-item' + (selected ? ' active' : ''), onclick: function () { go(hash); } }, [
@@ -38,13 +39,31 @@ function renderNav() {
   nav.appendChild(navButton(t('navCharacters'), null, active === 'characters', '#/characters'));
   nav.appendChild(navButton(t('navNew'), null, active === 'new', '#/new'));
   if (overview.projects.length) nav.appendChild(el('h2', { text: t('projects') }));
+  // A released project folds away below the others (G-208): done, and every release event ticked off or the
+  // release day past – the user may post by hand without ticking.
+  const released = [];
+  const now = new Date();
+  const today = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+  function isReleased(project, release) {
+    if (project.phase !== 'done' || !release) return false;
+    return Boolean((release.total && release.done === release.total) || (release.releaseDate && release.releaseDate < today));
+  }
   overview.projects.forEach(function (project) {
     if (project.error) { nav.appendChild(el('div', { class: 'nav-item error', text: project.slug + ': ' + project.error })); return; }
     const release = releases[project.slug];
     const current = project.stages.filter(function (s) { return s.id === project.current; })[0];
     const sub = release && release.total && project.phase === 'done' ? (release.releaseDate || '—') + ' · ' + release.done + '/' + release.total : current ? current.label : t('phases')[project.phase];
-    nav.appendChild(navButton(project.title, sub, active === 'project:' + project.slug || active === 'release:' + project.slug || active === 'review:' + project.slug, '#/p/' + project.slug, project.phase));
+    const selected = active === 'project:' + project.slug || active === 'release:' + project.slug || active === 'review:' + project.slug;
+    const button = navButton(project.title, sub, selected, '#/p/' + project.slug, project.phase);
+    if (isReleased(project, release)) released.push({ button: button, selected: selected });
+    else nav.appendChild(button);
   });
+  if (released.length) {
+    const open = releasedOpen || released.some(function (entry) { return entry.selected; });
+    const group = el('details', { class: 'nav-group', open: open }, [el('summary', { text: t('navReleased') + ' (' + released.length + ')' })].concat(released.map(function (entry) { return entry.button; })));
+    group.addEventListener('toggle', function () { releasedOpen = group.open; });
+    nav.appendChild(group);
+  }
   if (overview.series.length) nav.appendChild(el('h2', { text: t('series') }));
   overview.series.forEach(function (series) {
     if (series.error) { nav.appendChild(el('div', { class: 'nav-item error', text: series.slug + ': ' + series.error })); return; }

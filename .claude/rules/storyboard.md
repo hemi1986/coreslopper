@@ -59,7 +59,6 @@ not use "cut" for a shot.
   chained (G-71).
 - An AI-clip layer with only `prompts.video` passes validation and renders empty (G-73).
 - `queue add --kind` builds items from the unvalidated storyboard (G-72).
-- A highlight of several words passes validation and is never shown (G-77).
 - The fields `storyboard.timing`, `style` and `characters`, and `layer.blend`, are read by nothing (G-78, G-79).
 - A section id containing `intro` or `outro` changes the rendered look (G-83).
 - `fade`, `dissolve` and `wipe` render alike (G-80).

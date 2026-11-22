@@ -9,6 +9,7 @@ import {
   loadChannel,
   loadProject,
   loadReleaseSchedule,
+  scheduleZoneWarning,
   platformLimits,
   plainLyrics,
   planAutopilot,
@@ -717,7 +718,9 @@ export async function boardAutopilot(options: {
 }): Promise<BoardAutopilot> {
   const now = options.now ?? new Date();
   const settings = options.schedule.autopilot;
-  const { ready, notes } = autopilotReadiness(settings, options.env, now);
+  const { ready, notes: readiness } = autopilotReadiness(settings, options.env, now);
+  const zone = scheduleZoneWarning(options.schedule);
+  const notes = zone ? [zone, ...readiness] : readiness;
   const blockers: string[] = [];
   if (!options.manifest) blockers.push('no release package yet: run release');
   if (!options.data) blockers.push('review/upload.yaml is missing');

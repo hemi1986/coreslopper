@@ -60,7 +60,7 @@ describe('workspace characterization', () => {
     const v3 = await runtimeFixture('9.11.0', { 'skills/a.md': 'v2\n', 'skills/b.md': 'v3\n' });
     const second = await updateWorkspace({ targetDir: target, runtimeDir: v3, install: false });
     expect(second.changes.map((change) => change.path)).not.toContain('skills/a.md');
-    expect(second.keptLocal).toBe(1);
+    expect(second.keptLocal).toEqual(['skills/a.md']);
     expect(await read(target, 'skills/a.md')).toBe('mine\n');
     expect(await read(target, 'skills/a.md.coreslopper-new')).toBe('v2\n');
   });
@@ -72,7 +72,7 @@ describe('workspace characterization', () => {
     const v2 = await runtimeFixture('9.10.0', { 'skills/a.md': 'ported upstream\n' });
     const result = await updateWorkspace({ targetDir: target, runtimeDir: v2, install: false });
     expect(result.changes.map((change) => change.path)).not.toContain('skills/a.md');
-    expect(result.keptLocal).toBe(0);
+    expect(result.keptLocal).toEqual([]);
     expect(existsSync(join(target, 'skills/a.md.coreslopper-new'))).toBe(false);
   });
 
