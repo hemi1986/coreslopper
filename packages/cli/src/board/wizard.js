@@ -3,7 +3,7 @@
 // command to type in Claude Code, where the grilling happens.
 //   #/new                 choose            #/new/video[/<slug>]
 //   #/new/series[/<slug>]                   #/new/episode[/<slug>]
-import { addStrings, api, copyButton, el, go, post, projectFile, setLang, showError, t, upload } from './lib.js';
+import { addStrings, api, copyButton, el, go, pending, post, projectFile, setLang, showError, t, upload } from './lib.js';
 import { libraryPicker } from './characters.js';
 
 addStrings({
@@ -93,7 +93,7 @@ function referencesStep(n, scope, slug, references, refresh) {
   const progress = el('span', { class: 'sub' });
   const link = input({ type: 'url', placeholder: t('url') });
   const base = '/api/upload/' + scope + '/' + encodeURIComponent(slug) + '/reference';
-  const addFiles = function () {
+  const addFiles = pending(function () {
     const list = Array.prototype.slice.call(files.files);
     let chain = Promise.resolve();
     list.forEach(function (file, index) {
@@ -102,8 +102,8 @@ function referencesStep(n, scope, slug, references, refresh) {
         return upload(base + query, file, function (share) { progress.textContent = (index + 1) + '/' + list.length + ' · ' + Math.round(share * 100) + '%'; });
       });
     });
-    chain.then(function () { refresh(); }).catch(function (error) { progress.textContent = error.message; progress.className = 'error'; });
-  };
+    return chain.then(function () { refresh(); }).catch(function (error) { progress.textContent = error.message; progress.className = 'error'; });
+  }, { spinner: false });
   const change = function (payload) { return post('/api/new/' + scope + '/' + encodeURIComponent(slug) + '/references', payload).then(refresh).catch(showError); };
   const fileUrl = function (path) { return scope === 'series' ? '/series-files/' + encodeURIComponent(slug) + '/' + path.split('/').map(encodeURIComponent).join('/') : projectFile(slug, path); };
   const list = el('div', { class: 'refs' }, references.map(function (r) {
@@ -115,14 +115,14 @@ function referencesStep(n, scope, slug, references, refresh) {
         r.subject ? el('div', { class: 'meta', text: r.subject }) : null,
         r.note ? el('div', { class: 'meta', text: r.note }) : null
       ]),
-      el('button', { class: 'small', text: t('remove'), onclick: function () { change({ action: 'delete', id: r.id }); } })
+      el('button', { class: 'small', text: t('remove'), onclick: pending(function () { return change({ action: 'delete', id: r.id }); }) })
     ]);
   }));
   return step(n, t('stepRefs'), references.length > 0, [
     el('p', { class: 'meta', text: t('refsHelp') }),
     el('div', { class: 'form-row' }, [field(t('kind'), kind), field(t('subject'), subject), field(t('note'), note)]),
     el('div', { class: 'form-row' }, [files, el('button', { class: 'small', text: t('addFiles'), onclick: addFiles }), progress]),
-    el('div', { class: 'form-row' }, [link, el('button', { class: 'small', text: t('addLink'), onclick: function () { change({ action: 'link', url: link.value.trim(), kind: kind.value, subject: subject.value, note: note.value }); } })]),
+    el('div', { class: 'form-row' }, [link, el('button', { class: 'small', text: t('addLink'), onclick: pending(function () { return change({ action: 'link', url: link.value.trim(), kind: kind.value, subject: subject.value, note: note.value }); }) })]),
     list
   ]);
 }
@@ -149,13 +149,12 @@ function videoForm() {
     el('div', { class: 'form-row' }, [field(t('language'), language), field(t('rights'), rights), field(t('license'), license)]),
     error, el('button', { class: 'primary', type: 'submit', text: t('create') })
   ]);
-  form.onsubmit = function (event) {
-    event.preventDefault();
+  form.onsubmit = pending(function () {
     if (options.slugs.indexOf(slug.value) >= 0) { error.textContent = t('taken'); return; }
-    post('/api/new/video', { title: title.value, artist: artist.value, slug: slug.value, budget: Number(budget.value), imageProvider: image.value, videoProvider: video.value, language: language.value, rights: rights.value, license: license.value })
+    return post('/api/new/video', { title: title.value, artist: artist.value, slug: slug.value, budget: Number(budget.value), imageProvider: image.value, videoProvider: video.value, language: language.value, rights: rights.value, license: license.value })
       .then(function (r) { go('#/new/video/' + r.slug); })
       .catch(function (e) { error.textContent = e.message; });
-  };
+  });
   node.appendChild(form);
 }
 
@@ -177,17 +176,17 @@ function videoSteps(slug) {
       sectionList.innerHTML = '';
       sections.forEach(function (s) { sectionList.appendChild(el('li', {}, [el('b', { text: '[' + s.tag + '] ' }), s.lines[0] || '']) ); });
     };
-    const propose = function () {
-      post('/api/new/video/' + encodeURIComponent(slug) + '/lyrics', { text: text.value, preview: true }).then(function (r) { text.value = r.text; showSections(r.sections); lyricsError.textContent = ''; }).catch(function (e) { lyricsError.textContent = e.message; });
-    };
+    const propose = pending(function () {
+      return post('/api/new/video/' + encodeURIComponent(slug) + '/lyrics', { text: text.value, preview: true }).then(function (r) { text.value = r.text; showSections(r.sections); lyricsError.textContent = ''; }).catch(function (e) { lyricsError.textContent = e.message; });
+    });
     if (state.lyrics.written) post('/api/new/video/' + encodeURIComponent(slug) + '/lyrics', { text: state.lyrics.text, preview: true }).then(function (r) { showSections(r.sections); }).catch(function () {});
     node.appendChild(step(2, t('stepLyrics'), state.lyrics.written, [
       el('p', { class: 'meta', text: t('lyricsHelp') }), text,
       el('div', { class: 'form-row' }, [
         el('button', { class: 'small', text: t('propose'), onclick: propose }),
-        el('button', { class: 'small', text: t('saveLyrics'), onclick: function () {
-          post('/api/new/video/' + encodeURIComponent(slug) + '/lyrics', { text: text.value }).then(refresh).catch(function (e) { lyricsError.textContent = e.message; });
-        } })
+        el('button', { class: 'small', text: t('saveLyrics'), onclick: pending(function () {
+          return post('/api/new/video/' + encodeURIComponent(slug) + '/lyrics', { text: text.value }).then(refresh).catch(function (e) { lyricsError.textContent = e.message; });
+        }) })
       ]),
       lyricsError, el('h4', { class: 'section-title', text: t('sections') }), sectionList
     ]));
@@ -197,13 +196,13 @@ function videoSteps(slug) {
     const audioUpload = function (target, label) {
       const file = el('input', { type: 'file', accept: '.wav,.mp3,.flac,.aif,.aiff,.m4a,.ogg,.opus,audio/*' });
       const progress = el('span', { class: 'sub' });
-      const button = el('button', { class: 'small', text: t('upload'), onclick: function () {
+      const button = el('button', { class: 'small', text: t('upload'), onclick: pending(function () {
         if (!file.files[0]) return;
         progress.textContent = t('uploading');
-        upload('/api/upload/project/' + encodeURIComponent(slug) + '/' + target + '?name=' + encodeURIComponent(file.files[0].name), file.files[0], function (share) { progress.textContent = Math.round(share * 100) + '%'; })
+        return upload('/api/upload/project/' + encodeURIComponent(slug) + '/' + target + '?name=' + encodeURIComponent(file.files[0].name), file.files[0], function (share) { progress.textContent = Math.round(share * 100) + '%'; })
           .then(function (r) { if (r.warnings && r.warnings.length) window.alert(r.warnings.join('\n')); refresh(); })
           .catch(function (e) { progress.textContent = e.message; progress.className = 'error'; });
-      } });
+      }, { spinner: false }) });
       return field(label, el('div', { class: 'form-row' }, [file, button, progress]));
     };
     const s = state.song;
@@ -219,7 +218,7 @@ function videoSteps(slug) {
     node.appendChild(step(6, t('stepDone'), state.setupDone, state.setupDone ? [commandBox(t('setupDone'), '/new-video ' + slug, projectLink(slug))] : [
       finishError,
       el('div', { class: 'form-row' }, [
-        el('button', { class: 'primary', text: t('finish'), disabled: state.missing.length ? true : undefined, onclick: function () { post('/api/new/video/' + encodeURIComponent(slug) + '/finish', {}).then(refresh).catch(function (e) { finishError.textContent = e.message; }); } }),
+        el('button', { class: 'primary', text: t('finish'), disabled: state.missing.length ? true : undefined, onclick: pending(function () { return post('/api/new/video/' + encodeURIComponent(slug) + '/finish', {}).then(refresh).catch(function (e) { finishError.textContent = e.message; }); }) }),
         projectLink(slug)
       ])
     ]));
@@ -246,13 +245,12 @@ function seriesForm() {
     el('div', { class: 'form-row' }, [field(t('format'), format), field(t('imageProvider'), image), field(t('videoProvider'), video), field(t('audioProvider'), audio)]),
     error, el('button', { class: 'primary', type: 'submit', text: t('create') })
   ]);
-  form.onsubmit = function (event) {
-    event.preventDefault();
+  form.onsubmit = pending(function () {
     if (options.slugs.indexOf(slug.value) >= 0) { error.textContent = t('taken'); return; }
-    post('/api/new/series', { title: title.value, slug: slug.value, budget: Number(budget.value), format: format.value, imageProvider: image.value, videoProvider: video.value, audioProvider: audio.value })
+    return post('/api/new/series', { title: title.value, slug: slug.value, budget: Number(budget.value), format: format.value, imageProvider: image.value, videoProvider: video.value, audioProvider: audio.value })
       .then(function (r) { go('#/new/series/' + r.slug); })
       .catch(function (e) { error.textContent = e.message; });
-  };
+  });
   node.appendChild(form);
 }
 
@@ -291,12 +289,11 @@ function episodeForm() {
     el('div', { class: 'form-row' }, [field(t('series'), series), field(t('episode'), number), field(t('slug'), slug), field(t('budget'), budget)]),
     info, error, el('button', { class: 'primary', type: 'submit', text: t('create') })
   ]);
-  form.onsubmit = function (event) {
-    event.preventDefault();
-    post('/api/new/episode', { series: series.value, episode: Number(number.value), slug: slug.value, budget: Number(budget.value) })
+  form.onsubmit = pending(function () {
+    return post('/api/new/episode', { series: series.value, episode: Number(number.value), slug: slug.value, budget: Number(budget.value) })
       .then(function (r) { go('#/new/episode/' + r.slug); })
       .catch(function (e) { error.textContent = e.message; });
-  };
+  });
   node.appendChild(form);
 }
 

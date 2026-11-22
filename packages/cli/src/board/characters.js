@@ -2,7 +2,7 @@
 // series, to take into a new music video or series canon with one click.
 //   #/characters        the gallery, a new character, import from a project
 //   #/characters/<id>   one character: files, states, where it is used, use it
-import { addStrings, api, el, go, post, setLang, showError, t, upload } from './lib.js';
+import { addStrings, api, el, go, pending, post, setLang, showError, t, upload } from './lib.js';
 
 addStrings({
   de: {
@@ -82,10 +82,9 @@ function newCharacterForm(onCreated) {
     el('div', { class: 'form-row' }, [field(t('voice'), voice), field(t('transcript'), transcript)]),
     progress, el('button', { class: 'primary', type: 'submit', text: t('createChar') })
   ]);
-  form.onsubmit = function (event) {
-    event.preventDefault();
+  form.onsubmit = pending(function () {
     progress.className = 'meta';
-    post('/api/library/new', { name: name.value, description: description.value, prompt: prompt.value, tags: tags.value, face: face.value }).then(function (created) {
+    return post('/api/library/new', { name: name.value, description: description.value, prompt: prompt.value, tags: tags.value, face: face.value }).then(function (created) {
       const files = [];
       if (sheet.files[0]) files.push({ file: sheet.files[0], role: 'sheet' });
       Array.prototype.forEach.call(images.files, function (file) { files.push({ file: file, role: 'ref' }); });
@@ -99,21 +98,21 @@ function newCharacterForm(onCreated) {
       });
       return chain.then(function () { onCreated(created.id); });
     }).catch(function (error) { progress.textContent = error.message; progress.className = 'error'; });
-  };
+  });
   return form;
 }
 
 function importForm(data, refresh) {
   const target = el('select', { class: 'text' }, data.targets.map(function (x) { return el('option', { value: targetValue(x), text: targetLabel(x) }); }));
   const result = el('p', { class: 'meta' });
-  const button = el('button', { class: 'small', text: t('libImportButton'), onclick: function () {
+  const button = el('button', { class: 'small', text: t('libImportButton'), onclick: pending(function () {
     const parts = target.value.split('/');
-    post('/api/library/import', { scope: parts[0], slug: parts[1] }).then(function (r) {
+    return post('/api/library/import', { scope: parts[0], slug: parts[1] }).then(function (r) {
       result.className = 'meta';
       result.textContent = r.results.length ? t('libImported')(r.results.length) + ': ' + r.results.map(function (x) { return x.character + ' → ' + x.id; }).join(', ') : t('libNothing');
       refresh(r);
     }).catch(function (error) { result.textContent = error.message; result.className = 'error'; });
-  } });
+  }) });
   return el('section', { class: 'card' }, [
     el('h3', { text: t('libImport'), style: 'margin:0 0 6px' }), el('p', { class: 'meta', text: t('libImportHelp') }),
     data.targets.length ? el('div', { class: 'form-row' }, [target, button]) : null, result
@@ -154,10 +153,10 @@ function gallery() {
 // ------------------------------------------------------------------- detail
 
 function fileTile(entry, name, label, refresh) {
-  const remove = el('button', { class: 'small', text: t('removeFile'), onclick: function () {
+  const remove = el('button', { class: 'small', text: t('removeFile'), onclick: pending(function () {
     if (!window.confirm(t('confirmRemoveFile')(name))) return;
-    post('/api/library/' + encodeURIComponent(entry.id), { action: 'remove-file', name: name }).then(refresh).catch(showError);
-  } });
+    return post('/api/library/' + encodeURIComponent(entry.id), { action: 'remove-file', name: name }).then(refresh).catch(showError);
+  }) });
   const isAudio = /\.wav$/i.test(name);
   return el('div', { class: 'file' }, [
     isAudio ? el('audio', { controls: true, preload: 'none', src: libraryFile(entry.id, name) })
@@ -177,9 +176,9 @@ function editForm(entry, done) {
     el('div', { class: 'form-row' }, [field(t('prompt'), prompt)]),
     error,
     el('div', { class: 'form-row' }, [
-      el('button', { class: 'primary', text: t('save'), onclick: function () {
-        post('/api/library/' + encodeURIComponent(entry.id), { action: 'update', name: name.value, description: description.value, prompt: prompt.value, tags: tags.value }).then(done).catch(function (e) { error.textContent = e.message; });
-      } }),
+      el('button', { class: 'primary', text: t('save'), onclick: pending(function () {
+        return post('/api/library/' + encodeURIComponent(entry.id), { action: 'update', name: name.value, description: description.value, prompt: prompt.value, tags: tags.value }).then(done).catch(function (e) { error.textContent = e.message; });
+      }) }),
       el('button', { class: 'small', text: t('cancel'), onclick: done })
     ])
   ]);
@@ -211,10 +210,10 @@ function detail(id) {
     const useResult = el('p', { class: 'meta' });
     node.appendChild(el('section', { class: 'card' }, [
       el('h3', { text: t('useIn'), style: 'margin:0 0 8px' }),
-      data.targets.length ? el('div', { class: 'form-row' }, [target, el('button', { class: 'primary', text: t('useButton'), onclick: function () {
+      data.targets.length ? el('div', { class: 'form-row' }, [target, el('button', { class: 'primary', text: t('useButton'), onclick: pending(function () {
         const parts = target.value.split('/');
-        post('/api/library/use', { scope: parts[0], slug: parts[1], id: entry.id, states: checks.chosen() }).then(function (r) { useResult.className = 'meta'; useResult.textContent = t('used')(r.result); }).catch(function (e) { useResult.textContent = e.message; useResult.className = 'error'; });
-      } })]) : null,
+        return post('/api/library/use', { scope: parts[0], slug: parts[1], id: entry.id, states: checks.chosen() }).then(function (r) { useResult.className = 'meta'; useResult.textContent = t('used')(r.result); }).catch(function (e) { useResult.textContent = e.message; useResult.className = 'error'; });
+      }) })]) : null,
       checks.node ? el('p', { class: 'meta', text: t('statesHelp') }) : null, checks.node, useResult,
       el('p', { class: 'meta' }, [el('b', { text: t('usedIn') + ': ' })].concat(entry.usedIn.length ? entry.usedIn.map(function (use, index) {
         return el('span', {}, [index ? ', ' : '', el('a', { href: (use.scope === 'series' ? '#/s/' : '#/p/') + use.slug, text: use.slug })]);
@@ -233,7 +232,7 @@ function detail(id) {
     const progress = el('span', { class: 'sub' });
     node.appendChild(el('section', { class: 'card' }, [
       el('h3', { text: t('refs'), style: 'margin:0 0 4px' }), el('div', { class: 'files' }, tiles),
-      el('div', { class: 'form-row', style: 'margin-top:12px;align-items:center' }, [file, el('span', { class: 'meta', text: t('role') }), role, transcript, el('button', { class: 'small', text: t('addFile'), onclick: function () {
+      el('div', { class: 'form-row', style: 'margin-top:12px;align-items:center' }, [file, el('span', { class: 'meta', text: t('role') }), role, transcript, el('button', { class: 'small', text: t('addFile'), onclick: pending(function () {
         let chain = Promise.resolve();
         Array.prototype.forEach.call(file.files, function (f) {
           chain = chain.then(function () {
@@ -241,8 +240,8 @@ function detail(id) {
             return upload('/api/upload/library/' + encodeURIComponent(entry.id) + query, f, function (share) { progress.textContent = Math.round(share * 100) + '%'; });
           });
         });
-        chain.then(refresh).catch(function (e) { progress.textContent = e.message; progress.className = 'error'; });
-      } }), progress])
+        return chain.then(refresh).catch(function (e) { progress.textContent = e.message; progress.className = 'error'; });
+      }, { spinner: false }) }), progress])
     ]));
 
     // States
@@ -258,10 +257,10 @@ function detail(id) {
         return el('li', { text: h.at.slice(0, 10) + ' · ' + h.from + ' · ' + h.added.join(', ') });
       }))]));
     }
-    node.appendChild(el('button', { class: 'small', text: t('deleteChar'), onclick: function () {
+    node.appendChild(el('button', { class: 'small', text: t('deleteChar'), onclick: pending(function () {
       if (!window.confirm(t('confirmDelete'))) return;
-      post('/api/library/' + encodeURIComponent(entry.id), { action: 'delete' }).then(function () { go('#/characters'); }).catch(showError);
-    } }));
+      return post('/api/library/' + encodeURIComponent(entry.id), { action: 'delete' }).then(function () { go('#/characters'); }).catch(showError);
+    }) }));
   }).catch(showError);
 }
 
@@ -295,12 +294,12 @@ export function libraryPicker(scope, slug, onChange) {
           el('div', { class: 'meta clamp', text: entry.description }),
           checks.node, message
         ]),
-        el('button', { class: 'small', text: t('useButton'), onclick: function () {
-          post('/api/library/use', { scope: scope, slug: slug, id: entry.id, states: checks.chosen() }).then(function (r) {
+        el('button', { class: 'small', text: t('useButton'), onclick: pending(function () {
+          return post('/api/library/use', { scope: scope, slug: slug, id: entry.id, states: checks.chosen() }).then(function (r) {
             message.textContent = t('used')(r.result);
             if (onChange) onChange();
           }).catch(function (e) { message.textContent = e.message; message.className = 'error'; });
-        } })
+        }) })
       ]));
     });
     box.appendChild(list);

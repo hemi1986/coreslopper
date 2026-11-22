@@ -30,11 +30,11 @@ The board's views live in `packages/cli/src/board/*.js` with the shared helpers 
 `lib.js`. One shared helper per case keeps the views from each building their own.
 
 ## Acceptance Criteria
-- [ ] Every view of the board (production, project, series, calendar, characters, wizard, guide, release) shows the spinner in the main area when its data takes longer than 200 ms, and none when it answers faster
-- [ ] Every button that sends a request is disabled with a spinner until the answer arrives; a double click sends one request (checked with a slowed request in the sandbox)
-- [ ] After a refused request the button is enabled again and the refusal is shown as before
-- [ ] Uploads show their percentage as before
-- [ ] The spinner's label exists in German and English and a screen reader announces it
+- [x] Every view of the board (production, project, series, calendar, characters, wizard, guide, release) shows the spinner in the main area when its data takes longer than 200 ms, and none when it answers faster
+- [x] Every button that sends a request is disabled with a spinner until the answer arrives; a double click sends one request (checked with a slowed request in the sandbox)
+- [x] After a refused request the button is enabled again and the refusal is shown as before
+- [x] Uploads show their percentage as before
+- [x] The spinner's label exists in German and English and a screen reader announces it
 
 ## Out of Scope
 - A spinner for work that runs outside the board's requests (a stage, a render); the production view already shows those states
