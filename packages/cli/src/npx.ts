@@ -56,7 +56,7 @@ function workspaceSummary(root: string): void {
 const program = new Command();
 program
   .name('coreslopper')
-  .description('Create and manage a coreslopper music-video workspace.')
+  .description('Create and manage a coreslopper workspace for music videos and series.')
   .version(ownVersion())
   .showHelpAfterError();
 
@@ -127,7 +127,7 @@ program
 
 program
   .command('doctor [dir]')
-  .description('Check the workspace, tools, and credentials.')
+  .description('Check the workspace, its files and layout, tools, provider keys, and publishing credentials.')
   .option('--json', 'Print machine-readable JSON')
   .action((dir: string | undefined, options: { json?: boolean }) =>
     run(async () => {

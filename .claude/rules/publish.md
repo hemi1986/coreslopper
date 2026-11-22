@@ -77,7 +77,6 @@ All are in `docs/glossary.md`. A publish upload never goes public; a post does.
 - `TIKTOK_DIRECT_POST` is read as `1/true/yes` for the scopes, but only as `1` by the runner (G-172).
 - `retries` counts failed attempts. Lateness counts from the calendar time, also for the upload a day ahead.
 - The timer, its script and its lock are named after `release-run` but run the whole watchdog round (G-178).
-- Docs drifted: ADR 0023's "nothing public", `docs/publishing.md`, the board's "they stay manual" (G-171).
 
 ## Read next
 

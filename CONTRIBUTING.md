@@ -50,6 +50,26 @@ npm run dev:workspace                 # creates or updates ../coreslopper-sandbo
 npm run dev:workspace -- ../other-dir
 ```
 
+## Engineering workflow (Kataster)
+
+Of the two layers ([The workspace payload](#the-workspace-payload), [ADR 0036](docs/adr/0036-workspace-payload.md)), the engineering layer is the [Kataster](https://www.npmjs.com/package/kataster) agent workflow in its standard form. Claude Code and OpenCode load it from `.claude/` and `.opencode/`. Its map is [docs/workflow.md](docs/workflow.md), which lists the sources of truth, commands, phases, and rules. Read it when you are unsure where something belongs.
+
+| Where | What |
+|---|---|
+| `docs/workflow.md` | The map. |
+| `docs/domain/` | The domain model (`events.yaml`), the context maps, the adoption report, and the gap register (`gap-register.md`), which lists where the code and the decided model still differ. |
+| `docs/architecture/` | The repository map, the logical data model, and the package boundaries with their baseline. |
+| `docs/stories/` | The stories, the generated `BACKLOG.md`, and `OPEN_QUESTIONS.md`. |
+| `.claude/rules/` | One file per adopted slice: its boundary, its rules, and its typical pitfalls. |
+
+To make a change:
+
+1. `/feature <idea>` grills the idea and writes stories into `docs/stories/`. A story the spec linter accepts waits for your review before it is `ready`. Refactorings, dependencies, and docs are `chore` or `task` stories in the fast lane.
+2. `/implement [ST-NNN]` builds one `ready` story on its own branch and scales the review to the diff.
+3. Run the gate before you open a pull request: `node .claude/skills/implement/scripts/verify.ts`.
+
+None of it reaches a workspace: `scripts/runtime-files.mjs` classifies the engineering layer as not shipped, and the runtime build fails on a tracked file it does not classify.
+
 ## Skills
 
 Product skills live in `workspace/.claude/skills/`. Use the vendored `writing-for-agents` skill when creating or editing a skill. Own skills use only:

@@ -85,8 +85,8 @@ Container (`docs/glossary.md`); Workspace Payload, Engineering Layer, Sandbox Wo
   unnamed (G-181, medium).
 - The upstream CI ships into workspaces and calls `npm run build`, which the runtime's `package.json` removed
   (G-183, medium).
-- `docs/onboarding.md` says to run `update --force` once without a baseline. A plain update records the baseline;
-  `--force` overwrites local edits (G-186, medium).
+- Without a baseline a plain update writes a conflict copy for every file that differs and records the baseline;
+  `--force` overwrites local edits instead (G-186, closed).
 - A directory without a marker passes as a workspace, and so does the upstream repository (G-185).
 - `update` is in the npx CLI only, `migrate-layout` in the workspace CLI only. The workspace CLI's `init` finds no
   runtime in a workspace (G-188).

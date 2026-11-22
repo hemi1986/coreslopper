@@ -14,8 +14,8 @@ import {
 } from '@coreslopper/providers';
 import { BatchSchema, runBatch, type BatchTarget } from '../packages/cli/src/generate.js';
 
-// Characterization tests for the generation slice (adopted 2026-11-21, docs/domain/adoption-report.md).
-// They pin what runBatch and the generation runner do today, not what the gap register wants.
+// Characterization tests from the adoption of the generation slice (2026-11-21).
+// They pin what runBatch and the generation runner do today; they do not assert what they should do.
 
 function target(
   providers: Record<string, string>,

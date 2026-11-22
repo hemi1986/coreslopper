@@ -304,7 +304,7 @@ export async function updateWorkspace(options: UpdateOptions): Promise<UpdateRes
   }
   if (!hadBaseline) {
     warnings.push(
-      'This workspace has no recorded baseline, so every file that differs from upstream counts as a local change. Review the conflicts, or commit and rerun with --force.',
+      `This workspace has no recorded baseline, so every file that differs from upstream is a conflict this once. ${dryRun ? 'A real run records the baseline' : 'The baseline is recorded now'}, so later updates merge normally; --force would overwrite your local edits.`,
     );
   }
 

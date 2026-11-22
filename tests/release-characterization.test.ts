@@ -12,8 +12,8 @@ import {
 } from '../packages/core/src/index.ts';
 import { uploadYaml } from './helpers/release-fixture.ts';
 
-// Characterization tests for the release slice (adopted 2026-11-22, docs/domain/adoption-report.md). They pin what
-// the code does today and the decided model keeps, not what the gap register wants.
+// Characterization tests from the adoption of the release slice (2026-11-22).
+// They pin what the code does today and the decided model keeps; they do not assert what it should do.
 
 const schedule = ReleaseScheduleSchema.parse({ version: 1 });
 const now = new Date('2026-11-21T09:00:00Z');

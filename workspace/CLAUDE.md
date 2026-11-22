@@ -31,7 +31,7 @@ Create a workspace with `npx coreslopper init <dir>` (or `npx coreslopper@latest
 
 ## Hooks
 
-`.claude/settings.json` registers a `PostToolUse` hook for `Write|Edit`. It validates changes to `storyboard.yaml`, `timing.json`, `timing.overrides.json`, `project.yaml`, `state.json`, `style.yaml`, `characters.yaml`, `script.yaml`, `series.yaml`, `sets.yaml`, `review/upload.yaml`, `review/calendar.yaml`, and the replies to review rounds (`review/rounds/<NNN>.replies.json`) in projects and series canons, the workspace's `config/channel.yaml` and `config/release-schedule.yaml`, and the character library's `library/characters/<id>/character.yaml`. Exit code 2 blocks the edit and returns the validation message.
+`.claude/settings.json` registers a `PostToolUse` hook for `Write|Edit|MultiEdit`. It validates changes to `storyboard.yaml`, `timing.json`, `timing.overrides.json`, `project.yaml`, `state.json`, `style.yaml`, `characters.yaml`, `script.yaml`, `series.yaml`, `sets.yaml`, `references.yaml`, `review/upload.yaml`, `review/calendar.yaml`, and the replies to review rounds (`review/rounds/<NNN>.replies.json`) in projects and series canons, the workspace's `config/channel.yaml` and `config/release-schedule.yaml`, and the character library's `library/characters/<id>/character.yaml`. Exit code 2 blocks the edit and returns the validation message.
 
 The hook calls `npm run cli -- validate-file <file>`, which is also runnable by hand.
 

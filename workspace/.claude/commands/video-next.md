@@ -70,4 +70,4 @@ Report the hard stop with the exact command the user can run to continue.
 
 ## After the pipeline
 
-The pipeline ends with `qa-export`. Uploading is the user's step: `publish` reaches YouTube and TikTok, so this command never runs `publish` or `publish-auth`, and neither does a stage runner. When the project is done, point the user to `npm run cli -- publish projects/<slug> --dry-run` and [docs/publishing.md](../../docs/publishing.md).
+The pipeline ends with `qa-export`. Uploading is the user's step: `publish` reaches YouTube and TikTok, so this command never runs `publish` or `publish-auth`, and neither does a stage runner. When the project is done, point the user to the board's release view (`npm run cli -- board`, a server they start themselves), where they post, tick off what went live, and approve the release for the autopilot; [docs/publishing.md](../../docs/publishing.md) covers `publish` and the autopilot.

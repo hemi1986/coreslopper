@@ -20,3 +20,9 @@ Publish the root package as `coreslopper` with a small `init`/`doctor`/`new`/`st
 - The npm tarball includes the runtime (~1.2 MB compressed) and must be rebuilt with `npm run build` before publishing.
 - Tool installation is best-effort: Node itself and fal.ai/Suno accounts remain the user's responsibility.
 - Secrets never enter the package or the repository: `.env` is local and gitignored, Suno uses MCP OAuth, and `--fal-key` is supported only for automation.
+
+## Note — 2026-11-22
+
+[ADR 0012](0012-workspace-update.md) replaced `init --force` with `update` as the way to update a workspace, and [ADR 0047](0047-workspace-marker-and-visible-conflicts.md) (proposed) amends both. Two more statements no longer hold:
+- `init` writes no `.mcp.json`. The pipeline needs no MCP server, and the song is always the user's own. `init` stores `FAL_KEY`, `HIGGSFIELD_API_KEY`, `TOPVIEW_API_PLATFORM_KEY`, and the optional YouTube and TikTok app credentials in `.env`.
+- The npx CLI has `init`, `update`, `doctor`, `new`, `status`, and `validate`.

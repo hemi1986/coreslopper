@@ -7,9 +7,8 @@ import { LibraryCharacterSchema, ReferencesSchema, type LoadedProject, type Shot
 import { addLibraryCharacter, addLibraryFile, entryDir, removeLibraryFile } from '../packages/cli/src/character-library.ts';
 import { shotReferences } from '../packages/cli/src/queue.ts';
 
-// Characterization tests for the bibles and the character library (adopted 2026-11-22,
-// docs/domain/adoption-report.md). They pin what the code does today and the decided model keeps, not what the gap
-// register wants.
+// Characterization tests from the adoption of the bibles and the character library (2026-11-22).
+// They pin what the code does today and the decided model keeps; they do not assert what it should do.
 
 const temporary: string[] = [];
 afterEach(async () => {

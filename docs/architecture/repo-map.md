@@ -79,11 +79,11 @@ node .claude/skills/adopt/scripts/repo-map.ts --adopt-slice <name>
 
 | # | Package | Score | Why |
 |---|---|---|---|
-| 1 | `packages/cli` (@coreslopper/cli) | 0.61 | 320 changed files in recent history; shared library; shared infrastructure – not a domain slice |
-| 2 | `scripts/audio-analysis` (coreslopper-audio-analysis) | 0.19 | 24 changed files in recent history |
-| 3 | `packages/remotion` (@coreslopper/remotion) | 0.16 | 61 changed files in recent history; shared library; shared infrastructure – not a domain slice |
-| 4 | `packages/core` (@coreslopper/core) | 0.04 | 111 changed files in recent history; shared library; layer package – hosts many concepts, not a domain slice |
-| 5 | `packages/providers` (@coreslopper/providers) | 0.03 | 77 changed files in recent history; shared library; layer package – hosts many concepts, not a domain slice |
+| 1 | `packages/cli` (@coreslopper/cli) | 0.61 | 358 changed files in recent history; shared library; shared infrastructure – not a domain slice |
+| 2 | `scripts/audio-analysis` (coreslopper-audio-analysis) | 0.19 | 27 changed files in recent history |
+| 3 | `packages/remotion` (@coreslopper/remotion) | 0.16 | 62 changed files in recent history; shared library; shared infrastructure – not a domain slice |
+| 4 | `packages/core` (@coreslopper/core) | 0.04 | 119 changed files in recent history; shared library; layer package – hosts many concepts, not a domain slice |
+| 5 | `packages/providers` (@coreslopper/providers) | 0.03 | 80 changed files in recent history; shared library; layer package – hosts many concepts, not a domain slice |
 
 ## Suggested first slice
 

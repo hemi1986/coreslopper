@@ -1,5 +1,5 @@
-// Characterization tests for the project and stage pipeline: they pin existing behaviour the domain model
-// confirmed (docs/domain/events.yaml, AGG-Project), not the behaviour it still wants.
+// Characterization tests from the adoption of the pipeline slice (2026-11-21).
+// They pin the project's stage behaviour the domain model confirmed; they do not assert what it should do.
 import { describe, expect, it } from 'vitest';
 import {
   BudgetError,
