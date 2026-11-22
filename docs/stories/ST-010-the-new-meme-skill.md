@@ -8,7 +8,7 @@ size: null
 risk: null
 depends_on: [ST-006, ST-008, ST-009]
 labels: [feature:meme]
-status: in-progress
+status: done
 ---
 
 ## Task
@@ -27,8 +27,8 @@ What it does (Q9, Q15):
    completes the `script` stage; then names `/video-next <slug>`.
 
 ## Acceptance Criteria
-- [ ] The skill exists in `workspace/.claude/skills/new-meme/` and is listed in `workspace/AGENTS.md` and `skills-lock.json` where own skills are listed
-- [ ] It reads pitch, references, characters and the sound library before the first question
-- [ ] It proposes library sounds with the reason from their use when and writes `sound: <id>` lines; it falls back to a prompt line and says so
-- [ ] Its script passes the meme validation (ST-009) and it completes `script` through `stage-done`
-- [ ] Tried end to end in a sandbox workspace (`npm run dev:workspace`) with a library of three sounds
+- [x] The skill exists in `workspace/.claude/skills/new-meme/` and is listed in `workspace/AGENTS.md` and `skills-lock.json` where own skills are listed
+- [x] It reads pitch, references, characters and the sound library before the first question
+- [x] It proposes library sounds with the reason from their use when and writes `sound: <id>` lines; it falls back to a prompt line and says so
+- [x] Its script passes the meme validation (ST-009) and it completes `script` through `stage-done`
+- [x] Tried end to end in a sandbox workspace (`npm run dev:workspace`) with a library of three sounds
