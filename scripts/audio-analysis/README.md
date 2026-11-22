@@ -27,7 +27,7 @@ uv run python analyze.py --project ../../projects/my-video --device cuda
 
 Useful flags:
 
-- `--vocals <path>` — use an existing vocal stem (`audio/stems/vocals.wav` after `import-song`).
+- `--vocals <path>` — use this vocal stem. Default: the stem `song.json` records, else `audio/stems/vocals.wav` if present.
 - `--no-separate` — do not run Demucs; analyze the mix.
 - `--skip-asr` — distribute lyric timings without WhisperX. Use only for fixtures or motion-only demos.
 - `--language <code>` — sung language for ASR and alignment. Default: `language` from `song.json`, else WhisperX auto-detection.
@@ -39,7 +39,7 @@ Useful flags:
 
 Lyrics-first: `lyrics.txt` is authoritative for text, order, and section tags; ASR only supplies timestamps.
 
-1. Separate vocals with Demucs when no stem is supplied.
+1. Separate vocals with Demucs when the project has no vocal stem.
 2. Compute BPM, beats, onsets, and RMS energy with librosa.
 3. Transcribe the vocals with WhisperX in the project language and collect word timestamps.
 4. Split the lyrics into timed lines and stage directions. A line that is only `(Vibration.)` becomes a cue in `meta.cues`; `(Spoken) Hallo.` becomes a spoken line (`meta.lineKinds`).

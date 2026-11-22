@@ -50,16 +50,35 @@ def project_language(project: Path) -> str | None:
     return str(value) if value else None
 
 
+def imported_vocals(project: Path) -> Path | None:
+    """The vocal stem already in the project: song.json `vocals`, else audio/stems/vocals.wav."""
+    song = project / "song.json"
+    recorded: str | None = None
+    if song.exists():
+        try:
+            value = json.loads(song.read_text(encoding="utf-8")).get("vocals")
+        except (OSError, ValueError):
+            value = None
+        recorded = str(value) if value else None
+    for candidate in ([project / recorded] if recorded else []) + [project / "audio" / "stems" / "vocals.wav"]:
+        if candidate.exists():
+            return candidate
+    return None
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project", required=True, help="Project directory")
     parser.add_argument("--audio", help="Mixed song path (default: <project>/audio/song.wav)")
-    parser.add_argument("--vocals", help="Existing vocal stem path")
+    parser.add_argument(
+        "--vocals",
+        help="Existing vocal stem path (default: song.json `vocals`, else <project>/audio/stems/vocals.wav if present)",
+    )
     parser.add_argument(
         "--separate",
         action=argparse.BooleanOptionalAction,
         default=True,
-        help="Separate vocals with Demucs when no stem is supplied",
+        help="Separate vocals with Demucs when the project has no stem",
     )
     parser.add_argument("--device", choices=["auto", "cuda", "cpu"], default="auto")
     parser.add_argument("--demucs-model", default="htdemucs_ft")
@@ -341,7 +360,9 @@ def main() -> int:
         return 2
 
     device = resolve_device(args.device)
-    vocals_path = Path(args.vocals).resolve() if args.vocals else None
+    vocals_path = Path(args.vocals).resolve() if args.vocals else imported_vocals(project)
+    if vocals_path is not None and not args.vocals:
+        print(f"Using the vocal stem {vocals_path}; delete it to separate the mix with Demucs again.")
     if vocals_path is None and args.separate:
         vocals_path = separate_vocals(
             audio_path,

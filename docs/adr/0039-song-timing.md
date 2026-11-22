@@ -47,8 +47,8 @@ skill, the glossary, and the code partly disagree (`docs/domain/adoption-report.
 
 ## Consequences
 
-- Several of these rules are ahead of the code. Today the analysis turns parenthesized lines into untimed cues
-  and overwrites an imported stem when `--vocals` is missing. It falls back silently and skips its schema check
+- Several of these rules are ahead of the code. Today the analysis turns parenthesized lines into untimed cues.
+  It falls back silently and skips its schema check
   when run from its own directory. Section ids drift from the tag text, and the timing check skips lines inside
   sections. An unknown override breaks every command, and `validate` needs a storyboard. Gaps G-49 and later in
   `docs/domain/gap-register.md`.
