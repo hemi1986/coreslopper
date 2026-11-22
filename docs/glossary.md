@@ -697,29 +697,53 @@ _Avoid_: captions, lyrics
 ## Model bench
 
 **Model Bench**:
-The fixed comparison of generation models and servers on scenes from past projects, stored in `bench/`. It informs model choices; it never produces project assets.
+The fixed comparison of generation models and servers on scenes from past projects, run in the workspace and stored in `bench/`. It informs model choices; it never produces project assets.
 _Avoid_: test suite, eval, benchmark project
 
 **Bench Case**:
-One scene that once broke or was hard, with its prompt, seed, inputs, known good result, and rubric, in `bench/cases/<id>.yaml`.
+One scene that once broke or was hard, with its prompt, seed, inputs, known good result, the failure it stresses (`focus`), and rubric, in `bench/cases/<id>.yaml`. A case is a fixed input, not a recommended prompt.
 _Avoid_: test, scenario, shot (a **Shot** belongs to a storyboard)
 
+**Bench Set**:
+A named selection of bench cases, such as `core` (every case), `smoke` (a quick check that a target works at all), or `portrait`. A case belongs to one or more sets.
+_Avoid_: set (a **Set** is a location), suite
+
 **Bench Target**:
-A named way to run operations: a provider, a ComfyUI workflow or model slug per operation, its params, and optionally another ComfyUI server.
+A named way to run operations: a provider, a ComfyUI workflow or model slug per operation, its params, and optionally another ComfyUI server. A target runs only the operations it lists; a case it cannot run is skipped, not failed.
 _Avoid_: model, backend, config
 
 **Bench Fixture**:
-A media file a bench case needs (keyframe, reference, vocal segment, known good result), copied from a workspace project by `bench import`. Fixtures are never committed.
+A media file a bench case needs (keyframe, reference, vocal segment, known good result), copied from the projects of the workspace, or of another workspace, by `bench import`. Fixtures are never committed.
 _Avoid_: asset, sample
 
+**Known Good Result**:
+The result the source project accepted for a bench case, shown beside every target's result as the bar to meet, not a target to copy. A case without one loses only that column.
+_Avoid_: golden, reference (a reference is an input)
+
 **Bench Run**:
-One execution of selected bench cases on selected bench targets, stored in `bench/runs/<id>/` with its results, scores, ratings, and comparison page.
+One execution of selected bench cases on selected bench targets, stored in `bench/runs/<id>/` with its results, scores, ratings, and comparison page. A run is extended by running again with its id.
 _Avoid_: job, batch
 
+**Bench Result**:
+The outcome of one bench case on one bench target for one seed: ok, refused, error, or skipped, with its files, time, cost, size, VRAM peak, and, when asked for, whether a second render gave the same bytes and the word error rate of its speech. A refusal is a result; an error is not scored.
+_Avoid_: generation, attempt (an **Attempt** belongs to the generation queue), cell
+
+**Frame Strip**:
+A row of frames of a bench result's clip at the case's positions, the first thing the art director and the user look at.
+_Avoid_: contact sheet (a **Contact Sheet** belongs to a storyboard), thumbnails
+
 **Rubric**:
-The weighted criteria of a bench case, each scored 0 (fail), 1 (weak), or 2 (pass) by the art director.
+The weighted criteria of a bench case, each naming one observable way the scene fails, scored 0 (fail), 1 (weak), or 2 (pass) by the art director.
 _Avoid_: checklist, test
 
+**Bench Score**:
+The art director's points for one bench result against the case's rubric, with a pass, weak, or fail outcome and a note that names the frame and the failure. A bench score is not a **Verdict**: it never files or requeues anything.
+_Avoid_: verdict, rating
+
 **Rating**:
-The user's own 1-5 grade of a bench result, given on the comparison page and exported as `ratings.json`.
-_Avoid_: score (the art director's rubric result)
+The user's own 1-5 grade of a bench result, with an optional note, given on the comparison page and exported as `ratings.json`. The user's ratings break ties between bench scores.
+_Avoid_: score (the art director's rubric result), grade, stars
+
+**Bench Budget**:
+The `budget_usd` of the bench in `bench/bench.yaml`, with its spend in `bench/state.json`, separate from every **Project Budget**. A bench run whose estimate exceeds it is refused before the first call.
+_Avoid_: project budget, credits

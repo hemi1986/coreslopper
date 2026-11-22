@@ -15,7 +15,7 @@
 # Slices adopted 2026-11-21: project and stage pipeline (confirmed); human review (confirmed); art-director verdicts and the
 # generation queue (decided by recommendation, not reviewed by the user – see the adoption report); song timing and lyrics
 # (decided by recommendation, four answers from the user); storyboard and generation (decided by recommendation, four answers from the user each).
-# Slices adopted 2026-11-22: series; bibles and the character library; render; release; publishing (decided by recommendation, four answers from the user each).
+# Slices adopted 2026-11-22: series; bibles and the character library; render; release; publishing; the workspace; the model bench (decided by recommendation, four answers from the user each).
 # See docs/domain/adoption-report.md.
 
 version: 1
@@ -43,6 +43,9 @@ actors:
   - id: ACT-Watchdog
     name: Watchdog round
     description: The round watch runs every few minutes – in the board container (board --watch 5) or from release-timer – the release autopilot first, then the production scan (ADR 0031); it never approves and never starts Claude Code
+  - id: ACT-BenchSkill
+    name: Model bench skill
+    description: The model-bench skill in Claude Code – maps the user's comparison to targets and cases, imports fixtures, estimates, runs, dispatches one art director per case, rebuilds the report and ends with a recommendation per operation (workspace/.claude/skills/model-bench/SKILL.md)
 external_systems:
   - id: EXT-Provider
     name: Generation provider
@@ -138,6 +141,10 @@ bounded_contexts:
   - id: BC-Workspace
     name: Workspace
     purpose: Gives the user a private, self-contained workspace and keeps it current – init and its onboarding copy the runtime snapshot, store the provider keys and record the baseline; update merges a newer runtime against the baseline without losing the user's own edits; doctor checks the workspace, tools and keys; migrate-layout moves an old layout; the board container runs the board and its watchdog. Upstream, the runtime build decides what ships
+
+  - id: BC-Bench
+    name: Model bench
+    purpose: Replays fixed scenes from past projects – the bench cases – on several bench targets before a model, workflow, server or provider switch, measures every result mechanically, has the art director score it against the case's rubric and the user rate it, and ends with a recommendation per operation; it has its own budget and never produces project assets
 
 aggregates:
   - id: AGG-Project
@@ -550,7 +557,43 @@ aggregates:
       - The runtime's package.json is private and has no bin, files, publish settings or build scripts (the code does this, build-runtime.mjs:61-79)
       - The npx CLI carries no render stack – Remotion and React stay development dependencies the workspace installs (the code does this, package.json; tsup.config.ts:14-16; guarded only by the CI pack smoke test – gap register)
       - Only what a workspace can run ships into it – the upstream CI does not (decided 2026-11-22, HS-211; ci.yml ships and runs a build the workspace lacks – gap register)
-
+  - id: AGG-BenchCase
+    name: Bench case
+    context: BC-Bench
+    status: as-is
+    evidence:
+      - bench/cases/<id>.yaml, one file per case, parsed whole by BenchCaseSchema with its cross-field rules; a case is valid or not loaded (packages/core/src/bench.ts:17-129,245-258)
+    invariants:
+      - Every input and the known good result name one of the case's fixtures (the code does this, core/src/bench.ts:102-108)
+      - An operation gets the inputs it needs – references for edits, image-to-video, lip-sync and reference-to-video, exactly two for first-last-frame, none for text-to-image, text-to-video and audio, an audio input for lip-sync, a flex prompt for reference-to-video (the code does this, core/src/bench.ts:109-125)
+      - Rubric criteria have unique ids and a weight of at least 1 (the code does this, core/src/bench.ts:45-49,126-128)
+      - A case's id is its file name (the code does this, core/src/bench.ts:252-254)
+      - Params in a case are portable; ComfyUI node ids belong in a target (the code does this for the tracked cases only, tests/bench.test.ts:115-129; ADR 0020)
+      - A case names its source project by slug, and its fixtures by paths inside that project – so it belongs to the workspace that holds the project (decided 2026-11-22, HS-226; the tracked cases ship upstream to every workspace – gap register)
+  - id: AGG-BenchRun
+    name: Bench run
+    context: BC-Bench
+    status: as-is
+    evidence:
+      - bench/runs/<id>/run.json, the run's cases, targets, seeds and results keyed by <case>/<target>/<seed index>, loaded once and written whole and atomically after every result (packages/cli/src/bench.ts:127-136,523-539,698-700)
+    invariants:
+      - One result per result key; a later result for the same key replaces the earlier one (the code does this, bench.ts:140,489-493)
+      - The n-th seed of a case is the case's seed plus n times 101 (the code does this, bench.ts:145-147)
+      - A target that does not run a case's operation, or a reference-to-video target for a case without a flex prompt, gives a skipped result, never a failed one (the code does this, bench.ts:293-299,563-569)
+      - A refusal by the provider is a result, not an error; an error is never scored (the code does this for the status, bench.ts:686-691; the report counts a scored error – gap register)
+      - Running again with a run's id fills the gaps – ok and refused results stay, unless --fresh, and the estimate counts only what is left (decided 2026-11-22, HS-228; every planned item runs again – gap register)
+      - Every generation goes through the generation funnel with the target's provider, workflow folder and server (the code does this for runBatch, bench.ts:577,634,675; ADR 0041; Pika classification and reference-to-video ignore the target – gap register)
+  - id: AGG-BenchBudget
+    name: Bench budget
+    context: BC-Bench
+    status: as-is
+    evidence:
+      - bench/state.json, the bench's spend, its total overwritten from bench/bench.yaml budget_usd on every load and saved atomically by the generation funnel's recordSpend (packages/cli/src/bench.ts:268-277,354-360; packages/cli/src/generate.ts:756-759)
+    invariants:
+      - The bench budget is separate from every project budget; a bench run never bills a project (the code does this, bench.ts:347-361)
+      - A bench run's whole estimate fits the remaining bench budget and its batch cap before the first call (the code does this, bench.ts:600; tests/bench.test.ts:254)
+      - One batch cap holds for the whole run and for each of its generations – batch_cap_usd, or the whole remaining bench budget when it is not set (decided 2026-11-22, HS-230; each generation falls back to 30 % – gap register)
+      - No bench run loses another's spend, and no charged generation goes unrecorded (decided 2026-11-22, HS-237; state.json has no lock, and spend above the estimate is thrown before it is saved – gap register)
 events:
   - id: EVT-ProjectCreated
     name: Project created
@@ -1172,7 +1215,84 @@ events:
     context: BC-Workspace
     data: [Lock hash, Port]
     description: "docker compose up started the board and its watchdog on 127.0.0.1; the entrypoint ran npm ci into the node_modules volume when package-lock.json changed, then dropped to the workspace owner's user (docker/entrypoint.sh; compose.yaml)"
-
+  - id: EVT-BenchCaseAdded
+    name: Bench case added
+    context: BC-Bench
+    aggregate: AGG-BenchCase
+    data: [Case id, Sets, Operation, Role, Source project, Fixtures, Rubric]
+    description: "A case file written into bench/cases/ from a scene of a source project – prompt, seed, references and the accepted result from its manifest – and checked with bench list (workspace/.claude/skills/model-bench/SKILL.md, Adding a case)"
+  - id: EVT-BenchTargetAdded
+    name: Bench target added
+    context: BC-Bench
+    data: [Target, Provider, Operations, Server, Workflow folder, Pricing]
+    description: "A target entry written into bench/targets.yaml, copied from the closest one, and parsed by BenchTargetsFileSchema (packages/core/src/bench.ts:133-163; SKILL.md step 1)"
+  - id: EVT-BenchFixturesImported
+    name: Bench fixtures imported
+    context: BC-Bench
+    data: [Source, Copied, Skipped, Missing]
+    description: "bench import copied each fixture from <source>/projects/<path> into bench/fixtures/<case>/, or cut a vocal window into a 48 kHz wav; a missing source sets exit code 1 (packages/cli/src/bench.ts:170-211)"
+  - id: EVT-BenchRunPlanned
+    name: Bench run planned
+    context: BC-Bench
+    aggregate: AGG-BenchRun
+    data: [Run id, Cases, Targets, Seeds, Generations, Estimate, Remaining budget]
+    description: "bench run estimated every planned generation through a dry run of the funnel (seed 0 twice with --repeat) and logged the worst case; a dry run ends here (bench.ts:541-605)"
+  - id: EVT-BenchRunRefusedOverBudget
+    name: Bench run refused over budget
+    context: BC-Bench
+    aggregate: AGG-BenchBudget
+    data: [Estimate, Remaining budget, Batch cap]
+    description: "The whole run's estimate exceeded the remaining bench budget or its cap: a BudgetError before any call, also for a dry run (bench.ts:600; tests/bench.test.ts:254; tests/bench-characterization.test.ts)"
+  - id: EVT-BenchResultRecorded
+    name: Bench result recorded
+    context: BC-Bench
+    aggregate: AGG-BenchRun
+    data: [Result key, Seed, Files, Hash, Cached, Cost, Time, Media, VRAM peak, Frame strip, Review clip, Same bytes, Transcript]
+    description: "A generation of the run came back ok: its files, measurements and extras written into run.json, its fresh time appended to bench/timings.jsonl (bench.ts:606-700)"
+  - id: EVT-BenchResultRefused
+    name: Bench result refused
+    context: BC-Bench
+    aggregate: AGG-BenchRun
+    data: [Result key, Message]
+    description: "The provider refused the request; classified by a pattern over the error text (bench.ts:138,690)"
+  - id: EVT-BenchResultFailed
+    name: Bench result failed
+    context: BC-Bench
+    aggregate: AGG-BenchRun
+    data: [Result key, Message]
+    description: "The estimate or the generation threw anything but a budget error; the run goes on (bench.ts:585-591,686-696)"
+  - id: EVT-BenchResultSkipped
+    name: Bench result skipped
+    context: BC-Bench
+    aggregate: AGG-BenchRun
+    data: [Result key, Reason]
+    description: "The target does not run the case's operation, or has no flex prompt for reference-to-video (bench.ts:563-569)"
+  - id: EVT-BenchSpendRecorded
+    name: Bench spend recorded
+    context: BC-Bench
+    aggregate: AGG-BenchBudget
+    data: [Cost, Spent, Total]
+    description: "A paid generation's planned cost added to bench/state.json by the funnel; ComfyUI and mock cost nothing (generate.ts:690,756-759; bench.ts:354-360)"
+  - id: EVT-BenchCaseScored
+    name: Bench case scored
+    context: BC-Bench
+    data: [Run id, Case, Result key, Points per criterion, Outcome, Notes]
+    description: "One art director per case wrote bench/runs/<id>/scores/<case>.json, one bench score per ok or refused result (workspace/.claude/skills/model-bench/scoring.md; art-director.md step 9)"
+  - id: EVT-BenchReportBuilt
+    name: Bench report built
+    context: BC-Bench
+    data: [Run id, Page]
+    description: "bench report, or the end of bench run, rendered bench/runs/<id>/index.html from run.json, the scores, ratings.json and the cases (bench.ts:703,752-763; bench-report.ts:303)"
+  - id: EVT-BenchResultRated
+    name: Bench result rated
+    context: BC-Bench
+    data: [Result key, Stars, Note]
+    description: "The user gave a 1-5 rating and a note on the comparison page; kept in the browser's localStorage under bench-ratings:<run id> (bench-report.ts:264-287)"
+  - id: EVT-RatingsExported
+    name: Ratings exported
+    context: BC-Bench
+    data: [Run id, Ratings]
+    description: "The page's Export ratings.json downloaded the ratings; the user saves the file into the run folder by hand (bench-report.ts:288-292; bench/README.md)"
 commands:
   - id: CMD-CreateProject
     name: Create project
@@ -1951,7 +2071,77 @@ commands:
     description: "runSetup – npm install, then uv sync --group dev for the audio analysis – run by init and by an update that changed something, or by hand as npm install && npm run python:sync (packages/cli/src/tools.ts:267-288)"
     rules:
       - A failed install is a warning; non-interactive init sets exit code 1 when the install was wanted and failed (the code does this, init-command.ts:163; init.ts:326-337)
-
+  - id: CMD-AddBenchCase
+    name: Add a bench case
+    actor: ACT-BenchSkill
+    aggregate: AGG-BenchCase
+    produces: [EVT-BenchCaseAdded]
+    description: "Copy a case file and fill it from a scene that once broke or was hard (SKILL.md, Adding a case)"
+    rules:
+      - The focus names the failure in one sentence; 3-6 rubric criteria each catch one way the scene fails, weighted by what the failure costs (the skill says so, SKILL.md)
+      - bench list validates the case, then bench import fetches its fixtures (the skill says so, SKILL.md)
+  - id: CMD-AddBenchTarget
+    name: Add a bench target
+    actor: ACT-BenchSkill
+    produces: [EVT-BenchTargetAdded]
+    description: "A new workflow, checkpoint, server or paid model becomes one target in bench/targets.yaml; config/models.yaml stays untouched until a bench shows the switch is worth it (ADR 0020; SKILL.md step 1)"
+    rules:
+      - A target lists at least one operation; comfyui_url and comfyui_workflows_dir only for a ComfyUI target; the only swap is as referenceToVideo (the code does this, core/src/bench.ts:139,157-160)
+      - A paid model without a price in config/models.yaml carries its pricing (the skill says so, SKILL.md step 1)
+      - The current default is always a target of the comparison, as the baseline (the skill says so, SKILL.md step 1)
+  - id: CMD-ImportBenchFixtures
+    name: Import the bench fixtures
+    actor: ACT-BenchSkill
+    produces: [EVT-BenchFixturesImported]
+    description: "bench import [--from <workspace>] [--cases <ids>] [--force] (bench.ts:170-211; index.ts:1394-1405)"
+    rules:
+      - The source is the workspace's own projects; --from names another workspace or its projects/ folder (the code does this, bench.ts:172; core/src/bench.ts:261-266; the help text says "this repository" – gap register)
+      - An existing fixture is kept unless --force (the code does this, bench.ts:180-186)
+  - id: CMD-RunBench
+    name: Run the bench
+    actor: ACT-BenchSkill
+    aggregate: AGG-BenchRun
+    produces: [EVT-BenchRunPlanned, EVT-BenchRunRefusedOverBudget, EVT-BenchResultRecorded, EVT-BenchResultRefused, EVT-BenchResultFailed, EVT-BenchResultSkipped, EVT-BenchSpendRecorded]
+    description: "bench run --targets <a,b> [--set|--cases] [--seeds n] [--repeat] [--fresh] [--transcribe] [--id] [--dry-run] (bench.ts:495-705; index.ts:1407-1447)"
+    rules:
+      - Every input fixture of the selected cases is present before anything runs; a missing known good result is allowed (the code does this, bench.ts:512-521)
+      - Params merge as role defaults, then case params, then target params; the target wins (the code does this, bench.ts:301-330)
+      - A remote server's URL, --fresh's invocation and --repeat's second render each get their own cache key; otherwise the bench shares the workspace's generation cache (the code does this, bench.ts:617-625,678; generate.ts)
+      - --repeat renders the first seed a second time without a cached result in the same invocation and compares the bytes (decided 2026-11-22, HS-229; the second render is cached across invocations – gap register)
+      - A dry run lists the plan and its estimate also when the estimate exceeds the budget, and says so (decided 2026-11-22, HS-230; it throws – gap register)
+      - A refusal is what the provider marks as a content refusal; a configuration error is never a refusal (decided 2026-11-22, HS-231; a pattern over the message – gap register)
+      - VRAM is sampled from ComfyUI's /system_stats every 1.5 s and kept only for a fresh result (the code does this, bench.ts:90-118,645-646)
+  - id: CMD-ScoreBenchCase
+    name: Score a bench case
+    actor: ACT-ArtDirector
+    produces: [EVT-BenchCaseScored]
+    description: "One art director per case, in parallel, scores every ok and refused result of the case against its rubric (SKILL.md step 6; scoring.md)"
+    rules:
+      - Per criterion 2 pass, 1 weak, 0 fail; a refusal scores 0 on every criterion; an error is not scored (the skill says so, scoring.md)
+      - Pass when no criterion is 0 and the weighted score is at least 80 %; fail when a criterion of weight 2 or more is 0 or the score is below 50 %; otherwise weak (the skill says so, scoring.md; "weighted criterion" read as every criterion, HS-232)
+      - The rubric replaces the art director's usual axes, the real-person rule included (decided 2026-11-22, HS-238; art-director.md says "instead of these axes" without naming it – gap register)
+  - id: CMD-BuildBenchReport
+    name: Build the bench report
+    actor: ACT-BenchSkill
+    produces: [EVT-BenchReportBuilt]
+    description: "bench report [run|latest] (bench.ts:711-763)"
+    rules:
+      - scores/<case>.json are merged over scores.json in name order; every score is validated (the code does this, bench.ts:731-750)
+      - The page marks a bench score whose outcome contradicts the scoring rule, and only ok and refused results count in a target's means (decided 2026-11-22, HS-232; colour by percentage only, a scored error counts – gap register)
+  - id: CMD-RateBenchResult
+    name: Rate a bench result
+    actor: ACT-User
+    produces: [EVT-BenchResultRated]
+    description: "Click 1-5 stars and add a note on the comparison page; clicking the active star clears it (bench-report.ts:264-287)"
+    rules:
+      - A rating reaches the run folder without a download and a manual save (decided 2026-11-22, HS-233; kept in the browser until exported – gap register)
+  - id: CMD-ExportRatings
+    name: Export the ratings
+    actor: ACT-User
+    produces: [EVT-RatingsExported]
+    description: "Export ratings.json on the page, then save it into bench/runs/<id>/ (bench-report.ts:288-292)"
+    rules:
+      - The browser's copy wins over an embedded ratings.json when the page loads (the code does this, bench-report.ts:268-272)
 policies:
   - id: POL-RunNextStage
     name: Run the next autonomous stage
@@ -2038,7 +2228,16 @@ policies:
     when: [EVT-WorkspaceUpdated]
     then: [CMD-InstallDependencies]
     description: "update runs npm install and uv sync when it changed a file and --no-install is not set; the board container installs again when package-lock.json changed (update.ts:317-327; docker/entrypoint.sh:19-26)"
-
+  - id: POL-ScoreEveryBenchCase
+    name: Every bench case of a run gets scored
+    when: [EVT-BenchResultRecorded, EVT-BenchResultRefused]
+    then: [CMD-ScoreBenchCase]
+    description: "The model-bench skill dispatches one art director per case once the run is done; the main context never views the media (SKILL.md step 6)"
+  - id: POL-ReportAfterBenchRun
+    name: A bench run ends with its report
+    when: [EVT-BenchResultRecorded, EVT-BenchResultRefused, EVT-BenchResultFailed, EVT-BenchResultSkipped]
+    then: [CMD-BuildBenchReport]
+    description: "bench run writes index.html after its last generation, and the skill rebuilds it after scoring; a budget error mid-run writes none (bench.ts:703; SKILL.md step 7)"
 read_models:
   - id: RM-Status
     name: Status
@@ -2246,7 +2445,24 @@ read_models:
     used_by: [ACT-User]
     fields: [From version, To version, Path, Action, Kept local, Warnings]
     description: "update's list of added, updated, removed, conflicting, overwritten and kept files, the count of local changes and the warnings; the same list for a dry run (update.ts:113-151,355-381)"
-
+  - id: RM-BenchList
+    name: Bench list
+    fed_by: [EVT-BenchCaseAdded, EVT-BenchTargetAdded, EVT-BenchFixturesImported]
+    used_by: [ACT-BenchSkill, ACT-User]
+    fields: [Case, Sets, Operation, Fixture status, Target, Provider, Operations, Swap, Set]
+    description: "bench list: every case with its fixture status, the targets and the sets (bench.ts:220-240)"
+  - id: RM-ComparisonPage
+    name: Comparison page
+    fed_by: [EVT-BenchReportBuilt, EVT-BenchCaseScored, EVT-RatingsExported]
+    used_by: [ACT-User, ACT-BenchSkill]
+    fields: [Target, Planned, Ok, Refused, Errors, Skipped, Rubric mean, Worst seed, Time, Cost, VRAM peak, Same bytes, Rating mean, Case, Known good result, Inputs, Result, Frame strip, Bench score, Rating]
+    description: "bench/runs/<id>/index.html, one self-contained local file: per target the summary, per case the known good result and inputs beside every target's result (bench-report.ts:48-92,303-340; ADR 0020)"
+  - id: RM-ModelRecommendation
+    name: Model recommendation
+    fed_by: [EVT-BenchReportBuilt, EVT-BenchCaseScored, EVT-RatingsExported]
+    used_by: [ACT-User]
+    fields: [Operation, Rubric mean, Worst seed, Time, VRAM peak, Cost, Refusals, Same bytes, Cases that differ most, Recommendation, config/models.yaml change]
+    description: "The skill's summary per operation – keep, switch, or use only for some shots – and the config/models.yaml change it implies; models.yaml changes only when the user asks (SKILL.md step 8)"
 hotspots:
   - id: HS-1
     question: "'Production phase' (setup/ready/running/failed/done) is a derived project status, but the glossary lists 'phase' under Avoid for Stage, and 'setup' is both a stage ID and a phase. Which word is the domain term?"
@@ -3354,7 +3570,106 @@ hotspots:
     refs: [BC-Workspace]
     status: resolved
     resolution: "ADR 0047 (proposed) records the marker as the workspace's identity, the baseline as upstream's last offer, conflicts visible until resolved, one runtime version, only what a workspace can run ships, the npx CLI owning init and update, and the container's image per workspace; it amends 0010 and 0012 (recommendation, not reviewed by the user – delegated, 2026-11-22)"
-
+  - id: HS-222
+    question: "Is the model bench its own context, or part of Generation?"
+    refs: [BC-Bench]
+    status: resolved
+    resolution: "Its own context, Model bench, downstream of Generation: it calls the generation funnel with its own budget, manifest and cache key extras and owns cases, targets, runs, scores and ratings (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-223
+    question: "Which consistency boundaries does the bench have?"
+    refs: [AGG-BenchCase, AGG-BenchRun, AGG-BenchBudget]
+    status: resolved
+    resolution: "Three as-is aggregates: the bench case (one file, one schema), the bench run (run.json, written whole after every result) and the bench budget (state.json). Targets are configuration checked by a command rule; scores and ratings are files written beside the run by the art director and the user (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-224
+    question: "Bench Set clashes with Set, golden/reference/known good result name one thing, the score field is called verdict although the glossary says bench scores are not verdicts, and rating/grade/stars name the user's grade. Which words?"
+    refs: [BC-Bench]
+    status: resolved
+    resolution: "Bench Set (_Avoid_ set), Known Good Result (_Avoid_ golden, reference), Bench Score with a pass/weak/fail outcome (_Avoid_ verdict; the field name stays a spelling), Rating (_Avoid_ grade, stars), plus Bench Result, Frame Strip and Bench Budget (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-225
+    question: "Where does the bench run – in this repository, where runs and fixtures exist, or in the workspace it ships to?"
+    refs: [BC-Bench, CMD-ImportBenchFixtures]
+    status: resolved
+    resolution: "In the user's workspace; fixtures come from its own projects and --from names another workspace only. The help text, the README and ADR 0020 read as if this repository were the host. Low: the user has not used the bench yet (user: would run it in their workspace; and recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-226
+    question: "The tracked cases are scenes of the maintainer's own projects – project slugs, a real person's face, character names, lyrics – and ship to every workspace, where every fixture is missing. Keep shipping them?"
+    refs: [AGG-BenchCase]
+    status: resolved
+    resolution: "The user's cases move into their workspace; upstream ships the mechanism, the schemas and one or two generic example cases. ADR 0048 amends ADR 0020. Medium (user: into my workspace; and recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-227
+    question: "update merges bench.yaml, targets.yaml and the cases like any runtime file. The skill edits targets and the budget, and once the cases leave upstream an untouched case would be removed from the workspace. Who owns bench/?"
+    refs: [AGG-BenchCase, AGG-WorkspaceMarker]
+    status: resolved
+    resolution: "bench/bench.yaml, bench/targets.yaml and bench/cases/ are the workspace's own: update only adds missing files there. This must ship before the cases leave upstream, or the next update removes them. Medium (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-228
+    question: "The skill says a rerun with the same id resumes and fills gaps; the code runs every planned item again, estimates finished items again and can replace an ok result by an error. bench report picks the latest run by modification time through ls, and two runs in one minute share an id. What holds?"
+    refs: [AGG-BenchRun]
+    status: resolved
+    resolution: "A rerun fills the gaps: ok and refused results stay unless --fresh, and the estimate counts only what is left. The latest run is the newest by id, read without a shell. Low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-229
+    question: "--repeat promises a second render without cache, but its cache key is the same on every invocation, so a later run compares cached bytes. Uncached per invocation or as is?"
+    refs: [CMD-RunBench]
+    status: resolved
+    resolution: "Uncached per invocation: the second render's key carries the invocation, like --fresh. Low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-230
+    question: "bench.yaml documents the whole remaining budget as the default batch cap, and the whole-run check uses it; each generation falls back to 30 % and turns into an error result. A dry run over budget throws instead of listing, and the error names the project budget. One cap?"
+    refs: [AGG-BenchBudget, CMD-RunBench]
+    status: resolved
+    resolution: "One cap: batch_cap_usd or the whole remaining bench budget, passed to every generation; a dry run lists its plan and says it is over budget; the message names the bench budget. Low: local targets cost nothing (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-231
+    question: "A refusal is recognised by a pattern that also matches 'not allowed' and 'policy' in any message. Is a broad pattern acceptable?"
+    refs: [CMD-RunBench]
+    status: resolved
+    resolution: "A refusal is what the provider marks as a content refusal; a configuration error is never a refusal. Low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-232
+    question: "The page colours a score by percentage only, so a fail can show green; a scored error or skipped result counts in the mean; the time legend says fresh only while cache-hit times count; 'no weighted criterion is 0' is ambiguous. What holds?"
+    refs: [CMD-BuildBenchReport, CMD-ScoreBenchCase]
+    status: resolved
+    resolution: "The art director's outcome stays the source; the page marks an outcome that contradicts the scoring rule; only ok and refused results count; recorded times of cache hits count and the legend says so; every criterion is weighted, so pass needs no 0 at all. Low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-233
+    question: "Ratings stay in the browser until the user exports ratings.json and saves it into the run folder by hand. Enough?"
+    refs: [CMD-RateBenchResult, CMD-ExportRatings]
+    status: resolved
+    resolution: "A rating reaches the run folder without a download – for example through the board, the user's entry point. Low (user: grades the results themselves; and recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-234
+    question: "The bench shares the workspace's generation cache with projects. A bench result can come from a project's generation, without a recorded time. Intended?"
+    refs: [AGG-BenchRun]
+    status: resolved
+    resolution: "Intended: the same request gives the same result at no cost; a result without a recorded time says 'time unknown', and --fresh measures again (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-235
+    question: "A target's own workflow folder is ignored when Pika workflows are classified (G-100), and a reference-to-video swap on a non-ComfyUI target renders on the local ComfyUI under the target's name. What holds?"
+    refs: [AGG-BenchRun]
+    status: resolved
+    resolution: "A target's provider, server and workflow folder hold for every generation it runs; a swap a provider cannot run is a skipped result. Low, untested inference for the swap (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-236
+    question: "run.json, state.json and ratings.json are read without validation; a bench score has no JSON Schema and its criteria are not checked against the rubric. Validate?"
+    refs: [AGG-BenchRun, AGG-BenchBudget]
+    status: resolved
+    resolution: "Every file the bench reads has a schema, and a bench score names exactly the case's rubric criteria. Low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-237
+    question: "state.json is loaded once per run and saved without a lock; spend above the estimate is thrown after the provider charged and before it is saved. Same rule as the project budget?"
+    refs: [AGG-BenchBudget]
+    status: resolved
+    resolution: "The same rule as the project state (pipeline slice, G-1): no run loses another's spend and no charged generation goes unrecorded. Low: local targets cost nothing (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-238
+    question: "The art director fails a recognizable real person; a bench case may test a real person's identity on purpose. Does the rule apply to bench scores?"
+    refs: [CMD-ScoreBenchCase]
+    status: resolved
+    resolution: "No: the rubric replaces the usual axes, and the user's own face in their own workspace is the case's point; art-director.md and scoring.md say so explicitly (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-239
+    question: "Drifted texts: ADR 0020 (25 generations, sets core and smoke), the README's example target that exists only as a comment, --from 'default this repository', --repeat 'without cache', the skill's 'resumes and fills gaps', bench.yaml's cap comment. Fix together?"
+    refs: [BC-Bench]
+    status: resolved
+    resolution: "Fixed together with the decisions they depend on; ADR 0020 stays accepted and ADR 0048 amends it. Low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-240
+    question: "What should pin the slice's behaviour now, and what is left untested?"
+    refs: [AGG-BenchRun, AGG-BenchBudget]
+    status: resolved
+    resolution: "Four characterization tests in tests/bench-characterization.test.ts: a rerun with the id runs every item again, an item above 30 % of the budget becomes an error result without batch_cap_usd, a dry run over budget throws, the report counts a scored error and cache-hit times. The rest is a gap: the case and target rules not yet tested, the refusal pattern, --fresh, --transcribe, VRAM, the frame strip, the review clip, the score merge, the latest run, the page's script. Low (recommendation, not reviewed by the user – delegated, 2026-11-22)"
+  - id: HS-241
+    question: "Is moving the cases into the workspace a decision worth recording beside ADR 0020?"
+    refs: [BC-Bench, AGG-BenchCase]
+    status: resolved
+    resolution: "ADR 0048 (proposed) records the workspace as the bench's host, the user's cases as workspace content with generic examples upstream, and bench/'s configuration and cases as the workspace's own at update, shipped before the cases leave upstream; it amends 0020 (recommendation, not reviewed by the user – delegated, 2026-11-22)"
 flows:
   - id: FLOW-AutonomousStage
     name: One autonomous stage
@@ -3407,3 +3722,6 @@ flows:
   - id: FLOW-WorkspaceUpdate
     name: From a new release to a current workspace
     sequence: [ACT-User, CMD-UpdateWorkspace, EVT-ConflictCopyWritten, EVT-WorkspaceUpdated, RM-UpdateReport, POL-InstallAfterUpdate, CMD-InstallDependencies, EVT-DependenciesInstalled, CMD-MigrateLayout, EVT-LayoutMigrated, CMD-StartBoardContainer, EVT-BoardContainerStarted]
+  - id: FLOW-ModelComparison
+    name: From a comparison question to a model recommendation
+    sequence: [ACT-User, ACT-BenchSkill, CMD-AddBenchTarget, EVT-BenchTargetAdded, CMD-ImportBenchFixtures, EVT-BenchFixturesImported, RM-BenchList, CMD-RunBench, EVT-BenchRunPlanned, EVT-BenchResultRecorded, EVT-BenchSpendRecorded, POL-ScoreEveryBenchCase, CMD-ScoreBenchCase, EVT-BenchCaseScored, POL-ReportAfterBenchRun, CMD-BuildBenchReport, EVT-BenchReportBuilt, RM-ComparisonPage, CMD-RateBenchResult, EVT-BenchResultRated, CMD-ExportRatings, EVT-RatingsExported, RM-ModelRecommendation]

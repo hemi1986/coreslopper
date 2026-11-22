@@ -41,7 +41,7 @@ Files that share a concept stem or a table across layers. These are suggestions 
 | release | cli, core, tests | 21 | – | 3 layers: cli, core, tests; 3 packages; 21 files | yes |
 | thumbnail | cli, remotion, tests | 7 | – | 3 layers: cli, remotion, tests; 3 packages; 7 files | yes |
 | generate | cli, scripts, tests | 7 | – | 3 layers: cli, scripts, tests; 2 packages; 7 files | – |
-| bench | cli, core, tests | 4 | – | 3 layers: cli, core, tests; 3 packages; 4 files | – |
+| bench | cli, core, tests | 4 | – | 3 layers: cli, core, tests; 3 packages; 4 files | yes |
 | media | cli, remotion, tests | 4 | – | 3 layers: cli, remotion, tests; 3 packages; 4 files | yes |
 | board | cli, tests | 7 | – | 2 layers: cli, tests; 2 packages; 7 files | – |
 | publish | cli, tests | 9 | – | 2 layers: cli, tests; 2 packages; 9 files | yes |

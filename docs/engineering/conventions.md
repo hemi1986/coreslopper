@@ -141,6 +141,13 @@ state in memory), one core transition (`setStageRunning`, `setStageDone`, `setSt
   interrupted update is repaired by running it again. Paths that `update` never overwrites are listed in
   `USER_OWNED_FILES` and `USER_OWNED_PREFIXES` (`packages/cli/src/update.ts`); add a user-owned path there and in
   `docs/onboarding.md` together. Tools install best effort, and a failure is a warning (`tools.ts`).
+- Model bench: core holds only the case, target, configuration and score schemas, their loaders and pure helpers
+  (`packages/core/src/bench.ts`); the CLI runs the commands and the measurement (`packages/cli/src/bench.ts`); the
+  comparison page is a pure renderer (`bench-report.ts`). Every bench generation is a one-item `runBatch` with the
+  bench's own `BatchTarget` (`bench/state.json`, `bench/manifest.jsonl`, the run's output folder), the target's
+  `providerFactory` and the cache key extras; never call a provider around it. `run.json` is written whole after
+  every result. A bench writes only under `bench/` and never into a project. Workflow node ids belong in a target,
+  not in a case. The run, state and ratings files have no schema yet (G-202).
 - User-owned files (`timing.overrides.json`, `lyrics.txt`, imported stems, `project.yaml`) are never replaced by
   a tool; a command that would do so is a hard stop. The one exception: fixing a proposed release day writes
   `release.release_date` into `project.yaml`, keeping every comment (`setReleaseDate`,
@@ -228,5 +235,6 @@ directory. `tests/helpers/release-fixture.ts` builds release projects.
 | Layout migration | `migrateLayout(root, { dryRun })` on a temp workspace with `series/<slug>/` | integration | `tests/migrate-layout.test.ts` |
 | Runtime classification | `runtimePath`, `planRuntime` on paths or `git ls-files` (not shipped) | unit | `tests/runtime-files.test.ts` |
 | Provider key check | `validateFalKey`, `validateHiggsfieldKey` with a fake `fetchImpl` | unit | `tests/init.test.ts` |
+| Model bench | `runBench({ targets, cases, id, dryRun, paths: benchPaths(tempDir) })` on a temp bench folder with inline case and target files and fixtures written by the test; mock targets cost nothing, a `fal` target with a price checks the budget in a dry run; `summarizeTargets` on an inline `BenchRun` | integration, unit | `tests/bench.test.ts`, `tests/bench-characterization.test.ts` |
 | Remotion render | a real still or JPEG; opt-in with `CORESLOPPER_RENDER_TESTS=1` (needs Chrome) | integration | `tests/thumbnail-render.test.ts` |
 | Agent instruction | not testable deterministically | – | `workspace/.claude/commands/video-next.md` |

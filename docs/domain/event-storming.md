@@ -74,6 +74,12 @@ flowchart LR
     CMD_CreateSandbox["Create the sandbox workspace"]:::cmd
     CMD_StartBoardContainer["Start the board container"]:::cmd
     CMD_InstallDependencies["Install the dependencies"]:::cmd
+    CMD_AddBenchTarget["Add a bench target"]:::cmd
+    CMD_ImportBenchFixtures["Import the bench fixtures"]:::cmd
+    CMD_ScoreBenchCase["Score a bench case"]:::cmd
+    CMD_BuildBenchReport["Build the bench report"]:::cmd
+    CMD_RateBenchResult["Rate a bench result"]:::cmd
+    CMD_ExportRatings["Export the ratings"]:::cmd
     subgraph BC_Timing["Timing"]
         CMD_WriteLyrics["Write lyrics"]:::cmd
         CMD_AnalyzeSong["Analyze song"]:::cmd
@@ -255,6 +261,24 @@ flowchart LR
         EVT_RuntimeBuilt["Runtime built"]:::evt
         EVT_BoardContainerStarted["Board container started"]:::evt
     end
+    subgraph BC_Bench["Model bench"]
+        CMD_AddBenchCase["Add a bench case"]:::cmd
+        CMD_RunBench["Run the bench"]:::cmd
+        EVT_BenchCaseAdded["Bench case added"]:::evt
+        EVT_BenchTargetAdded["Bench target added"]:::evt
+        EVT_BenchFixturesImported["Bench fixtures imported"]:::evt
+        EVT_BenchRunPlanned["Bench run planned"]:::evt
+        EVT_BenchRunRefusedOverBudget["Bench run refused over budget"]:::evt
+        EVT_BenchResultRecorded["Bench result recorded"]:::evt
+        EVT_BenchResultRefused["Bench result refused"]:::evt
+        EVT_BenchResultFailed["Bench result failed"]:::evt
+        EVT_BenchResultSkipped["Bench result skipped"]:::evt
+        EVT_BenchSpendRecorded["Bench spend recorded"]:::evt
+        EVT_BenchCaseScored["Bench case scored"]:::evt
+        EVT_BenchReportBuilt["Bench report built"]:::evt
+        EVT_BenchResultRated["Bench result rated"]:::evt
+        EVT_RatingsExported["Ratings exported"]:::evt
+    end
     ACT_User(["User"]):::act
     ACT_Orchestrator(["Orchestrator"]):::act
     ACT_SetupSkill(["Setup skill"]):::act
@@ -263,6 +287,7 @@ flowchart LR
     ACT_ArtDirector(["Art director"]):::act
     ACT_QueueRun(["Queue run"]):::act
     ACT_Watchdog(["Watchdog round"]):::act
+    ACT_BenchSkill(["Model bench skill"]):::act
     EXT_Provider[["Generation provider"]]:::ext
     EXT_ComfyUI[["ComfyUI server"]]:::ext
     EXT_AudioModels[["Local audio models"]]:::ext
@@ -297,6 +322,8 @@ flowchart LR
     POL_PostsWaitForMainVideo{{"Posts that link to the main video follow it"}}:::pol
     POL_CommentWhenPublic{{"The main video gets its comment when it is public"}}:::pol
     POL_InstallAfterUpdate{{"An update that changed something installs the dependencies"}}:::pol
+    POL_ScoreEveryBenchCase{{"Every bench case of a run gets scored"}}:::pol
+    POL_ReportAfterBenchRun{{"A bench run ends with its report"}}:::pol
     RM_Status[("Status")]:::rm
     RM_NextAction[("Next action")]:::rm
     RM_ProductionView[("Production view")]:::rm
@@ -332,6 +359,9 @@ flowchart LR
     RM_PlatformReadiness[("Platform readiness")]:::rm
     RM_DoctorReport[("Doctor report")]:::rm
     RM_UpdateReport[("Update report")]:::rm
+    RM_BenchList[("Bench list")]:::rm
+    RM_ComparisonPage[("Comparison page")]:::rm
+    RM_ModelRecommendation[("Model recommendation")]:::rm
     ACT_SetupSkill --> CMD_CreateProject
     CMD_CreateProject --> EVT_ProjectCreated
     ACT_Orchestrator --> CMD_StartStage
@@ -566,6 +596,28 @@ flowchart LR
     CMD_StartBoardContainer --> EVT_BoardContainerStarted
     ACT_User --> CMD_InstallDependencies
     CMD_InstallDependencies --> EVT_DependenciesInstalled
+    ACT_BenchSkill --> CMD_AddBenchCase
+    CMD_AddBenchCase --> EVT_BenchCaseAdded
+    ACT_BenchSkill --> CMD_AddBenchTarget
+    CMD_AddBenchTarget --> EVT_BenchTargetAdded
+    ACT_BenchSkill --> CMD_ImportBenchFixtures
+    CMD_ImportBenchFixtures --> EVT_BenchFixturesImported
+    ACT_BenchSkill --> CMD_RunBench
+    CMD_RunBench --> EVT_BenchRunPlanned
+    CMD_RunBench --> EVT_BenchRunRefusedOverBudget
+    CMD_RunBench --> EVT_BenchResultRecorded
+    CMD_RunBench --> EVT_BenchResultRefused
+    CMD_RunBench --> EVT_BenchResultFailed
+    CMD_RunBench --> EVT_BenchResultSkipped
+    CMD_RunBench --> EVT_BenchSpendRecorded
+    ACT_ArtDirector --> CMD_ScoreBenchCase
+    CMD_ScoreBenchCase --> EVT_BenchCaseScored
+    ACT_BenchSkill --> CMD_BuildBenchReport
+    CMD_BuildBenchReport --> EVT_BenchReportBuilt
+    ACT_User --> CMD_RateBenchResult
+    CMD_RateBenchResult --> EVT_BenchResultRated
+    ACT_User --> CMD_ExportRatings
+    CMD_ExportRatings --> EVT_RatingsExported
     EVT_StageCompleted --> POL_RunNextStage
     EVT_StageSkipped --> POL_RunNextStage
     POL_RunNextStage --> CMD_StartStage
@@ -608,6 +660,14 @@ flowchart LR
     POL_CommentWhenPublic --> CMD_PostPinnedComment
     EVT_WorkspaceUpdated --> POL_InstallAfterUpdate
     POL_InstallAfterUpdate --> CMD_InstallDependencies
+    EVT_BenchResultRecorded --> POL_ScoreEveryBenchCase
+    EVT_BenchResultRefused --> POL_ScoreEveryBenchCase
+    POL_ScoreEveryBenchCase --> CMD_ScoreBenchCase
+    EVT_BenchResultRecorded --> POL_ReportAfterBenchRun
+    EVT_BenchResultRefused --> POL_ReportAfterBenchRun
+    EVT_BenchResultFailed --> POL_ReportAfterBenchRun
+    EVT_BenchResultSkipped --> POL_ReportAfterBenchRun
+    POL_ReportAfterBenchRun --> CMD_BuildBenchReport
     EVT_StageStarted -.-> RM_Status
     EVT_StageCompleted -.-> RM_Status
     EVT_StageFailed -.-> RM_Status
@@ -787,6 +847,20 @@ flowchart LR
     EVT_WorkspaceUpdated -.-> RM_UpdateReport
     EVT_ConflictCopyWritten -.-> RM_UpdateReport
     RM_UpdateReport -.-> ACT_User
+    EVT_BenchCaseAdded -.-> RM_BenchList
+    EVT_BenchTargetAdded -.-> RM_BenchList
+    EVT_BenchFixturesImported -.-> RM_BenchList
+    RM_BenchList -.-> ACT_BenchSkill
+    RM_BenchList -.-> ACT_User
+    EVT_BenchReportBuilt -.-> RM_ComparisonPage
+    EVT_BenchCaseScored -.-> RM_ComparisonPage
+    EVT_RatingsExported -.-> RM_ComparisonPage
+    RM_ComparisonPage -.-> ACT_User
+    RM_ComparisonPage -.-> ACT_BenchSkill
+    EVT_BenchReportBuilt -.-> RM_ModelRecommendation
+    EVT_BenchCaseScored -.-> RM_ModelRecommendation
+    EVT_RatingsExported -.-> RM_ModelRecommendation
+    RM_ModelRecommendation -.-> ACT_User
     classDef evt fill:#a3391f,stroke:#e65100,color:#fff
     classDef cmd fill:#64b5f6,stroke:#0d47a1,color:#000
     classDef pol fill:#ce93d8,stroke:#4a148c,color:#000
@@ -1384,6 +1458,65 @@ flowchart LR
     classDef hs fill:#e57373,stroke:#b71c1c,color:#fff
 ```
 
+### From a comparison question to a model recommendation
+
+```mermaid
+flowchart LR
+    ACT_User(["User"]):::act
+    ACT_BenchSkill(["Model bench skill"]):::act
+    CMD_AddBenchTarget["Add a bench target"]:::cmd
+    EVT_BenchTargetAdded["Bench target added"]:::evt
+    CMD_ImportBenchFixtures["Import the bench fixtures"]:::cmd
+    EVT_BenchFixturesImported["Bench fixtures imported"]:::evt
+    RM_BenchList[("Bench list")]:::rm
+    CMD_RunBench["Run the bench"]:::cmd
+    EVT_BenchRunPlanned["Bench run planned"]:::evt
+    EVT_BenchResultRecorded["Bench result recorded"]:::evt
+    EVT_BenchSpendRecorded["Bench spend recorded"]:::evt
+    POL_ScoreEveryBenchCase{{"Every bench case of a run gets scored"}}:::pol
+    CMD_ScoreBenchCase["Score a bench case"]:::cmd
+    EVT_BenchCaseScored["Bench case scored"]:::evt
+    POL_ReportAfterBenchRun{{"A bench run ends with its report"}}:::pol
+    CMD_BuildBenchReport["Build the bench report"]:::cmd
+    EVT_BenchReportBuilt["Bench report built"]:::evt
+    RM_ComparisonPage[("Comparison page")]:::rm
+    CMD_RateBenchResult["Rate a bench result"]:::cmd
+    EVT_BenchResultRated["Bench result rated"]:::evt
+    CMD_ExportRatings["Export the ratings"]:::cmd
+    EVT_RatingsExported["Ratings exported"]:::evt
+    RM_ModelRecommendation[("Model recommendation")]:::rm
+    ACT_User --> ACT_BenchSkill
+    ACT_BenchSkill --> CMD_AddBenchTarget
+    CMD_AddBenchTarget --> EVT_BenchTargetAdded
+    EVT_BenchTargetAdded --> CMD_ImportBenchFixtures
+    CMD_ImportBenchFixtures --> EVT_BenchFixturesImported
+    EVT_BenchFixturesImported --> RM_BenchList
+    RM_BenchList --> CMD_RunBench
+    CMD_RunBench --> EVT_BenchRunPlanned
+    EVT_BenchRunPlanned --> EVT_BenchResultRecorded
+    EVT_BenchResultRecorded --> EVT_BenchSpendRecorded
+    EVT_BenchSpendRecorded --> POL_ScoreEveryBenchCase
+    POL_ScoreEveryBenchCase --> CMD_ScoreBenchCase
+    CMD_ScoreBenchCase --> EVT_BenchCaseScored
+    EVT_BenchCaseScored --> POL_ReportAfterBenchRun
+    POL_ReportAfterBenchRun --> CMD_BuildBenchReport
+    CMD_BuildBenchReport --> EVT_BenchReportBuilt
+    EVT_BenchReportBuilt --> RM_ComparisonPage
+    RM_ComparisonPage --> CMD_RateBenchResult
+    CMD_RateBenchResult --> EVT_BenchResultRated
+    EVT_BenchResultRated --> CMD_ExportRatings
+    CMD_ExportRatings --> EVT_RatingsExported
+    EVT_RatingsExported --> RM_ModelRecommendation
+    classDef evt fill:#a3391f,stroke:#e65100,color:#fff
+    classDef cmd fill:#64b5f6,stroke:#0d47a1,color:#000
+    classDef pol fill:#ce93d8,stroke:#4a148c,color:#000
+    classDef rm fill:#81c784,stroke:#1b5e20,color:#000
+    classDef act fill:#a3751f,stroke:#f57f17,color:#000
+    classDef ext fill:#f48fb1,stroke:#880e4f,color:#000
+    classDef agg fill:#ffe082,stroke:#ff6f00,color:#000
+    classDef hs fill:#e57373,stroke:#b71c1c,color:#fff
+```
+
 ## Bounded Contexts & Aggregates
 
 | Context | Purpose | Aggregates | Events |
@@ -1401,6 +1534,7 @@ flowchart LR
 | Release (`BC-Release`) | Turns a finished project into everything its release needs – the release folder with its manifest, the platform texts laid out and checked against the limits, the release calendar planned across the workspace, and the release board where the user ticks off what went live and gives the one release approval | Release package, Release calendar, Release status | Upload data written, Release package built, Release rules broken, Upload text rendered, Release calendar planned, Release day fixed, Calendar event marked done, Live URL recorded, Release approved, Approval withdrawn, Approval refused, Release checked, Calendar event taken over, Calendar event given back |
 | Publishing (`BC-Publish`) | Gets an approved release onto the platforms – the publish command uploads by hand, privately or as drafts; the release autopilot posts every calendar event a platform API can post at its time once the user approved the release, without ever posting twice; the platform credentials and the watchdog round that runs it every few minutes | Publish log, Autopilot log, Autopilot round, Platform credentials | Platform authorized, Token rotated, Publish planned, Video uploaded, Upload failed, Autopilot round run, Post claimed, Calendar event posted, Calendar event uploaded, Video went public, Post attempt failed, Pinned comment posted, Spotify link appended, Microsite page deployed, Retry requested, Post forced, Timer installed |
 | Workspace (`BC-Workspace`) | Gives the user a private, self-contained workspace and keeps it current – init and its onboarding copy the runtime snapshot, store the provider keys and record the baseline; update merges a newer runtime against the baseline without losing the user's own edits; doctor checks the workspace, tools and keys; migrate-layout moves an old layout; the board container runs the board and its watchdog. Upstream, the runtime build decides what ships | Workspace marker, Runtime snapshot | Workspace created, Provider key stored, Tool installed, Dependencies installed, Workspace updated, Conflict copy written, Layout migrated, Runtime built, Board container started |
+| Model bench (`BC-Bench`) | Replays fixed scenes from past projects – the bench cases – on several bench targets before a model, workflow, server or provider switch, measures every result mechanically, has the art director score it against the case's rubric and the user rate it, and ends with a recommendation per operation; it has its own budget and never produces project assets | Bench case, Bench run, Bench budget | Bench case added, Bench target added, Bench fixtures imported, Bench run planned, Bench run refused over budget, Bench result recorded, Bench result refused, Bench result failed, Bench result skipped, Bench spend recorded, Bench case scored, Bench report built, Bench result rated, Ratings exported |
 
 ## Aggregates
 
@@ -1435,3 +1569,6 @@ flowchart LR
 | Platform credentials (`AGG-PlatformCredentials`) | Publishing | as-is | the workspace's .env (mode 0600), written by saveEnvValue from publish-auth and from the adapters when a token rotates (packages/cli/src/publish-auth.ts:24-34; packages/cli/src/social-auth.ts:51-127; packages/providers/src/publish/x.ts:227-232; tiktok.ts:253-257); readiness from autopilotReadiness (packages/cli/src/autopilot-state.ts:68-91) |
 | Workspace marker (`AGG-WorkspaceMarker`) | Workspace | as-is | coreslopper.workspace.json at the workspace root – version, runtime version, created, the first project, the last update and the baseline (SHA-256 per runtime file) – written whole by init and by every update that is not a dry run (packages/cli/src/workspace.ts:6-17; packages/cli/src/init.ts:167-176,324; packages/cli/src/update.ts:96-99,308-315)<br>updateWorkspace classifies every runtime file against the baseline and the workspace in one pass, then writes the new baseline (update.ts:192-353) |
 | Runtime snapshot (`AGG-RuntimeSnapshot`) | Workspace | as-is | runtime/, built whole from the tracked files by build-runtime.mjs through planRuntime, which classifies every tracked path as shipped, shipped from workspace/ or not shipped (scripts/runtime-files.mjs:20-149; scripts/build-runtime.mjs:19-80)<br>the npm package carries dist/cli.js and runtime/ (package.json bin and files; tsup.config.ts) |
+| Bench case (`AGG-BenchCase`) | Model bench | as-is | bench/cases/<id>.yaml, one file per case, parsed whole by BenchCaseSchema with its cross-field rules; a case is valid or not loaded (packages/core/src/bench.ts:17-129,245-258) |
+| Bench run (`AGG-BenchRun`) | Model bench | as-is | bench/runs/<id>/run.json, the run's cases, targets, seeds and results keyed by <case>/<target>/<seed index>, loaded once and written whole and atomically after every result (packages/cli/src/bench.ts:127-136,523-539,698-700) |
+| Bench budget (`AGG-BenchBudget`) | Model bench | as-is | bench/state.json, the bench's spend, its total overwritten from bench/bench.yaml budget_usd on every load and saved atomically by the generation funnel's recordSpend (packages/cli/src/bench.ts:268-277,354-360; packages/cli/src/generate.ts:756-759) |

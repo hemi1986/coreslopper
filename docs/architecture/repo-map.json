@@ -463,7 +463,9 @@
         "3 layers: cli, core, tests",
         "3 packages",
         "4 files"
-      ]
+      ],
+      "adopted": true,
+      "adoptedAt": "2026-11-22"
     },
     {
       "name": "media",

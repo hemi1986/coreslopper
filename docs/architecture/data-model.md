@@ -632,6 +632,73 @@ publish slice), `GETTING_STARTED.md`, an optional `.mcp.json`, and the conflict 
 | Package | the root `package.json`, private, without `bin`, `files`, `publishConfig` and the build scripts | yes | EVT-RuntimeBuilt |
 | Version | SemVer, the package's | yes | EVT-RuntimeBuilt |
 
+### AGG-BenchCase – Bench case (as-is)
+
+`bench/cases/<id>.yaml`, one file per case, parsed whole by `BenchCaseSchema` with its cross-field rules
+(`packages/core/src/bench.ts:17-129,245-258`; `schema/bench-case.schema.json`). Today tracked upstream; the user's
+cases belong to their workspace (HS-226).
+
+| Attribute | Type | Required | Source |
+|---|---|---|---|
+| Id | Slug, equal to the file name | yes | EVT-BenchCaseAdded |
+| Title, Focus | Text – focus names the failure the case stresses | yes | EVT-BenchCaseAdded |
+| Bench sets | list of Slug, default `core` | yes | EVT-BenchCaseAdded |
+| Source | source project slug and shot | no | EVT-BenchCaseAdded |
+| Operation | one of the eight generation operations | yes | EVT-BenchCaseAdded |
+| Model role | role id, e.g. `image.edit` | yes | EVT-BenchCaseAdded |
+| Prompt, Seed | Text, Integer | yes | EVT-BenchCaseAdded |
+| Flex prompt | structured prompt for reference-to-video | for reference-to-video | EVT-BenchCaseAdded |
+| Size, Duration, Params | Pixels, Seconds, portable params (no node ids) | no | EVT-BenchCaseAdded |
+| Fixtures | map of name → source path inside the project, optionally a cut window | no | EVT-BenchCaseAdded |
+| Inputs | references and audio, each a fixture name | by operation | EVT-BenchCaseAdded |
+| Known good result | a fixture name, with a note | no | EVT-BenchCaseAdded |
+| Expected text | Text, for the word error rate | no | EVT-BenchCaseAdded |
+| Refusal accepted | Boolean, default false | yes | EVT-BenchCaseAdded |
+| Frame positions | list of fractions, default 0.05, 0.35, 0.65, 0.95 | yes | EVT-BenchCaseAdded |
+| Rubric | criteria with unique id, check, weight ≥ 1 | yes, at least one | EVT-BenchCaseAdded |
+
+Beside it: the bench targets in `bench/targets.yaml` (provider, optional server and workflow folder, per operation a
+model, params, pricing and the reference-to-video swap; EVT-BenchTargetAdded), `bench/bench.yaml` (budget, batch cap,
+default size, set descriptions), and the fixtures in `bench/fixtures/<case>/` (EVT-BenchFixturesImported).
+
+### AGG-BenchRun – Bench run (as-is)
+
+`bench/runs/<id>/run.json`, written whole and atomically after every result (`packages/cli/src/bench.ts:127-136,700`);
+a TypeScript interface only, read without validation (HS-236).
+
+| Attribute | Type | Required | Source |
+|---|---|---|---|
+| Run id | `YYYYMMDD-HHMM[-set]` or the user's name | yes | EVT-BenchRunPlanned |
+| Created, Updated | Timestamp | yes | EVT-BenchRunPlanned, EVT-BenchResultRecorded |
+| Bench set, Cases, Seeds | Slug, list of case ids, Integer (the largest asked for) | yes | EVT-BenchRunPlanned |
+| Targets | map of target → provider, description, server URL and status | yes | EVT-BenchRunPlanned |
+| Bench results | one per result key `<case>/<target>/<seed index>` | yes | EVT-BenchResult* |
+| – Status | ok, refused, error, skipped | yes | EVT-BenchResultRecorded, …Refused, …Failed, …Skipped |
+| – Seed | case seed + seed index × 101 | yes | EVT-BenchRunPlanned |
+| – Files, Hash, Cached, Cost | relative paths, SHA-256, Boolean, Money | ok | EVT-BenchResultRecorded |
+| – Time | Seconds, fresh or recorded in `bench/timings.jsonl` | no | EVT-BenchResultRecorded |
+| – Media, VRAM | size, length, fps; device, total, before, peak in GB | no | EVT-BenchResultRecorded |
+| – Frame strip, Review clip | relative paths | clips; lip-sync | EVT-BenchResultRecorded |
+| – Same bytes | Boolean, seed 0 with `--repeat` | no | EVT-BenchResultRecorded |
+| – Transcript | text and word error rate | with `--transcribe` | EVT-BenchResultRecorded |
+| – Message | Text | refused, error, skipped | EVT-BenchResultRefused, …Failed, …Skipped |
+
+Beside it in the run folder: `scores/<case>.json` (per result key the points per criterion, a pass/weak/fail outcome
+and notes, validated by `BenchScoreSchema`; EVT-BenchCaseScored), `ratings.json` (per result key stars 1-5 and a note,
+not validated; EVT-RatingsExported), `out/<target>/<case>/s<n>/` and `index.html` (EVT-BenchReportBuilt).
+
+### AGG-BenchBudget – Bench budget (as-is)
+
+`bench/state.json`, the bench's own state; its total is overwritten from `bench/bench.yaml` `budget_usd` on every load
+(`packages/cli/src/bench.ts:268-277`). Spend comes from the generation funnel; every call is a line in
+`bench/manifest.jsonl`.
+
+| Attribute | Type | Required | Source |
+|---|---|---|---|
+| Total | Money, from `budget_usd` | yes | configuration |
+| Spent | Money, the planned cost of every paid generation | yes | EVT-BenchSpendRecorded |
+| Batch cap | Money, `batch_cap_usd`; the whole remaining budget for the run, 30 % for each generation today (HS-230) | no | configuration |
+
 ## Lifecycle
 
 Stage state as the code allows it today. Every transition is accepted from every status (HS-11); the diagram
@@ -716,6 +783,23 @@ stateDiagram-v2
   Deleted --> Deleted: stays deleted (package-lock.json comes back)
 ```
 
+### A bench result (model bench)
+
+```mermaid
+stateDiagram-v2
+  [*] --> skipped: the target does not run the case
+  [*] --> error: the estimate failed
+  [*] --> planned: estimated in the run
+  planned --> ok: generated or served from the cache
+  planned --> refused: the provider refused
+  planned --> error: the generation failed
+  ok --> scored: the art director scored it
+  refused --> scored: scored 0, or counted as a refusal
+  scored --> rated: the user rated it
+  ok --> planned: the run runs again with its id (every result today, HS-228)
+  error --> planned: the run runs again with its id
+```
+
 ## Overview
 
 ```mermaid
@@ -725,6 +809,18 @@ erDiagram
   WORKSPACE ||--o{ CONFLICT_COPY : "file.coreslopper-new"
   RUNTIME_SNAPSHOT ||--|{ BASELINE_ENTRY : "hashed into"
   WORKSPACE ||--o{ PROJECT : "projects/"
+  WORKSPACE ||--o{ BENCH_CASE : "bench/cases/"
+  BENCH_CASE }o--o| PROJECT : "source project"
+  BENCH_CASE ||--o{ BENCH_FIXTURE : "copied by bench import"
+  WORKSPACE ||--o{ BENCH_TARGET : "bench/targets.yaml"
+  WORKSPACE ||--|| BENCH_BUDGET : "bench/state.json"
+  WORKSPACE ||--o{ BENCH_RUN : "bench/runs/"
+  BENCH_RUN ||--o{ BENCH_RESULT : "one per case, target and seed"
+  BENCH_RESULT }o--|| BENCH_CASE : "of"
+  BENCH_RESULT }o--|| BENCH_TARGET : "on"
+  BENCH_RESULT }o--o| CACHED_GENERATION : "records or reuses"
+  BENCH_RESULT ||--o| BENCH_SCORE : "scored by the art director"
+  BENCH_RESULT ||--o| RATING : "rated by the user"
   PROJECT ||--|| PROJECT_CONFIG : "configured by"
   PROJECT ||--|{ STAGE_STATE : "one per stage of its kind"
   STAGE_STATE }o--|| STAGE_DEFINITION : "defined by"

@@ -2350,3 +2350,224 @@ is the one area left without a slice. It is small and could be adopted with `ben
 | HS-218 | One skip list and one `.env` filter | recommendation; low | conventions, G-190 |
 | HS-220 | Five characterization tests now, the rest a gap | recommendation; low | `tests/workspace-characterization.test.ts`, `tests/runtime-files.test.ts`, G-192 |
 | HS-221 | ADR 0047 | recommendation | `docs/adr/0047-workspace-marker-and-visible-conflicts.md` |
+
+# Adoption – bench
+Date: 2026-11-22 · Commit: 6023e3c · Slice: the model bench – cases, targets, fixtures, runs, bench scores, ratings and the bench budget (concept `bench`) · Analysts: 3 lenses
+
+## Scope
+
+- **Slice:**
+  - core: `packages/core/src/bench.ts` (the schemas, loaders and pure helpers) and its export;
+  - cli: `packages/cli/src/bench.ts` (the commands and the measurement), `bench-report.ts` (the comparison page), the
+    `bench` commands in `index.ts`;
+  - content: `bench/README.md`, `bench.yaml`, `targets.yaml`, the 28 cases in `bench/cases/`;
+  - instructions: `workspace/.claude/skills/model-bench/` (`SKILL.md`, `scoring.md`) and step 9 of the art director;
+  - docs: ADR 0020; tests: `tests/bench.test.ts`.
+- **Out of scope:**
+  - the generation funnel, the cache and the manifest: generation slice (G-100 stays there);
+  - the art director's verdicts: verdict slice;
+  - `update`'s merge of `bench/`: workspace slice, raised here as G-194;
+  - `scripts/audio-analysis/transcribe.py`: timing slice, the bench only calls it;
+  - the board's shell: the next slice.
+- **Intent:** domain model, as for the earlier slices. **Language:** artifacts `en`, UI `en`.
+- **Since the last slice:** no code change. `slice.ts --cluster bench` found the 4 seeds; the scope was widened by
+  hand to `bench/`, the skill and ADR 0020.
+
+| Layer | Files |
+|---|---|
+| core (domain) | `packages/core/src/bench.ts` |
+| cli (application) | `packages/cli/src/bench.ts`, `bench-report.ts`, `index.ts` (the `bench` commands) |
+| content | `bench/` (tracked: README, `bench.yaml`, `targets.yaml`, `cases/`) |
+| instructions | `workspace/.claude/skills/model-bench/`, `workspace/.claude/agents/art-director.md` step 9 |
+| tests | `bench`; new `bench-characterization` |
+
+## How this slice was decided
+
+As in the earlier slices, there were no code-level questions. Every technical hotspot was decided by the
+recommendation and is marked "not reviewed by the user – delegated". The user answered four questions about how
+they work:
+1. They have never used the bench.
+2. They would run it in their workspace.
+3. The cases, which are scenes from their own videos, belong in their workspace, not upstream.
+4. They would rate the results on the comparison page themselves.
+
+How the answers shaped the model:
+- Answer 1 keeps every behaviour gap low. Nothing in the bench is on the user's path today.
+- Answer 2 makes the workspace the host (HS-225). The help text, the README and ADR 0020 still read as if this
+  repository were the host (G-204, G-206).
+- Answer 3 raises the slice's two medium gaps:
+  - the cases ship upstream (G-193);
+  - `update` would delete a case once it leaves upstream, unless `bench/` becomes add-only first (G-194).
+
+  ADR 0048 records the order.
+- Answer 4 keeps the rating as the tie-breaker. The manual export and save becomes a gap (G-200).
+
+ADR 0048 stays `Proposed`.
+
+## What the repository is (facts)
+
+- **Four commands.**
+  - `bench list` prints the cases with their fixture status, then the targets and the sets.
+  - `bench import [--from] [--cases] [--force]` copies each fixture from `<source>/projects/<path>` into
+    `bench/fixtures/<case>/`, or cuts a vocal window into a 48 kHz wav. The default source is the workspace itself:
+    `repoRoot()` finds it by the package name.
+  - `bench run --targets …` takes `--set`, `--cases`, `--seeds`, `--repeat`, `--fresh`, `--transcribe`, `--id` and
+    `--dry-run`.
+  - `bench report [run|latest]` builds the comparison page again.
+- **The case.**
+  - One zod schema with its cross-field rules: inputs are fixtures, each operation's inputs are checked, rubric ids
+    are unique, the id is the file name.
+  - Defaults: the `core` set, weight 1, no accepted refusal, frames at 5/35/65/95 %.
+  - JSON Schemas exist for the case, the targets file and the configuration.
+- **The run.**
+  - Plan: one dry-run `runBatch` per item for the estimate; seed 0 counts twice with `--repeat`. Then one
+    whole-run budget check, and a dry run stops there.
+  - Run: a ComfyUI reachability check, then each item in sequence. `run.json` is written whole after every result.
+  - Result key `<case>/<target>/<seed index>`; the seed is the case seed + n × 101.
+  - Statuses: ok, refused (a pattern over the message), error, skipped.
+  - A budget error during the run stops it without a page.
+- **Measured:** wall time (kept in `timings.jsonl` and looked up on a cache hit), cost, size, length, fps, VRAM
+  sampled every 1.5 s from `/system_stats` (fresh results only), a frame strip, a lip-sync review clip, bytes
+  compared with `--repeat`, the word error rate with `--transcribe`.
+- **The budget.** `bench/state.json`. Its total is overwritten from `bench.yaml` on every load. Spend comes from the
+  funnel's `recordSpend`. ComfyUI and mock cost nothing.
+- **Scores and ratings.**
+  - One art director per case writes `scores/<case>.json`, validated when loaded; the code never computes an
+    outcome.
+  - The page keeps ratings in localStorage and exports `ratings.json`. The report shows the rubric mean, the
+    worst-seed mean, time, cost, VRAM peak, same bytes and the mean rating.
+- **Shipping.** `bench/` ships whole. Fixtures, runs, the state, the manifest and the timings are gitignored upstream
+  and in the workspace. This repository holds untracked runs and fixtures from earlier trials.
+- **History.** Two commits: `99b981a` (2026-11-14, the bench, with `providerFactory` and `cacheKey` added to the
+  funnel) and `83e262d` (2026-11-19, the reference-to-video swap, four targets, the portrait set). There are no fixes,
+  reverts or TODOs.
+
+## Domain model (decided by recommendation)
+
+- **Context:** `BC-Bench` – Model bench, downstream of Generation.
+- **Aggregates (all `as-is`):**
+  - `AGG-BenchCase`:
+    - inputs that are fixtures;
+    - each operation's inputs;
+    - unique criteria;
+    - the id as the file name;
+    - portable params;
+    - a case belongs to the workspace that holds its project.
+  - `AGG-BenchRun`:
+    - one result per key;
+    - the seed step;
+    - skipped, not failed;
+    - a refusal as a result, an error never scored;
+    - a rerun fills the gaps;
+    - the target's provider and folder for every generation.
+  - `AGG-BenchBudget`:
+    - separate from projects;
+    - the whole run checked before the first call;
+    - one batch cap;
+    - no lost spend.
+- **Commands:**
+  - add a case;
+  - add a target;
+  - import the fixtures;
+  - run the bench;
+  - score a case (the art director);
+  - build the report;
+  - rate a result and export the ratings (the user).
+- **Policies:** every case of a run gets scored; a run ends with its report.
+- **Read models:** the bench list, the comparison page, the model recommendation.
+- **Flow:** `FLOW-ModelComparison`. **Actor:** the model bench skill.
+- **Glossary:**
+  - New: **Bench Set**, **Known Good Result**, **Bench Result**, **Frame Strip**, **Bench Score**, **Bench Budget**.
+  - Sharpened: **Model Bench** (run in the workspace), **Bench Case** (focus; a fixed input), **Bench Target** (skip,
+    not fail), **Bench Fixture** (from the workspace's own projects), **Bench Run** (extended by its id), **Rubric**,
+    **Rating** (_Avoid_ grade, stars; the tie-breaker).
+- **ADR:** 0048 (Proposed), which amends 0020.
+
+## Package documentation written
+
+- `.claude/rules/bench.md` – the path-scoped slice doc. Nothing is left `[OPEN]`.
+- `docs/engineering/conventions.md` – the bench's layering, one `runBatch` per generation with its own target, writes
+  only under `bench/`, node ids in targets; a seam row.
+- `docs/architecture/data-model.md` – the three aggregates, a bench result's lifecycle, the bench in the overview.
+- `docs/domain/context-map.as-is.md` – `BC-Bench` and its edges to Generation, the generation queue (the art
+  director), Pipeline (the fixtures), ComfyUI, FFmpeg and Workspace.
+
+## Contradictions found and how they were resolved
+
+| Contradiction | Resolution |
+|---|---|
+| ADR 0020: the cases are text and can ship, versus scenes of the maintainer's projects that run nowhere else and upstream staying generic | the user's cases into their workspace, generic examples upstream (user; ADR 0048, G-193) |
+| The help text and the README: import from "this repository" or `../my-workspace`, versus `bench/` shipping and the default being the workspace | the workspace is the host (user; G-204, G-206) |
+| The skill: a rerun "resumes and fills gaps", versus every item run again | a rerun fills the gaps (G-195) |
+| The help and README: `--repeat` "without cache", versus a cached second render across invocations | uncached per invocation (G-196) |
+| `bench.yaml`: the whole remaining budget as the default cap, versus 30 % per generation | one cap (G-197) |
+| The glossary: bench scores "are not verdicts", versus the field `verdict` | **Bench Score** with an outcome; the field name is a spelling |
+| `scoring.md`: an error is not scored, versus the page counting a scored error; "fresh only" time, versus cache-hit times | only ok and refused results count; the legend says recorded times (G-199) |
+| The art director: a real person fails, versus a case that tests a real person on purpose | the rubric replaces the axes, the rule included (G-204) |
+| ADR 0020: 25 generations, two sets, versus 28 cases and three sets; the README's example target only a comment | text fix (G-204) |
+| The glossary: Set (a location), versus `sets` of cases; golden, reference and known good result for one thing | **Bench Set**, **Known Good Result** |
+
+## Rules and checks
+
+| Rule | Enforcement | State |
+|---|---|---|
+| A rerun with the run id runs every item again; the earlier result comes back as a cache hit | `tests/bench-characterization.test.ts` | green |
+| Without `batch_cap_usd`, an item above 30 % of the remaining budget becomes an error result | `tests/bench-characterization.test.ts` | green |
+| A dry run over the bench budget throws instead of listing | `tests/bench-characterization.test.ts` | green |
+| The report counts a scored error result and cache-hit times | `tests/bench-characterization.test.ts` | green |
+| The case and target files parse, param precedence, the reference-to-video swap, rubric weights, the word error rate, import, missing fixtures, a mock run with skip and report, the whole-run budget check | existing `tests/bench.test.ts` | green |
+| Core imports no package | `tests/package-boundaries.test.ts`, `docs/architecture/boundaries.yaml` | green |
+| Cases in the workspace, `bench/` add-only, gap-filling rerun, uncached repeat, one cap, a narrow refusal, the page's scoring, ratings in the run folder, the target's routing, schemas for every file, no lost spend, the texts | documentation until stories build them (G-193–G-206) | – |
+
+## Gap register (candidates – stories only with --stories)
+
+14 candidates, G-193 to G-206, in `docs/domain/gap-register.md`:
+- 9 *exist but contradict*. G-193 (the cases ship upstream) is medium. G-195 to G-199, G-201, G-203 and G-204 are
+  low.
+- 5 are *missing*. G-194 (`bench/` not add-only) is medium. G-200, G-202, G-205 and G-206 are low.
+- None is *dead*.
+
+## Deliberately left alone
+
+- Production code, the cases, the skill, and ADR 0020, which is accepted. ADR 0048 amends it. Only the glossary was
+  corrected.
+- The untracked runs, fixtures and spend in this repository's `bench/`: gitignored, never shipped.
+- G-100 (Pika classification from the default folder): the generation slice's. Its line numbers in `bench.ts` moved
+  to 335-343 (noted in G-201).
+- `cost.ts`'s "project budget" in every budget message and `resolveItem` routing reference-to-video to ComfyUI: the
+  generation slice's (G-97).
+- `transcribe.py` without a language: the timing slice's script.
+
+## Open hotspots
+
+None. HS-222 to HS-241 are resolved, four of them partly by the user's answers.
+
+## Next slice
+
+The board's shell (`board/app.js`, `lib.js`, `index.html`, `board.css` and the server's own parts of
+`release-board.ts`) is the last area without a slice. After it, every slice is adopted and the gaps can be worked.
+
+## Decision log
+
+| # | Decision | How | Written to |
+|---|---|---|---|
+| HS-226 | The user's cases move into their workspace; upstream ships the mechanism, schemas and generic examples | user (into my workspace) and recommendation; medium | `AGG-BenchCase`, ADR 0048, G-193 |
+| HS-227 | `bench/`'s configuration and cases are add-only for `update`, shipped before the cases leave upstream | recommendation; medium | ADR 0048, G-194 |
+| HS-225 | The workspace is the bench's host; `--from` names another workspace | user (would run it in their workspace) and recommendation; low | `CMD-ImportBenchFixtures`, ADR 0048, G-204, G-206 |
+| HS-233 | A rating reaches the run folder without a download | user (rates the results) and recommendation; low | `CMD-RateBenchResult`, ADR 0048, G-200 |
+| HS-222 | One context, Model bench, downstream of Generation | recommendation | `BC-Bench` |
+| HS-223 | Three as-is aggregates; targets are configuration, scores and ratings files beside the run | recommendation | the three aggregates |
+| HS-224 | Bench Set, Known Good Result, Bench Result, Frame Strip, Bench Score, Bench Budget; Rating without grade and stars | recommendation | glossary |
+| HS-228 | A rerun fills the gaps; the latest run by id, without a shell | recommendation; low | `AGG-BenchRun`, ADR 0048, G-195 |
+| HS-229 | `--repeat` uncached per invocation | recommendation; low | `CMD-RunBench`, ADR 0048, G-196 |
+| HS-230 | One batch cap; a dry run over budget lists its plan | recommendation; low | `AGG-BenchBudget`, `CMD-RunBench`, ADR 0048, G-197 |
+| HS-231 | A refusal is the provider's content refusal, never a configuration error | recommendation; low | `CMD-RunBench`, G-198 |
+| HS-232 | The art director's outcome is the source; the page marks a contradiction; only ok and refused results count | recommendation; low | `CMD-BuildBenchReport`, `CMD-ScoreBenchCase`, G-199 |
+| HS-234 | The shared generation cache is intended | recommendation | gap register decisions |
+| HS-235 | A target's provider, server and folder hold for every generation; an unrunnable swap is skipped | recommendation; low | `AGG-BenchRun`, G-201 |
+| HS-236 | Every file the bench reads has a schema; a score names the rubric's criteria | recommendation; low | conventions, G-202 |
+| HS-237 | The project state's rule for the bench budget: no lost spend | recommendation; low | `AGG-BenchBudget`, G-203 |
+| HS-238 | The rubric replaces the art director's axes, the real-person rule included | recommendation; low | `CMD-ScoreBenchCase`, ADR 0048, G-204 |
+| HS-239 | Drifted texts fixed together | recommendation; low | G-204 |
+| HS-240 | Four characterization tests now, the rest a gap | recommendation; low | `tests/bench-characterization.test.ts`, G-205 |
+| HS-241 | ADR 0048 | recommendation | `docs/adr/0048-bench-in-the-workspace.md` |

@@ -36,6 +36,9 @@
 | GAP-AGG-PlatformCredentials | as-is boundary | [AGG-PlatformCredentials](events.yaml) | [BC-Publish](context-map.as-is.md#bc-publish--publishing) | – | the workspace's .env (mode 0600), written by saveEnvValue from publish-auth and from the adapters when a token rotates (packages/cli/src/publish-auth.ts:24-34; packages/cli/src/social-auth.ts:51-127; packages/providers/src/publish/x.ts:227-232; tiktok.ts:253-257); readiness from autopilotReadiness (packages/cli/src/autopilot-state.ts:68-91) | Decide the target boundary |
 | GAP-AGG-WorkspaceMarker | as-is boundary | [AGG-WorkspaceMarker](events.yaml) | [BC-Workspace](context-map.as-is.md#bc-workspace--workspace) | – | coreslopper.workspace.json at the workspace root – version, runtime version, created, the first project, the last update and the baseline (SHA-256 per runtime file) – written whole by init and by every update that is not a dry run (packages/cli/src/workspace.ts:6-17; packages/cli/src/init.ts:167-176,324; packages/cli/src/update.ts:96-99,308-315)<br>updateWorkspace classifies every runtime file against the baseline and the workspace in one pass, then writes the new baseline (update.ts:192-353) | Decide the target boundary |
 | GAP-AGG-RuntimeSnapshot | as-is boundary | [AGG-RuntimeSnapshot](events.yaml) | [BC-Workspace](context-map.as-is.md#bc-workspace--workspace) | – | runtime/, built whole from the tracked files by build-runtime.mjs through planRuntime, which classifies every tracked path as shipped, shipped from workspace/ or not shipped (scripts/runtime-files.mjs:20-149; scripts/build-runtime.mjs:19-80)<br>the npm package carries dist/cli.js and runtime/ (package.json bin and files; tsup.config.ts) | Decide the target boundary |
+| GAP-AGG-BenchCase | as-is boundary | [AGG-BenchCase](events.yaml) | [BC-Bench](context-map.as-is.md#bc-bench--model-bench) | – | bench/cases/<id>.yaml, one file per case, parsed whole by BenchCaseSchema with its cross-field rules; a case is valid or not loaded (packages/core/src/bench.ts:17-129,245-258) | Decide the target boundary |
+| GAP-AGG-BenchRun | as-is boundary | [AGG-BenchRun](events.yaml) | [BC-Bench](context-map.as-is.md#bc-bench--model-bench) | – | bench/runs/<id>/run.json, the run's cases, targets, seeds and results keyed by <case>/<target>/<seed index>, loaded once and written whole and atomically after every result (packages/cli/src/bench.ts:127-136,523-539,698-700) | Decide the target boundary |
+| GAP-AGG-BenchBudget | as-is boundary | [AGG-BenchBudget](events.yaml) | [BC-Bench](context-map.as-is.md#bc-bench--model-bench) | – | bench/state.json, the bench's spend, its total overwritten from bench/bench.yaml budget_usd on every load and saved atomically by the generation funnel's recordSpend (packages/cli/src/bench.ts:268-277,354-360; packages/cli/src/generate.ts:756-759) | Decide the target boundary |
 <!-- kataster:gap-register:end -->
 
 ## Gaps found by the adoption of the project and stage pipeline (2026-11-21)
@@ -515,3 +518,46 @@ Decisions (by recommendation, not reviewed by the user):
 
   ADR 0047 (proposed) records them.
 - The container's time zone stays G-167 (publish slice); `doctor`'s publish and autopilot rows are the publish slice's.
+
+## Gaps found by the adoption of the bench slice (2026-11-22)
+
+Candidates only – no stories until the user asks (`/adopt <scope> --stories`). Priority is a suggestion. The user has
+not used the model bench yet. They would run it in their workspace, want their own cases there rather than upstream,
+and want to rate the results themselves. So the bench is not on their path today. Only the cases' place and
+`update`'s ownership of `bench/` are medium: the cases are the maintainer's private scenes in a public repository.
+
+| # | Class | Gap | Evidence | Source | Priority |
+|---|---|---|---|---|---|
+| G-193 | Exists but contradicts | Every tracked bench case is a scene of the maintainer's own projects – source project slugs, fixture paths, character names, lyrics, and a real person's face – and ships to every workspace, where every fixture is missing and the case cannot run; `bench.yaml` and `targets.yaml` name projects too; upstream should ship the mechanism and generic example cases | `bench/cases/*.yaml` (`source`, `fixtures`); `bench/bench.yaml:15`; `bench/targets.yaml:26,84`; `scripts/runtime-files.mjs:70`; ADR 0048 | HS-226 | medium |
+| G-194 | Missing | `update` merges `bench/bench.yaml`, `bench/targets.yaml` and `bench/cases/` like any runtime file: the skill's target and budget edits turn into conflict copies, and once a case leaves upstream an untouched copy is deleted from the workspace; `bench/` must be add-only before G-193 is worked | `packages/cli/src/update.ts:45,250-292`; `workspace/.claude/skills/model-bench/SKILL.md` steps 1 and 4 | HS-227 | medium |
+| G-195 | Exists but contradicts | A rerun with the same `--id` runs every planned item again, estimates finished items at full price again, and replaces an earlier ok result by an error when the retry fails; the skill says it "resumes and fills gaps". `bench report` picks the latest run by modification time through `ls -1t`, and two runs in one minute with the same set share an id | `packages/cli/src/bench.ts:363-366,526-539,630,698,711-720`; `SKILL.md` step 5; `tests/bench-characterization.test.ts` | HS-228 | low |
+| G-196 | Exists but contradicts | `--repeat`'s second render has the fixed cache key extra `repeat: 1`, so a later invocation without `--fresh` compares cached bytes; the help and README say "twice without cache" | `bench.ts:678`; `index.ts:1415`; `bench/README.md` | HS-229 | low |
+| G-197 | Exists but contradicts | Without `batch_cap_usd`, the whole run is checked against the whole remaining bench budget, as `bench.yaml` documents, but each generation's own check falls back to 30 % and turns into an error result; a dry run over budget throws instead of listing its plan; the message names the "project budget" | `bench.ts:582-601`; `packages/core/src/cost.ts:13-31`; `bench/bench.yaml:5`; `tests/bench-characterization.test.ts` | HS-230 | low |
+| G-198 | Exists but contradicts | A refusal is recognised by a pattern over the error text that also matches "not allowed" and "policy", so a configuration or provider error can be counted as a refusal (inference, untested) | `bench.ts:138,690` | HS-231 | low |
+| G-199 | Exists but contradicts | The comparison page colours a bench score by percentage only, so a fail can show green; a scored error or skipped result counts in a target's means; the time legend says "fresh generations only" while recorded cache-hit times count | `packages/cli/src/bench-report.ts:53-58,69,83,113-118,331`; `scoring.md`; `tests/bench-characterization.test.ts` | HS-232 | low |
+| G-200 | Missing | Ratings stay in the browser's localStorage until the user exports `ratings.json` and saves it into the run folder by hand; the browser's copy then wins over the file | `bench-report.ts:264-292`; `bench/README.md` | HS-233 | low |
+| G-201 | Exists but contradicts | An `as: referenceToVideo` swap on a target whose provider is not ComfyUI is routed to ComfyUI by `resolveItem`, and the bench's factory then builds the default local ComfyUI, so the result carries the target's name but ran locally (inference, untested); G-100 still holds (`bench.ts:335-343` now) | `bench.ts:284-290,332-345`; `packages/cli/src/generate.ts:345-348` | HS-235 | low |
+| G-202 | Missing | `run.json`, `state.json` and `ratings.json` are read with a plain cast; a bench score has no JSON Schema in `schema/`, and nothing checks that its criteria are the case's rubric criteria | `bench.ts:42-136,273,486,731-757`; `packages/core/src/bench.ts:181-189`; `scripts/generate-schema.ts` | HS-236 | low |
+| G-203 | Exists but contradicts | `bench/state.json` is loaded once per run and saved without a lock, so two runs on paid targets lose spend; spend above the estimate is thrown by `recordSpend` after the provider charged and before it is saved (inference; see G-1) | `bench.ts:268-277,523`; `packages/core/src/state.ts:330-336`; `generate.ts:756-759` | HS-237 | low |
+| G-204 | Exists but contradicts | Drifted texts: ADR 0020 (a core set of 25 generations, sets `core` and `smoke` only, fixtures imported from another workspace); the README's example target `local-ltx-int8` exists only as a comment; `--from` "default this repository"; `--repeat` "without cache"; the skill's "resumes and fills gaps"; `bench.yaml`'s cap comment; `art-director.md` does not say that the real-person rule gives way to the rubric | `docs/adr/0020-model-bench.md`; `bench/README.md:19-24`; `bench/targets.yaml:112-117`; `index.ts:1398,1415`; `SKILL.md` step 5; `workspace/.claude/agents/art-director.md` step 9 | HS-225, HS-238, HS-239 | low |
+| G-205 | Missing | No test of the unknown target and case errors, an empty selection, first-last-frame with two references, operations that take none, reference-to-video without a flex prompt, unique rubric ids, an id that is not the file name, the target rules, the refusal pattern and `refusalOk`, `--fresh`, `--transcribe`, VRAM sampling, the frame strip, the review clip, the score merge order, the latest run, and the page's script | `tests/bench.test.ts`; `tests/bench-characterization.test.ts` | HS-240 | low |
+| G-206 | Missing | Nothing in the repository says that the bench runs in the workspace: the help text, the README and ADR 0020 read as if this repository were the host, and runs, fixtures and spend from earlier trials sit untracked in this repository's `bench/` | `index.ts:1398`; `bench/README.md:18`; `bench/state.json`, `bench/runs/` (untracked) | HS-225 | low |
+
+Decisions (by recommendation, not reviewed by the user):
+
+- GAP-AGG-BenchCase, GAP-AGG-BenchRun and GAP-AGG-BenchBudget: the boundaries stay as recovered (`as-is`).
+- Exists and is intended:
+  - the bench as a fixed comparison on scenes that once broke, before a model, workflow, server or provider switch;
+    `config/models.yaml` changes only when the user asks (ADR 0020);
+  - a target runs only the operations it lists, and a case it cannot run is skipped, not failed;
+  - every generation through the generation funnel with the bench's own budget and manifest, separate from every
+    project budget (ADR 0041);
+  - the shared generation cache: the same request gives the same result at no cost, a result without a recorded
+    time says so, and `--fresh` measures again (HS-234);
+  - a refusal as a result; the art director's bench score against the rubric, never a verdict; the user's rating
+    as the tie-breaker (user: rates the results themselves);
+  - the comparison page as a local file, since it shows private media (ADR 0020).
+
+  ADR 0048 (proposed) records the rest.
+- The untracked runs, fixtures and spend in this repository's `bench/` are left alone. They are gitignored and
+  never ship.

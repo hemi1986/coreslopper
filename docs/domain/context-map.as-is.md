@@ -3,7 +3,7 @@
 > Recovered from code by `/adopt` on 2026-11-21 at b195086. This is **not a target**.
 > Target: [context-map.md](context-map.md) · Gap register: [gap-register.md](gap-register.md).
 
-Adopted slices: project and stage pipeline; human review; art-director verdicts and the generation queue (decided by recommendation); song timing and lyrics (decided by recommendation, four answers from the user); the storyboard (decided by recommendation, four answers from the user); generation and the provider adapters (decided by recommendation, four answers from the user); series budget, script, takes and the episode track (decided by recommendation, four answers from the user); the bibles, user references and the character library (decided by recommendation, four answers from the user); render, Shorts, composed images and the media directory (decided by recommendation, four answers from the user); the release package, calendar, release board and approval (decided by recommendation, four answers from the user); publishing – the publish command, the release autopilot, the platform credentials and the watchdog round (decided by recommendation, four answers from the user); the workspace – init, onboarding, update, doctor, the layout migration, the runtime build and the board container (decided by recommendation, four answers from the user). Other areas – the model bench, the board's shell – appear only as neighbours until their own slice is adopted.
+Adopted slices: project and stage pipeline; human review; art-director verdicts and the generation queue (decided by recommendation); song timing and lyrics (decided by recommendation, four answers from the user); the storyboard (decided by recommendation, four answers from the user); generation and the provider adapters (decided by recommendation, four answers from the user); series budget, script, takes and the episode track (decided by recommendation, four answers from the user); the bibles, user references and the character library (decided by recommendation, four answers from the user); render, Shorts, composed images and the media directory (decided by recommendation, four answers from the user); the release package, calendar, release board and approval (decided by recommendation, four answers from the user); publishing – the publish command, the release autopilot, the platform credentials and the watchdog round (decided by recommendation, four answers from the user); the workspace – init, onboarding, update, doctor, the layout migration, the runtime build and the board container (decided by recommendation, four answers from the user); the model bench – cases, targets, fixtures, runs, bench scores, ratings and the bench budget (decided by recommendation, four answers from the user). The board's shell appears only as a neighbour until its own slice is adopted.
 
 ```mermaid
 flowchart LR
@@ -22,7 +22,7 @@ flowchart LR
   BC-Generation -->|planned cost of every new generation recorded as spend| BC-Pipeline
   BC-Generation -->|cloud adapters: fal.ai, Higgsfield, Topview| Providers[Cloud providers - external]
   BC-Generation -->|tagged workflows on the user's GPU| ComfyUI[ComfyUI server - external]
-  Bench[Model bench - not adopted] -->|own budget and manifest, same runBatch| BC-Generation
+  BC-Bench -->|one-item batches through runBatch with the bench budget, manifest and cache key extras; the workspace's generation cache| BC-Generation
   BC-Series -->|takes and ambience through runBatch on the episode budget; canon generations on the series budget| BC-Generation
   BC-Series -->|mix, stems, conversion, lip-sync segments| FFmpeg[FFmpeg - external]
   BC-Series -->|episode track writes timing.json; overrides move sound and picture| BC-Timing
@@ -68,6 +68,11 @@ flowchart LR
   BC-Workspace -->|the npx CLI and runtime; the dependencies| NpmRegistry[npm registry - external]
   BC-Workspace -->|the board image and container| Docker[Docker - external]
   BC-Workspace -->|uv, Python, ffmpeg, Claude Code| ToolInstallers[Tool installers - external]
+  BC-Bench -->|a bench result is scored by the art director against the case rubric, never a verdict| BC-GenerationQueue
+  BC-Bench -->|fixtures copied from the projects' keyframes, references, vocal segments and accepted results| BC-Pipeline
+  BC-Bench -->|VRAM sampled from /system_stats; another server per target| ComfyUI
+  BC-Bench -->|frame strips, review clips, vocal windows cut, media probed| FFmpeg
+  BC-Workspace -->|bench/ ships with the runtime and is merged by update like any runtime file| BC-Bench
 ```
 
 ## Contexts
@@ -446,3 +451,27 @@ Boundaries:
 - Outside: the npm registry, the tool installers, the providers' key checks, Docker.
 - A conflict is reported once (HS-209); the upstream CI ships and cannot pass in a workspace (HS-211); `update` says
   nothing about a changed `docker/` (HS-212).
+
+### BC-Bench – Model bench
+Purpose (as recovered, decided by recommendation HS-222): replays fixed scenes from past projects – the bench cases –
+on several bench targets before a model, workflow, server or provider switch, measures every result, has the art
+director score it against the case's rubric and the user rate it, and ends with a recommendation per operation. It
+has its own budget and never produces project assets (ADR 0020, ADR 0048 proposed).
+Core terms: Model Bench, Bench Case, Bench Set, Bench Target, Bench Fixture, Known Good Result, Bench Run, Bench
+Result, Frame Strip, Rubric, Bench Score, Rating, Bench Budget.
+Evidence:
+- the case, target and configuration schemas and their loaders in core (`packages/core/src/bench.ts:17-290`;
+  `schema/bench-*.schema.json`)
+- the commands `bench list|import|run|report` and the measurement in the CLI (`packages/cli/src/bench.ts`;
+  `index.ts:1386-1457`); the comparison page, a pure renderer (`packages/cli/src/bench-report.ts`)
+- `bench/runs/<id>/run.json`, written whole after every result; `bench/state.json`, the bench budget
+- the `model-bench` skill and `scoring.md`, and step 9 of the art director (`workspace/.claude/`)
+Boundaries:
+- Writes only under `bench/`: fixtures, runs, the bench state, manifest and timings. Never a project file, never a
+  project budget.
+- Downstream of Generation: every generation is a one-item batch through `runBatch` with the bench's own budget,
+  manifest and cache key extras (ADR 0041). It shares the workspace's generation cache (HS-234).
+- Reads the workspace's projects only through `bench import` (HS-225).
+- The art director scores bench results by the rubric; a bench score is not a verdict and files nothing (HS-224).
+- The tracked cases cite the maintainer's projects and ship to every workspace (HS-226); `update` merges `bench/`
+  like any runtime file (HS-227).
