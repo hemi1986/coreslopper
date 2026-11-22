@@ -94,7 +94,7 @@ describe('review rounds', () => {
     expect(((await productionProject(dir)) as { next: { reason: string } }).next.reason).not.toBe('review');
   });
 
-  it('keeps the desktop player\'s notes and gives them ids when the board first writes', async () => {
+  it('keeps notes without ids from the retired desktop player and gives them ids when the board first writes', async () => {
     const { dir } = await demo();
     await mkdir(join(dir, 'review', 'notes'), { recursive: true });
     await writeFile(join(dir, 'review', 'notes', '16x9.json'), JSON.stringify({ video: '16x9.mp4', fps: 30, notes: [{ frame: 30, seconds: 1, time: '00:01.000', text: 'From the desktop player.' }] }));

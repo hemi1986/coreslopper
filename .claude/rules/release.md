@@ -79,8 +79,8 @@ Done Mark, Live URL, Release Approval, Announcement, Microsite, TODO. All are in
 
 - A proposed day is fixed only by the approval, so a user who posts by hand keeps a TODO. `--replan` proposes
   again (G-150, high).
-- The board's refresh (`render: false, stills: false`) deletes a stale format or a changed dated image from the
-  folder (G-151, high).
+- The board's refresh (`render: false, stills: false`) keeps the earlier copy of a stale format and drops a dated
+  image whose date or title changed; the post falls back to the cover (G-151).
 - QA misses chapters, the description's bytes and `linkedin.md`. QA calls a missing upload text WARN (G-152).
 - A broken `upload.yaml` shows on the board as no texts (G-153). The live URL never reaches `texts/x.md` and
   `texts/linkedin.md` (G-154).

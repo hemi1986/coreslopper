@@ -12,7 +12,7 @@
 | `packages/providers/src/` | generation, publish and post adapters, the cache/manifest runner | core |
 | `packages/remotion/src/` | Remotion compositions and motion components: pure functions of props and frame, no file access | core: runtime values from `@coreslopper/core/browser` only; `import type` from `@coreslopper/core` is erased and allowed |
 | `packages/cli/src/` | every command (`index.ts` wires them), the board server and its static page (`board/*.js`), the watchdog | core, providers, remotion |
-| `scripts/` | Python helpers (audio analysis, review player), the runtime build and its file classification (`runtime-files.mjs`), the sandbox | – |
+| `scripts/` | Python helpers (audio analysis), the runtime build and its file classification (`runtime-files.mjs`), the sandbox | – |
 | `workspace/` | the workspace root: media skills, agents, commands, hook | – |
 
 Packages resolve each other through `tsconfig.json` `paths` and the matching `resolve.alias` in
@@ -212,7 +212,7 @@ directory. `tests/helpers/release-fixture.ts` builds release projects.
 | Page, form, flow | the board's HTTP API | integration | `tests/board-review.test.ts` |
 | Queue run | `runQueue(dir, { deps })` with injected `generate`, `review`, `restart`, `log` (`QueueDeps`) | integration | `tests/queue.test.ts` |
 | Headless agent | `reviewImage(dir, { runner })` with a fake runner returning the JSON | unit | `tests/review-image.test.ts` |
-| Python helper | the helper's functions | unit (pytest, `npm run python:test`) | `scripts/review-player/tests/test_review_notes.py`, `scripts/audio-analysis/tests/test_timing_core.py` |
+| Python helper | the helper's functions | unit (pytest, `npm run python:test`) | `scripts/audio-analysis/tests/test_timing_core.py` |
 | Song analysis | `analyze.py --no-separate --skip-asr --schema …` on a fixture project; no model loads | integration (pytest) | `scripts/audio-analysis/tests/test_analyze_integration.py` |
 | Timing rule | `mergeTiming`, `assertTiming`, `resolveAnchor` on an inline `Timing` | unit | `tests/timing.test.ts`, `tests/timing-characterization.test.ts` |
 | Storyboard rule | `resolveStoryboard` on an inline `Storyboard`, `Timing`, style and character bible | unit | `tests/storyboard-characterization.test.ts`, `tests/continuity.test.ts` |

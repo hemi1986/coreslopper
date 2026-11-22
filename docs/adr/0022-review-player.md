@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — 2026-11-16. Extends [ADR 0002](0002-autonomous-pipeline.md).
+Superseded by ADR-0050 — 2026-11-22. Was: Accepted — 2026-11-16. The desktop player is retired; review happens in the board ([ADR 0032](0032-web-review-rounds.md)). Extends [ADR 0002](0002-autonomous-pipeline.md).
 
 ## Context
 

@@ -3,7 +3,7 @@ import type { ReviewNote, ReviewReplies, ReviewRound } from './schema.js';
 // Review rounds: the user's notes on a render, sent to the agent in rounds.
 // Pure helpers shared by the board, `status`, and the tests.
 
-/** `mm:ss.mmm` for a position in a video, as the review player writes it. */
+/** `mm:ss.mmm` for a position in a video, as the board's review view writes it. */
 export function formatReviewTime(seconds: number): string {
   const total = Math.round(seconds * 1000);
   const minutes = Math.floor(total / 60000);

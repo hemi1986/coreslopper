@@ -75,18 +75,6 @@ Every character the pipeline builds lands in the workspace's character library. 
 
 Watch the result in the board's **Review** tab (`npm run cli -- board`): step frame by frame along a timeline of sections and shots, write notes on a frame or a range, and send them to the agent with one click. `/video-next <slug>` then works through them, re-renders the preview, and answers every note on the board ([docs/board.md](docs/board.md#review)).
 
-The desktop player writes the same notes:
-
-```bash
-npm run cli -- review <slug>                  # newer of preview and master render
-npm run cli -- review <slug> --format 9x16    # another format
-npm run cli -- review <slug> --video projects/<slug>/renders/shorts/M2-chorus-9x16.mp4
-```
-
-Space plays and pauses, ←/→ steps one frame, ↑/↓ one second. While paused, type what is wrong and press Enter: the note is saved with its frame and time in `projects/<slug>/review/notes/<video>.json`. PageUp/PageDown jumps between notes, Delete removes one, Esc quits. The first start sets up the player's Python environment with uv.
-
-Then ask Claude Code for a fix pass, for example *"work through the review notes for <slug>"*. It maps every note to its shot, fixes timing, motion, or generated media, re-renders, and reports which notes are done. Keys and file format: [scripts/review-player/README.md](scripts/review-player/README.md).
-
 ## 4. Release
 
 The last stage, `qa-export`, builds the release package in `projects/<slug>/renders/release/`: every format, three thumbnails, three Shorts with covers, the song as WAV, the streaming cover, the Spotify Canvas, lyrics, and the texts for each platform (YouTube, Shorts, TikTok, Instagram, Spotify and the distributor, X, LinkedIn when the song suits it, and your microsite). It also plans a **release calendar** for the project: when what goes online where.
@@ -159,7 +147,6 @@ Run these inside the workspace.
 | `npm run cli -- status <project>` | Stages, spend, and the next step. |
 | `npm run cli -- validate <project>` | Check timing, storyboard, style, and characters. |
 | `npm run cli -- render <project> --format 16x9` | Render a format (`16x9`, `9x16`, `1x1`). |
-| `npm run cli -- review <project>` | Watch a render frame by frame and leave review notes. |
 | `npm run cli -- board` | The workspace's page: production status of every project and series, and the release view with files, texts, settings, and the calendar of all projects. |
 | `npm run cli -- calendar <project>` | Plan or show a project's release calendar (`--replan`, `--done-until <date>`). |
 | `npm run cli -- release-run --plan` | What the release autopilot posts when, and what needs you. |
@@ -192,7 +179,6 @@ Your projects, `.env`, and your own edits to workflow files are kept. If a file 
 | What each stage does, and running one by hand | [docs/pipeline.md](docs/pipeline.md) |
 | Series and episodes: stages, takes, re-timing | [docs/pipeline.md#episodes](docs/pipeline.md#episodes), [ADR 0016](docs/adr/0016-episode-projects.md) |
 | fal.ai, Higgsfield, budgets, and model roles | [docs/providers.md](docs/providers.md) |
-| Review player: keys, notes, fix pass | [scripts/review-player/README.md](scripts/review-player/README.md) |
 | Release board, calendar, and what each platform accepts | [docs/release-platforms.md](docs/release-platforms.md), [ADR 0028](docs/adr/0028-release-board-and-calendar.md) |
 | The release autopilot: one approval, then the calendar posts by API | [docs/publishing.md](docs/publishing.md#release-autopilot), [ADR 0029](docs/adr/0029-release-autopilot.md) |
 | Uploading to YouTube and TikTok | [docs/publishing.md](docs/publishing.md) |

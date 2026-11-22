@@ -1345,10 +1345,10 @@ export type CharacterState = z.infer<typeof CharacterStateSchema>;
 export type CharacterBible = z.infer<typeof CharacterBibleSchema>;
 export type LibraryCharacter = z.infer<typeof LibraryCharacterSchema>;
 export type BrandKit = z.infer<typeof BrandKitSchema>;
-/** One note on a render: a frame, or a range from `frame` to `end_frame`. Written by the review player and the board. */
+/** One note on a render: a frame, or a range from `frame` to `end_frame`. Written by the board's review view. */
 export const ReviewNoteSchema = z
   .object({
-    /** Set by the board; notes of the desktop player have none until the board submits them. */
+    /** Set by the board; notes written by the retired desktop player have none until the board submits them. */
     id: z.string().min(1).optional(),
     frame: z.number().int().nonnegative(),
     seconds: z.number().nonnegative(),

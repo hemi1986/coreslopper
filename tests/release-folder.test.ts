@@ -465,6 +465,20 @@ describe('release folder', () => {
     expect(stale.renders).toEqual(['16x9']);
   });
 
+  it('keeps the earlier copy of a stale format when it may not render', async () => {
+    const dir = await fixture();
+    const full = await buildRelease({ projectDir: dir, deps: fakeDeps() });
+    const video = full.manifest.files.find((file) => file.kind === 'video' && file.path.endsWith('-16x9.mp4'))!;
+    const state = JSON.parse(await readFile(join(dir, 'state.json'), 'utf8'));
+    state.artifacts['render:renders/16x9.mp4:inputs'] = 'old';
+    await writeFile(join(dir, 'state.json'), JSON.stringify(state));
+
+    const quick = await buildRelease({ projectDir: dir, render: false, stills: false, deps: fakeDeps({ inputsHash: async () => 'new' }) });
+    expect(existsSync(join(full.dir, video.path))).toBe(true);
+    expect(quick.manifest.files.map((file) => file.path)).toContain(video.path);
+    expect(quick.todos.join()).toContain('renders/16x9.mp4 is stale');
+  });
+
   it('converts a non-deliverable song once', async () => {
     const dir = await fixture();
     const deps = fakeDeps({}, { 'song.wav': wavProbe('pcm_f32le', '44100') });

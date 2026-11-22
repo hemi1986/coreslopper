@@ -175,6 +175,11 @@ class ReleaseWriter {
     this.files.push({ path, kind, bytes: (await stat(target)).size, sha256: await hashFileStream(target), spec, source });
   }
 
+  /** Carry the previous manifest's entry over unchanged, so the clean-up keeps its file. */
+  keep(entry: ReleaseFile): void {
+    this.files.push(entry);
+  }
+
   /** The previous manifest's entry, when its file is still on disk unchanged. */
   async unchanged(path: string, match: (entry: ReleaseFile) => boolean): Promise<ReleaseFile | undefined> {
     const entry = this.previous.get(path);
@@ -251,16 +256,23 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
     } else if (!stale) {
       warnings.push(`${rel} has no recorded render hash; assumed current (renders made before release tracking)`);
     }
+    const path = `video/${slug}-${format.id}.mp4`;
     if (stale) {
       if (options.render === false) {
         todos.push(`${rel} is ${reason}: npm run cli -- render projects/${slug} --format ${format.id}`);
+        // The quick refresh keeps the earlier copy: the user may still be posting it on another platform.
+        const earlier = await writer.unchanged(path, (entry) => entry.kind === 'video');
+        if (earlier) {
+          writer.keep(earlier);
+          if (format.id === formatId(project.config.formats.master.aspect)) files.master = path;
+          files.videos = { ...files.videos, [format.id]: path };
+        }
         continue;
       }
       deps.log(`Rendering ${format.id} (${reason})...`);
       await deps.render(project.paths.root, format.id);
     }
     const recordedFile = loadedArtifact(await loadProject(project.paths.root), `render:${rel}:sha256`);
-    const path = `video/${slug}-${format.id}.mp4`;
     const facts = videoFacts(deps.probe(source));
     const hash = await writer.place(source, path, 'video', { ...format, duration: timing?.audio.duration, measured: facts });
     if (recordedFile && recordedFile !== hash) warnings.push(`${rel} differs from the render recorded in state.json`);

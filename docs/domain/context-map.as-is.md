@@ -114,7 +114,6 @@ Evidence:
   (`packages/core/src/schema.ts:1349-1421`); pure helpers `packages/core/src/review.ts`
 - writes and the lock `review/.notes.lock` (`packages/cli/src/board-review.ts:200-269`); board routes
   `/api/review/<slug>[/notes|/submit]` (`packages/cli/src/release-board.ts:373-392`)
-- a second writer of notes: the desktop player (`scripts/review-player/review_notes.py`), without the lock
 - replies validated by `validate-file` and the workspace hook; answered by a `review-fix` runner per
   `workspace/.claude/commands/video-next.md` and `workspace/.claude/skills/assembly-render/SKILL.md`
 Boundaries:

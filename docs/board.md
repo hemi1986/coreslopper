@@ -74,7 +74,7 @@ The **Review** tab of a project plays its renders (newest first) frame by frame:
 
 Below the player, the timeline shows the song's sections, the storyboard's shots, and the notes; click it to jump. Write a note and press Enter: it sits on the current frame, or on the range you marked with `I` and `O`. Drafts can be changed or deleted.
 
-**Send to the agent** freezes the render's drafts as a review round in `review/rounds/<NNN>.json`, with the shots and section of each note. Then run `/video-next <slug>` in Claude Code: it works through the round before anything else, re-renders the preview, and answers each note (fixed, partly, not fixed, or a question), which appears under the note. Notes from the desktop player (`npm run cli -- review`) show up here too and go out with the next round.
+**Send to the agent** freezes the render's drafts as a review round in `review/rounds/<NNN>.json`, with the shots and section of each note. Then run `/video-next <slug>` in Claude Code: it works through the round before anything else, re-renders the preview, and answers each note (fixed, partly, not fixed, or a question), which appears under the note.
 
 ## The watchdog
 
