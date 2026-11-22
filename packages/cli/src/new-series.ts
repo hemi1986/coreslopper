@@ -7,6 +7,7 @@ import {
   SeriesSchema,
   ValidationError,
   createSeriesState,
+  defaultLipSyncProvider,
   loadBrand,
   loadDefaults,
   repoRoot,
@@ -33,6 +34,7 @@ export interface NewSeriesOptions {
   /** Master format ID; defaults to the master in config/defaults.yaml. */
   format?: FormatId;
   brand?: string;
+  /** `lipsync` defaults to the video provider's lip-sync default (`defaultLipSyncProvider`); written to `series.yaml`. */
   providers?: Partial<Series['providers']>;
   /** Workspace root. Defaults to the repository root discovered from cwd. */
   root?: string;
@@ -82,12 +84,19 @@ export async function createSeries(options: NewSeriesOptions): Promise<string> {
   const master: Format = options.format
     ? { ...FORMAT_SIZES[options.format], fps: defaults.formats.master.fps }
     : defaults.formats.master;
+  const video = options.providers?.video ?? 'mock';
   const series = SeriesSchema.parse({
     version: 1,
     slug,
     title,
     formats: { master, derivatives: [] },
-    providers: { image: 'mock', video: 'mock', audio: 'mock', ...options.providers },
+    providers: {
+      image: 'mock',
+      audio: 'mock',
+      ...options.providers,
+      video,
+      lipsync: options.providers?.lipsync ?? defaultLipSyncProvider(video),
+    },
     brand,
     budget_usd: options.budget,
     episodes: [],
@@ -105,7 +114,7 @@ export async function createSeries(options: NewSeriesOptions): Promise<string> {
 
   console.log(`Created series ${title} (${slug}) at ${dir}`);
   console.log(
-    `Budget: $${options.budget.toFixed(2)} · master ${master.aspect} ${master.width}x${master.height} · providers: image=${series.providers.image}, video=${series.providers.video}, audio=${series.providers.audio}`,
+    `Budget: $${options.budget.toFixed(2)} · master ${master.aspect} ${master.width}x${master.height} · providers: image=${series.providers.image}, video=${series.providers.video}, lipsync=${series.providers.lipsync}, audio=${series.providers.audio}`,
   );
   console.log('Next: write the bible, characters, sets, and episode plan (new-series skill), then generate the references.');
   return dir;

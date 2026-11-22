@@ -1,5 +1,5 @@
 import { ConfigError } from './errors.js';
-import type { ModelPricing, ModelRole, ProjectConfig, ProviderKind } from './schema.js';
+import type { LipSyncProviderKind, ModelPricing, ModelRole, ProjectConfig, ProviderKind, VideoProviderKind } from './schema.js';
 
 export interface ResolvedModelRole {
   provider: string;
@@ -83,15 +83,18 @@ export function resolveModelRole(
   };
 }
 
+/**
+ * The lip-sync provider a project gets when `providers.lipsync` is not set: its video provider, except
+ * Topview, whose Avatar 4 needs separate OpenAPI credentials (TOPVIEW_UID, TOPVIEW_OPENAPI_KEY) and so
+ * stays on fal unless the project opts in. A ComfyUI project lip-syncs locally (ADR 0053).
+ */
+export function defaultLipSyncProvider(video: VideoProviderKind): LipSyncProviderKind {
+  return video === 'topview' ? 'fal' : video;
+}
+
 /** The provider a role uses in a given project. */
 export function providerForRole(config: Pick<ProjectConfig, 'providers'>, role: string): ProviderKind {
-  if (role === 'video.lipsync') {
-    if (config.providers.lipsync) return config.providers.lipsync;
-    // ComfyUI and Topview projects keep lip-sync on fal unless they opt in: local lip-sync is
-    // slower, and Topview's Avatar 4 needs separate OpenAPI credentials (TOPVIEW_UID, TOPVIEW_OPENAPI_KEY).
-    const video = config.providers.video;
-    return video === 'comfyui' || video === 'topview' ? 'fal' : video;
-  }
+  if (role === 'video.lipsync') return config.providers.lipsync ?? defaultLipSyncProvider(config.providers.video);
   if (role.startsWith('audio.')) return config.providers.audio ?? 'comfyui';
   if (role.startsWith('video.')) return config.providers.video;
   return config.providers.image;

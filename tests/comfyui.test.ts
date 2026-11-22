@@ -319,11 +319,16 @@ describe('ComfyUI provider selection', () => {
     formats: { master: { aspect: '16:9', width: 1920, height: 1080, fps: 30 }, derivatives: [] },
   };
 
-  it('keeps lip-sync on fal when video clips render in ComfyUI', () => {
+  it('lip-syncs locally by default when video clips render in ComfyUI', () => {
     const config = ProjectConfigSchema.parse({ ...base, providers: { image: 'fal', video: 'comfyui' } });
     expect(providerForRole(config, 'video.image_to_video.quality')).toBe('comfyui');
-    expect(providerForRole(config, 'video.lipsync')).toBe('fal');
+    expect(providerForRole(config, 'video.lipsync')).toBe('comfyui');
     expect(providerForRole(config, 'image.keyframe')).toBe('fal');
+  });
+
+  it('keeps an explicit providers.lipsync over the ComfyUI default', () => {
+    const config = ProjectConfigSchema.parse({ ...base, providers: { image: 'fal', video: 'comfyui', lipsync: 'fal' } });
+    expect(providerForRole(config, 'video.lipsync')).toBe('fal');
   });
 
   it('accepts ComfyUI for stills, lip-sync, and audio when selected', () => {

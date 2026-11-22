@@ -109,7 +109,7 @@ npm run cli -- estimate --role image.keyframe --units 8 --project projects/my-vi
 npm run cli -- generate projects/my-video --batch assets/batches/scene-01.json
 ```
 
-Roles resolve to the project's provider. A Higgsfield project uses the `alternatives.higgsfield` entries in `config/models.yaml`; lip-sync runs on Higgsfield Speak v2 unless `providers.lipsync` names another provider (fal.ai OmniHuman is cheaper for short lines, see [providers.md](providers.md#lip-sync)). With `providers.video: comfyui`, clips render locally from `comfyui/workflows/` at $0 and lip-sync falls back to fal.ai ([comfyui/README.md](../comfyui/README.md)).
+Roles resolve to the project's provider. A Higgsfield project uses the `alternatives.higgsfield` entries in `config/models.yaml`; lip-sync runs on Higgsfield Speak v2 unless `providers.lipsync` names another provider (fal.ai OmniHuman is cheaper for short lines, see [providers.md](providers.md#lip-sync)). With `providers.video: comfyui`, clips and lip-sync render locally from `comfyui/workflows/` at $0 ([comfyui/README.md](../comfyui/README.md), [ADR 0053](adr/0053-local-lipsync-by-default.md)); `new` writes `providers.lipsync` into `project.yaml`, so set it to `fal` there to lip-sync in the cloud.
 
 Completion: every shot has its source asset or a documented reason; every character shot used references; a shot with `refs.plate` has a keyframe edited from its plate, with its states and props as references; manifest and budget reconciled; art-director passes.
 

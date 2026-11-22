@@ -10,7 +10,7 @@ Set providers in `projects/<slug>/project.yaml`:
 providers:
   image: higgsfield
   video: fal
-  lipsync: fal   # optional; defaults to providers.video
+  lipsync: fal   # new, new-series, and the wizard write it; unset, it defaults to providers.video (fal for topview)
 ```
 
 | Key | Covers | Values |
@@ -18,7 +18,7 @@ providers:
 | `image` | `generateImage`, `editImage` | `fal`, `higgsfield`, `topview`, `comfyui`, `mock` |
 | `video` | `textToVideo`, `imageToVideo`, `firstLastFrameToVideo` | `fal`, `higgsfield`, `topview`, `comfyui`, `mock` |
 | — | `referenceToVideo` | always `comfyui` (Pika H3 Flex, `video.reference_to_video`), or `mock` |
-| `lipsync` | `lipSync` | `fal` (OmniHuman 1.5), `higgsfield` (Speak v2), `topview` (Avatar 4, separate credentials), `comfyui` (LTX FLF2V lip-sync, see [comfyui/README.md](../comfyui/README.md)), `mock`. Defaults to `video`, or to `fal` when `video` is `comfyui` or `topview`. |
+| `lipsync` | `lipSync` | `fal` (OmniHuman 1.5), `higgsfield` (Speak v2), `topview` (Avatar 4, separate credentials), `comfyui` (Pika H3 lip-sync, LTX FLF2V as fallback, see [comfyui/README.md](../comfyui/README.md)), `mock`. Defaults to `video`, or to `fal` when `video` is `topview` ([ADR 0053](adr/0053-local-lipsync-by-default.md)). `new`, `new-series`, and the board wizard write it explicitly; `--lipsync-provider` chooses another. |
 
 Clips without lip-sync default to `referenceToVideo` with the keyframe as the first reference (see the `ai-clips` skill), so they render locally even when `video` names a cloud provider. `video` then covers drafts, first-last-frame shots, and the cloud hero shots chosen within the project budget.
 
@@ -35,7 +35,7 @@ providers:
 
 ## Local clips with ComfyUI
 
-Set `providers.video: comfyui` to render clips on your own GPU. Stills stay on `providers.image`; lip-sync falls back to fal.ai. Each video role's `alternatives.comfyui.model` names a workflow in `comfyui/workflows/`, exported with Export (API) and tagged by node title. A local clip costs $0 against the budget. Setup, title tags, params, and server variables are in [comfyui/README.md](../comfyui/README.md).
+Set `providers.video: comfyui` to render clips on your own GPU. Stills stay on `providers.image`; lip-sync runs locally too, unless `providers.lipsync` names a cloud provider. Each video role's `alternatives.comfyui.model` names a workflow in `comfyui/workflows/`, exported with Export (API) and tagged by node title. A local clip costs $0 against the budget. Setup, title tags, params, and server variables are in [comfyui/README.md](../comfyui/README.md).
 
 Per batch item, `params` choose how a local clip is made: `video_model` (`ltx` or `wan`; Wan 2.2 is image-to-video only and never lip-syncs), `quality` (`draft` or `final`), and after a final clip the **Restore Pass** (`seedvr2`: `restore`, `upscale`, or `off`; `color_correction`: `lab` or `wavelet`). `params.workflow` runs one item on another workflow, such as a slower `-quality` variant. Cloud providers ignore these keys.
 

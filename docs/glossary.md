@@ -457,7 +457,7 @@ A named creative job in `config/models.yaml`, such as `image.keyframe` or `video
 _Avoid_: model (the slug or workflow a role names), preset
 
 **Provider**:
-What runs the generations of one kind for a project, set in `project.yaml` `providers` (`image`, `video`, `lipsync`, `audio`): a cloud provider (`fal`, `higgsfield`, `topview`), the local provider `comfyui`, or `mock`. Lip-sync falls back to fal.ai when the video provider is ComfyUI or Topview; reference-to-video always runs on ComfyUI.
+What runs the generations of one kind for a project, set in `project.yaml` `providers` (`image`, `video`, `lipsync`, `audio`): a cloud provider (`fal`, `higgsfield`, `topview`), the local provider `comfyui`, or `mock`. Lip-sync runs on the video provider, except that a Topview project lip-syncs on fal.ai; reference-to-video always runs on ComfyUI.
 _Avoid_: backend, vendor, engine
 
 **Generation Cache**:
