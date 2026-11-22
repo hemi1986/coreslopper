@@ -68,6 +68,11 @@ describe('take source', () => {
     expect(() => takeSource(lineOf(script, 'pause'))).toThrow(/has no take/);
     expect(() => takeSource(lineOf(script, 'chat'))).toThrow(/has no take/);
   });
+
+  it('describes a generated effect by kind, prompt and length only, so existing effect takes keep their hash', async () => {
+    const effect = lineOf(await demoScript(), 'sfx');
+    expect(takeSource({ ...effect, text_en: 'A sign', pause_after: 2 })).toEqual({ kind: 'sfx', prompt: effect.prompt, duration: effect.duration });
+  });
 });
 
 describe('script rules', () => {
