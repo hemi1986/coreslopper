@@ -145,8 +145,37 @@ describe('createMeme as new --kind meme runs it', () => {
   it('finishes a meme setup only once pitch.md holds the idea', async () => {
     const ws = await workspace();
     const dir = await createMeme(ws, { slug: 'office-prank', imageProvider: 'mock', videoProvider: 'mock', idea: 'The printer takes revenge' });
-    await writeFile(join(dir, 'pitch.md'), '\n');
-    await expect(finishSetup(dir)).rejects.toThrow(/the idea in pitch.md/);
+    for (const pitch of ['\n', '# Pitch\n\n## Idea\n\n']) {
+      await writeFile(join(dir, 'pitch.md'), pitch);
+      await expect(finishSetup(dir)).rejects.toThrow(/the idea in pitch.md/);
+    }
+  });
+
+  it('takes a library character whose id has an underscore, and refuses an unknown lip-sync provider as a 400', async () => {
+    const ws = await workspace();
+    await addLibraryCharacter(ws, { id: 'office_robot', name: 'Office Robot', description: 'A boxy grey robot.' });
+    const dir = await createMeme(ws, { slug: 'office-prank', imageProvider: 'mock', videoProvider: 'mock', idea: 'The printer takes revenge', characters: ['office_robot'] });
+    expect(await readFile(join(dir, 'characters.yaml'), 'utf8')).toContain('library: office_robot');
+    const refused = await post(ws, '/api/new/meme', { ...MEME, slug: 'other', idea: 'x', lipsyncProvider: 'nonsense' });
+    expect(refused.status).toBe(400);
+    expect(existsSync(join(ws, 'projects', 'other'))).toBe(false);
+  });
+
+  it('of two creates of one slug at once, refuses one and keeps the other meme whole', async () => {
+    const ws = await workspace();
+    const input = { slug: 'office-prank', imageProvider: 'mock', videoProvider: 'mock', idea: 'The printer takes revenge' };
+    const results = await Promise.allSettled([createMeme(ws, input), createMeme(ws, { ...input, idea: 'The stapler strikes back' })]);
+    expect(results.map((result) => result.status).sort()).toEqual(['fulfilled', 'rejected']);
+    const project = await loadProject(join(ws, 'projects', 'office-prank'));
+    expect(project.state.stages.setup?.status).toBe('done');
+  });
+
+  it('defaults the budget to the configured minimum when that is above 10 USD', async () => {
+    const ws = await workspace();
+    const defaults = join(ws, 'config', 'defaults.yaml');
+    await writeFile(defaults, (await readFile(defaults, 'utf8')).replace(/minimum_usd:\s*[\d.]+/, 'minimum_usd: 25'));
+    const dir = await createMeme(ws, { slug: 'office-prank', imageProvider: 'mock', videoProvider: 'mock', idea: 'The printer takes revenge' });
+    expect((await loadProject(dir)).config.budget_usd).toBe(25);
   });
 
   it('offers the library characters and the meme budget default in the wizard options', async () => {

@@ -574,6 +574,9 @@ program
         if (kind !== 'meme' && (options.idea !== undefined || options.setting !== undefined)) {
           throw new ValidationError('--idea and --setting are for --kind meme only');
         }
+        if (kind === 'meme' && (options.series !== undefined || options.episode !== undefined)) {
+          throw new ValidationError('a meme has no series; leave out --series and --episode');
+        }
         if (kind === 'meme') {
           // CMD-CreateMeme: pitch.md from the idea and the setting, setup done.
           const { createMeme } = await import('./board-wizard.js');

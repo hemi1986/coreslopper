@@ -359,7 +359,7 @@ export async function finishSetup(projectDir: string): Promise<void> {
   const project = await loadProject(projectDir);
   if (project.config.kind === 'meme') {
     const pitch = await readFile(join(projectDir, 'pitch.md'), 'utf8').catch(() => '');
-    if (!pitch.trim()) throw new ValidationError('still missing: the idea in pitch.md');
+    if (!pitchHasIdea(pitch)) throw new ValidationError('still missing: the idea in pitch.md');
   } else if (project.config.kind !== 'episode') {
     const state = await videoWizardState(projectDir);
     if (state.missing.length) throw new ValidationError(`still missing: ${state.missing.join(', ')}`);
@@ -426,7 +426,7 @@ export interface NewMemeInput {
   imageProvider: unknown;
   videoProvider: unknown;
   /** Defaults to the video provider's lip-sync default. */
-  lipsyncProvider?: LipSyncProviderKind;
+  lipsyncProvider?: unknown;
   /** Required: what the meme is about, in the user's words. */
   idea: unknown;
   setting?: unknown;
@@ -438,17 +438,28 @@ export interface NewMemeInput {
 
 export const MEME_DEFAULT_BUDGET_USD = 10;
 
+/** 10 USD, or the configured minimum when that is higher. */
+async function memeDefaultBudget(root: string): Promise<number> {
+  return Math.max(MEME_DEFAULT_BUDGET_USD, (await loadDefaults(root)).budget.minimum_usd);
+}
+
 /** pitch.md: the idea and the setting in the user's words, where the grilling starts (ADR 0051). */
 export function memePitch(idea: string, setting?: string): string {
   return ['# Pitch', '', '## Idea', '', idea, ...(setting ? ['', '## Setting', '', setting] : []), ''].join('\n');
 }
 
+/** The chosen library ids; `loadLibraryCharacter` checks each with the library's own id rule. */
 function characterIds(value: unknown): string[] {
   if (value === undefined || value === null) return [];
-  if (!Array.isArray(value) || value.some((id) => typeof id !== 'string' || !SLUG.test(id))) {
+  if (!Array.isArray(value) || value.some((id) => typeof id !== 'string')) {
     throw new ValidationError('characters is a list of library character ids');
   }
   return [...new Set(value as string[])];
+}
+
+/** Whether pitch.md holds more than headings, i.e. an idea. */
+function pitchHasIdea(text: string): boolean {
+  return text.split('\n').some((line) => line.trim() && !line.trim().startsWith('#'));
 }
 
 /**
@@ -473,10 +484,10 @@ export async function createMeme(root: string, input: NewMemeInput): Promise<str
     kind: 'meme',
     // The CLI may leave the title out; createProject derives it from the slug.
     title: optionalText(input.title, 'title', 200),
-    budget: input.budget === undefined || input.budget === '' ? MEME_DEFAULT_BUDGET_USD : budget(input.budget),
+    budget: input.budget === undefined || input.budget === '' ? await memeDefaultBudget(root) : budget(input.budget),
     imageProvider: choice(input.imageProvider, IMAGE_PROVIDERS, 'image provider') as ImageProviderKind,
     videoProvider: choice(input.videoProvider, VIDEO_PROVIDERS, 'video provider') as VideoProviderKind,
-    ...(input.lipsyncProvider ? { lipsyncProvider: input.lipsyncProvider } : {}),
+    ...(input.lipsyncProvider === undefined ? {} : { lipsyncProvider: choice(input.lipsyncProvider, VIDEO_PROVIDERS, 'lip-sync provider') as LipSyncProviderKind }),
     ...distribution(input.internal),
   });
   try {
