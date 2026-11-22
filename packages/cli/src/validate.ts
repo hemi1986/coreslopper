@@ -15,6 +15,7 @@ import {
   type ProjectConfig,
 } from '@coreslopper/core';
 import { basename } from 'node:path';
+import { scriptCanon } from './script-canon.js';
 
 /** state.json and project.yaml must agree on the project kind; a mismatch is an error, not a guess. */
 export function assertKindMatches(state: Pick<State, 'kind'>, config: Pick<ProjectConfig, 'kind'>): void {
@@ -71,6 +72,8 @@ export async function validateProject(projectDir: string, options: { write?: boo
 
   assertKindMatches(project.state, config);
   const episodeContext = episode ? validateEpisode(project, await lipsyncMaxDuration(config)) : undefined;
+  // A meme's script against the sound library and, once style-character wrote them, its own bibles (HS-262).
+  if (config.kind === 'meme' && project.script) validateScript(project.script, await scriptCanon(project, project.script));
 
   if (!effectiveTiming) {
     throw new ValidationError(

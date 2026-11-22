@@ -3,7 +3,8 @@
  * text of an episode; these checks run before any take is generated.
  */
 import { ValidationError } from './errors.js';
-import type { CharacterBible, Line, Script, ScriptLine, Section, SetBible, Timing } from './schema.js';
+import type { CharacterBible, Line, ProjectKind, Script, ScriptLine, Section, SetBible, Timing } from './schema.js';
+import { MEME_MAX_SECONDS } from './state.js';
 
 /** Script line kinds that are spoken and therefore follow the TTS text rule. */
 export const SPOKEN_LINE_KINDS = ['dialogue', 'voiceover', 'announcement'] as const;
@@ -46,32 +47,85 @@ export function scriptLines(script: Script): Array<{ scene: string; line: Script
 }
 
 export interface ScriptCanon {
-  characters: CharacterBible;
-  sets: SetBible;
+  /** The project kind; a missing kind means `episode`. */
+  kind?: ProjectKind;
+  /**
+   * The character and set bible. An episode always has them (its series canon). A meme writes its own
+   * after the script, so before style-character its speakers and sets are checked as ids only (HS-262).
+   */
+  characters?: CharacterBible;
+  sets?: SetBible;
+  /** Seconds each library sound plays (`librarySoundSeconds`), by id: the sounds a meme's script names that the library holds. */
+  sounds?: Record<string, number>;
+}
+
+const ID = /^[a-z0-9][a-z0-9_-]*$/;
+
+/**
+ * The length of a script line that is known before any take exists: a pause, a
+ * generated effect's duration, a library sound's (trimmed) length. Spoken and
+ * chat lines are measured later, so they give `undefined`, as does an unknown sound.
+ */
+export function knownLineSeconds(line: ScriptLine, sounds: Record<string, number> = {}): number | undefined {
+  if (line.kind === 'pause') return line.duration;
+  if (line.kind !== 'sfx') return undefined;
+  if (line.sound !== undefined) return line.prompt === undefined ? sounds[line.sound] : undefined;
+  return line.duration;
+}
+
+/** The pause after a line, which every line but a pause has. */
+function pauseAfter(line: ScriptLine): number {
+  return line.kind === 'pause' ? 0 : line.pause_after;
+}
+
+/** The sound line rules (CMD-WriteMemeScript): a library sound or a prompt, exactly one; only a generated effect has a duration. */
+function soundLineIssues(line: Extract<ScriptLine, { kind: 'sfx' }>, label: string, canon: ScriptCanon): string[] {
+  if (line.sound !== undefined && canon.kind !== 'meme') {
+    return [`${label} names the library sound "${line.sound}"; library sounds belong to memes, an episode's effect needs a prompt and a duration`];
+  }
+  if (line.sound !== undefined && line.prompt !== undefined) return [`${label} names a library sound or a prompt, not both`];
+  if (line.sound === undefined && line.prompt === undefined) return [`${label} needs a library sound (sound) or a prompt`];
+  if (line.sound !== undefined) {
+    const issues: string[] = [];
+    if (canon.sounds?.[line.sound] === undefined) issues.push(`${label}: there is no library sound "${line.sound}"`);
+    if (line.duration !== undefined) issues.push(`${label} has no duration; its length comes from the sound's trim`);
+    return issues;
+  }
+  // A generated effect without a duration never parses (ScriptLineSchema).
+  return [];
 }
 
 /**
- * Check a script against the series canon: unique scene and line IDs, known
- * speakers and sets, an English subtitle on every subtitled line, the TTS rule
- * on spoken German text, a chat speed when there are chat lines, and no
- * overlapping lines yet. Throws one ValidationError that lists every issue.
+ * CMD-ValidateScript: check a script against its bibles and, for a meme, the
+ * sound library. Unique scene and line IDs, known speakers and sets (for a meme
+ * without bibles yet: valid ids), an English subtitle on every subtitled line,
+ * the TTS rule on spoken German text, a chat speed when there are chat lines,
+ * no overlapping lines yet, the sound line rules, and for a meme at most 30
+ * seconds of the lengths already known (HS-264). Throws one ValidationError
+ * that lists every issue.
  */
 export function validateScript(script: Script, canon: ScriptCanon): void {
   const issues: string[] = [];
-  const characterIds = new Set(canon.characters.characters.map((character) => character.id));
-  const setIds = new Set(canon.sets.sets.map((set) => set.id));
+  const meme = canon.kind === 'meme';
+  const characterIds = canon.characters && new Set(canon.characters.characters.map((character) => character.id));
+  const setIds = canon.sets && new Set(canon.sets.sets.map((set) => set.id));
+  if (!meme && !characterIds) issues.push('the script needs the character bible of its series canon');
+  if (!meme && !setIds) issues.push('the script needs the set bible of its series canon');
 
   const sceneIds = new Set<string>();
   for (const scene of script.scenes) {
     if (sceneIds.has(scene.id)) issues.push(`duplicate scene id "${scene.id}"`);
     sceneIds.add(scene.id);
-    if (!setIds.has(scene.set)) {
+    if (setIds && !setIds.has(scene.set)) {
       issues.push(`scene "${scene.id}" plays in unknown set "${scene.set}"; known sets: ${[...setIds].join(', ') || 'none'}`);
+    } else if (!setIds && meme && !ID.test(scene.set)) {
+      issues.push(`scene "${scene.id}": set "${scene.set}" is not a valid id (lowercase letters, digits, dashes, underscores)`);
     }
   }
 
   const lineIds = new Set<string>();
   let hasChat = false;
+  let knownSeconds = 0;
   for (const { scene, line } of scriptLines(script)) {
     const label = `line "${line.id}" (scene "${scene}")`;
     if (lineIds.has(line.id)) issues.push(`duplicate line id "${line.id}"`);
@@ -81,9 +135,14 @@ export function validateScript(script: Script, canon: ScriptCanon): void {
       issues.push(`${label} sets "with: ${line.with}"; overlapping lines are not supported yet, so lines play one after another`);
     }
     if (line.kind === 'chat') hasChat = true;
+    if (line.kind === 'sfx') issues.push(...soundLineIssues(line, label, canon));
+    knownSeconds += (knownLineSeconds(line, canon.sounds) ?? 0) + pauseAfter(line);
 
     if (isSubtitledLine(line)) {
-      if (!characterIds.has(line.speaker)) issues.push(`${label} has unknown speaker "${line.speaker}"`);
+      if (characterIds && !characterIds.has(line.speaker)) issues.push(`${label} has unknown speaker "${line.speaker}"`);
+      else if (!characterIds && meme && !ID.test(line.speaker)) {
+        issues.push(`${label}: speaker "${line.speaker}" is not a valid id (lowercase letters, digits, dashes, underscores)`);
+      }
       if (!line.text_en?.trim()) issues.push(`${label} needs text_en for the English subtitles`);
     }
     if (isSpokenLine(line)) {
@@ -97,6 +156,11 @@ export function validateScript(script: Script, canon: ScriptCanon): void {
 
   if (hasChat && !script.chat) {
     issues.push('the script has chat lines but no "chat: { cps, hold }" typing speed');
+  }
+  if (meme && knownSeconds > MEME_MAX_SECONDS + 1e-9) {
+    issues.push(
+      `a meme lasts at most ${MEME_MAX_SECONDS} seconds; its pauses and sounds alone add up to ${Number(knownSeconds.toFixed(3))} s`,
+    );
   }
 
   if (issues.length > 0) throw new ValidationError('Invalid script', issues);
@@ -143,6 +207,8 @@ export function isAudibleLine(line: ScriptLine): boolean {
  */
 export function takeSource(line: ScriptLine): Record<string, unknown> {
   if (isSpokenLine(line)) return { kind: line.kind, speaker: line.speaker, text: line.text_de };
+  // A library sound's take is a copy; what it is made from is the sound (ST-011 adds its file and trim).
+  if (line.kind === 'sfx' && line.sound !== undefined) return { kind: 'sfx', sound: line.sound };
   if (line.kind === 'sfx') return { kind: 'sfx', prompt: line.prompt, duration: line.duration };
   throw new ValidationError(`Script line "${line.id}" (${line.kind}) has no take.`);
 }
@@ -164,9 +230,10 @@ export interface Placement {
 }
 
 /**
- * Place the script lines strictly one after another. A spoken line lasts as
- * long as its take, an effect or pause as long as its `duration`, a chat line
- * as long as `chatSeconds`; `pause_after` is silence before the next line.
+ * Place the script lines strictly one after another. A spoken line or a
+ * library sound lasts as long as its take, a generated effect or pause as
+ * long as its `duration`, a chat line as long as `chatSeconds`; `pause_after`
+ * is silence before the next line.
  * Scenes become sections that start at 0 and cover the episode without gaps;
  * the last one ends after the last line's pause. Times are rounded to
  * milliseconds without drift.
@@ -181,7 +248,8 @@ export function placeLines(script: Script, takeDurations: Record<string, number>
     const sceneStart = cursor;
     for (const line of scene.lines) {
       let length: number;
-      if (isSpokenLine(line)) {
+      // A spoken line and a library sound last as long as their take; the take of a sound is its trimmed copy.
+      if (isSpokenLine(line) || (line.kind === 'sfx' && line.sound !== undefined)) {
         const take = takeDurations[line.id];
         if (take === undefined) throw new ValidationError(`Script line "${line.id}" has no take duration.`);
         length = ms(take);
@@ -189,6 +257,7 @@ export function placeLines(script: Script, takeDurations: Record<string, number>
         if (!script.chat) throw new ValidationError('The script has chat lines but no "chat: { cps, hold }" typing speed.');
         length = ms(chatSeconds(line.text_de, script.chat));
       } else {
+        if (line.duration === undefined) throw new ValidationError(`Script line "${line.id}" has no duration.`);
         length = ms(line.duration);
       }
       const text = isSubtitledLine(line) ? line.text_de : '';

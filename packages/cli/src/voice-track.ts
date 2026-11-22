@@ -30,6 +30,7 @@ import {
   textHash,
   type EpisodeProject,
 } from './takes.js';
+import { scriptCanon } from './script-canon.js';
 
 export interface VoiceTrackOptions {
   dryRun?: boolean;
@@ -66,7 +67,12 @@ function lineItem(project: EpisodeProject, line: ScriptLine): BatchItem {
       params: { transcript: speaker.voice.transcript },
     };
   }
-  if (line.kind === 'sfx') {
+  if (line.kind === 'sfx' && line.sound !== undefined) {
+    throw new ValidationError(
+      `Line "${line.id}" names the library sound "${line.sound}"; the voice track does not copy library sounds yet. Put the sound at audio/lines/${line.id}.wav and run import-takes.`,
+    );
+  }
+  if (line.kind === 'sfx' && line.prompt !== undefined) {
     return {
       operation: 'generateAudio',
       role: 'audio.sfx',
@@ -98,7 +104,7 @@ async function registerGenerated(source: string, destination: string, hash: stri
  */
 export async function voiceTrack(projectDir: string, options: VoiceTrackOptions = {}): Promise<void> {
   const project = requireEpisode(await loadProject(projectDir), 'voice-track');
-  validateScript(project.script, project);
+  validateScript(project.script, await scriptCanon(project, project.script));
   const takes = loadTakes(project);
   const blocked: string[] = [];
 
@@ -120,7 +126,7 @@ export async function voiceTrack(projectDir: string, options: VoiceTrackOptions 
       current += 1;
       continue;
     }
-    if (line.kind === 'sfx' && sfxMax !== undefined && line.duration > sfxMax) {
+    if (line.kind === 'sfx' && line.duration !== undefined && sfxMax !== undefined && line.duration > sfxMax) {
       blocked.push(`Line "${line.id}": the effect is ${line.duration} s; role "audio.sfx" allows at most ${sfxMax} s.`);
       continue;
     }

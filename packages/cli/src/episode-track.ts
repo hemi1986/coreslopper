@@ -30,6 +30,7 @@ import {
   textHash,
   type EpisodeProject,
 } from './takes.js';
+import { scriptCanon } from './script-canon.js';
 
 const SAMPLE_RATE = 48_000;
 /** Energy frames like the music-video analysis: 512-sample hop, 2048-sample window. */
@@ -203,7 +204,7 @@ async function checkTakes(project: EpisodeProject): Promise<Record<string, numbe
  */
 export async function episodeTrack(projectDir: string): Promise<Timing> {
   const project = requireEpisode(await loadProject(projectDir), 'episode-track');
-  validateScript(project.script, project);
+  validateScript(project.script, await scriptCanon(project, project.script));
   const durations = await checkTakes(project);
   const placement = placeLines(project.script, durations);
 

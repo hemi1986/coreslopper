@@ -635,8 +635,14 @@ export const ScriptLineSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('sfx'),
     ...ScriptLineBase,
-    prompt: z.string().min(1),
-    duration: z.number().positive(),
+    /**
+     * A sound line names a library sound (`sound`, memes only) or a prompt to
+     * generate one – exactly one of the two, checked by validateScript.
+     */
+    sound: ScriptIdSchema.optional(),
+    prompt: z.string().min(1).optional(),
+    /** Seconds of a generated effect; a library sound's length comes from its trim, so its line has none. */
+    duration: z.number().positive().optional(),
     /** Optional English subtitle for on-screen text seen during this sound (a label, a sign); not spoken. */
     text_en: z.string().optional(),
     pause_after: PauseAfterSchema,
@@ -646,7 +652,12 @@ export const ScriptLineSchema = z.discriminatedUnion('kind', [
     ...ScriptLineBase,
     duration: z.number().positive(),
   }),
-]);
+]).superRefine((line, ctx) => {
+  // A generated effect needs its length; the sound or prompt rule needs the project kind and stays in validateScript.
+  if (line.kind === 'sfx' && line.sound === undefined && line.prompt !== undefined && line.duration === undefined) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['duration'], message: 'a generated effect needs a duration' });
+  }
+});
 
 export const SceneSchema = z.object({
   id: ScriptIdSchema,
@@ -1520,6 +1531,11 @@ export const LibrarySoundSchema = z
   });
 
 export type LibrarySound = z.infer<typeof LibrarySoundSchema>;
+
+/** How long a library sound plays: its trim, or the whole sound without one. */
+export function librarySoundSeconds(sound: { length: number; trim?: { start: number; end: number } }): number {
+  return sound.trim ? sound.trim.end - sound.trim.start : sound.length;
+}
 
 /** Where a cue or a trim leaves the sound: a trim inside the length, a cue inside the (trimmed) sound. */
 export function librarySoundTimeProblems(sound: { length: number; cue?: number; trim?: { start: number; end: number } }): { field: 'cue' | 'trim'; message: string }[] {

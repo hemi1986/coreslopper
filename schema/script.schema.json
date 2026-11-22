@@ -243,6 +243,11 @@
                       "minLength": 1,
                       "pattern": "^[a-z0-9][a-z0-9_-]*$"
                     },
+                    "sound": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "^[a-z0-9][a-z0-9_-]*$"
+                    },
                     "prompt": {
                       "type": "string",
                       "minLength": 1
@@ -262,9 +267,7 @@
                   },
                   "required": [
                     "kind",
-                    "id",
-                    "prompt",
-                    "duration"
+                    "id"
                   ]
                 },
                 {

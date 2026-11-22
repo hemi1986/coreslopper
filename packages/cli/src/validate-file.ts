@@ -25,6 +25,7 @@ import {
   validateScript,
 } from '@coreslopper/core';
 import { isLibrarySoundFile, validateLibrarySoundEntry } from './sound-library.js';
+import { scriptCanon } from './script-canon.js';
 import { loadUploadData } from './upload-text.js';
 import { assertKindMatches, validateProject } from './validate.js';
 
@@ -139,14 +140,18 @@ export async function validateChangedFile(file: string): Promise<string | undefi
   if (name === 'script.yaml') {
     // Only the script against the canon: timing is rebuilt from the script by
     // episode-track, so it is expected to be stale right after a script edit.
+    // A meme's script is checked against the sound library, and against its own
+    // bibles once style-character wrote them; before that its speakers and sets are ids (HS-262).
     const project = await loadProject(projectDir);
-    if (project.config.kind !== 'episode') {
-      throw new ValidationError(`script.yaml belongs to episode projects; ${projectDir} is a ${project.config.kind}.`);
+    if (project.config.kind !== 'episode' && project.config.kind !== 'meme') {
+      throw new ValidationError(`script.yaml belongs to episode and meme projects; ${projectDir} is a ${project.config.kind}.`);
     }
     if (!project.script) throw new ValidationError(`script.yaml is missing in ${projectDir}.`);
-    if (!project.characters) throw new ValidationError(`characters.yaml is missing in ${project.paths.series}.`);
-    if (!project.sets) throw new ValidationError(`sets.yaml is missing in ${project.paths.series}.`);
-    validateScript(project.script, { characters: project.characters, sets: project.sets });
+    if (project.config.kind === 'episode') {
+      if (!project.characters) throw new ValidationError(`characters.yaml is missing in ${project.paths.series}.`);
+      if (!project.sets) throw new ValidationError(`sets.yaml is missing in ${project.paths.series}.`);
+    }
+    validateScript(project.script, await scriptCanon(project, project.script));
     return 'script';
   }
   if (name === 'project.yaml') {

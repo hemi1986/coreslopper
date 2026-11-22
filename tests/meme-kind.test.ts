@@ -186,7 +186,8 @@ describe('episode-track on a meme', () => {
   it(`refuses a track over ${MEME_MAX_SECONDS} seconds as a hard stop`, async () => {
     const projectDir = await memeWorkspace();
     await writeScript(projectDir, [20, 10.5]);
-    await expect(episodeTrack(projectDir)).rejects.toThrow(/lasts 30\.500 s; a meme lasts at most 30 s/);
+    // Pauses are known before any take exists, so the script check stops it first (ST-009, HS-264).
+    await expect(episodeTrack(projectDir)).rejects.toMatchObject({ details: [expect.stringMatching(/a meme lasts at most 30 seconds; .* 30\.5 s/)] });
     expect(existsSync(join(projectDir, 'timing.json'))).toBe(false);
     expect(existsSync(join(projectDir, 'audio', 'episode.wav'))).toBe(false);
   });
