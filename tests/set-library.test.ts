@@ -218,4 +218,34 @@ describe('taking sets into the library', () => {
     expect(await validateChangedFile(join(setEntryDir(ws, 'bar'), 'set.yaml'))).toBe('library set');
   });
 
+  it('ST-026: A set taken from the library extends its entry', async () => {
+    const ws = await workspace();
+    await libraryBar(ws);
+    const dir = await production(
+      ws,
+      'after-midnight',
+      [
+        bar({
+          library: 'bar',
+          plates: [
+            { id: 'counter', angle: 'counter, frontal', ref: 'sets/bar/plates/counter.png' },
+            { id: 'door', angle: 'door, from inside', ref: 'sets/bar/plates/door.png' },
+          ],
+        }),
+      ],
+      { 'sets/bar/plates/counter.png': 'counter', 'sets/bar/plates/door.png': 'door' },
+    );
+
+    const [result] = await importSets(ws, dir, { now: new Date('2026-11-23T11:00:00Z') });
+
+    expect(result).toEqual({ set: 'bar', id: 'bar', created: false, added: ['door.png', 'plate:door'], missing: [] });
+    const entry = await loadLibrarySet(ws, 'bar');
+    expect(entry.name).toBe('Bar');
+    expect(entry.plates).toEqual([
+      { id: 'counter', angle: 'counter, frontal', file: 'counter.png' },
+      { id: 'door', angle: 'door, from inside', file: 'door.png' },
+    ]);
+    expect(entry.history.at(-1)).toEqual({ at: '2026-11-23T11:00:00.000Z', from: 'projects/after-midnight', added: ['door.png', 'plate:door'] });
+  });
+
 });
