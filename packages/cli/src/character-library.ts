@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { copyFile, mkdir, readFile, readdir, rm } from 'node:fs/promises';
 import { basename, extname, join, relative, resolve, sep } from 'node:path';
@@ -14,7 +13,19 @@ import {
   type LibraryCharacter,
 } from '@coreslopper/core';
 import { SLUG, projectDirs, seriesDirs } from './board-production.js';
-import { checkLibraryId, entryText, libraryEntryDir, libraryEntryFile, parseTags, slugOfName } from './library-entry.js';
+import {
+  LIBRARY_FILE_LIMITS,
+  checkLibraryId,
+  copyByContent,
+  entryText,
+  fileHash,
+  freeName,
+  libraryEntryDir,
+  libraryEntryFile,
+  parseTags,
+  safeName,
+  slugOfName,
+} from './library-entry.js';
 
 // The workspace's character library: `library/characters/<id>/character.yaml`
 // with the character's files next to it. Characters of finished
@@ -23,14 +34,6 @@ import { checkLibraryId, entryText, libraryEntryDir, libraryEntryFile, parseTags
 // project or canon takes a copy (`useCharacter`): identity and outfits always,
 // each continuity state only when chosen. Nothing in a project points into
 // the library, so a later change there never touches a finished video.
-
-const MB = 1024 * 1024;
-
-export const LIBRARY_FILE_LIMITS = {
-  bytes: 512 * MB,
-  images: ['.png', '.jpg', '.jpeg', '.webp'],
-  audio: ['.wav'],
-} as const;
 
 export const libraryRoot = (root: string) => join(root, 'library', 'characters');
 export const entryDir = (root: string, id: string) => libraryEntryDir(root, 'characters', id);
@@ -109,59 +112,6 @@ export async function listLibrary(root: string): Promise<{ characters: LibraryEn
 
 // ------------------------------------------------------------------ files
 
-async function fileHash(path: string): Promise<string> {
-  return createHash('sha256').update(await readFile(path)).digest('hex');
-}
-
-/** A safe file name: letters, digits, dot, dash, underscore. */
-function safeName(name: string): string {
-  const base = basename(name).normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^\w.-]+/g, '-').replace(/^[-.]+|[-.]+$/g, '').toLowerCase();
-  return base || 'file';
-}
-
-/** A name in `dir` that is free: `face.png`, then `face-2.png`. */
-function freeName(dir: string, name: string, taken: Set<string>): string {
-  const extension = extname(name).toLowerCase();
-  const stem = safeName(basename(name, extname(name)));
-  for (let n = 1; ; n += 1) {
-    const candidate = `${stem}${n === 1 ? '' : `-${n}`}${extension}`;
-    if (!taken.has(candidate) && !existsSync(join(dir, candidate))) return candidate;
-  }
-}
-
-/**
- * Copy files into a folder, once each by content: a file whose bytes are
- * already there maps to the existing name. Returns the target name per source
- * and the names that are new.
- */
-async function copyByContent(sources: string[], dir: string): Promise<{ names: Map<string, string>; added: string[] }> {
-  await mkdir(dir, { recursive: true });
-  const known = new Map<string, string>();
-  for (const name of await readdir(dir).catch(() => [] as string[])) {
-    if (name === 'character.yaml' || name.startsWith('.')) continue;
-    known.set(await fileHash(join(dir, name)), name);
-  }
-  const names = new Map<string, string>();
-  const added: string[] = [];
-  const taken = new Set<string>();
-  for (const source of sources) {
-    if (names.has(source)) continue;
-    const hash = await fileHash(source);
-    const existing = known.get(hash);
-    if (existing) {
-      names.set(source, existing);
-      continue;
-    }
-    const name = freeName(dir, source, taken);
-    taken.add(name);
-    await copyFile(source, join(dir, name));
-    known.set(hash, name);
-    names.set(source, name);
-    added.push(name);
-  }
-  return { names, added };
-}
-
 // ----------------------------------------------------------------- import
 
 export interface ImportResult {
@@ -225,7 +175,7 @@ export async function importCharacters(root: string, sourceDir: string, options:
     }
     const id = options.into ?? (await matchEntry(root, character, files, slug));
     const created = !existsSync(entryFile(root, id));
-    const { names, added } = await copyByContent(files, entryDir(root, id));
+    const { names, added } = await copyByContent(files, entryDir(root, id), 'characters');
     const name = (path: string | undefined) => (path ? names.get(resolve(sourceDir, path)) : undefined);
     const entry: LibraryCharacter = created
       ? {
@@ -441,7 +391,7 @@ export async function useCharacter(root: string, targetDir: string, id: string, 
   const absent = names.filter((name) => !existsSync(source(name)));
   if (absent.length) throw new ValidationError(`library files of ${id} are missing: ${absent.join(', ')}`);
   const folder = join(targetDir, 'characters', id);
-  const { names: copied, added } = await copyByContent(names.map(source), folder);
+  const { names: copied, added } = await copyByContent(names.map(source), folder, 'characters');
   const rel = (name: string | undefined) => (name ? `characters/${id}/${copied.get(source(name))}` : undefined);
 
   const file = join(targetDir, 'characters.yaml');

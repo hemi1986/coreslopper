@@ -1,14 +1,16 @@
 import { existsSync } from 'node:fs';
-import { mkdir, readdir } from 'node:fs/promises';
+import { mkdir, readdir, stat } from 'node:fs/promises';
+import { basename, extname, join } from 'node:path';
 import { stringify } from 'yaml';
-import { LibrarySetSchema, ValidationError, readYamlFile, writeTextAtomic, type LibrarySet } from '@coreslopper/core';
-import { entryText, libraryEntryDir, libraryEntryFile, parseTags, slugOfName } from './library-entry.js';
+import { LibrarySetSchema, ValidationError, isScriptId, readYamlFile, writeTextAtomic, type LibrarySet } from '@coreslopper/core';
+import { LIBRARY_FILE_LIMITS, commitCopies, copyByContent, discardCopies, entryText, fileHash, libraryEntryDir, libraryEntryFile, parseTags, slugOfName } from './library-entry.js';
 
 // The workspace's set library: `library/sets/<id>/set.yaml` with the set's
-// files next to it (ADR 0052). The user adds sets by hand (`addLibrarySet`);
-// a project or series canon takes a copy of the entry, with every reference
-// and every plate. Nothing in a production points into the library, so a later
-// change there never touches a finished video.
+// files next to it (ADR 0052). The user adds sets and their files by hand
+// (`addLibrarySet`, `addLibrarySetFile`); a project or series canon takes a
+// copy of the entry, with every reference and every plate. Nothing in a
+// production points into the library, so a later change there never touches a
+// finished video.
 
 export const setEntryDir = (root: string, id: string) => libraryEntryDir(root, 'sets', id);
 const setEntryFile = (root: string, id: string) => libraryEntryFile(root, 'sets', id);
@@ -68,4 +70,95 @@ export async function addLibrarySet(root: string, input: NewLibrarySet, now = ne
   await mkdir(setEntryDir(root, id), { recursive: true });
   await saveLibrarySet(root, entry);
   return entry;
+}
+
+export type SetFileRole = 'ref' | 'plate';
+
+export interface SetFileOptions {
+  role: SetFileRole;
+  /** plate: camera position and framing, e.g. "counter, frontal, waist height". */
+  angle?: unknown;
+  /** plate: its id; default from the angle (kebab-case). */
+  plate?: unknown;
+}
+
+export interface AddLibrarySetFileResult {
+  entry: LibrarySet;
+  /** The new file name and `plate:<id>`, empty when the set already had the file. */
+  added: string[];
+  /** False when the image was already stored and the entry did not change. */
+  changed: boolean;
+}
+
+/**
+ * CMD-AddLibrarySetFile (`set add-file`): copy an image into a set as a
+ * reference or a plate (EVT-LibrarySetFileAdded). Images are png, jpg or webp,
+ * at most 512 MB. A plate needs its camera angle; its id comes from `--plate`
+ * or the angle. A file is stored once by its content, so adding the same image
+ * again changes nothing. The copy is staged, so a failed write never leaves a
+ * file the entry does not name.
+ */
+export async function addLibrarySetFile(root: string, id: string, source: string, options: SetFileOptions, now = new Date()): Promise<AddLibrarySetFileResult> {
+  const entry = await loadLibrarySet(root, id);
+  const before = structuredClone(entry);
+  if (!existsSync(source)) throw new ValidationError(`missing file: ${source}`);
+  if (!(await stat(source)).isFile()) throw new ValidationError(`not a file: ${source}`);
+  const { role } = options;
+  if (role !== 'ref' && role !== 'plate') throw new ValidationError('role must be ref or plate');
+  const extension = extname(source).toLowerCase();
+  if (!(LIBRARY_FILE_LIMITS.images as readonly string[]).includes(extension)) {
+    throw new ValidationError(`a set image takes ${LIBRARY_FILE_LIMITS.images.join(' ')}; got ${extension || 'no extension'}`);
+  }
+  const bytes = (await stat(source)).size;
+  if (bytes > LIBRARY_FILE_LIMITS.bytes) {
+    throw new ValidationError(`a set file is at most ${LIBRARY_FILE_LIMITS.bytes / (1024 * 1024)} MB; ${basename(source)} is ${(bytes / (1024 * 1024)).toFixed(1)} MB`);
+  }
+  if (role === 'ref' && (options.angle !== undefined || options.plate !== undefined)) {
+    throw new ValidationError('--angle and --plate belong to a plate; add --role plate');
+  }
+  const dir = setEntryDir(root, id);
+  let angle: string | undefined;
+  let plateId: string | undefined;
+  if (role === 'plate') {
+    angle = entryText(options.angle, 'camera angle', 200, true)!;
+    plateId = options.plate === undefined ? slugOfName(angle, 'plate') : String(options.plate);
+    if (!isScriptId(plateId)) throw new ValidationError(`not a plate id: ${plateId}`);
+    const existing = entry.plates.find((plate) => plate.id === plateId);
+    if (existing) {
+      if (!existing.file || !existsSync(join(dir, existing.file))) throw new ValidationError(`the plate "${plateId}" of "${id}" has no image on disk; remove the plate or restore its file`);
+      if ((await fileHash(join(dir, existing.file))) === (await fileHash(source))) return { entry, added: [], changed: false };
+      throw new ValidationError(`the set "${id}" has the plate "${plateId}" with another image; name another plate id with --plate`);
+    }
+  }
+  const { names, added, staged } = await copyByContent([source], dir, 'sets', { stage: true });
+  const name = names.get(source)!;
+  const changes = [...added];
+  if (role === 'ref') {
+    if (!entry.refs.includes(name)) {
+      entry.refs.push(name);
+      if (!changes.includes(name)) changes.push(name);
+    }
+  } else {
+    entry.plates.push({ id: plateId!, angle: angle!, file: name });
+    changes.push(`plate:${plateId}`);
+  }
+  if (!changes.length) {
+    await discardCopies(staged);
+    return { entry, added: [], changed: false };
+  }
+  entry.history.push({ at: now.toISOString(), from: 'manual', added: changes });
+  try {
+    await saveLibrarySet(root, entry);
+  } catch (error) {
+    await discardCopies(staged);
+    throw error;
+  }
+  try {
+    await commitCopies(staged);
+  } catch (error) {
+    await saveLibrarySet(root, before);
+    await discardCopies(staged);
+    throw error;
+  }
+  return { entry, added: changes, changed: true };
 }

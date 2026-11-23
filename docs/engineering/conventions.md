@@ -73,7 +73,8 @@ state in memory), one core transition (`setStageRunning`, `setStageDone`, `setSt
 - The bibles' rules are schemas in core (`schema.ts`); the character library's rules – entry matching, content
   dedupe, import and use – live in `packages/cli/src/character-library.ts`, and the display rules, file types and
   reference kinds are repeated in the CLI and the board's JS (G-132). The set library (`set-library.ts`, ADR 0052)
-  shares the entry id, field text, tags and name→id with it through `library-entry.ts`. Library, `references.yaml`
+  shares the entry id, field text, tags, name→id, file limits and the content-wise copy with it through
+  `library-entry.ts`. Library, `references.yaml`
   and character-use writes are atomic but unlocked (G-130). An episode's bibles are the canon's: read them through `loadProject`,
   never from the episode folder.
 - Rendering: the CLI owns all input, output and encoding. `buildVideoProps` (`packages/cli/src/render.ts`) turns
@@ -232,7 +233,7 @@ directory. `tests/helpers/release-fixture.ts` builds release projects.
 | Series budget | `createSeries` / `createProject` in a temp workspace with copies of `config/`, `templates/` and `brand/` | integration | `tests/series-budget.test.ts` |
 | Bible schema | `StyleBibleSchema`, `CharacterBibleSchema`, `SetBibleSchema`, `ReferencesSchema`, `LibraryCharacterSchema` `.safeParse` on an inline object | unit | `tests/continuity.test.ts`, `tests/character-characterization.test.ts` |
 | Character library | `importCharacters`, `useCharacter`, `addLibraryCharacter`, `addLibraryFile`, `removeLibraryFile` on a temp workspace (a temp folder is enough without projects) | integration | `tests/character-library.test.ts`, `tests/character-characterization.test.ts` |
-| Set library | `addLibrarySet` on a temp workspace (a temp folder is enough) | integration | `tests/set-library.test.ts` |
+| Set library | `addLibrarySet`, `addLibrarySetFile` on a temp workspace (a temp folder is enough) | integration | `tests/set-library.test.ts` |
 | Keyframe references | `shotReferences(project, shot)` on an inline `LoadedProject` and `Shot` with files in a temp folder | unit | `tests/character-characterization.test.ts` |
 | Episode audio | `voiceTrack`, `importTakes`, `episodeTrack` on a temp copy of the demo canon and episode, mock provider; skipped without ffmpeg | integration | `tests/episode-track.test.ts` |
 | Provider adapter | the adapter with a fake `fetchImpl` (cloud) or a fake ComfyUI server | unit | `tests/fal-provider.test.ts`, `tests/topview.test.ts`, `tests/comfyui.test.ts` |

@@ -789,7 +789,7 @@ character
 
 const set = program
   .command('set')
-  .description('The workspace set library (library/sets/<id>/): new.');
+  .description('The workspace set library (library/sets/<id>/): new, add-file.');
 
 set
   .command('new')
@@ -804,6 +804,21 @@ set
       const root = repoRoot();
       const entry = await library.addLibrarySet(root, options);
       console.log(`✔ ${entry.id} in ${relative(process.cwd(), library.setEntryDir(root, entry.id)) || '.'}`);
+    }),
+  );
+
+set
+  .command('add-file <id> <file>')
+  .description('Copy an image into a library set as a reference or a plate.')
+  .option('--role <role>', 'ref | plate', 'ref')
+  .option('--angle <text>', 'plate: camera position and framing ("counter, frontal, waist height")')
+  .option('--plate <id>', 'plate: its id (default: from the angle)')
+  .action((id: string, file: string, options: { role: string; angle?: string; plate?: string }) =>
+    run(async () => {
+      const { addLibrarySetFile } = await import('./set-library.js');
+      const role = validateChoice(options.role, ['ref', 'plate'] as const, 'role');
+      const result = await addLibrarySetFile(repoRoot(), id, file, { role, angle: options.angle, plate: options.plate });
+      console.log(result.changed ? `✔ ${basename(file)} → ${id} (${role})` : `✔ ${basename(file)} is already in ${id}`);
     }),
   );
 

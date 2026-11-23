@@ -2,9 +2,9 @@
 
 > Generated from `docs/stories/ST-*.md` – **do not edit manually**. Change the story files instead.
 
-**Progress: 14 of 24 domain stories done** · scenarios 50 of 80
+**Progress: 15 of 24 domain stories done** · scenarios 54 of 80
 
-**42 stories** · In Progress: 0 · Ready: 15 · Ready for Human Review: 0 · In Review: 1 · Draft: 0 · Done: 26 · Superseded: 0
+**42 stories** · In Progress: 0 · Ready: 14 · Ready for Human Review: 0 · In Review: 1 · Draft: 0 · Done: 27 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
 
@@ -12,7 +12,6 @@ Within each section: by priority, then by story ID, with dependencies pulled in 
 
 | ID | Title | Type | Context | Priority | Size | Risk | Depends on |
 |---|---|---|---|---|---|---|---|
-| [ST-025](ST-025-add-a-file-to-a-library-set.md) | Add a reference or a plate to a library set | domain | Library | should | – | – | ST-024 |
 | [ST-026](ST-026-take-sets-into-the-library.md) | Take the sets of a production into the library | domain | Library | should | – | – | ST-023 |
 | [ST-027](ST-027-finished-set-bibles-go-into-the-library.md) | The sets of a finished set bible go into the library by themselves | domain | Library | should | – | – | ST-026 |
 | [ST-028](ST-028-use-a-library-set.md) | Use a library set in a music video or series canon | domain | Bibles | should | – | – | ST-025 |
@@ -63,4 +62,5 @@ Within each section: by priority, then by story ID, with dependencies pulled in 
 | [ST-020](ST-020-episode-announcement-says-new-episode.md) | An episode's announcement images say "new episode", not "new song" | chore | – | should | – | – | – |
 | [ST-023](ST-023-library-set-entries.md) | Library set entries and their validation | tech-task | – | should | – | – | – |
 | [ST-024](ST-024-add-a-library-set-by-hand.md) | Add a library set by hand | domain | Library | should | – | – | ST-023 |
+| [ST-025](ST-025-add-a-file-to-a-library-set.md) | Add a reference or a plate to a library set | domain | Library | should | – | – | ST-024 |
 | [ST-039](ST-039-restart-comfyui-only-when-stuck.md) | Restart ComfyUI only when it is stuck | task | – | should | – | – | – |
