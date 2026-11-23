@@ -12,7 +12,7 @@ risk: null
 events: [EVT-FormatRendered, EVT-RenderFailed]
 depends_on: [ST-007]
 labels: [feature:meme]
-status: in-progress
+status: done
 ---
 
 ## Story
