@@ -248,4 +248,22 @@ describe('taking sets into the library', () => {
     expect(entry.history.at(-1)).toEqual({ at: '2026-11-23T11:00:00.000Z', from: 'projects/after-midnight', added: ['door.png', 'plate:door'] });
   });
 
+  it('ST-026: A plate id with another image is renamed', async () => {
+    const ws = await workspace();
+    await libraryBar(ws, 'counter');
+    const dir = await production(
+      ws,
+      'after-midnight',
+      [bar({ library: 'bar', plates: [{ id: 'counter', angle: 'counter, frontal', ref: 'sets/bar/plates/counter.png' }] })],
+      { 'sets/bar/plates/counter.png': 'another image of the counter' },
+    );
+
+    await importSets(ws, dir);
+
+    const entry = await loadLibrarySet(ws, 'bar');
+    expect(entry.plates.map((plate) => plate.id)).toEqual(['counter', 'counter-after-midnight']);
+    expect(entry.plates[1]).toMatchObject({ angle: 'counter, frontal' });
+    expect(existsSync(join(setEntryDir(ws, 'bar'), entry.plates[1]!.file!))).toBe(true);
+  });
+
 });
