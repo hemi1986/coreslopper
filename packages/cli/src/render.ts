@@ -154,11 +154,13 @@ export async function buildVideoProps(
   const audioSrc = hasAudio ? publicAsset(audioPath, paths.root, root) : undefined;
 
   let subtitles: VideoProps['subtitles'];
-  if (options.subtitles) {
+  // A meme's subtitles are burned in (HS-263); an episode asks for them with --subtitles en.
+  const language = options.subtitles ?? (project.config.kind === 'meme' ? 'de' : undefined);
+  if (language) {
     if (!project.script || !project.effectiveTiming) {
-      throw new ValidationError('Burned-in subtitles come from an episode script; this project has none.');
+      throw new ValidationError('Burned-in subtitles come from a script; this project has none.');
     }
-    subtitles = subtitleCues(project.script, project.effectiveTiming).map(({ start, end, text }) => ({ start, end, text }));
+    subtitles = subtitleCues(project.script, project.effectiveTiming, language).map(({ start, end, text }) => ({ start, end, text }));
   }
 
   const props: VideoProps = {
