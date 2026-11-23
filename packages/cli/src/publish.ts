@@ -6,7 +6,11 @@ import {
   ConfigError,
   PublishLogSchema,
   ValidationError,
+  loadProject,
+  memeCaption,
+  memeDescription,
   readJsonFile,
+  repoRoot,
   writeJsonAtomic,
   type PublishEntry,
   type PublishLog,
@@ -31,6 +35,7 @@ import {
   type PublishItem,
 } from '@coreslopper/providers';
 import { withReleaseLock } from './release-calendar.js';
+import { usedSoundCredits } from './release.js';
 import { loadUploadData, uploadPaths } from './upload-text.js';
 
 /** YouTube limits that `publish` checks before an upload. */
@@ -55,6 +60,8 @@ export interface VideoProbe {
 
 export interface PublishOptions {
   projectDir: string;
+  /** The workspace root the sound library lives in; defaults to the repository root of the working directory. */
+  root?: string;
   platform?: PlatformChoice;
   /** `main`, `shorts`, or a Short name. */
   only?: string;
@@ -156,9 +163,17 @@ export function selectItems(
   projectDir: string,
   data: UploadData,
   only?: string,
+  /** The credit texts a meme's caption carries (HS-261, HS-265); empty for a music video or an episode. */
+  credits: string[] = [],
 ): { item: PublishItem; platforms: PublishPlatform[] }[] {
+  const main = toItem(projectDir, data, data.main, 'main');
+  // The main video of a meme posts its release caption, credits included; the platforms see the same text as the folder (HS-172).
+  if (credits.length) {
+    main.description = memeDescription(data, credits);
+    main.caption = memeCaption(data, credits);
+  }
   const all = [
-    { item: toItem(projectDir, data, data.main, 'main'), platforms: data.main.platforms },
+    { item: main, platforms: data.main.platforms },
     ...data.shorts.map((short) => ({ item: toItem(projectDir, data, short, 'short'), platforms: short.platforms })),
   ];
   if (!only) return all;
@@ -272,7 +287,7 @@ export async function buildPublishPlan(
   projectDir: string,
   data: UploadData,
   log: PublishLog,
-  options: Pick<PublishOptions, 'platform' | 'only' | 'schedule' | 'force' | 'mock' | 'now' | 'probe'> = {},
+  options: Pick<PublishOptions, 'platform' | 'only' | 'schedule' | 'force' | 'mock' | 'now' | 'probe'> & { credits?: string[] } = {},
 ): Promise<PublishPlan> {
   const root = resolve(projectDir);
   const now = options.now?.() ?? new Date();
@@ -285,7 +300,7 @@ export async function buildPublishPlan(
   const probes = new Map<string, VideoProbe | undefined>();
   let unprobed = 0;
 
-  for (const { item, platforms } of selectItems(root, data, options.only)) {
+  for (const { item, platforms } of selectItems(root, data, options.only, options.credits)) {
     const targets = platforms.filter((platform) => wanted.includes(platform));
     if (targets.length === 0) continue;
     const file = item.file.startsWith(`${root}/`) ? relative(root, item.file) : item.file;
@@ -426,6 +441,16 @@ export async function appendPublishEntry(logPath: string, entry: PublishEntry): 
 }
 
 /**
+ * The credit texts a meme's upload carries: one per library sound its takes came
+ * from (HS-261, HS-265). The upload posts the caption the release folder holds,
+ * so a credit never misses the posted text (HS-172).
+ */
+async function uploadCredits(projectDir: string, root: string): Promise<string[]> {
+  const project = await loadProject(projectDir);
+  return project.config.kind === 'meme' ? usedSoundCredits(project, root) : [];
+}
+
+/**
  * Upload the release package: validate, plan, check quota, then upload each
  * item that is not in the publish log with the same file hash. Every upload
  * is private or a draft. The log is written after each item.
@@ -437,7 +462,8 @@ export async function publishProject(options: PublishOptions): Promise<PublishSu
   const data = await loadUploadData(projectDir);
   const logPath = uploadPaths(projectDir).log;
   let log = await readPublishLog(logPath);
-  const plan = await buildPublishPlan(projectDir, data, log, options);
+  const credits = await uploadCredits(projectDir, options.root ?? repoRoot());
+  const plan = await buildPublishPlan(projectDir, data, log, { ...options, credits });
   for (const line of formatPlan(plan, data.main.title, Boolean(options.dryRun))) print(line);
 
   if (plan.errors.length) {

@@ -57,7 +57,9 @@ export function tiktokRedirectUri(env: NodeJS.ProcessEnv = process.env): string 
 }
 
 /** The caption the user pastes in TikTok: the title and the hashtags, without YouTube's `#shorts`. */
-export function tiktokCaption(item: Pick<PublishItem, 'title' | 'hashtags'>): string {
+export function tiktokCaption(item: Pick<PublishItem, 'title' | 'hashtags'> & { caption?: string }): string {
+  // A meme posts its one release caption (credits included); a music video's Short gets title and hashtags.
+  if (item.caption?.trim()) return item.caption.trim();
   const isShorts = (tag: string) => /^#shorts$/i.test(tag);
   const title = item.title
     .split(/\s+/)

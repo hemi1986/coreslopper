@@ -12,6 +12,8 @@ export interface PublishItem {
   title: string;
   /** The description body without hashtags. */
   description: string;
+  /** The whole post text when the platform takes one caption (a meme's release caption, credits included); `description` plus hashtags otherwise. */
+  caption?: string;
   tags: string[];
   hashtags: string[];
   language: string;

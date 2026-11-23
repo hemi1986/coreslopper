@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { stringify } from 'yaml';
-import { ConfigError, PublishLogSchema, UploadDataSchema, type PublishLog } from '../packages/core/src/index.ts';
+import { ConfigError, ProjectConfigSchema, PublishLogSchema, UploadDataSchema, type PublishLog } from '../packages/core/src/index.ts';
 import {
   MockPublisher,
   RefreshingToken,
@@ -25,9 +25,11 @@ import {
   buildPublishPlan,
   publishProject,
   quotaDay,
+  youtubeDescription,
   youtubeTagChars,
   type VideoProbe,
 } from '../packages/cli/src/publish.ts';
+import { memeFixture } from './helpers/release-fixture.ts';
 import { renderUploadText, writeUploadText } from '../packages/cli/src/upload-text.ts';
 import { parseUploadText, uploadTextProblems } from '../packages/cli/src/release-files.ts';
 import { checkUploadData } from '../packages/cli/src/qa.ts';
@@ -92,7 +94,21 @@ async function fixture(data: unknown = uploadData()): Promise<string> {
   await mkdir(join(dir, 'review'), { recursive: true });
   await mkdir(join(dir, 'renders', 'shorts'), { recursive: true });
   await mkdir(join(dir, 'renders', 'thumbnails'), { recursive: true });
-  await writeFile(join(dir, 'project.yaml'), 'version: 1\n');
+  await writeFile(
+    join(dir, 'project.yaml'),
+    stringify(
+      ProjectConfigSchema.parse({
+        version: 1,
+        slug: 'neon-rain',
+        kind: 'music-video',
+        title: 'Neon Rain',
+        created: '2026-11-16T00:00:00Z',
+        workflow: { version: '0.1.0' },
+        budget_usd: 40,
+        formats: { master: { aspect: '16:9', width: 1920, height: 1080, fps: 30 } },
+      }),
+    ),
+  );
   await writeFile(join(dir, 'review', 'upload.yaml'), stringify(data));
   for (const [file, content] of Object.entries({
     'renders/16x9.mp4': 'main-video',
@@ -313,6 +329,21 @@ describe('publish run and idempotency', () => {
     // A failed attempt is retried on the next run; the YouTube upload is not.
     const next = await publishProject({ projectDir: dir, dryRun: true, only: 'N1-intro', probe, adapters: forbidden, log: quiet });
     expect(next.plan.steps.map((step) => `${step.platform}:${step.action}`)).toEqual(['youtube:skip', 'tiktok:upload']);
+  });
+});
+
+describe('a meme upload', () => {
+  it('posts the release caption with the credit of every sound it took', async () => {
+    const credit = 'Boom by Jane Doe (CC BY 4.0)';
+    const { dir, root } = await memeFixture({ licence: 'cc-by', credit });
+    const youtube = new MockPublisher('youtube');
+    const tiktok = new MockPublisher('tiktok');
+    await publishProject({ projectDir: dir, root, mock: true, only: 'main', probe: () => VERTICAL, adapters: { youtube, tiktok }, log: quiet });
+    const yt = youtube.calls.find((call) => call.item.name === 'main')!.item;
+    const tt = tiktok.calls.find((call) => call.item.name === 'main')!.item;
+    expect(youtubeDescription(yt)).toContain(credit);
+    expect(tiktokCaption(tt)).toContain(credit);
+    expect(tiktokCaption(tt)).toContain('He printed the report anyway.');
   });
 });
 
