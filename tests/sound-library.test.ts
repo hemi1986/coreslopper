@@ -288,6 +288,16 @@ describe('sound remove', () => {
     expect(existsSync(join(root, 'library', 'sounds', 'vine-boom'))).toBe(false);
   });
 
+  it('ST-003: An unknown sound is refused', async () => {
+    const root = await holding('sad-trombone');
+
+    const refused = await removeLibrarySound(root, 'vine-boom').catch((error: unknown) => error);
+
+    expect(refused).toBeInstanceOf(ValidationError);
+    expect((refused as Error).message).toMatch(/no library sound "vine-boom"/);
+    expect(await ids(root)).toEqual(['sad-trombone']);
+  });
+
   it('removes a sound at the command line', async () => {
     const root = await holding('vine-boom');
     await writeFile(join(root, 'package.json'), JSON.stringify({ name: 'coreslopper' }));
