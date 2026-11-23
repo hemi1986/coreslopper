@@ -182,6 +182,17 @@ function convertToWav(source: string, target: string): void {
   }
 }
 
+/** A WAV's length in seconds, rounded to the millisecond. */
+function measureLength(wav: string): number {
+  return Math.round(probeDuration(wav) * 1000) / 1000;
+}
+
+/** Integrated loudness in LUFS; a sound shorter than the loudness window is looped up to it. */
+function measureLufs(length: number, wav: string): number {
+  const loops = length > 0 && length < LOUDNESS_WINDOW ? Math.ceil(LOUDNESS_WINDOW / length) - 1 : 0;
+  return Math.round(measureLoudness(wav, loops).lufs * 10) / 10;
+}
+
 /**
  * CMD-AddLibrarySound (`sound add`): store a local file as a WAV in
  * `library/sounds/<id>/`, measure its length and loudness, and write its
@@ -211,15 +222,14 @@ export async function addLibrarySound(root: string, input: NewLibrarySound, now 
   try {
     const wav = join(incoming, LIBRARY_SOUND_FILE);
     convertToWav(input.file, wav);
-    const length = Math.round(probeDuration(wav) * 1000) / 1000;
+    const length = measureLength(wav);
     const problems = librarySoundTimeProblems({ length, cue: fields.cue, trim: fields.trim });
     if (problems.length) throw new SoundRefused(problems.map((problem) => problem.message).join('; '), 'outside', undefined, id);
     const hash = await hashFileStream(wav);
     const originalHash = await hashFileStream(input.file);
     const same = (await storedHashes(root)).find((entry) => entry.hashes.includes(hash) || entry.hashes.includes(originalHash));
     if (same) throw new SoundRefused(`this file is already stored as "${same.id}"`, 'duplicate', same.id, id);
-    const loops = length < LOUDNESS_WINDOW ? Math.ceil(LOUDNESS_WINDOW / length) - 1 : 0;
-    const loudness = Math.round(measureLoudness(wav, loops).lufs * 10) / 10;
+    const loudness = measureLufs(length, wav);
     if (!Number.isFinite(loudness)) throw new SoundRefused(`${input.file} is silent; its loudness cannot be measured`, 'silent', undefined, id);
 
     const sound = LibrarySoundSchema.parse({
@@ -365,7 +375,44 @@ export async function checkSoundLibrary(root: string): Promise<SoundLibraryCheck
     }
     if (!existsSync(join(folder, LIBRARY_SOUND_FILE))) {
       issues.push({ kind: 'missing-file', id: entry.name, message: `"${entry.name}" is an entry without a file: ${LIBRARY_SOUND_FILE} is missing from its folder – copy it back or remove the entry` });
+      continue;
     }
+    // The entry loads with its own id, or it is broken in a way the load names.
+    let sound: LibrarySound;
+    try {
+      sound = await loadLibrarySound(root, entry.name);
+    } catch (error) {
+      issues.push({ kind: 'invalid', id: entry.name, message: `"${entry.name}" is an entry that does not load: ${(error as Error).message}` });
+      continue;
+    }
+    if (sound.id !== entry.name) {
+      issues.push({ kind: 'invalid', id: entry.name, message: `"${entry.name}" is an entry that does not load: sound.yaml says id "${sound.id}", but the id must be the folder name` });
+      continue;
+    }
+    const wav = join(folder, LIBRARY_SOUND_FILE);
+    const hash = await hashFileStream(wav);
+    if (hash === sound.hash) continue;
+    // The user swapped the file: measure it again (EVT-LibrarySoundRemeasured).
+    const length = measureLength(wav);
+    if (!(length > 0)) {
+      issues.push({ kind: 'invalid', id: entry.name, message: `"${entry.name}" has no measurable length: ${LIBRARY_SOUND_FILE} holds no audio` });
+      continue;
+    }
+    const problems = librarySoundTimeProblems({ length, cue: sound.cue, trim: sound.trim });
+    if (problems.length) {
+      // Writing these would break the entry's own rule, so the check reports them and leaves the entry as it was.
+      for (const problem of problems) {
+        issues.push({
+          kind: problem.field === 'cue' ? 'cue-outside' : 'trim-outside',
+          id: entry.name,
+          message: `"${entry.name}": ${problem.message} after the file changed – the entry keeps what it had until sound edit fixes it`,
+        });
+      }
+      continue;
+    }
+    const loudness = measureLufs(length, wav);
+    await writeSound(join(folder, LIBRARY_SOUND_ENTRY), LibrarySoundSchema.parse({ ...sound, length, loudness, hash }));
+    remeasured.push({ id: entry.name, length, loudness, hash });
   }
   return { issues, remeasured };
 }

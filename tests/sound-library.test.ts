@@ -475,6 +475,7 @@ describe.skipIf(!hasFfmpeg())('sound check', () => {
 
     await copyFile(join(files, 'boom.mp3'), join(root, 'library', 'sounds', 'loose.wav'));
     await mkdir(soundDir(root, 'broken'), { recursive: true });
+    await copyFile(join(files, 'boom.mp3'), join(soundDir(root, 'broken'), 'sound.wav'));
     await writeFile(join(soundDir(root, 'broken'), 'sound.yaml'), 'version: 1\nid: broken\n');
 
     const check = await checkSoundLibrary(root);
