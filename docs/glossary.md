@@ -731,12 +731,12 @@ The episode track reduced to one speaker's takes, at full length; the driving au
 _Avoid_: dialogue stem
 
 **Subtitles**:
-The text of the spoken and chat lines, plus on-screen text an sfx line names (a label, a sign), timed by the effective timing, in the project's subtitle language: English (translated) for an episode, German (as spoken) burned in for a meme, or off.
+The text of the spoken and chat lines, timed by the effective timing, in the project's subtitle language: English (translated) for an episode, German (as spoken) burned in for a meme, or off. An sfx line adds a cue only for on-screen text it names in English, so a German meme's cues are its spoken and chat text.
+_Avoid_: captions, lyrics
 
 **Subtitle Language**:
-The language of a project's burned-in subtitles, set as `subtitles` in `project.yaml`: `de` (as spoken, a meme's default), `en` (translated, an episode's default), or `off`.
+The language of a project's burned-in subtitles, set as `subtitles` in `project.yaml`: `de` (as spoken, a meme's default), `en` (translated, an episode's default), or `off`. A meme accepts `de` or `off`; English subtitles for a meme are not supported yet.
 _Avoid_: caption language, subtitle mode
-_Avoid_: captions, lyrics
 
 ## Memes
 

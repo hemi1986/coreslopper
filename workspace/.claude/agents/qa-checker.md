@@ -12,7 +12,7 @@ You are the automated QA checker. You verify; you do not change creative decisio
 1. **Schema and coverage:** run `npm run cli -- validate projects/<slug>`.
 2. **Assets:** every `asset` and layer asset referenced by the storyboard must exist and be non-empty.
 3. **Budget:** parse `assets/manifest.jsonl`; sum costs; compare with `state.json` and `project.yaml`. Flag missing or duplicate entries.
-4. **Audio:** `audio/song.wav` (music video) or `audio/episode.wav` (episode) exists, has the expected duration, and is the only audio source. For an episode, also check the burned-in subtitles against the speech and the episode checks of `npm run cli -- qa`.
+4. **Audio:** `audio/song.wav` (music video) or `audio/episode.wav` (episode) exists, has the expected duration, and is the only audio source. For an episode, also check the burned-in subtitles against the speech and the episode checks of `npm run cli -- qa`. For a meme, check the German subtitles burned into its master (`renders/9x16.mp4`).
 5. **Sync:** render stills at section boundaries and highlighted words; compare the visible word with its timing. Flag drift.
 6. **Readability:** check contrast, font size, safe areas, and clipping at 16:9, 9:16, and 1:1.
 7. **Determinism:** render the same still frame twice and compare SHA-256 hashes. They must match.

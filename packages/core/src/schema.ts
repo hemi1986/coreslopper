@@ -146,6 +146,9 @@ export const ProjectConfigSchema = z
   .superRefine((config, ctx) => {
     if (config.kind === 'meme') {
       for (const message of memeFormatProblems(config.formats)) ctx.addIssue({ code: 'custom', path: ['formats'], message });
+      if (config.subtitles === 'en') {
+        ctx.addIssue({ code: 'custom', path: ['subtitles'], message: "a meme's subtitles are German (de) or off; an English version is not supported yet" });
+      }
     }
     if (config.kind !== 'episode') return;
     for (const key of ['series', 'episode'] as const) {
@@ -154,6 +157,16 @@ export const ProjectConfigSchema = z
       }
     }
   });
+
+/**
+ * The language of a project's subtitles: its `subtitles` setting, else `de` for a meme (German speech, burned in)
+ * and `en` for an episode; a music video has none (HS-263).
+ */
+export function subtitleLanguage(config: Pick<ProjectConfig, 'kind' | 'subtitles'>): 'en' | 'de' | 'off' {
+  if (config.subtitles) return config.subtitles;
+  if (config.kind === 'meme') return 'de';
+  return config.kind === 'episode' ? 'en' : 'off';
+}
 
 /** `templates/meme/project.yaml`: what every meme starts with – its kind and its one 9:16 format. */
 export const MemeTemplateSchema = z.object({

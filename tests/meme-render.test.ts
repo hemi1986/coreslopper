@@ -3,9 +3,9 @@ import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parse, stringify } from 'yaml';
-import { CharacterBibleSchema, ScriptSchema, StyleBibleSchema, type Timing } from '@coreslopper/core';
+import { CharacterBibleSchema, ProjectConfigSchema, ScriptSchema, StyleBibleSchema, type Timing } from '@coreslopper/core';
 import { createProject } from '../packages/cli/src/new-project.ts';
-import { buildVideoProps } from '../packages/cli/src/render.ts';
+import { buildVideoProps, renderInputsHash } from '../packages/cli/src/render.ts';
 
 // ST-014: a meme's render carries German subtitles in its project's subtitle language.
 
@@ -45,7 +45,7 @@ function timing(): Timing {
  * The meme "office-prank" with the dialogue line "punchline" (German and English text) and the sound line
  * "reveal-boom" naming the library sound "vine-boom", whose entry lives in the workspace's library.
  */
-async function officePrank(options: { subtitles?: 'de' | 'en' | 'off' } = {}): Promise<string> {
+async function officePrank(options: { subtitles?: 'de' | 'en' | 'off'; textDe?: string } = {}): Promise<string> {
   const workspace = await mkdtemp(join(tmpdir(), 'coreslopper-meme-render-'));
   temporary.push(workspace);
   for (const folder of ['config', 'templates', 'brand']) await cp(join(root, folder), join(workspace, folder), { recursive: true });
@@ -74,7 +74,7 @@ async function officePrank(options: { subtitles?: 'de' | 'en' | 'off' } = {}): P
             set: 'open-office',
             description: 'The printer refuses to print.',
             lines: [
-              { id: 'punchline', kind: 'dialogue', speaker: 'kim', text_de: 'Ich drucke nicht mehr.', text_en: 'I am not printing anymore.' },
+              { id: 'punchline', kind: 'dialogue', speaker: 'kim', text_de: options.textDe ?? 'Ich drucke nicht mehr.', text_en: 'I am not printing anymore.' },
               { id: 'reveal-boom', kind: 'sfx', sound: 'vine-boom' },
             ],
           },
@@ -117,9 +117,8 @@ describe('subtitles for a meme', () => {
     const projectDir = await officePrank();
     const { props } = await buildVideoProps({ projectDir });
 
-    expect(props.subtitles).toBeDefined();
-    // "reveal-boom" plays from 5 to 6.4 s and names no on-screen text.
-    expect((props.subtitles ?? []).filter((cue) => cue.start < 6.4 && cue.end > 5)).toEqual([]);
+    // "reveal-boom" plays from 5 to 6.4 s and names no on-screen text, so its window carries no cue either.
+    expect(props.subtitles).toEqual([{ start: 2, end: 4, text: 'Ich drucke nicht mehr.' }]);
   });
 
   it('ST-014: Subtitles can be turned off', async () => {
@@ -127,5 +126,43 @@ describe('subtitles for a meme', () => {
     const { props } = await buildVideoProps({ projectDir });
 
     expect(props.subtitles).toBeUndefined();
+  });
+});
+
+describe('the subtitle language setting', () => {
+  it('leaves a leading acting direction out of a German cue', async () => {
+    const projectDir = await officePrank({ textDe: '(flüstert) Ich drucke nicht mehr.' });
+    const { props } = await buildVideoProps({ projectDir });
+
+    expect(props.subtitles).toEqual([{ start: 2, end: 4, text: 'Ich drucke nicht mehr.' }]);
+  });
+
+  it('refuses to burn subtitles in when the project sets them off', async () => {
+    const projectDir = await officePrank({ subtitles: 'off' });
+
+    await expect(buildVideoProps({ projectDir, subtitles: 'en' })).rejects.toThrow(/sets subtitles off/);
+  });
+
+  it('refuses an English subtitle language for a meme', () => {
+    expect(() =>
+      ProjectConfigSchema.parse({
+        version: 1,
+        slug: 'office-prank',
+        kind: 'meme',
+        title: 'Office prank',
+        created: '2026-11-22T00:00:00Z',
+        workflow: { version: '0.1.0' },
+        budget_usd: 10,
+        subtitles: 'en',
+        formats: { master: { aspect: '9:16', width: 1080, height: 1920, fps: 30 }, derivatives: [] },
+      }),
+    ).toThrow(/German \(de\) or off/);
+  });
+
+  it('changes the render record when the setting changes', async () => {
+    const on = await buildVideoProps({ projectDir: await officePrank() });
+    const off = await buildVideoProps({ projectDir: await officePrank({ subtitles: 'off' }) });
+
+    expect(await renderInputsHash(on.props)).not.toBe(await renderInputsHash(off.props));
   });
 });

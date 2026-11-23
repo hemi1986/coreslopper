@@ -41,7 +41,7 @@ export interface RenderOptions {
   requireAudio?: boolean;
   /** Inclusive frame range, for test renders. */
   frames?: [number, number];
-  /** Burn in subtitles in this language (only `en`); the render is named `<format>.en.mp4`. */
+  /** Burn in subtitles in this language (only `en`, an episode's; a meme burns its project's language in); the render is named `<format>.en.mp4`. */
   subtitles?: 'en';
 }
 
@@ -155,13 +155,21 @@ export async function buildVideoProps(
   const audioSrc = hasAudio ? publicAsset(audioPath, paths.root, root) : undefined;
 
   let subtitles: VideoProps['subtitles'];
-  // A meme's subtitles are burned in its project's subtitle language (HS-263); an episode asks for them with --subtitles en.
-  const language = options.subtitles ?? (project.config.kind === 'meme' ? subtitleLanguage(project.config) : undefined);
-  if (language && language !== 'off') {
+  // The project's subtitle language decides the cues: a meme burns them in, an episode only with --subtitles en,
+  // and `off` means none (HS-263).
+  const setting = subtitleLanguage(project.config);
+  const language = options.subtitles ?? (project.config.kind === 'meme' && setting !== 'off' ? setting : undefined);
+  if (language) {
     if (!project.script || !project.effectiveTiming) {
       throw new ValidationError('Burned-in subtitles come from a script; this project has none.');
     }
-    subtitles = subtitleCues(project.script, project.effectiveTiming, language).map(({ start, end, text }) => ({ start, end, text }));
+    if (setting === 'off') {
+      throw new ValidationError('The project sets subtitles off; remove "subtitles: off" from project.yaml to burn them in.');
+    }
+    if (options.subtitles && options.subtitles !== setting) {
+      throw new ValidationError(`The project's subtitle language is ${setting}; --subtitles ${options.subtitles} does not match it.`);
+    }
+    subtitles = subtitleCues(project.script, project.effectiveTiming, setting).map(({ start, end, text }) => ({ start, end, text }));
   }
 
   const props: VideoProps = {

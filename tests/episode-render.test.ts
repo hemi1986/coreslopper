@@ -10,7 +10,7 @@ import {
   stageOutputs,
   subtitleCues,
 } from '@coreslopper/core';
-import { formatConfig, masterFormatId, outputPath } from '../packages/cli/src/render.ts';
+import { buildVideoProps, formatConfig, masterFormatId, outputPath } from '../packages/cli/src/render.ts';
 import { subtitlesPath } from '../packages/cli/src/subtitles.ts';
 import { subtitleSafeArea } from '../packages/remotion/src/components/Subtitles.tsx';
 
@@ -113,6 +113,12 @@ describe('subtitles', () => {
     const cues = subtitleCues(script, project.effectiveTiming!);
     expect(cues).toHaveLength(before + 1);
     expect(cues.find((cue) => cue.id === sfx!.id)!.text).toBe('DIARY');
+  });
+
+  it('burns the English subtitles in only when the render asks for them', async () => {
+    const { props } = await buildVideoProps({ projectDir: episodeDir, subtitles: 'en' });
+    expect(props.subtitles!.length).toBeGreaterThan(0);
+    expect(props.subtitles![0]!.text).toContain('Past midnight again.');
   });
 });
 

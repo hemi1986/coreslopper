@@ -42,6 +42,11 @@ license: MIT
 - In the stills, read the burned-in subtitles of `renders/<format>.en.mp4` against the speech, and check chat windows for legibility.
 - The master is `renders/<format>.mp4` for the master format; record `review/report.md`, the master, and the SRT with `stage-done ... qa-export`.
 
+## Memes
+
+- The meme's German subtitles are burned into its master (`renders/9x16.mp4`); read them against the speech in the stills. There is no SRT and no `.en.mp4`.
+- The master is `renders/9x16.mp4`; record `review/report.md` and the master with `stage-done ... qa-export`.
+
 ## Completion criteria
 
 - Every check has a pass/fail result and evidence.

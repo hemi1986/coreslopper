@@ -52,8 +52,9 @@ when a take goes stale (`docs/domain/adoption-report.md`, series).
   (ADR 0026) does not apply, because an episode's timing has no words.
 - **The spoken language as it is.** Spoken text is German (`text_de`, the TTS rule's examples and
   abbreviations), and subtitles are English (`text_en`, `renders/<slug>.en.srt`). The field names tie the
-  product to that pair. When a series in another language needs it, the spoken and subtitle language become
-  series settings. Until then nothing is renamed.
+  product to that pair. The subtitle language is a project setting (`subtitles` in `project.yaml`: `de` by
+  default for a meme, `en` for an episode, or `off`; HS-263, ST-014); the spoken language becomes a series
+  setting when a series in another language needs it. Until then nothing is renamed.
 - **Rules in core.** Three domain rules belong in `packages/core`: take status, the blocking rule, and the
   series budget sum. File access stays in the CLI.
 
