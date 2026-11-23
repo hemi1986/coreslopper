@@ -26,11 +26,11 @@ live. It changes no behaviour a person can see yet.
   checked, not assumed).
 
 ## Acceptance Criteria
-- [ ] `library-set` schema with tests for a valid entry, a missing plate angle and a duplicate plate id
-- [ ] `sets.yaml` accepts `library` on a set; the set bible's tests cover it
-- [ ] `validate-file` refuses a `set.yaml` whose id is not its folder or that names a missing file, with a test each
-- [ ] `schema/` regenerated; `.gitignore` in the repository and in `workspace/` keeps `set.yaml` and ignores the media
-- [ ] A test shows that `update` leaves an existing `library/sets/<id>/` untouched
+- [x] `library-set` schema with tests for a valid entry, a missing plate angle and a duplicate plate id
+- [x] `sets.yaml` accepts `library` on a set; the set bible's tests cover it
+- [x] `validate-file` refuses a `set.yaml` whose id is not its folder or that names a missing file, with a test each
+- [x] `schema/` regenerated; `.gitignore` in the repository and in `workspace/` keeps `set.yaml` and ignores the media
+- [x] A test shows that `update` leaves an existing `library/sets/<id>/` untouched
 
 ## Out of Scope
 - Any command that writes an entry (ST-024 onwards)

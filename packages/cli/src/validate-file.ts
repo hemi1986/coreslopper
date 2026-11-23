@@ -10,6 +10,7 @@ import {
   StyleBibleSchema,
   CharacterBibleSchema,
   LibraryCharacterSchema,
+  LibrarySetSchema,
   ChannelConfigSchema,
   ReleaseCalendarSchema,
   ReleaseScheduleSchema,
@@ -113,6 +114,10 @@ export async function validateChangedFile(file: string): Promise<string | undefi
   if (isLibraryCharacterFile(file)) {
     await validateLibraryCharacter(resolve(file));
     return 'library character';
+  }
+  if (isLibrarySetFile(file)) {
+    await validateLibrarySet(resolve(file));
+    return 'library set';
   }
   if (isLibrarySoundFile(file)) {
     await validateLibrarySoundEntry(file);
@@ -266,4 +271,20 @@ async function validateLibraryCharacter(path: string): Promise<void> {
   const files = [entry.sheet, ...entry.refs, entry.voice?.ref, ...entry.states.map((state) => state.ref)].filter(Boolean) as string[];
   const missing = files.filter((file) => !existsSync(join(dir, file)));
   if (missing.length) throw new ValidationError(`library character ${entry.id} names files that are missing: ${missing.join(', ')}`);
+}
+
+/** `library/sets/<id>/set.yaml` of the workspace's set library. */
+export function isLibrarySetFile(file: string): boolean {
+  const dir = dirname(resolve(file));
+  return basename(file) === 'set.yaml' && basename(dirname(dir)) === 'sets' && basename(dirname(dirname(dir))) === 'library';
+}
+
+/** A library set: the schema, its id matching its folder, and every named file present. */
+async function validateLibrarySet(path: string): Promise<void> {
+  const entry = await readYamlFile(path, LibrarySetSchema);
+  const dir = dirname(path);
+  if (entry.id !== basename(dir)) throw new ValidationError(`set.yaml says id "${entry.id}", but its folder is "${basename(dir)}".`);
+  const files = [...entry.refs, ...entry.plates.map((plate) => plate.file)].filter(Boolean) as string[];
+  const missing = files.filter((file) => !existsSync(join(dir, file)));
+  if (missing.length) throw new ValidationError(`library set ${entry.id} names files that are missing: ${missing.join(', ')}`);
 }

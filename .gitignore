@@ -65,6 +65,10 @@ series/*/assets/*
 library/characters/*/*
 !library/characters/*/character.yaml
 
+# Set library media; each set.yaml stays tracked
+library/sets/*/*
+!library/sets/*/set.yaml
+
 # Sound library audio; each sound.yaml stays tracked
 library/sounds/*/*
 !library/sounds/*/sound.yaml
