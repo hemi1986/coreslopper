@@ -439,7 +439,7 @@ describe.skipIf(!hasFfmpeg())('sound check', () => {
     const check = await checkSoundLibrary(root);
 
     expect(check.issues).toEqual([expect.objectContaining({ kind: 'missing-entry', id: 'bruh' })]);
-    expect(check.issues[0].message).toMatch(/without an entry/);
+    expect(check.issues[0]?.message).toMatch(/without an entry/);
     expect((await listLibrarySounds(root)).sounds.map((sound) => sound.id)).toEqual([]);
   });
 
@@ -452,7 +452,7 @@ describe.skipIf(!hasFfmpeg())('sound check', () => {
     const check = await checkSoundLibrary(root);
 
     expect(check.issues).toEqual([expect.objectContaining({ kind: 'cue-outside', id: 'vine-boom' })]);
-    expect(check.issues[0].message).toMatch(/cue 1\.2 .*outside/);
+    expect(check.issues[0]?.message).toMatch(/cue 1\.2 .*outside/);
     // A cue outside the new length would break the entry, so the check reports it instead of writing it.
     expect((await loadLibrarySound(root, 'vine-boom')).cue).toBe(1.2);
   });
@@ -465,7 +465,7 @@ describe.skipIf(!hasFfmpeg())('sound check', () => {
     const check = await checkSoundLibrary(root);
 
     expect(check.issues).toEqual([expect.objectContaining({ kind: 'missing-file', id: 'vine-boom' })]);
-    expect(check.issues[0].message).toMatch(/without a file/);
+    expect(check.issues[0]?.message).toMatch(/without a file/);
   });
 
   it('reports a loose file and an entry that does not load, and passes a sound library that is fine', async () => {
@@ -484,5 +484,18 @@ describe.skipIf(!hasFfmpeg())('sound check', () => {
       ['invalid', 'broken'],
       ['missing-entry', 'loose.wav'],
     ]);
+  });
+
+  it('reports a swapped file that is silent instead of failing', async () => {
+    const { root, files } = await workspace();
+    await addLibrarySound(root, { file: tone(join(files, 'boom.mp3'), 1.4), title: 'Vine Boom', useWhen: 'a dramatic reveal' });
+    const wav = soundWav(root, 'vine-boom');
+    await rm(wav);
+    execFileSync(resolveBinary('ffmpeg'), ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'anullsrc=sample_rate=48000:duration=1', wav]);
+
+    const check = await checkSoundLibrary(root);
+
+    expect(check.issues).toEqual([expect.objectContaining({ kind: 'invalid', id: 'vine-boom' })]);
+    expect(check.remeasured).toEqual([]);
   });
 });

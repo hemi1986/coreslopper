@@ -411,6 +411,10 @@ export async function checkSoundLibrary(root: string): Promise<SoundLibraryCheck
       continue;
     }
     const loudness = measureLufs(length, wav);
+    if (!Number.isFinite(loudness)) {
+      issues.push({ kind: 'invalid', id: entry.name, message: `"${entry.name}" is silent: its loudness cannot be measured – put its old file back or add a new one with sound add` });
+      continue;
+    }
     await writeSound(join(folder, LIBRARY_SOUND_ENTRY), LibrarySoundSchema.parse({ ...sound, length, loudness, hash }));
     remeasured.push({ id: entry.name, length, loudness, hash });
   }

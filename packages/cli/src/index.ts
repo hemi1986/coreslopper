@@ -787,7 +787,7 @@ character
 
 const sound = program
   .command('sound')
-  .description('The workspace sound library (library/sounds/<id>/): list, add, edit.');
+  .description('The workspace sound library (library/sounds/<id>/): list, add, edit, check.');
 
 sound
   .command('list')
@@ -841,6 +841,18 @@ sound
       const { updateLibrarySound } = await import('./sound-library.js');
       const { sound: entry, changed } = await updateLibrarySound(repoRoot(), id, options);
       console.log(changed ? `✔ ${entry.id} updated: ${entry.title} – ${entry.use_when}${entry.tags.length ? ` [${entry.tags.join(', ')}]` : ''}` : `✔ ${entry.id}: nothing changed`);
+    }),
+  );
+
+sound
+  .command('check')
+  .description('Check the whole library after hand edits: an entry without its file, a file without an entry, a cue or trim outside the length; a swapped file is measured again, nothing is added or removed.')
+  .option('--json', 'Print the issues and the remeasured sounds as JSON')
+  .action((options: { json?: boolean }) =>
+    run(async () => {
+      const { checkSoundLibrary, soundCheckLines } = await import('./sound-library.js');
+      const check = await checkSoundLibrary(repoRoot());
+      console.log(options.json ? JSON.stringify(check, null, 2) : soundCheckLines(check).join('\n'));
     }),
   );
 
