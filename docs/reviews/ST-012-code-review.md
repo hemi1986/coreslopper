@@ -1,5 +1,5 @@
 # Code review – ST-012: A shot lands on a sound's cue
-Base: main · Commits: 2 · Date: 2026-11-23
+Base: main · Commits: 2 (round 1) + 3845598 (round 2) · Date: 2026-11-23
 
 Scope: the new `edge: cue` on line anchors (`AnchorSchema`), its resolution in `resolveAnchor`/`resolveStoryboard`, the cue map built in `validateProject`, the meme format rule in `ProjectConfigSchema`, the four ST-012 tests, the glossary and skill changes. The four ST-012 tests pass, the neighbouring suites (`meme-kind`, `meme-script`, `episode`, `timing`, `storyboard-characterization`, `continuity`, `schema`) pass, `typecheck` is clean, `check-language.ts` reports "Glossary language OK", and `schema/storyboard.schema.json` was regenerated for both anchor positions.
 
@@ -19,5 +19,35 @@ Scope: the new `edge: cue` on line anchors (`AnchorSchema`), its resolution in `
 
 Checked and fine: the cue moment is `line.start + cue + offset` with `ensureTime` still guarding the range; the two refusal messages are specific enough to tell "not a sound line" from "the sound has no cue"; `edge: cue` on `word` anchors is untouched; `lineCues` is a pure function over the script and the library (no clock, no I/O); the meme format rule sits in `ProjectConfigSchema`, so `new`, the wizard and every `loadProject` see it, which is the right layer per ADR 0051; the skill addition stays inside the story's scope (no `at_cue`, per Out of Scope).
 
-Verdict: fix blockers first.
+Round 1 verdict: fix blockers first.
 Most important: #1 – a cue-anchored shot makes the storyboard valid but the assets stage impossible: `queue.ts:clipSeconds` (and `clip-audio`) resolve the raw anchors without cues and throw on a storyboard `validate` just accepted.
+
+## Round 2 – verification of commit 3845598
+
+Re-read `git diff main...HEAD` and the touched tests; ran `npm test` (87 files, 821 passed), `npm run typecheck`, `check-language.ts` (OK) and `npm run schema` (tree stays clean).
+
+| # | Status | Evidence |
+|---|---|---|
+| 1 | fixed | `projectSoundCues` (`script-canon.ts:87`) is the one producer of the cue map; `validateProject` (`validate.ts:83,120`), `buildShotItems` (`queue.ts:330,391`) and `clipAudioTake` (`clip-audio.ts:110,116-117`) all pass it into `resolveAnchor`, so a storyboard `validate` accepts now queues and clips. Scenario 1's test runs the real meme fixture through `validateProject` and then `buildShotItems` (`tests/storyboard-cue.test.ts:125-132`); without cues `buildShotItems` would throw, so the regression is caught. |
+| 2 | fixed | ADR 0051:38-40 now names the `cue` edge as an addition to ADR 0005's line anchors; `conventions.md:184-185` states the cue context and that every shot-anchor caller passes it; `resolveStoryboard` takes one `StoryboardContext` (`timing.ts:530,546`). ADR 0005 untouched, as it must be. |
+| 3 | fixed | Integration test through `validateProject` on `office-prank` + `library/sounds/vine-boom/sound.yaml` (cue 0.12) + cue-anchored storyboard (`storyboard-cue.test.ts:82-135`); the three anchor tests stay as rule tests. |
+| 4 | fixed | `memeFormatProblems` (`schema.ts:107`) is called by both `ProjectConfigSchema` (`:143`) and `MemeTemplateSchema` (`:163`); one message, one rule. |
+| 5 | fixed | `SoundCue`/`SoundCues` and `soundCuesByLine` (`timing.ts:181-206`), messages say "sound cue", glossary Anchor entry reworded (`glossary.md:120`). |
+| 6 | fixed | The cue builder now lives next to anchor resolution in `core/src/timing.ts`; `episode.ts` no longer carries it. |
+| 7 | fixed | `StoryboardContext` replaces the three trailing optionals; every call site reads `{ episode }`, `{ sets }` or `{ cues }`. |
+| 8 | fixed | Refusal names the kind: "…a sound line with a library sound (memes only)." (`timing.ts:217`). |
+| 9 | fixed | `startFrame` asserted as `184`, both refusal tests go through `issueOf`, and the offset on a cue anchor is asserted at `6.37`. |
+| 10 | answered – (a) | A kept-but-removed sound now fails with "is no longer in the sound library" (`timing.ts:223`) and the skill states it. The branch added for this answer has no test (see residual). |
+| 11 | answered – (b) | `storyboard/SKILL.md:60` says the cue comes from the library entry, also when the take is an import; the anchor means where the library hit would be. |
+
+Residual findings, all minor:
+
+| # | Severity | Area | File:line | Finding | Source | Suggested direction |
+|---|---|---|---|---|---|---|
+| R1 | minor | Test quality | packages/core/src/timing.ts:222-224 · tests/storyboard-cue.test.ts:82-104 | The `!cue.held` refusal is a new user-visible rule, but no test reaches it: no fixture drops `sound.yaml` while the line keeps a current take. A later change to `held` (or to `scriptLibrarySounds`) can turn the message back into "has no sound cue" unnoticed. | tdd (new rule without a red test); story Context "a line without a library sound … is refused" | Extend `officePrank` to drop the library entry and keep a take, assert "is no longer in the sound library". |
+| R2 | minor | Design / seam | packages/core/src/timing.ts:208 | `resolveAnchor`'s third parameter is still optional, so the type does not stop a new shot-anchor caller from omitting cues – the shape of #1. It is now documented ("every caller that resolves shot anchors passes them"), not enforced. | codebase-design (one adapter per real variation); #1's root cause | When a fourth caller appears, route all shot seconds through one function rather than widening `resolveAnchor` again. |
+| R3 | minor | Test readability | tests/storyboard-cue.test.ts:134 | The offset-on-a-cue assertion is a single ~300-character line that rebuilds timing, script and cues inline inside scenario 1's test; the scenario does not ask for it, and the line is the hardest to read in the file. | codebase-design (locality); smell: Long Method-ish expression | Move it to its own `it` with the fixture helpers. |
+| R4 | minor | Test quality | tests/storyboard-cue.test.ts:131-132 | `durationSeconds` 4 is also what resolving the cue as the line's plain start would give (`ceil(10-6)`), so the queue assertion proves "does not throw", not "used the cue". The value is covered by the `startSeconds` assertion above; no action needed beyond knowing what this catches. | tdd (the assertion must disagree with the wrong behaviour) | If it is to guard the value too, pick a line start whose `ceil` differs from the cue's. |
+
+Verdict: ready to merge.
+Most important remaining finding: R1 – the round-2 answer to #10 ships a second refusal message that no test reaches; everything that was blocking in round 1 is fixed and covered.

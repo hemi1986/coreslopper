@@ -131,7 +131,9 @@ describe('a shot lands on a sound cue', () => {
     const { items } = await buildShotItems(project, { kind: 'clip', shots: ['002'] });
     expect(items[0]!.durationSeconds).toBe(4);
     // The offset still applies on a cue anchor.
-    expect(resolve([shot('shot-001', time(0), cue('reveal-boom', 0.25)), shot('shot-002', cue('reveal-boom', 0.25), time(10))], timingOf([{ id: 'reveal-boom', start: 6, end: 7.4 }]), soundCuesByLine(scriptOf([{ id: 'reveal-boom', kind: 'sfx', sound: 'vine-boom' }]), { 'vine-boom': { cue: 0.12 } })).shots[1]!.startSeconds).toBeCloseTo(6.37, 6);
+    const offsetTiming = timingOf([{ id: 'reveal-boom', start: 6, end: 7.4 }]);
+    const offsetCues = soundCuesByLine(scriptOf([{ id: 'reveal-boom', kind: 'sfx', sound: 'vine-boom' }]), { 'vine-boom': { cue: 0.12 } });
+    expect(resolve([shot('shot-001', time(0), cue('reveal-boom', 0.25)), shot('shot-002', cue('reveal-boom', 0.25), time(10))], offsetTiming, offsetCues).shots[1]!.startSeconds).toBeCloseTo(6.37, 6);
   });
 
   it('ST-012: A cue anchor on a spoken line is refused', () => {
@@ -160,6 +162,21 @@ describe('a shot lands on a sound cue', () => {
       failure = error;
     }
     expect(issueOf(failure)).toContain('"vine-boom" has no sound cue');
+  });
+
+  it('refuses a cue anchor on a sound the library no longer holds', () => {
+    const timing = timingOf([{ id: 'reveal-boom', start: 6, end: 7.4 }]);
+    const script = scriptOf([{ id: 'reveal-boom', kind: 'sfx', sound: 'vine-boom' }]);
+    // The entry is gone; the meme keeps the take (HS-260), but its cue went with the entry.
+    const cues = soundCuesByLine(script, {});
+
+    let failure: unknown;
+    try {
+      resolve([shot('shot-001', time(0), cue('reveal-boom')), shot('shot-002', time(7.4), time(10))], timing, cues);
+    } catch (error) {
+      failure = error;
+    }
+    expect(issueOf(failure)).toContain('"vine-boom" is no longer in the sound library');
   });
 });
 
