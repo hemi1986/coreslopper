@@ -314,6 +314,64 @@ export async function updateLibrarySound(root: string, id: string, changes: Libr
   return { sound: updated, changed: true };
 }
 
+/** EVT-LibrarySoundRemeasured: a file the user swapped, measured again. */
+export interface RemeasuredSound {
+  id: string;
+  length: number;
+  loudness: number;
+  hash: string;
+}
+
+/** The result of `sound check`: what is broken, and what it measured again. */
+export interface SoundLibraryCheck {
+  issues: SoundLibraryIssue[];
+  remeasured: RemeasuredSound[];
+}
+
+/** EVT-SoundLibraryChecked: what `sound check` found, by kind. */
+export type SoundLibraryIssueKind = 'missing-file' | 'missing-entry' | 'cue-outside' | 'trim-outside' | 'invalid';
+
+export interface SoundLibraryIssue {
+  kind: SoundLibraryIssueKind;
+  /** The entry's id, or the name of the file or folder that has no entry. */
+  id: string;
+  /** Names the id itself: a check line is printed as it is. */
+  message: string;
+}
+
+/**
+ * CMD-CheckSoundLibrary (`sound check`): after hand edits, look at the whole
+ * library – an entry without its file, a file or folder without an entry, a cue
+ * or trim outside the length (EVT-SoundLibraryChecked). A file the user swapped
+ * is measured again (EVT-LibrarySoundRemeasured); nothing is ever added or
+ * removed here.
+ */
+export async function checkSoundLibrary(root: string): Promise<SoundLibraryCheck> {
+  const issues: SoundLibraryIssue[] = [];
+  const remeasured: RemeasuredSound[] = [];
+  const dir = soundLibraryRoot(root);
+  if (!existsSync(dir)) return { issues, remeasured };
+  for (const entry of (await readdir(dir, { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name))) {
+    // The `.incoming-` folder of a running `sound add` is not part of the library.
+    if (entry.name.startsWith('.')) continue;
+    const folder = join(dir, entry.name);
+    if (!entry.isDirectory() || !existsSync(join(folder, LIBRARY_SOUND_ENTRY))) continue;
+    if (!existsSync(join(folder, LIBRARY_SOUND_FILE))) {
+      issues.push({ kind: 'missing-file', id: entry.name, message: `"${entry.name}" is an entry without a file: ${LIBRARY_SOUND_FILE} is missing from its folder – copy it back or remove the entry` });
+    }
+  }
+  return { issues, remeasured };
+}
+
+/** The output of `sound check`: what it measured again, then every issue, or one line when the library is fine. */
+export function soundCheckLines(check: SoundLibraryCheck): string[] {
+  const lines = [
+    ...check.remeasured.map((sound) => `✔ ${sound.id} measured again: ${sound.length} s, ${sound.loudness} LUFS`),
+    ...check.issues.map((issue) => `✖ ${issue.message}`),
+  ];
+  return lines.length ? lines : ['✔ The sound library is fine: every entry has its file, every file an entry, and every cue and trim lies inside its sound.'];
+}
+
 /** RM-SoundLibrary: a library sound and the projects whose takes came from it. */
 export interface LibrarySoundListing extends LibrarySound {
   /** Slugs of the memes whose take registry has a take of source `library:<id>`, sorted. */

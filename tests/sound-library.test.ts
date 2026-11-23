@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { stringify } from 'yaml';
 import { resolveBinary } from '../packages/cli/src/media.ts';
 import { hashFileStream } from '../packages/core/src/index.ts';
-import { addLibrarySound, listLibrarySounds, loadLibrarySound, soundDir, soundListLines, SoundRefused, updateLibrarySound } from '../packages/cli/src/sound-library.ts';
+import { addLibrarySound, checkSoundLibrary, listLibrarySounds, loadLibrarySound, soundCheckLines, soundDir, soundListLines, SoundRefused, updateLibrarySound } from '../packages/cli/src/sound-library.ts';
 import { validateChangedFile } from '../packages/cli/src/validate-file.ts';
 
 const temporary: string[] = [];
@@ -408,5 +408,80 @@ describe('sound list', () => {
     expect(listing.sounds.map((sound) => sound.id)).toEqual(['record-scratch', 'vine-boom']);
     expect(listing.errors.map((error) => error.id)).toEqual(['broken']);
     expect(soundListLines(listing).at(-1)).toMatch(/^✖ broken: /);
+  });
+});
+
+describe.skipIf(!hasFfmpeg())('sound check', () => {
+  const soundWav = (root: string, id: string) => join(soundDir(root, id), 'sound.wav');
+
+  it('ST-004: A swapped file is measured again', async () => {
+    const { root, files } = await workspace();
+    await addLibrarySound(root, { file: tone(join(files, 'boom.mp3'), 1.4), title: 'Vine Boom', useWhen: 'a dramatic reveal', cue: 0.12 });
+    await rm(soundWav(root, 'vine-boom'));
+    tone(soundWav(root, 'vine-boom'), 2.0, 550);
+
+    const check = await checkSoundLibrary(root);
+
+    const stored = await loadLibrarySound(root, 'vine-boom');
+    expect(stored.length).toBeCloseTo(2.0, 1);
+    expect(stored.hash).toBe(await hashFileStream(soundWav(root, 'vine-boom')));
+    expect(stored.loudness).toBeLessThan(0);
+    expect(check.remeasured).toEqual([expect.objectContaining({ id: 'vine-boom', hash: stored.hash })]);
+    expect(check.issues).toEqual([]);
+    expect(soundCheckLines(check)[0]).toMatch(/^✔ vine-boom measured again: 2(\.0+)? s, -?\d/);
+  });
+
+  it('ST-004: A folder without an entry is reported, not added', async () => {
+    const { root, files } = await workspace();
+    await mkdir(join(root, 'library', 'sounds', 'bruh'), { recursive: true });
+    await copyFile(tone(join(files, 'bruh.wav'), 0.8), join(root, 'library', 'sounds', 'bruh', 'sound.wav'));
+
+    const check = await checkSoundLibrary(root);
+
+    expect(check.issues).toEqual([expect.objectContaining({ kind: 'missing-entry', id: 'bruh' })]);
+    expect(check.issues[0].message).toMatch(/without an entry/);
+    expect((await listLibrarySounds(root)).sounds.map((sound) => sound.id)).toEqual([]);
+  });
+
+  it('ST-004: A cue that no longer fits is reported', async () => {
+    const { root, files } = await workspace();
+    await addLibrarySound(root, { file: tone(join(files, 'boom.mp3'), 1.4), title: 'Vine Boom', useWhen: 'a dramatic reveal', cue: 1.2 });
+    await rm(soundWav(root, 'vine-boom'));
+    tone(soundWav(root, 'vine-boom'), 1.0, 550);
+
+    const check = await checkSoundLibrary(root);
+
+    expect(check.issues).toEqual([expect.objectContaining({ kind: 'cue-outside', id: 'vine-boom' })]);
+    expect(check.issues[0].message).toMatch(/cue 1\.2 .*outside/);
+    // A cue outside the new length would break the entry, so the check reports it instead of writing it.
+    expect((await loadLibrarySound(root, 'vine-boom')).cue).toBe(1.2);
+  });
+
+  it('ST-004: An entry without its file is reported', async () => {
+    const { root, files } = await workspace();
+    await addLibrarySound(root, { file: tone(join(files, 'boom.mp3'), 1.4), title: 'Vine Boom', useWhen: 'a dramatic reveal' });
+    await rm(soundWav(root, 'vine-boom'));
+
+    const check = await checkSoundLibrary(root);
+
+    expect(check.issues).toEqual([expect.objectContaining({ kind: 'missing-file', id: 'vine-boom' })]);
+    expect(check.issues[0].message).toMatch(/without a file/);
+  });
+
+  it('reports a loose file and an entry that does not load, and passes a sound library that is fine', async () => {
+    const { root, files } = await workspace();
+    await addLibrarySound(root, { file: tone(join(files, 'boom.mp3'), 1.4), title: 'Vine Boom', useWhen: 'a dramatic reveal' });
+    expect(soundCheckLines(await checkSoundLibrary(root))).toEqual(['✔ The sound library is fine: every entry has its file, every file an entry, and every cue and trim lies inside its sound.']);
+
+    await copyFile(join(files, 'boom.mp3'), join(root, 'library', 'sounds', 'loose.wav'));
+    await mkdir(soundDir(root, 'broken'), { recursive: true });
+    await writeFile(join(soundDir(root, 'broken'), 'sound.yaml'), 'version: 1\nid: broken\n');
+
+    const check = await checkSoundLibrary(root);
+
+    expect(check.issues.map((issue) => [issue.kind, issue.id])).toEqual([
+      ['invalid', 'broken'],
+      ['missing-entry', 'loose.wav'],
+    ]);
   });
 });
