@@ -53,7 +53,7 @@ import { footerLines, releaseLabels, releaseTexts, type ReleaseTextInput } from 
 import { thumbnailProblems, jpegSize } from '../packages/cli/src/thumbnail-files.ts';
 import { validateChangedFile } from '../packages/cli/src/validate-file.ts';
 import { coverTextProblem, layoutSquare, thumbnailSize, type LineMetrics } from '../packages/remotion/src/lib/thumbnail.ts';
-import { RELEASE, cleanupFixtures, demo, fakeDeps, fixture, fixtureProbe, jpeg, memeFixture, tree, uploadYaml, videoProbe, wavProbe } from './helpers/release-fixture.ts';
+import { RELEASE, cleanupFixtures, demo, diskTree, fakeDeps, fixture, fixtureProbe, jpeg, memeFixture, memeUploadYaml, tree, uploadYaml, videoProbe, wavProbe } from './helpers/release-fixture.ts';
 
 const temporary: string[] = [];
 afterEach(async () => {
@@ -192,6 +192,18 @@ describe('TODO detection and text limits', () => {
     expect(errors.join('\n')).toContain('spotify: pitch has 501 characters, limit 500');
     const lenient = ChannelConfigSchema.parse({ version: 1, name: 'x', language: 'de', limits: { instagram: { hashtags: 10 } } });
     expect(platformTextProblems(UploadDataSchema.parse(broken), platformLimits(lenient)).errors.join()).not.toContain('6 hashtags');
+  });
+
+  it('checks a meme caption with its credits against the platform limits', () => {
+    const data = UploadDataSchema.parse(memeUploadYaml());
+    expect(platformTextProblems(data, platformLimits(), { kind: 'meme' })).toEqual({ errors: [], missing: [] });
+    const many = UploadDataSchema.parse({ ...memeUploadYaml(), main: { ...memeUploadYaml().main, hashtags: ['#a', '#b', '#c', '#d', '#e', '#f'] } });
+    expect(platformTextProblems(many, platformLimits(), { kind: 'meme' }).errors).toContain('instagram: 6 hashtags, limit 5');
+    const errors = platformTextProblems(data, platformLimits(), { kind: 'meme', credits: ['x'.repeat(2200)] }).errors.join('\n');
+    expect(errors).toContain('tiktok: caption has');
+    expect(errors).toContain('instagram: caption has');
+    const long = UploadDataSchema.parse({ ...memeUploadYaml(), main: { ...memeUploadYaml().main, description: 'x'.repeat(5001) } });
+    expect(platformTextProblems(long, platformLimits(), { kind: 'meme' }).errors.join('\n')).toContain('youtube short: description has');
   });
 
   it('lays out per-platform texts in the project language with channel links and TODOs', () => {
@@ -514,6 +526,7 @@ describe('release folder', () => {
     const result = await buildRelease({ projectDir: dir, root, deps: fakeDeps() });
     expect(result.errors).toEqual([]);
     const files = await tree(result.dir);
+    expect(await diskTree(result.dir)).toEqual([...files, 'manifest.json'].sort());
     expect(files).toContain('video/office-prank-9x16.mp4');
     expect(files).toContain('cover/office-prank-1080x1920.jpg');
     expect(files).toEqual(expect.arrayContaining(['texts/youtube.md', 'texts/tiktok.md', 'texts/instagram.md']));
@@ -522,12 +535,16 @@ describe('release folder', () => {
   });
 
   it('ST-015: No music-video parts are built', async () => {
-    const { dir, root } = await memeFixture();
+    const { dir, root } = await memeFixture({ withMusicVideoParts: true });
     const result = await buildRelease({ projectDir: dir, root, deps: fakeDeps() });
     const files = await tree(result.dir);
-    expect(files.filter((path) => /^(shorts|audio|streaming|announce|instagram|microsite)\//.test(path))).toEqual([]);
-    expect(files.filter((path) => path.endsWith('.wav'))).toEqual([]);
+    const disk = await diskTree(result.dir);
+    expect(disk).toEqual([...files, 'manifest.json'].sort());
+    expect(disk.filter((path) => /^(shorts|audio|streaming|announce|instagram|microsite|thumbnails)\//.test(path))).toEqual([]);
+    expect(disk.filter((path) => path.endsWith('.wav'))).toEqual([]);
+    expect(files.filter((path) => path.startsWith('texts/')).sort()).toEqual(['texts/instagram.md', 'texts/release-plan.md', 'texts/tiktok.md', 'texts/youtube.md']);
     const calendar = await loadCalendar(dir);
+    expect(calendar).toBeDefined();
     expect(calendar?.events.filter((event) => event.step === 'announce')).toEqual([]);
   });
 
@@ -538,6 +555,16 @@ describe('release folder', () => {
     for (const name of ['youtube.md', 'tiktok.md', 'instagram.md']) {
       expect(await readFile(join(result.dir, 'texts', name), 'utf8')).toContain(credit);
     }
+  });
+
+  it('checks the meme caption with its credits, and plans it as a Short, not a Premiere', async () => {
+    const { dir, root } = await memeFixture({ credit: 'x'.repeat(2200) });
+    const result = await buildRelease({ projectDir: dir, root, deps: fakeDeps() });
+    expect(result.errors.join('\n')).toContain('tiktok: caption has');
+    expect(result.errors.join('\n')).toContain('instagram: caption has');
+    const plan = await readFile(join(result.dir, 'texts', 'release-plan.md'), 'utf8');
+    expect(plan).toContain('Post the video as a YouTube Short');
+    expect(plan).not.toContain('Premiere');
   });
 });
 
@@ -617,6 +644,16 @@ async function request(handler: ReturnType<typeof boardHandler>, method: string,
 }
 
 describe('release board', () => {
+  it("shows a meme's credit and its Short plan on the board", async () => {
+    const credit = 'Boom by Jane Doe (CC BY 4.0)';
+    const { dir, root } = await memeFixture({ credit });
+    await buildRelease({ projectDir: dir, root, deps: fakeDeps() });
+    const board = await boardProject(dir, root);
+    const youtube = board.platforms.find((platform) => platform.id === 'youtube')!;
+    expect(youtube.posts.find((post) => post.id === 'youtube')!.fields.find((field) => field.label === 'Description')?.value).toContain(credit);
+    expect(board.calendar.find((event) => event.step === 'youtube')?.label).toBe('Post the video as a YouTube Short (texts/youtube.md)');
+  });
+
   it('plans the calendar during release and lays out every platform with files, texts, and limits', async () => {
     const dir = await fixture();
     await buildRelease({ projectDir: dir, deps: fakeDeps() });

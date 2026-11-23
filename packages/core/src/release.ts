@@ -279,6 +279,16 @@ export function unmarkedPlaceholders(text: string): string[] {
 const chars = (text: string) => [...text].length;
 
 /**
+ * The caption of a meme's one video: its description, the credits the library
+ * sounds it took need, and its hashtags. `release` writes this string and the
+ * checks measure it, so the two cannot drift (HS-172, ADR 0045).
+ */
+export function memeCaption(data: Pick<UploadData, 'main'> | undefined, credits: string[] = []): string {
+  const main = data?.main;
+  return [main?.description.trim() ?? '', ...credits, main?.hashtags.join(' ') ?? ''].filter(Boolean).join('\n\n');
+}
+
+/**
  * Limit and completeness problems of the platform texts in the upload data:
  * `errors` break a limit, `missing` are texts the skill still has to write.
  * A meme has one video and no main-video extras: its one description is the
@@ -287,18 +297,21 @@ const chars = (text: string) => [...text].length;
 export function platformTextProblems(
   data: UploadData,
   limits: PlatformLimits,
-  options: { music?: boolean; kind?: 'music-video' | 'episode' | 'meme' } = { music: true },
+  options: { music?: boolean; kind?: 'music-video' | 'episode' | 'meme'; credits?: string[] } = { music: true },
 ): { errors: string[]; missing: string[] } {
   const errors: string[] = [];
   const missing: string[] = [];
   const main = data.main;
   const kind = options.kind ?? (options.music === false ? 'episode' : 'music-video');
   if (kind === 'meme') {
+    const caption = memeCaption(data, options.credits);
     if (chars(main.title) > limits.youtube.title) errors.push(`youtube short: title has ${chars(main.title)} characters, limit ${limits.youtube.title}`);
-    const caption = [main.description.trim(), main.hashtags.join(' ')].filter(Boolean).join('\n\n');
+    if (Buffer.byteLength(caption) > limits.youtube.description_bytes) errors.push(`youtube short: description has ${Buffer.byteLength(caption)} bytes, limit ${limits.youtube.description_bytes}`);
     if (chars(caption) > limits.tiktok.caption) errors.push(`tiktok: caption has ${chars(caption)} characters, limit ${limits.tiktok.caption}`);
+    const hashtags = caption.match(/#[\p{L}\p{N}_]+/gu)?.length ?? 0;
+    if (hashtags > limits.tiktok.hashtags) errors.push(`tiktok: ${hashtags} hashtags, limit ${limits.tiktok.hashtags}`);
     if (chars(caption) > limits.instagram.caption) errors.push(`instagram: caption has ${chars(caption)} characters, limit ${limits.instagram.caption}`);
-    if (main.hashtags.length > limits.instagram.hashtags) errors.push(`instagram: ${main.hashtags.length} hashtags, limit ${limits.instagram.hashtags}`);
+    if (hashtags > limits.instagram.hashtags) errors.push(`instagram: ${hashtags} hashtags, limit ${limits.instagram.hashtags}`);
     return { errors, missing };
   }
   if (chars(main.title) > limits.youtube.title) errors.push(`youtube main: title has ${chars(main.title)} characters, limit ${limits.youtube.title}`);

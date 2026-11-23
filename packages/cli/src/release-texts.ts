@@ -1,6 +1,7 @@
 import {
   TODO,
   chapterTime,
+  memeCaption as captionOf,
   type CalendarEvent,
   type ChannelConfig,
   type Chapter,
@@ -129,7 +130,7 @@ interface Labels {
     ics: string;
   };
   cal: {
-    steps: Record<'distributor' | 'pitch' | 'canvas' | 'song' | 'artist-pick' | 'youtube' | 'premiere' | 'community' | 'story' | 'page' | 'links', string>;
+    steps: Record<'distributor' | 'pitch' | 'canvas' | 'song' | 'artist-pick' | 'youtube' | 'youtube-short' | 'premiere' | 'community' | 'story' | 'page' | 'links', string>;
     announce: Record<'instagram' | 'youtube' | 'x', string>;
     post: Record<'instagram' | 'x' | 'linkedin', string>;
     short: (name: string, platform: string) => string;
@@ -137,7 +138,6 @@ interface Labels {
   };
   announce: { heading: string; image: string; files: (story?: string, post?: string, teaser?: string) => string };
   meme: { youtube: string; tiktok: string; instagram: string; cover: (file: string) => string; visibility: string };
-  credits: string;
   videoLink: string;
   x: { heading: string; post: string; reply: string; media: (file: string) => string; replyNote: string; short: string };
   li: { heading: string; skipped: (reason: string) => string; reason: string; post: string; hook: (n: number, limit: number) => string; media: (file: string) => string; noLinkNote: string };
@@ -251,6 +251,7 @@ const EN: Labels = {
       song: 'The song goes live on the streaming services',
       'artist-pick': 'Set the Artist Pick (the music video or the song)',
       youtube: 'Publish the main video on YouTube (youtube.md)',
+      'youtube-short': 'Post the video as a YouTube Short (texts/youtube.md)',
       premiere: 'Main video as a YouTube Premiere (youtube.md)',
       community: 'YouTube post about the video',
       story: 'Instagram story with a link sticker to the video',
@@ -276,7 +277,6 @@ const EN: Labels = {
     cover: (file) => `Cover: \`${file}\` (the video's cover on the platform)`,
     visibility: 'Public: upload the video as a Short',
   },
-  credits: 'Credits',
   x: {
     heading: 'X',
     post: 'Post',
@@ -429,6 +429,7 @@ const DE: Labels = {
       song: 'Der Song geht auf den Streamingdiensten online',
       'artist-pick': 'Artist Pick setzen (Musikvideo oder Song)',
       youtube: 'Hauptvideo auf YouTube veröffentlichen (youtube.md)',
+      'youtube-short': 'Das Video als YouTube Short posten (texts/youtube.md)',
       premiere: 'Hauptvideo als YouTube-Premiere (youtube.md)',
       community: 'YouTube-Post zum Video',
       story: 'Instagram-Story mit Link-Sticker zum Video',
@@ -454,7 +455,6 @@ const DE: Labels = {
     cover: (file) => `Cover: \`${file}\` (das Cover des Videos auf der Plattform)`,
     visibility: 'Öffentlich: das Video als Short hochladen',
   },
-  credits: 'Credits',
   x: {
     heading: 'X',
     post: 'Post',
@@ -720,10 +720,16 @@ function spotifyText(input: ReleaseTextInput, l: Labels): string {
 }
 
 /** One line naming a calendar event, in the labels' language. */
-export function calendarEventLabel(event: Pick<CalendarEvent, 'step' | 'platform' | 'item'>, l: Labels, premiere = true): string {
+export function calendarEventLabel(
+  event: Pick<CalendarEvent, 'step' | 'platform' | 'item'>,
+  l: Labels,
+  premiere = true,
+  kind: ReleaseTextInput['kind'] = 'music-video',
+): string {
   if (event.step === 'short') return l.cal.short(event.item, l.cal.platforms[event.platform]);
   if (event.step === 'announce') return l.cal.announce[event.platform as 'instagram' | 'youtube' | 'x'] ?? `${l.announce.heading}: ${l.cal.platforms[event.platform]}`;
   if (event.step === 'post') return l.cal.post[event.platform as 'instagram' | 'x' | 'linkedin'] ?? l.cal.platforms[event.platform];
+  if (event.step === 'youtube' && kind === 'meme') return l.cal.steps['youtube-short'];
   if (event.step === 'youtube' && premiere) return l.cal.steps.premiere;
   return l.cal.steps[event.step as keyof Labels['cal']['steps']] ?? event.step;
 }
@@ -745,7 +751,7 @@ function planText(input: ReleaseTextInput, l: Labels): string {
   for (const event of calendar.events) {
     const when = calendarWhen(event.at, input.language);
     const offset = Math.round((Date.parse(`${event.at.slice(0, 10)}T12:00:00Z`) - Date.parse(`${calendar.release_date}T12:00:00Z`)) / 86_400_000);
-    lines.push(`| ${offset > 0 ? `+${offset}` : offset} | ${when.weekday} ${when.date} | ${when.time} | ${calendarEventLabel(event, l, input.premiere ?? true)} |`);
+    lines.push(`| ${offset > 0 ? `+${offset}` : offset} | ${when.weekday} ${when.date} | ${when.time} | ${calendarEventLabel(event, l, input.premiere ?? true, input.kind)} |`);
   }
   lines.push('', `_${l.plan.ics}_`);
   return `${lines.join('\n')}\n`;
@@ -830,8 +836,7 @@ function linkedinText(input: ReleaseTextInput, l: Labels): string {
 
 /** The meme's one caption: its description, the credits of the library sounds it took, and the hashtags. */
 export function memeCaption(input: Pick<ReleaseTextInput, 'data' | 'credits'>): string {
-  const main = input.data?.main;
-  return [main?.description.trim() ?? '', ...(input.credits ?? []), main?.hashtags.join(' ') ?? ''].filter(Boolean).join('\n\n');
+  return captionOf(input.data, input.credits);
 }
 
 /** The meme video's file in the folder: its one 9:16 render, or the master when the format list names it. */
@@ -864,9 +869,8 @@ function memeTiktokText(input: ReleaseTextInput, l: Labels): string {
 }
 
 function memeInstagramText(input: ReleaseTextInput, l: Labels): string {
-  const main = input.data?.main;
   const caption = memeCaption(input);
-  const tags = (main?.hashtags.length ?? 0) + (caption.match(/#[\p{L}\p{N}_]+/gu)?.length ?? 0);
+  const tags = caption.match(/#[\p{L}\p{N}_]+/gu)?.length ?? 0;
   const lines = [`# ${l.meme.instagram}`, '', `**${l.file}:** \`${memeFile(input, l)}\``];
   if (input.files.cover) lines.push(l.meme.cover(input.files.cover));
   lines.push('', `### ${l.ig.caption} (${l.chars(count(caption), input.limits.instagram.caption)}, ${tags}/${input.limits.instagram.hashtags} ${l.hashtags})`, '', ...block(caption || l.todo('main.description')));

@@ -414,7 +414,7 @@ async function act(dir: string, item: AutopilotEventPlan, context: Context, deps
     }
     const studio = entry.remote_id ? `https://studio.youtube.com/video/${entry.remote_id}/edit` : 'YouTube Studio';
     const steps: string[] = [];
-    if (action.item === 'main' && context.schedule.release.premiere) steps.push(`Schedule it as a Premiere at ${item.event.at} in ${studio} (the API cannot).`);
+    if (action.item === 'main' && context.input.kind !== 'meme' && context.schedule.release.premiere) steps.push(`Schedule it as a Premiere at ${item.event.at} in ${studio} (the API cannot).`);
     else if (entry.status !== 'scheduled') steps.push(`Switch it to public at ${item.event.at} in ${studio} (an unaudited API project uploads private only).`);
     if (action.item !== 'main') steps.push(`Set the related video to the main video in ${studio}.`);
     return { status: entry.status === 'scheduled' ? 'scheduled' : 'uploaded', remote_id: entry.remote_id, url: entry.url, publish_at: entry.publish_at, warnings: entry.warnings, manual_steps: steps };

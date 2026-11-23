@@ -18,6 +18,7 @@ import {
   loadChannel,
   loadReleaseSchedule,
   loadProject,
+  libraryTakeSoundId,
   platformLimits,
   platformTextProblems,
   plainLyrics,
@@ -218,11 +219,12 @@ export function projectFormats(project: Pick<LoadedProject, 'config'>): { id: st
 export async function usedSoundCredits(project: LoadedProject, root: string): Promise<string[]> {
   const ids = new Set<string>();
   for (const take of [...Object.values(project.takes?.takes ?? {}), ...Object.values(project.takes?.ambience ?? {})]) {
-    const match = /^library:(.+)$/.exec(take.source);
-    if (match) ids.add(match[1]!);
+    const id = libraryTakeSoundId(take.source);
+    if (id) ids.add(id);
   }
   const credits: string[] = [];
   for (const id of [...ids].sort()) {
+    // A missing or unreadable entry adds no credit; the licence check (ST-016) reports it.
     const sound = await loadLibrarySound(root, id).catch(() => undefined);
     if (sound?.credit) credits.push(sound.credit);
   }
@@ -452,7 +454,8 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
   };
   // The calendar: the next free slots under config/release-schedule.yaml; kept times stay.
   const schedule = await loadReleaseSchedule(root);
-  input.premiere = schedule.release.premiere;
+  // A meme is a Short, never a Premiere.
+  input.premiere = !meme && schedule.release.premiere;
   input.calendar = await planCalendar(
     project.paths.root,
     calendarInput({
@@ -469,7 +472,7 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
     await deriveReleaseMedia({ project, dir, writer, files, data, calendar: input.calendar, language, title: identity.title, deps, todos, stills: options.stills !== false });
   }
   const labels = releaseLabels(language);
-  const ics = calendarIcs([input.calendar], (calendar, event) => `${calendar.title}: ${calendarEventLabel(event, labels, schedule.release.premiere)}`);
+  const ics = calendarIcs([input.calendar], (calendar, event) => `${calendar.title}: ${calendarEventLabel(event, labels, input.premiere, kind)}`);
   await writer.text('calendar.ics', ics, 'calendar', { events: input.calendar.events.length, release_date: input.calendar.release_date });
   if (data?.microsite && !meme) {
     const lyrics = existsSync(project.paths.lyrics) ? plainLyrics(await readFile(project.paths.lyrics, 'utf8')) : undefined;
@@ -477,7 +480,7 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
     await writer.text(`microsite/${slug}.json`, `${JSON.stringify(song, null, 2)}\n`, 'microsite', {});
   }
   if (data) {
-    const problems = platformTextProblems(data, limits, { kind });
+    const problems = platformTextProblems(data, limits, { kind, credits });
     errors.push(...problems.errors);
     todos.push(...problems.missing.map((field) => `${field} is missing in review/upload.yaml`));
   }

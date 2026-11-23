@@ -10,6 +10,7 @@ import {
   ValidationError,
   hashFileStream,
   librarySoundTimeProblems,
+  libraryTakeSoundId,
   readYamlFile,
   writeTextAtomic,
   type LibrarySound,
@@ -330,11 +331,11 @@ export async function soundUses(root: string): Promise<Map<string, string[]>> {
       // An unreadable takes.json is the voice track's business; here it uses nothing.
       .catch(() => null);
     for (const take of Object.values(raw?.takes ?? {})) {
-      const match = typeof take?.source === 'string' ? /^library:(.+)$/.exec(take.source) : null;
-      if (!match) continue;
-      const slugs = uses.get(match[1]!) ?? new Set<string>();
+      const id = typeof take?.source === 'string' ? libraryTakeSoundId(take.source) : undefined;
+      if (!id) continue;
+      const slugs = uses.get(id) ?? new Set<string>();
       slugs.add(basename(dir));
-      uses.set(match[1]!, slugs);
+      uses.set(id, slugs);
     }
   }
   return new Map([...uses].map(([id, slugs]) => [id, [...slugs].sort()]));

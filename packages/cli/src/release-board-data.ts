@@ -34,6 +34,7 @@ import {
   feedVideo,
   linkedinPostText,
   mediaFile,
+  memeCaption,
   releaseLabels,
   tiktokDescription,
   xTexts,
@@ -42,7 +43,7 @@ import {
   type ReleaseTextInput,
 } from './release-texts.js';
 import { loadUploadData, uploadPaths } from './upload-text.js';
-import { releaseDir, songJson } from './release.js';
+import { releaseDir, songJson, usedSoundCredits } from './release.js';
 import { DERIVED_PATHS } from './release-images.js';
 import { autopilotReadiness, lastRun, loadAutopilotLog } from './autopilot-state.js';
 
@@ -413,6 +414,7 @@ export async function projectReleaseContext(projectRoot: string, root: string) {
   const status = await loadStatus(project.paths.root);
   const schedule = await loadReleaseSchedule(root);
   const timing = project.effectiveTiming ?? project.timing;
+  const meme = kind === 'meme';
   const input: ReleaseTextInput = {
     kind,
     language,
@@ -423,10 +425,12 @@ export async function projectReleaseContext(projectRoot: string, root: string) {
     release: releaseFacts,
     channel,
     limits,
-    chapters: data?.main.chapters ?? (timing ? chaptersFromSections(timing) : []),
+    chapters: meme ? [] : (data?.main.chapters ?? (timing ? chaptersFromSections(timing) : [])),
+    credits: meme ? await usedSoundCredits(project, root) : [],
     files,
     calendar,
-    premiere: schedule.release.premiere,
+    // A meme is a Short, never a Premiere.
+    premiere: !meme && schedule.release.premiere,
     durationSeconds: timing?.audio.duration,
   };
   return { project, music, channel, limits, identity, data, language, l, dir, manifest, files, calendar, status, schedule, input };
@@ -441,7 +445,7 @@ export async function boardProject(projectRoot: string, root: string, options: {
   const at = (id: string) => calendar?.events.find((event) => event.id === id)?.at;
   const heading = (id: string, fallback: string) => {
     const event = calendar?.events.find((entry) => entry.id === id);
-    return event ? calendarEventLabel(event, l, schedule.release.premiere) : fallback;
+    return event ? calendarEventLabel(event, l, input.premiere, input.kind) : fallback;
   };
   const videoUrl = youtubeTarget(l, status.items.youtube?.url);
   const profile = (platform: string) => channel?.links[platform]?.url ?? channel?.links[platform]?.handle;
@@ -455,7 +459,7 @@ export async function boardProject(projectRoot: string, root: string, options: {
   if (announcement) {
     youtube.push({ id: 'announce:youtube', heading: heading('announce:youtube', l.announce.heading), at: at('announce:youtube'), files: files.announcePost ? file(b.announcePost, files.announcePost) : file(b.cover, files.cover), fields: field(b.text, announcement), checklist: [], url: true });
   }
-  const description = youtubeDescriptionText(input, l);
+  const description = input.kind === 'meme' ? memeCaption(input) : youtubeDescriptionText(input, l);
   youtube.push({
     id: 'youtube',
     heading: heading('youtube', b.master),
@@ -468,7 +472,7 @@ export async function boardProject(projectRoot: string, root: string, options: {
       ...field(b.tags, main?.tags.join(', '), { limit: limits.youtube.tags, unit: 'chars' }),
       ...field(b.pinned, main?.pinned_comment),
     ],
-    checklist: [schedule.release.premiere ? b.premiere : b.publish, b.synthetic, b.kids, b.category, b.endscreen],
+    checklist: [input.premiere ? b.premiere : b.publish, b.synthetic, b.kids, b.category, b.endscreen],
     url: true,
   });
   if (main?.community_post) youtube.push({ id: 'community', heading: heading('community', l.community), at: at('community'), files: file(b.upload, files.thumbnails[0]), fields: field(b.text, main.community_post), checklist: [], url: true });
@@ -700,7 +704,7 @@ export async function boardProject(projectRoot: string, root: string, options: {
     hasRelease: Boolean(manifest) && releasedPublicly(project.config),
     todos: manifest?.todos ?? [b.noRelease.replace('<slug>', project.config.slug)],
     platforms,
-    calendar: (calendar?.events ?? []).map((event) => ({ ...event, label: calendarEventLabel(event, l, schedule.release.premiere) })),
+    calendar: (calendar?.events ?? []).map((event) => ({ ...event, label: calendarEventLabel(event, l, input.premiere, input.kind) })),
     status,
     microsite,
   };

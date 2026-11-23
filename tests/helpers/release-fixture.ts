@@ -1,6 +1,6 @@
-import { mkdir, mkdtemp, readFile, cp, writeFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, cp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { parse, stringify } from 'yaml';
 import { ProjectConfigSchema, ReleaseManifestSchema, createInitialState } from '../../packages/core/src/index.ts';
 import type { ReleaseDeps } from '../../packages/cli/src/release.ts';
@@ -167,7 +167,7 @@ export function memeUploadYaml() {
  * upload data, one take copied from the library sound `vine-boom`, and the
  * workspace sound library that take came from.
  */
-export async function memeFixture(options: { licence?: string; credit?: string } = {}): Promise<{ dir: string; root: string }> {
+export async function memeFixture(options: { licence?: string; credit?: string; withMusicVideoParts?: boolean } = {}): Promise<{ dir: string; root: string }> {
   const base = await mkdtemp(join(tmpdir(), 'coreslopper-release-meme-'));
   temporary.push(base);
   const root = join(base, 'workspace');
@@ -194,6 +194,23 @@ export async function memeFixture(options: { licence?: string; credit?: string }
   await writeFile(join(dir, 'renders', '9x16.mp4'), 'render 9x16');
   await writeFile(join(dir, 'renders', 'cover-1080x1920.jpg'), jpeg(1080, 1920));
   await writeFile(join(dir, 'review', 'upload.yaml'), stringify(memeUploadYaml()));
+  if (options.withMusicVideoParts) {
+    // Everything a music-video release would consume: the meme's folder must hold none of it.
+    await mkdir(join(dir, 'renders', 'shorts'), { recursive: true });
+    await mkdir(join(dir, 'audio'), { recursive: true });
+    await mkdir(join(dir, 'assets', 'image'), { recursive: true });
+    await writeFile(join(dir, 'renders', 'shorts', 'Z1-intro-9x16.mp4'), 'short Z1-intro');
+    await writeFile(join(dir, 'renders', 'shorts', 'Z1-intro-thumb.jpg'), jpeg(1080, 1920));
+    await writeFile(join(dir, 'renders', 'shorts', 'Z1-intro-tiktok.jpg'), jpeg(1080, 1440));
+    await writeFile(join(dir, 'renders', 'cover-3000x3000.jpg'), jpeg(3000, 3000));
+    await writeFile(join(dir, 'assets', 'image', 'hero.png'), 'still');
+    await writeFile(
+      join(dir, 'renders', 'cover-3000x3000.recipe.json'),
+      JSON.stringify({ version: 1, still: 'assets/image/hero.png', format: '1x1', text: 'OFFICE PRANK', focus: '0.5,0.35' }),
+    );
+    await writeFile(join(dir, 'audio', 'song.wav'), 'RIFF song');
+    await writeFile(join(dir, 'review', 'upload.yaml'), stringify(uploadYaml()));
+  }
   const sound = join(root, 'library', 'sounds', 'vine-boom');
   await mkdir(sound, { recursive: true });
   await writeFile(
@@ -263,5 +280,14 @@ export function fakeDeps(overrides: Partial<ReleaseDeps> = {}, probes: Record<st
 export async function tree(dir: string): Promise<string[]> {
   const manifest = ReleaseManifestSchema.parse(JSON.parse(await readFile(join(dir, 'manifest.json'), 'utf8')));
   return manifest.files.map((file) => file.path).sort();
+}
+
+/** Every file on disk below `dir`, relative and sorted: the folder itself, not the manifest. */
+export async function diskTree(dir: string): Promise<string[]> {
+  const entries = await readdir(dir, { recursive: true, withFileTypes: true });
+  return entries
+    .filter((entry) => entry.isFile())
+    .map((entry) => relative(dir, join(entry.parentPath, entry.name)))
+    .sort();
 }
 
