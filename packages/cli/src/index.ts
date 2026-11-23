@@ -796,7 +796,7 @@ set
   .description('Take the sets of a project or series canon into the library: new entries, or new files and plates for entries they came from. Runs by itself when style-character is done.')
   .option('--series', 'The target is a series canon')
   .option('--id <set>', 'Only this set')
-  .option('--into <library-id>', 'Merge into this library entry (an earlier copy of the same set)')
+  .option('--into <library-id>', 'Merge into this library entry (an earlier copy of the same set); needs --id')
   .action((target: string, options: { series?: boolean; id?: string; into?: string }) =>
     run(async () => {
       const { importSets } = await import('./set-library.js');
@@ -928,8 +928,13 @@ function printImport(result: { character: string; id: string; created: boolean; 
   printLibraryImport(result.character, result);
 }
 
-function printSetImport(result: { set: string; id: string; created: boolean; added: string[]; missing: string[] }): void {
-  printLibraryImport(result.set, result);
+function printSetImport(result: { set: string; id?: string; created: boolean; skipped?: boolean; added: string[]; missing: string[] }): void {
+  if (result.skipped) {
+    console.log(`- ${result.set}: skipped, no files`);
+    if (result.missing.length) console.log(`  missing in the source: ${result.missing.join(', ')}`);
+    return;
+  }
+  printLibraryImport(result.set, { ...result, id: result.id ?? result.set });
 }
 
 /** What an import took in: one line per item, and the source files it could not find. */

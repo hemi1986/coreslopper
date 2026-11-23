@@ -8,8 +8,9 @@ import { ValidationError, isScriptId } from '@coreslopper/core';
 // What the character library and the set library share (ADR 0052, one
 // BC-Library): the entry id and folder (`library/<kind>/<id>/`), the
 // required/optional field text, tags, the id a name becomes, the file limits,
-// and the content-wise copy both use. The sound library stays its own context
-// (ADR 0051) and keeps its own refusal type.
+// where an import's source is recorded (`librarySourceLabel`), the guarded scan
+// of an entry's files, and the content-wise copy both use. The sound library
+// stays its own context (ADR 0051) and keeps its own refusal type.
 
 const MB = 1024 * 1024;
 
@@ -114,6 +115,21 @@ export interface CopyOptions {
 }
 
 /**
+ * The files of an entry's folder by content hash, each mapped to its name. The
+ * entry file and dot files (a staged copy) are skipped; a link or non-file is
+ * refused, since the entry may only name plain files of its folder.
+ */
+export async function entryFileHashes(dir: string, kind: LibraryEntryKind): Promise<Map<string, string>> {
+  const hashes = new Map<string, string>();
+  for (const item of await readdir(dir, { withFileTypes: true }).catch(() => [] as Dirent[])) {
+    if (item.name === KINDS[kind].file || item.name.startsWith('.')) continue;
+    if (!item.isFile()) throw new ValidationError(`the library ${KINDS[kind].noun} folder holds a ${item.isSymbolicLink() ? 'link' : 'non-file'} "${item.name}"; move it away`);
+    hashes.set(await fileHash(join(dir, item.name)), item.name);
+  }
+  return hashes;
+}
+
+/**
  * Copy files into an entry's folder, once each by content: a file whose bytes
  * are already there maps to the existing name. Returns the target name per
  * source, the names that are new, and the copies still staged (empty unless
@@ -126,12 +142,7 @@ export async function copyByContent(
   options: CopyOptions = {},
 ): Promise<{ names: Map<string, string>; added: string[]; staged: StagedCopy[] }> {
   await mkdir(dir, { recursive: true });
-  const known = new Map<string, string>();
-  for (const item of await readdir(dir, { withFileTypes: true }).catch(() => [] as Dirent[])) {
-    if (item.name === KINDS[kind].file || item.name.startsWith('.')) continue;
-    if (!item.isFile()) throw new ValidationError(`the library ${KINDS[kind].noun} folder holds a ${item.isSymbolicLink() ? 'link' : 'non-file'} "${item.name}"; move it away`);
-    known.set(await fileHash(join(dir, item.name)), item.name);
-  }
+  const known = await entryFileHashes(dir, kind);
   const names = new Map<string, string>();
   const added: string[] = [];
   const staged: StagedCopy[] = [];

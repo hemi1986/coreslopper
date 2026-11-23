@@ -241,6 +241,8 @@ describe('taking sets into the library', () => {
     expect(result).toEqual({ set: 'bar', id: 'bar', created: false, added: ['door.png', 'plate:door'], missing: [] });
     const entry = await loadLibrarySet(ws, 'bar');
     expect(entry.name).toBe('Bar');
+    expect(entry.description).toBe('A narrow bar in blue neon.');
+    expect(entry.prompt).toBe('narrow bar, blue neon, wet counter');
     expect(entry.plates).toEqual([
       { id: 'counter', angle: 'counter, frontal', file: 'counter.png' },
       { id: 'door', angle: 'door, from inside', file: 'door.png' },
@@ -299,7 +301,9 @@ describe('taking sets into the library', () => {
       { 'sets/lobby/start.png': 'lobby' },
     );
 
-    expect((await importSets(ws, dir)).map((result) => result.set)).toEqual(['lobby']);
+    const results = await importSets(ws, dir);
+    expect(results.find((result) => result.set === 'bar')).toMatchObject({ skipped: true, created: false, added: [] });
+    expect(results.find((result) => result.set === 'lobby')).toMatchObject({ id: 'lobby', created: true });
     await expect(importSets(ws, dir, { set: 'bar' })).rejects.toThrow(/no files/);
     expect(existsSync(join(ws, 'library', 'sets', 'bar'))).toBe(false);
   });
@@ -324,7 +328,7 @@ describe('taking sets into the library', () => {
     await writeFile(join(ws, 'outside.png'), 'outside');
     const dir = await production(ws, 'neon-rain', [bar({ refs: ['../outside.png'] })], {});
 
-    expect(await importSets(ws, dir)).toEqual([]);
+    expect(await importSets(ws, dir)).toEqual([{ set: 'bar', created: false, skipped: true, added: [], missing: ['../outside.png'] }]);
     const named = await production(ws, 'named', [bar({ refs: ['../outside.png'] })], {});
     await expect(importSets(ws, named, { set: 'bar' })).rejects.toThrow(/no files/);
   });
@@ -339,10 +343,90 @@ describe('taking sets into the library', () => {
       { 'sets/bar/plates/door.png': 'door' },
     );
 
-    const [result] = await importSets(ws, dir, { into: 'bar' });
+    const [result] = await importSets(ws, dir, { set: 'bar', into: 'bar' });
 
     expect(result).toMatchObject({ id: 'bar', created: false, added: ['door.png', 'plate:door'] });
-    await expect(importSets(ws, dir, { into: 'no-such-set' })).rejects.toThrow(/no library set/);
+    await expect(importSets(ws, dir, { set: 'bar', into: 'no-such-set' })).rejects.toThrow(/no library set/);
+    await expect(importSets(ws, dir, { into: 'bar' })).rejects.toThrow(/--id/);
+  });
+
+  it('matches a same-id entry that shares a file', async () => {
+    const ws = await workspace();
+    const first = await production(ws, 'neon-rain', [bar({ refs: ['sets/bar/start.png'] })], { 'sets/bar/start.png': 'the bar' });
+    await importSets(ws, first);
+    // The same place in a second video: no library link, but its start frame is the same image.
+    const second = await production(
+      ws,
+      'after-midnight',
+      [bar({ refs: ['sets/bar/start.png'], plates: [{ id: 'door', angle: 'door, from inside', ref: 'sets/bar/plates/door.png' }] })],
+      { 'sets/bar/start.png': 'the bar', 'sets/bar/plates/door.png': 'door' },
+    );
+
+    const [result] = await importSets(ws, second);
+
+    expect(result).toMatchObject({ set: 'bar', id: 'bar', created: false, added: ['door.png', 'plate:door'] });
+    expect((await readdir(join(ws, 'library', 'sets'))).sort()).toEqual(['bar']);
+  });
+
+  it('adds a reference whose image the entry already holds', async () => {
+    const ws = await workspace();
+    await libraryBar(ws);
+    const dir = await production(ws, 'after-midnight', [bar({ library: 'bar', refs: ['sets/bar/counter.png'] })], { 'sets/bar/counter.png': 'counter' });
+
+    const [result] = await importSets(ws, dir, { now: new Date('2026-11-23T12:00:00Z') });
+
+    expect(result).toMatchObject({ created: false, added: ['counter.png'] });
+    const entry = await loadLibrarySet(ws, 'bar');
+    expect(entry.refs).toEqual(['counter.png']);
+    expect(entry.history.at(-1)).toEqual({ at: '2026-11-23T12:00:00.000Z', from: 'projects/after-midnight', added: ['counter.png'] });
+  });
+
+  it('fills the image of a plate the entry holds without one', async () => {
+    const ws = await workspace();
+    await addLibrarySet(ws, { name: 'Bar', description: 'A narrow bar in blue neon.', prompt: 'narrow bar, blue neon, wet counter' });
+    await writeFile(
+      join(setEntryDir(ws, 'bar'), 'set.yaml'),
+      stringify({
+        version: 1,
+        id: 'bar',
+        name: 'Bar',
+        description: 'A narrow bar in blue neon.',
+        prompt: 'narrow bar, blue neon, wet counter',
+        plates: [{ id: 'counter', angle: 'counter, frontal' }],
+        origin: 'manual',
+        added: '2026-11-23T09:00:00.000Z',
+      }),
+    );
+    const dir = await production(ws, 'neon-rain', [bar({ library: 'bar', plates: [{ id: 'counter', angle: 'counter, frontal', ref: 'sets/bar/plates/counter.png' }] })], {
+      'sets/bar/plates/counter.png': 'counter',
+    });
+
+    const [result] = await importSets(ws, dir);
+
+    expect(result).toMatchObject({ created: false, added: ['counter.png', 'plate:counter'] });
+    expect((await loadLibrarySet(ws, 'bar')).plates).toEqual([{ id: 'counter', angle: 'counter, frontal', file: 'counter.png' }]);
+  });
+
+  it('records every later import, even one that brings nothing new', async () => {
+    const ws = await workspace();
+    await libraryBar(ws);
+    const dir = await production(ws, 'after-midnight', [bar({ library: 'bar', plates: [{ id: 'counter', angle: 'counter, frontal', ref: 'sets/bar/plates/counter.png' }] })], {
+      'sets/bar/plates/counter.png': 'counter',
+    });
+
+    const [result] = await importSets(ws, dir, { now: new Date('2026-11-23T13:00:00Z') });
+
+    expect(result).toMatchObject({ created: false, added: [] });
+    expect((await loadLibrarySet(ws, 'bar')).history.at(-1)).toEqual({ at: '2026-11-23T13:00:00.000Z', from: 'projects/after-midnight', added: [] });
+  });
+
+  it('treats a folder named as a set file as missing', async () => {
+    const ws = await workspace();
+    const dir = await production(ws, 'neon-rain', [bar({ refs: ['sets/bar/start.png'] })], { 'sets/bar/start.png/keep': 'a folder, not an image' });
+
+    const [result] = await importSets(ws, dir);
+
+    expect(result).toMatchObject({ skipped: true, missing: ['sets/bar/start.png'] });
   });
 
   it('refuses a production without a set bible or an unknown set', async () => {

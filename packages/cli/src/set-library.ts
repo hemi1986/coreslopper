@@ -1,9 +1,9 @@
-import { existsSync } from 'node:fs';
-import { mkdir, readdir, stat } from 'node:fs/promises';
+import { existsSync, statSync } from 'node:fs';
+import { mkdir, readdir, rm, stat } from 'node:fs/promises';
 import { basename, extname, join, resolve, sep } from 'node:path';
 import { stringify } from 'yaml';
 import { LibrarySetSchema, SetBibleSchema, ValidationError, isScriptId, readYamlFile, writeTextAtomic, type LibrarySet, type SetDefinition } from '@coreslopper/core';
-import { LIBRARY_FILE_LIMITS, commitCopies, copyByContent, discardCopies, entryText, fileHash, libraryEntryDir, libraryEntryFile, librarySourceLabel, parseTags, slugOfName } from './library-entry.js';
+import { LIBRARY_FILE_LIMITS, commitCopies, copyByContent, discardCopies, entryFileHashes, entryText, fileHash, libraryEntryDir, libraryEntryFile, librarySourceLabel, parseTags, slugOfName } from './library-entry.js';
 
 // The workspace's set library: `library/sets/<id>/set.yaml` with the set's
 // files next to it (ADR 0052). The user adds sets and their files by hand
@@ -29,13 +29,14 @@ async function saveLibrarySet(root: string, entry: LibrarySet): Promise<void> {
 /**
  * Whether the id is taken: its entry exists, or its folder holds files the
  * entry would not name (the aggregate's "every file in the entry's folder is
- * named by set.yaml"). An empty folder left by an interrupted write is reused.
+ * named by set.yaml"). An empty folder, or one left holding only staged
+ * copies by an interrupted write, is reused.
  */
 async function idTaken(root: string, id: string): Promise<'entry' | 'files' | undefined> {
   const dir = setEntryDir(root, id);
   if (!existsSync(dir)) return undefined;
   if (existsSync(setEntryFile(root, id))) return 'entry';
-  return (await readdir(dir)).length > 0 ? 'files' : undefined;
+  return (await readdir(dir)).some((name) => !name.startsWith('.')) ? 'files' : undefined;
 }
 
 export interface NewLibrarySet {
@@ -168,10 +169,12 @@ export async function addLibrarySetFile(root: string, id: string, source: string
 export interface ImportSetResult {
   /** The set's id in the project or canon. */
   set: string;
-  /** The library entry it went into. */
-  id: string;
+  /** The library entry it went into; absent when the set was skipped. */
+  id?: string;
   created: boolean;
-  /** New files and `plate:<id>` entries. */
+  /** True when the set names no file that exists; nothing was taken in. */
+  skipped?: boolean;
+  /** New files, references appended from a file the entry already held, and `plate:<id>` entries. */
   added: string[];
   /** Files the set names that do not exist. */
   missing: string[];
@@ -180,15 +183,21 @@ export interface ImportSetResult {
 export interface ImportSetsOptions {
   /** Only this set of the source; all with at least one file otherwise. */
   set?: string;
-  /** Put it into this library entry (an earlier copy of the same set). */
+  /** Put the named set into this library entry (an earlier copy of the same set); needs `set`. */
   into?: string;
   now?: Date;
+}
+
+/** `base`, or `base-2`, `base-3` …, within 80 characters so a counter is never cut away. */
+function numbered(base: string, n: number, max = 80): string {
+  const suffix = n === 1 ? '' : `-${n}`;
+  return `${base.slice(0, Math.max(1, max - suffix.length))}${suffix}`;
 }
 
 /** A plate id free in the entry, `<plate>-<slug>` with a counter when that too is taken. */
 function freePlateId(entry: LibrarySet, base: string): string {
   for (let n = 1; ; n += 1) {
-    const candidate = `${base}${n === 1 ? '' : `-${n}`}`.slice(0, 80);
+    const candidate = numbered(base, n);
     if (!entry.plates.some((plate) => plate.id === candidate)) return candidate;
   }
 }
@@ -199,8 +208,9 @@ function freePlateId(entry: LibrarySet, base: string): string {
  * and plates to that entry; so does one with the same id whose files share
  * content with the entry. Any other set becomes a new entry, named
  * `<id>-<slug>` if its id is taken. Name, description and prompt of an existing
- * entry stay, missing ones are filled in, and every later import is recorded in
- * the history. A set without a file is skipped; missing files are reported.
+ * entry stay, a plate without an image gains it, and every later import is
+ * recorded in the history. A set without a file is skipped with its missing
+ * files reported; one named with `set` is refused instead.
  */
 export async function importSets(root: string, sourceDir: string, options: ImportSetsOptions = {}): Promise<ImportSetResult[]> {
   const file = join(sourceDir, 'sets.yaml');
@@ -209,6 +219,7 @@ export async function importSets(root: string, sourceDir: string, options: Impor
   const from = librarySourceLabel(root, sourceDir);
   const slug = basename(sourceDir);
   const at = (options.now ?? new Date()).toISOString();
+  if (options.into && !options.set) throw new ValidationError('--into names one entry; name the set with --id as well');
   if (options.set && !bible.sets.some((set) => set.id === options.set)) {
     throw new ValidationError(`${from} has no set "${options.set}"`);
   }
@@ -217,17 +228,19 @@ export async function importSets(root: string, sourceDir: string, options: Impor
   for (const set of bible.sets) {
     if (options.set && set.id !== options.set) continue;
     const local = (path: string | undefined) => (path ? resolve(sourceDir, path) : undefined);
-    const exists = (path: string | undefined) => Boolean(path && existsSync(path) && resolve(path).startsWith(resolve(sourceDir) + sep));
+    // A plain file inside the source; a folder, a link out of the source, or nothing is reported as missing.
+    const exists = (path: string | undefined) => Boolean(path && resolve(path).startsWith(resolve(sourceDir) + sep) && statSync(path, { throwIfNoEntry: false })?.isFile());
     const named = [...set.refs, ...set.plates.map((plate) => plate.ref)].filter(Boolean) as string[];
     const missing = named.filter((path) => !exists(local(path)));
     const files = named.map(local).filter(exists) as string[];
     if (!files.length) {
       if (options.set) throw new ValidationError(`${set.id} in ${from} has no files to take into the library`);
+      results.push({ set: set.id, created: false, skipped: true, added: [], missing });
       continue;
     }
     const id = options.into ?? (await matchSetEntry(root, set, files, slug));
     const created = !existsSync(setEntryFile(root, id));
-    const { names, added } = await copyByContent(files, setEntryDir(root, id), 'sets');
+    const { names, added, staged } = await copyByContent(files, setEntryDir(root, id), 'sets', { stage: true });
     const name = (path: string | undefined) => (path ? names.get(resolve(sourceDir, path)) : undefined);
     const entry: LibrarySet = created
       ? {
@@ -244,22 +257,58 @@ export async function importSets(root: string, sourceDir: string, options: Impor
           history: [],
         }
       : await loadLibrarySet(root, id);
+    const before = created ? undefined : structuredClone(entry);
+    const refAdds: string[] = [];
     for (const ref of set.refs) {
       const target = name(ref);
-      if (target && !entry.refs.includes(target)) entry.refs.push(target);
+      if (target && !entry.refs.includes(target)) {
+        entry.refs.push(target);
+        refAdds.push(target);
+      }
     }
     const plateAdds: string[] = [];
     for (const plate of set.plates) {
       const target = name(plate.ref);
       const same = entry.plates.find((existing) => existing.id === plate.id);
-      if (same && (same.file === target || !target)) continue;
-      const plateId = same ? freePlateId(entry, `${plate.id}-${slug}`) : plate.id;
-      entry.plates.push({ id: plateId, angle: plate.angle, ...(plate.prompt ? { prompt: plate.prompt } : {}), ...(target ? { file: target } : {}) });
-      plateAdds.push(`plate:${plateId}`);
+      if (!same) {
+        entry.plates.push({ id: plate.id, angle: plate.angle, ...(plate.prompt ? { prompt: plate.prompt } : {}), ...(target ? { file: target } : {}) });
+        plateAdds.push(`plate:${plate.id}`);
+        continue;
+      }
+      if (same.file && target && same.file !== target) {
+        // The same plate id with another image becomes a new plate, never an overwrite.
+        const plateId = freePlateId(entry, `${plate.id}-${slug}`);
+        entry.plates.push({ id: plateId, angle: plate.angle, ...(plate.prompt ? { prompt: plate.prompt } : {}), file: target });
+        plateAdds.push(`plate:${plateId}`);
+        continue;
+      }
+      let filled = false;
+      if (!same.file && target) {
+        same.file = target;
+        filled = true;
+      }
+      if (!same.prompt && plate.prompt) {
+        same.prompt = plate.prompt;
+        filled = true;
+      }
+      if (filled) plateAdds.push(`plate:${same.id}`);
     }
-    const changes = [...added, ...plateAdds];
-    if (!created && changes.length) entry.history.push({ at, from, added: changes });
-    if (created || changes.length) await saveLibrarySet(root, entry);
+    const changes = [...new Set([...added, ...refAdds, ...plateAdds])];
+    if (!created) entry.history.push({ at, from, added: changes });
+    try {
+      await saveLibrarySet(root, entry);
+    } catch (error) {
+      await discardCopies(staged);
+      throw error;
+    }
+    try {
+      await commitCopies(staged);
+    } catch (error) {
+      if (before) await saveLibrarySet(root, before);
+      else await rm(setEntryFile(root, id), { force: true });
+      await discardCopies(staged);
+      throw error;
+    }
     results.push({ set: set.id, id, created, added: changes, missing });
   }
   return results;
@@ -272,13 +321,11 @@ async function matchSetEntry(root: string, set: SetDefinition, files: string[], 
   const taken = await idTaken(root, base);
   if (!taken) return base;
   if (taken === 'entry') {
-    const dir = setEntryDir(root, base);
-    const hashes = new Set<string>();
-    for (const name of await readdir(dir)) if (name !== 'set.yaml') hashes.add(await fileHash(join(dir, name)));
-    for (const file of files) if (hashes.has(await fileHash(file))) return base;
+    const known = await entryFileHashes(setEntryDir(root, base), 'sets');
+    for (const file of files) if (known.has(await fileHash(file))) return base;
   }
   for (let n = 1; ; n += 1) {
-    const candidate = `${base}-${slug}${n === 1 ? '' : `-${n}`}`.slice(0, 80);
+    const candidate = numbered(`${base}-${slug}`, n);
     if (!(await idTaken(root, candidate))) return candidate;
   }
 }
