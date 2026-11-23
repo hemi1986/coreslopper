@@ -12,7 +12,7 @@ risk: null
 events: [EVT-StoryboardValidated]
 depends_on: [ST-011]
 labels: [feature:meme]
-status: ready
+status: in-progress
 ---
 
 ## Story

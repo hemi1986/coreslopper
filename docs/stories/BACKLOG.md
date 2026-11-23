@@ -4,15 +4,20 @@
 
 **Progress: 11 of 24 domain stories done** · scenarios 40 of 80
 
-**42 stories** · In Progress: 0 · Ready: 20 · Ready for Human Review: 0 · In Review: 1 · Draft: 0 · Done: 21 · Superseded: 0
+**42 stories** · In Progress: 1 · Ready: 19 · Ready for Human Review: 0 · In Review: 1 · Draft: 0 · Done: 21 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
+
+## In Progress
+
+| ID | Title | Type | Context | Priority | Size | Risk | Depends on |
+|---|---|---|---|---|---|---|---|
+| [ST-012](ST-012-a-shot-lands-on-the-sound-cue.md) | A shot lands on a sound's cue | domain | Storyboard | should | – | – | ST-011 |
 
 ## Ready
 
 | ID | Title | Type | Context | Priority | Size | Risk | Depends on |
 |---|---|---|---|---|---|---|---|
-| [ST-012](ST-012-a-shot-lands-on-the-sound-cue.md) | A shot lands on a sound's cue | domain | Storyboard | should | – | – | ST-011 |
 | [ST-014](ST-014-burned-in-subtitles-for-a-meme.md) | A meme's render carries German subtitles | domain | Render | should | – | – | ST-007 |
 | [ST-020](ST-020-episode-announcement-says-new-episode.md) | An episode's announcement images say "new episode", not "new song" | chore | – | should | – | – | – |
 | [ST-023](ST-023-library-set-entries.md) | Library set entries and their validation | tech-task | – | should | – | – | – |
