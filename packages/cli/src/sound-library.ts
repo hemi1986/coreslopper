@@ -419,19 +419,20 @@ export async function checkSoundLibrary(root: string): Promise<SoundLibraryCheck
     .filter((entry) => !entry.name.startsWith('.'))
     // Code-unit order, as `sound list`, so the check prints the same order on every machine.
     .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  const removeHint = (name: string) => `sound remove ${ID.test(name) ? name : '<id>'}`;
   const entries: { id: string; file: string; wav: string; sound: LibrarySound; hash: string }[] = [];
   for (const entry of names) {
     const folder = join(dir, entry.name);
     if (!entry.isDirectory()) {
-      issues.push({ kind: 'missing-entry', id: entry.name, message: `"${entry.name}" is a file without an entry next to the folders – sound add <file> --title … stores it in its own folder` });
+      issues.push({ kind: 'missing-entry', id: entry.name, message: `"${entry.name}" is a file without an entry next to the folders – sound add <file> --title … stores it in its own folder, ${removeHint(entry.name)} deletes it` });
       continue;
     }
     if (!existsSync(join(folder, LIBRARY_SOUND_ENTRY))) {
-      issues.push({ kind: 'missing-entry', id: entry.name, message: `"${entry.name}" is a file without an entry: the folder holds no ${LIBRARY_SOUND_ENTRY} – sound add <file> --title … adds one, a folder never becomes an entry by itself` });
+      issues.push({ kind: 'missing-entry', id: entry.name, message: `"${entry.name}" is a file without an entry: the folder holds no ${LIBRARY_SOUND_ENTRY} – sound add <file> --title … adds one, ${removeHint(entry.name)} deletes the folder` });
       continue;
     }
     if (!existsSync(join(folder, LIBRARY_SOUND_FILE))) {
-      issues.push({ kind: 'missing-file', id: entry.name, message: `"${entry.name}" is an entry without a file: ${LIBRARY_SOUND_FILE} is missing from its folder – copy it back or remove the entry` });
+      issues.push({ kind: 'missing-file', id: entry.name, message: `"${entry.name}" is an entry without a file: ${LIBRARY_SOUND_FILE} is missing from its folder – copy it back, or ${removeHint(entry.name)} removes the entry` });
       continue;
     }
     // The rules of a hand edit: the schema, the id is the folder's name, the WAV is there (CMD-ValidateLibrarySound).

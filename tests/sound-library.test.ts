@@ -314,6 +314,8 @@ describe('sound remove', () => {
     const root = await holding('sad-trombone');
     await mkdir(soundDir(root, 'leftover'), { recursive: true });
     await writeFile(join(soundDir(root, 'leftover'), 'sound.wav'), 'RIFF');
+    // The check names the command that removes what it reports.
+    expect((await checkSoundLibrary(root)).issues[0]?.message).toMatch(/sound remove leftover deletes the folder/);
 
     await removeLibrarySound(root, 'leftover');
 
@@ -331,14 +333,16 @@ describe('sound remove', () => {
 
   it('names the memes that keep their take', async () => {
     const root = await holding('vine-boom');
-    const meme = join(root, 'projects', 'office-prank');
-    await mkdir(meme, { recursive: true });
-    await writeFile(join(meme, 'project.yaml'), 'version: 1\nslug: office-prank\n');
-    await writeFile(join(meme, 'takes.json'), JSON.stringify({ version: 1, takes: { 'reveal-boom': { source: 'library:vine-boom', duration: 1.2, text_hash: 'x' } }, ambience: {} }));
+    for (const slug of ['office-prank', 'cat-video']) {
+      const meme = join(root, 'projects', slug);
+      await mkdir(meme, { recursive: true });
+      await writeFile(join(meme, 'project.yaml'), `version: 1\nslug: ${slug}\n`);
+      await writeFile(join(meme, 'takes.json'), JSON.stringify({ version: 1, takes: { 'reveal-boom': { source: 'library:vine-boom', duration: 1.2, text_hash: 'x' } }, ambience: {} }));
+    }
 
     const removed = await removeLibrarySound(root, 'vine-boom');
 
-    expect(removed.used_in).toEqual(['office-prank']);
+    expect(removed.used_in).toEqual(['cat-video', 'office-prank']);
   });
 
   const guarded = process.getuid?.() === 0;

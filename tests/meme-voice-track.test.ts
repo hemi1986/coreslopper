@@ -10,6 +10,7 @@ import { createProject } from '../packages/cli/src/new-project.ts';
 import { resolveBinary } from '../packages/cli/src/media.ts';
 import { addLibrarySound, removeLibrarySound, soundDir, updateLibrarySound } from '../packages/cli/src/sound-library.ts';
 import { episodeTrack } from '../packages/cli/src/episode-track.ts';
+import { takeStatus } from '../packages/cli/src/takes.ts';
 import { voiceTrack } from '../packages/cli/src/voice-track.ts';
 
 // ST-011: the voice track copies a sound line's library sound into the meme as a take (POL-TakeChosenLibrarySounds).
@@ -117,9 +118,11 @@ describe.skipIf(!hasFfmpeg())('the voice track takes library sounds into a meme'
 
     await removeLibrarySound(workspace, 'vine-boom');
 
+    // HS-260: the take keeps what it was made from, so its own text hash is still the expected one.
     expect((await takesOf(projectDir)).takes['reveal-boom']).toEqual(take);
     expect(existsSync(file)).toBe(true);
     expect(await readFile(file)).toEqual(audio);
+    expect(await takeStatus(take, file, take.text_hash)).toBe('current');
   });
 
   it('ST-011: A line naming a sound that never was taken and is gone stops the voice track', async () => {
