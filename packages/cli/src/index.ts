@@ -787,6 +787,26 @@ character
     }),
   );
 
+const set = program
+  .command('set')
+  .description('The workspace set library (library/sets/<id>/): new.');
+
+set
+  .command('new')
+  .description('Add a set to the library by hand; the id comes from the name.')
+  .requiredOption('--name <name>', 'Display name')
+  .requiredOption('--description <text>', 'The place and how it looks')
+  .requiredOption('--prompt <text>', 'Prompt anchor for every keyframe in the set')
+  .option('--tags <list>', 'Comma-separated words for finding the set')
+  .action((options: { name: string; description: string; prompt: string; tags?: string }) =>
+    run(async () => {
+      const library = await import('./set-library.js');
+      const root = repoRoot();
+      const entry = await library.addLibrarySet(root, options);
+      console.log(`✔ ${entry.id} in ${relative(process.cwd(), library.entryDir(root, entry.id)) || '.'}`);
+    }),
+  );
+
 const sound = program
   .command('sound')
   .description('The workspace sound library (library/sounds/<id>/): list, add, edit, remove, check.');
