@@ -6,8 +6,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { stringify } from 'yaml';
 import { resolveBinary } from '../packages/cli/src/media.ts';
-import { hashFileStream } from '../packages/core/src/index.ts';
-import { addLibrarySound, checkSoundLibrary, listLibrarySounds, loadLibrarySound, soundCheckLines, soundDir, soundListLines, SoundRefused, updateLibrarySound } from '../packages/cli/src/sound-library.ts';
+import { hashFileStream, ValidationError } from '../packages/core/src/index.ts';
+import { addLibrarySound, checkSoundLibrary, listLibrarySounds, loadLibrarySound, removeLibrarySound, soundCheckLines, soundDir, soundListLines, SoundRefused, updateLibrarySound } from '../packages/cli/src/sound-library.ts';
 import { validateChangedFile } from '../packages/cli/src/validate-file.ts';
 
 const temporary: string[] = [];
@@ -246,6 +246,62 @@ describe.skipIf(!hasFfmpeg())('sound edit', () => {
     await expect(updateLibrarySound(root, 'vine-boom', { title: '' })).rejects.toThrow(/needs a title/);
     await expect(updateLibrarySound(root, 'no-such-sound', { title: 'x' })).rejects.toThrow(/no library sound "no-such-sound"/);
     await expect(updateLibrarySound(root, 'vine-boom', { trim: '0.5-0.4' })).rejects.toThrow(/must start before it ends/);
+  });
+});
+
+describe('sound remove', () => {
+  const title = (id: string) => (id === 'vine-boom' ? 'Vine Boom' : 'Sad Trombone');
+
+  /** A library held by hand: removing a sound only deletes its folder, so no ffmpeg is needed. */
+  async function holding(...ids: string[]): Promise<string> {
+    const { root } = await workspace();
+    for (const id of ids) {
+      await mkdir(soundDir(root, id), { recursive: true });
+      await writeFile(join(soundDir(root, id), 'sound.wav'), 'RIFF');
+      await writeFile(
+        join(soundDir(root, id), 'sound.yaml'),
+        stringify({
+          version: 1,
+          id,
+          title: title(id),
+          use_when: 'a dramatic reveal',
+          tags: [],
+          length: 1.4,
+          loudness: -18.5,
+          licence: 'unknown',
+          hash: (id === 'vine-boom' ? 'a' : 'b').repeat(64),
+          added: '2026-11-22T10:00:00.000Z',
+        }),
+      );
+    }
+    return root;
+  }
+
+  const ids = async (root: string) => (await listLibrarySounds(root)).sounds.map((sound) => sound.id);
+
+  it('ST-003: A removed sound leaves the library', async () => {
+    const root = await holding('vine-boom', 'sad-trombone');
+
+    await removeLibrarySound(root, 'vine-boom');
+
+    expect(await ids(root)).toEqual(['sad-trombone']);
+    expect(existsSync(join(root, 'library', 'sounds', 'vine-boom'))).toBe(false);
+  });
+
+  it('removes a sound at the command line', async () => {
+    const root = await holding('vine-boom');
+    await writeFile(join(root, 'package.json'), JSON.stringify({ name: 'coreslopper' }));
+    const cli = (...args: string[]) =>
+      spawnSync(join(process.cwd(), 'node_modules', '.bin', 'tsx'), [join(process.cwd(), 'packages', 'cli', 'src', 'index.ts'), 'sound', 'remove', ...args], { cwd: root, encoding: 'utf8' });
+
+    const removed = cli('vine-boom');
+    const unknown = cli('vine-boom');
+
+    expect(removed.status).toBe(0);
+    expect(removed.stdout).toMatch(/✔ vine-boom removed from the library/);
+    expect(existsSync(join(root, 'library', 'sounds', 'vine-boom'))).toBe(false);
+    expect(unknown.status).not.toBe(0);
+    expect(unknown.stderr + unknown.stdout).toMatch(/no library sound "vine-boom"/);
   });
 });
 

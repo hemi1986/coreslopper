@@ -266,6 +266,17 @@ export async function addLibrarySound(root: string, input: NewLibrarySound, now 
   }
 }
 
+/**
+ * CMD-RemoveLibrarySound (`sound remove`): delete a library sound's entry and
+ * its file (EVT-LibrarySoundRemoved). Memes that took it keep their takes
+ * (HS-260): nothing outside the library is touched. An unknown sound is refused.
+ */
+export async function removeLibrarySound(root: string, id: string): Promise<LibrarySound> {
+  const sound = await loadLibrarySound(root, id);
+  await rm(soundDir(root, id), { recursive: true, force: true });
+  return sound;
+}
+
 /** What `sound edit` may change; undefined keeps a field, an empty value clears an optional one. */
 export interface LibrarySoundChanges {
   title?: unknown;

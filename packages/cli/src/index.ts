@@ -845,6 +845,17 @@ sound
   );
 
 sound
+  .command('remove <id>')
+  .description('Delete a library sound and its file. A meme that took it keeps its take; the voice track only warns that its library sound is gone.')
+  .action((id: string) =>
+    run(async () => {
+      const { removeLibrarySound } = await import('./sound-library.js');
+      const sound = await removeLibrarySound(repoRoot(), id);
+      console.log(`✔ ${sound.id} removed from the library`);
+    }),
+  );
+
+sound
   .command('check')
   .description('Check the whole library after hand edits: an entry without its file, a file without an entry, the same file under two ids, a cue or trim outside the length. A swapped file is measured again and its sound.yaml rewritten; nothing is added or removed.')
   .action(() =>
