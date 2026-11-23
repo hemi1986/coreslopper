@@ -502,21 +502,21 @@ describe.skipIf(!hasFfmpeg())('sound check', () => {
     expect(stored.hash).not.toBe(await hashFileStream(wav));
   });
 
-  it('reports a file it cannot measure and still checks the others', async () => {
+  it('reports a file it cannot measure and still measures the next entry', async () => {
     const { root, files } = await workspace();
-    await addLibrarySound(root, { file: tone(join(files, 'boom.mp3'), 1.4), title: 'Vine Boom', useWhen: 'a dramatic reveal' });
+    await addLibrarySound(root, { file: tone(join(files, 'boom.mp3'), 1.4), title: 'Boom', useWhen: 'a dramatic reveal' });
     await addLibrarySound(root, { file: tone(join(files, 'scratch.mp3'), 0.9, 660), title: 'Record Scratch', useWhen: 'everything stops' });
-    await writeFile(soundWav(root, 'vine-boom'), 'not a wav at all');
+    // "boom" sorts before "vine-boom": the broken entry comes first, the sound one after it is still measured.
+    await writeFile(soundWav(root, 'boom'), 'not a wav at all');
     await rm(soundWav(root, 'record-scratch'));
+    tone(soundWav(root, 'record-scratch'), 2.0, 550);
 
     const check = await checkSoundLibrary(root);
 
-    expect(check.issues.map((issue) => [issue.kind, issue.id])).toEqual([
-      ['missing-file', 'record-scratch'],
-      ['invalid', 'vine-boom'],
-    ]);
+    expect(check.issues.map((issue) => [issue.kind, issue.id])).toEqual([['invalid', 'boom']]);
     // The message stays one line even though ffprobe reports over several.
-    expect(check.issues[1]?.message).toMatch(/cannot be measured: [^\n]+ – put its old file back/);
+    expect(check.issues[0]?.message).toMatch(/cannot be measured: [^\n]+ – put its old file back/);
+    expect(check.remeasured.map((sound) => sound.id)).toEqual(['record-scratch']);
   });
 
   it('reports the same file under two ids, and measures neither', async () => {
@@ -530,8 +530,12 @@ describe.skipIf(!hasFfmpeg())('sound check', () => {
 
     const check = await checkSoundLibrary(root);
 
-    expect(check.issues).toEqual([expect.objectContaining({ kind: 'duplicate', id: 'vine-boom-2' })]);
-    expect(check.issues[0]?.message).toMatch(/"vine-boom"/);
+    // Both entries are named: the content is stored twice, and neither version is blessed by a remeasure.
+    expect(check.issues.map((issue) => [issue.kind, issue.id])).toEqual([
+      ['duplicate', 'vine-boom'],
+      ['duplicate', 'vine-boom-2'],
+    ]);
+    expect(check.issues[0]?.message).toMatch(/"vine-boom-2"/);
     expect(check.remeasured).toEqual([]);
     expect((await loadLibrarySound(root, 'vine-boom-2')).hash).toBe('0'.repeat(64));
   });

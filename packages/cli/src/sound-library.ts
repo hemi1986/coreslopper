@@ -412,47 +412,38 @@ export async function checkSoundLibrary(root: string): Promise<SoundLibraryCheck
     entries.push({ id: entry.name, file: join(folder, LIBRARY_SOUND_ENTRY), wav: join(folder, LIBRARY_SOUND_FILE), sound, hash });
   }
 
-  // One sound, one entry: the same file content under a second id is reported, never written as a measurement.
-  const stored = new Map<string, string>();
+  // One sound, one entry: both entries holding the same file are named, and neither is measured again.
+  const byHash = new Map<string, string[]>();
+  for (const entry of entries) byHash.set(entry.hash, [...(byHash.get(entry.hash) ?? []), entry.id]);
   const shadowed = new Set<string>();
-  for (const entry of entries) {
-    const first = stored.get(entry.hash);
-    if (first === undefined) {
-      stored.set(entry.hash, entry.id);
-      continue;
+  for (const ids of byHash.values()) {
+    if (ids.length < 2) continue;
+    for (const id of ids) {
+      shadowed.add(id);
+      const others = ids.filter((other) => other !== id).map((other) => `"${other}"`).join(' and ');
+      issues.push({ kind: 'duplicate', id, message: `"${id}" holds the same file as ${others} – one sound, one entry; keep one of them` });
     }
-    shadowed.add(entry.id);
-    issues.push({ kind: 'duplicate', id: entry.id, message: `"${entry.id}" holds the same file as "${first}" – one sound, one entry; keep one of the two` });
   }
 
   for (const entry of entries) {
     if (shadowed.has(entry.id) || entry.hash === entry.sound.hash) continue;
     // The user swapped the file: measure it again (EVT-LibrarySoundRemeasured).
     let length: number;
-    try {
-      length = measureLength(entry.wav);
-    } catch (error) {
-      issues.push({ kind: 'invalid', id: entry.id, message: `"${entry.id}" is an entry whose ${LIBRARY_SOUND_FILE} cannot be measured: ${errorLine(error)} – put its old file back or replace it with a readable WAV` });
-      continue;
-    }
-    if (!(length > 0)) {
-      issues.push({ kind: 'invalid', id: entry.id, message: `"${entry.id}" has no measurable length: ${LIBRARY_SOUND_FILE} holds no audio – replace it with a readable WAV` });
-      continue;
-    }
-    const problems = librarySoundTimeProblems({ length, cue: entry.sound.cue, trim: entry.sound.trim });
-    if (problems.length) {
-      // Writing these would break the entry's own rule, so the check reports them and leaves the entry as it was.
-      for (const problem of problems) {
-        issues.push({
-          kind: problem.field === 'cue' ? 'cue-outside' : 'trim-outside',
-          id: entry.id,
-          message: `"${entry.id}": ${problem.message} after the file changed – the entry keeps what it had until sound edit fixes it`,
-        });
-      }
-      continue;
-    }
     let loudness: number;
     try {
+      length = measureLength(entry.wav);
+      const problems = librarySoundTimeProblems({ length, cue: entry.sound.cue, trim: entry.sound.trim });
+      if (problems.length) {
+        // Writing these would break the entry's own rule, so the check reports them and leaves the entry as it was.
+        for (const problem of problems) {
+          issues.push({
+            kind: problem.field === 'cue' ? 'cue-outside' : 'trim-outside',
+            id: entry.id,
+            message: `"${entry.id}": ${problem.message} after the file changed – the entry keeps what it had until sound edit fixes it`,
+          });
+        }
+        continue;
+      }
       loudness = measureLufs(length, entry.wav);
     } catch (error) {
       issues.push({ kind: 'invalid', id: entry.id, message: `"${entry.id}" is an entry whose ${LIBRARY_SOUND_FILE} cannot be measured: ${errorLine(error)} – put its old file back or replace it with a readable WAV` });
@@ -462,12 +453,25 @@ export async function checkSoundLibrary(root: string): Promise<SoundLibraryCheck
       issues.push({ kind: 'invalid', id: entry.id, message: `"${entry.id}" is silent: its loudness cannot be measured – put its old file back or replace it` });
       continue;
     }
+    // The measurement must belong to the file whose hash was read: a swap during the check would mix the two.
+    const still = await hashFileStream(entry.wav).catch(() => undefined);
+    if (still !== entry.hash) {
+      issues.push({ kind: 'invalid', id: entry.id, message: `"${entry.id}" changed while sound check ran – run it again` });
+      continue;
+    }
     // The new measurement replaces what the old file said; its original hash described a file the folder no longer holds.
     const measured = { ...entry.sound, length, loudness, hash: entry.hash };
     delete measured.original_hash;
-    await writeSound(entry.file, LibrarySoundSchema.parse(measured));
+    try {
+      await writeSound(entry.file, LibrarySoundSchema.parse(measured));
+    } catch (error) {
+      issues.push({ kind: 'invalid', id: entry.id, message: `"${entry.id}" could not be rewritten: ${errorLine(error)}` });
+      continue;
+    }
     remeasured.push({ id: entry.id, length, loudness, hash: entry.hash });
   }
+  // By id, so a check reads like the library and not like the passes it makes.
+  issues.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   return { issues, remeasured, checked: entries.length };
 }
 

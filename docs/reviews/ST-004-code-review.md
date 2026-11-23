@@ -55,5 +55,66 @@ Bug pass over the rest of the diff. No defects found:
   (tdd skill). Not a code defect – the tests themselves are sound – but it is why the duplicate and corrupt-file
   edges were never designed against.
 
-Verdict: fix blockers first
+Verdict of the first round (superseded by the second pass below): fix blockers first
 Most important finding: #1 – a corrupt or unreadable `sound.wav` makes `sound check` exit 1 with `✖ Could not read the duration …`, reporting nothing and leaving earlier entries rewritten; the command built to survive hand-edited media must report that entry as `invalid` instead.
+
+## Second pass
+
+Base: main · Commits: 8 · HEAD `54391fc` · Date: 2026-11-23
+
+Bug-focused pass over the current diff, mostly the rewritten two-pass check and the command layer. Re-ran at HEAD:
+`npx vitest run tests/sound-library.test.ts` (36 passed), `npm run typecheck` (clean), `check-language.ts` (OK),
+and `npx tsx packages/cli/src/index.ts sound check` on this repository (no library → hint, exit 0). The first half
+of this pass was written against `07396b9`; `d9afed2` (story Out of Scope) and `54391fc` (`errorLine`, the
+regression test) are folded in here, and every line number is at HEAD.
+
+The first pass's blocker and most minors are fixed: #1 (each read step is wrapped; the corrupt-file test proves the
+loop survives), #2 (duplicates are reported), #5 (code-unit comparator), #6 (the decision "a hidden name is never an
+entry" plus `INCOMING`), #8 (`original_hash` dropped), #10 (the `length > 0` guard is gone and `measureLufs` is the
+baseline expression again), #11 (tests for corrupt, duplicate, trim and id mismatch; the silent case now asserts
+the entry is untouched), #12 (`RemeasuredLibrarySound`), #13 (`--json` removed). Still open from the first pass:
+#3 and #4 – `d9afed2` now names both as Out of Scope in the story and points here: they stay open questions for
+the user, not defects against this story. The code is unchanged for them (`:429` still keys the remeasure on the
+hash, `:393` still reads `sound.wav` as a name). #7 (unlocked rewrite: the help text now says it rewrites, the
+missing lock and the lost comments remain), #9 (partly: the entry rules now go through `validateLibrarySoundEntry`,
+the add/check measurement pipeline still exists twice).
+
+The four questions:
+
+- **Ordering and double reports:** an entry never gets two issues and is never both rewritten and reported. A
+  pass-1 failure `continue`s before `entries.push` (`:383-413`), a duplicate is `shadowed` and skipped in pass 3
+  (`:429`), and every pass-3 `continue` follows its own issue. `remeasured` and `issues` are disjoint. What is not
+  right is the printed order: issues are concatenated per pass (pass 1, then duplicates, then pass 3), so a pass-3
+  issue for `alpha` prints after a pass-1 issue for `beta`. The entries are visited in code-unit order; the lines
+  are not, and `sound list` sorts by id. Deterministic, but not the order the commit claims (S2).
+- **The first entry of a duplicate pair** is measured and rewritten while the second is reported (S1). That is not
+  right: the check writes content it simultaneously calls a duplicate, and the blamed id is decided by folder
+  order, not by which hash moved.
+- **Rewritten and also reported:** never the same entry, but the same *content* – S1.
+- **Exit code:** no masking. `run()` sets 1 on a throw, nothing ever sets `process.exitCode = 0`
+  (`grep "exitCode = 0"` is empty), so a later failure keeps 1; the action sets it after `console.log`, the same
+  pattern as `doctor` and `watch` (`index.ts:383`, `:1370`). The only output lost is a throw *during* pass 3 (S3).
+
+| # | Severity | Area | File:line | Finding | Source (ADR, rule, glossary, smell) | Suggested direction |
+|---|---|---|---|---|---|---|
+| S1 | major | Two-pass logic | `packages/cli/src/sound-library.ts:415-426`, `:466-469` | `stored` keeps the first id of each hash group and `shadowed` only the later ones (`:418-425`); pass 3 skips only shadowed and hash-equal entries (`:429`). So the **first** member of a duplicate pair is measured and its `sound.yaml` is rewritten (`:468`) while only the **second** is reported. (a) The check writes the very content whose duplication it reports, contradicting its own comment at `:415` ("never written as a measurement") and the commit's claim. (b) The blamed/permitted id is whichever folder name sorts first: if the user swaps a file into `aaa` that matches `zzz`, the check prints `✔ aaa measured again` and `✖ "zzz" holds the same file as "aaa"` – the entry whose file did not move is named as the copy, and "keep one of the two" points at the wrong metadata. The common `cp -r vine-boom vine-boom-2` case happens to sort right, which hides it. (c) The duplicate test (`tests/sound-library.test.ts:522-537`) blanks the *shadowed* entry's hash and leaves the first unchanged, so it passes under either policy and never reaches the write; the acceptance probe (`ST-004-acceptance.md`, second round) replaced the shadowed entry's file for the same reason. | `AGG-LibrarySound` invariant 4; first pass #2 | Never write a member of a multi-id hash group; blame by evidence (the entry whose hash moved is the newcomer) and name both ids, or report on both and write neither. Add the swap-into-an-existing-entry case to the test. |
+| S2 | minor | Determinism / output | `packages/cli/src/sound-library.ts:383-413`, `:415-426`, `:428-470`, `:475-483` | The traversal is code-unit ordered, but the `issues` array is filled pass by pass: all pass-1 issues (folder order), then duplicate issues, then all pass-3 issues. An `alpha` that cannot be measured prints after a `beta` that has no `sound.yaml`, and `remeasured` lines always precede every issue. Deterministic, but different from `sound list`'s id order and from the commit's "the order is code-unit like sound list". The acceptance probe shows it: a corrupt `alpha` plus a `zulu` with a missing file reports `[["missing-file","zulu"],["invalid","alpha"]]` – `zulu` above `alpha`. | Review criterion "the check is deterministic"; consistency with `sound list` (`:519`) | Sort `issues` by id (stable within an id) before returning, or collect issues in one ordered pass; decide once whether the `✔` lines belong above a failing earlier id. |
+| S3 | minor | Safety on user data | `packages/cli/src/sound-library.ts:468` | The write is the one step in pass 3 without a `try`/`catch`. A read-only `sound.yaml`/folder or a full disk throws from `writeSound`; `run()` prints `✖ …`, exits 1, and the report for the entries already remeasured is never printed. That is the same "one broken entry ends the check" class the commit fixed for the read side. | Story commit "one broken entry never ends the check"; conventions.md "Errors are typed" | Wrap the write, push an `invalid` (or `not-written`) issue and continue; the entry keeps its old yaml, as the cue-outside branch already does. |
+| S4 | minor | Data correctness | `packages/cli/src/sound-library.ts:405-412` vs `:431-469` | Pass 1 hashes every `sound.wav`; pass 3 measures the file later and writes the entry with the **pass-1** hash (`:466`). If the file changes between the passes – plausible while the user is still dragging files in, which is when the check runs – the written `sound.yaml` carries a `length`/`loudness` of one file and the `hash` of another. The schema cannot see it; `POL-TakeChosenLibrarySounds` compares that hash to decide a take is stale, and `storedHashes` uses it for dedupe. The next check self-heals, but until then the entry is internally false. | `AGG-LibrarySound` invariants 4; `POL-TakeChosenLibrarySounds`; story "after hand edits" | Re-hash the WAV immediately before writing and use that value (write only if it still matches the pass-1 hash), or fold hash + measure + write into pass 3 and keep only ids in the duplicate map. |
+| S5 | minor | Output correctness / path leak | `packages/cli/src/media.ts:56-64` (used at `sound-library.ts:433`, `:456`) | `errorLine` (`:357-362`, `54391fc`) fixed the *message* – one line, 200 chars – but not the cause: ffprobe's stderr is inherited, not captured, because `execFileSync` without `stdio` writes the child's stderr to the parent. Running the corrupt-file test at HEAD still prints `/tmp/…/library/sounds/vine-boom/sound.wav: Invalid data found when processing input` to the terminal before the check prints its report, so the user gets a raw, unprefixed line with an absolute path above a report that otherwise contains only `✔`/`✖` lines (the command prints once, after the whole check). The issue line keeps the path too (only the tail is cut). `sound add` has the same leak on a degenerate file. | Review criterion "no internal IDs or paths on public pages"; UI/conventions.md "CLI messages are inline strings" | Pass `stdio: ['ignore', 'pipe', 'pipe']` in `probeDuration`; the thrown `ValidationError` already carries the path, so the check's own line loses nothing. |
+| S6 | minor | Duplication / leftovers | `packages/cli/src/sound-library.ts:434-436` vs `:457-459`, `:30`/`:379`, `:438` | New duplication and dead-ish code from the rewrite. The two pass-3 `catch` blocks produce character-for-character the same message; one "measure this entry" helper (also the remaining half of first-pass #9) would own it, and `errorLine` already shows what such a helper looks like. `INCOMING` (`:30`) is used only by `addLibrarySound` (`:224`), while the check filters on a bare `startsWith('.')` (`:379`) with a comment naming `.incoming-`, so the constant does not link the two and nothing enforces that the prefix starts with a dot. `if (!(length > 0))` (`:438`) is practically unreachable: `probeDuration` throws for a duration ≤ 0 (`media.ts:65-66`), so only a sub-half-millisecond file that rounds to 0 s reaches it – a guard carried over from the single-pass version. | Duplicated Code; Speculative Generality; first pass #6 and #9 | One measurement helper per entry; use `INCOMING` in the filter (or drop the constant and state the dot rule once); delete the length guard or explain the rounding case it covers. |
+| S7 | minor | Test quality | `tests/sound-library.test.ts:505-520` | At HEAD the test removes `record-scratch`'s WAV too, so it asserts one pass-1 issue (`missing-file`) and one pass-3 issue (`invalid`), in that order, plus that the message stays one line. It still does not pin that the check goes on: `record-scratch` sorts before `vine-boom` and is gone from `entries` after pass 1, so `vine-boom` is the **last** entry pass 3 processes – a `return` or early stop right after its failure leaves the test green. The commit message ("pin that the check goes on") claims more than the test does, and the acceptance probe (a corrupt `alpha` plus a `zulu` with a missing file that sorts after it) does not close the gap either: `zulu` is found in pass 1, before `alpha` is measured, so nothing runs after `alpha` in pass 3. The acceptance review itself records the same gap. What the test does pin is that a measurement failure is reported instead of thrown (the original defect). | tdd skill (the test must check the "Then" its name promises); first pass S1's missing case | Make the broken entry sort first (`alpha`) and put a second pass-3 case after it – another unmeasurable WAV, or a swapped, measurable one that must appear in `remeasured` – then assert both. Add the duplicate-first case of S1. |
+
+Bug pass over the rest of `07396b9`…`54391fc`. No defects found: the duplicate map is keyed on the actual WAV hash
+(not the stored one), so a stale `sound.yaml` cannot create a false duplicate; `checked` is `entries.length` and is
+only printed when nothing failed, so it cannot understate a checked library; a missing library, an empty library
+and a library of only hidden folders all reach the hint with exit 0; `delete measured.original_hash` before
+`LibrarySoundSchema.parse` leaves a valid entry; `errorLine` takes the last non-empty line and truncates to 200
+characters – for the three call sites the thrown value is a one-line `ValidationError`/fs error or a `Command
+failed: …` block whose last line is the real reason, so it loses nothing the check promised (it does not fix the
+inherited stderr, S5); `validateLibrarySoundEntry` is now the single place for the schema/id/WAV rules and its
+missing-WAV branch is unreachable after the check's own guard (harmless); the `RemeasuredLibrarySound` rename and
+the `--json` removal left no orphaned imports or callers; `d9afed2` only edits the story.
+
+Verdict: fix blockers first (no new blocker; one major, S1)
+Most important finding: S1 – the duplicate pass still measures and rewrites the first entry of a duplicate pair, so `sound check` writes content it simultaneously reports as a duplicate and blames whichever id sorts second.
