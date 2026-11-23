@@ -2,17 +2,11 @@
 
 > Generated from `docs/stories/ST-*.md` – **do not edit manually**. Change the story files instead.
 
-**Progress: 11 of 24 domain stories done** · scenarios 40 of 80
+**Progress: 12 of 24 domain stories done** · scenarios 44 of 80
 
-**42 stories** · In Progress: 1 · Ready: 19 · Ready for Human Review: 0 · In Review: 1 · Draft: 0 · Done: 21 · Superseded: 0
+**42 stories** · In Progress: 0 · Ready: 19 · Ready for Human Review: 0 · In Review: 1 · Draft: 0 · Done: 22 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
-
-## In Progress
-
-| ID | Title | Type | Context | Priority | Size | Risk | Depends on |
-|---|---|---|---|---|---|---|---|
-| [ST-012](ST-012-a-shot-lands-on-the-sound-cue.md) | A shot lands on a sound's cue | domain | Storyboard | should | – | – | ST-011 |
 
 ## Ready
 
@@ -68,4 +62,5 @@ Within each section: by priority, then by story ID, with dependencies pulled in 
 | [ST-038](ST-038-local-lip-sync-by-default-in-comfyui-projects.md) | ComfyUI projects lip-sync locally by default | task | – | must | – | – | – |
 | [ST-003](ST-003-remove-a-library-sound.md) | Remove a library sound | domain | Sound library | should | – | – | ST-001 |
 | [ST-004](ST-004-check-the-sound-library.md) | Check the sound library after hand edits | domain | Sound library | should | – | – | ST-001 |
+| [ST-012](ST-012-a-shot-lands-on-the-sound-cue.md) | A shot lands on a sound's cue | domain | Storyboard | should | – | – | ST-011 |
 | [ST-039](ST-039-restart-comfyui-only-when-stuck.md) | Restart ComfyUI only when it is stuck | task | – | should | – | – | – |
