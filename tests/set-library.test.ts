@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { addLibrarySet, entryDir, loadLibrarySet } from '../packages/cli/src/set-library.ts';
@@ -30,5 +30,13 @@ describe('adding a library set by hand', () => {
     expect(entry).toMatchObject({ id: 'neon-bar', name: 'Neon Bar', description: 'a narrow bar in blue neon', prompt: 'narrow bar, blue neon, wet counter', origin: 'manual', refs: [], plates: [] });
     expect(await loadLibrarySet(ws, 'neon-bar')).toEqual(entry);
     expect(await validateChangedFile(join(entryDir(ws, 'neon-bar'), 'set.yaml'))).toBe('library set');
+  });
+
+  it('ST-024: A taken id is refused', async () => {
+    const ws = await workspace();
+    await addLibrarySet(ws, neonBar);
+    await expect(addLibrarySet(ws, { name: 'Neon Bar', description: 'another bar', prompt: 'bar' })).rejects.toThrow(/neon-bar/);
+    expect(await readdir(join(ws, 'library', 'sets'))).toEqual(['neon-bar']);
+    expect((await loadLibrarySet(ws, 'neon-bar')).description).toBe('a narrow bar in blue neon');
   });
 });
