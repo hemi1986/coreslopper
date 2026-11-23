@@ -327,10 +327,10 @@ export async function soundUses(root: string): Promise<Map<string, string[]>> {
     const file = join(dir, 'takes.json');
     if (!existsSync(file)) continue;
     const raw = await readFile(file, 'utf8')
-      .then((content) => JSON.parse(content) as { takes?: Record<string, { source?: unknown }> } | null)
+      .then((content) => JSON.parse(content) as { takes?: Record<string, { source?: unknown }>; ambience?: Record<string, { source?: unknown }> } | null)
       // An unreadable takes.json is the voice track's business; here it uses nothing.
       .catch(() => null);
-    for (const take of Object.values(raw?.takes ?? {})) {
+    for (const take of [...Object.values(raw?.takes ?? {}), ...Object.values(raw?.ambience ?? {})]) {
       const id = typeof take?.source === 'string' ? libraryTakeSoundId(take.source) : undefined;
       if (!id) continue;
       const slugs = uses.get(id) ?? new Set<string>();

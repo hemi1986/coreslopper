@@ -451,8 +451,9 @@ export async function boardProject(projectRoot: string, root: string, options: {
   const profile = (platform: string) => channel?.links[platform]?.url ?? channel?.links[platform]?.handle;
   const hashtagCount = (caption: string, tags: string[]) => tags.length + (caption.match(/#[\p{L}\p{N}_]+/gu)?.length ?? 0);
   const main = data?.main;
+  const meme = input.kind === 'meme';
   const thumbs = files.thumbnails.map((path, index) => ({ label: index === 0 ? b.upload : b.alt(index + 1), path, kind: 'image' as const }));
-  const announcement = announcementText(input);
+  const announcement = meme ? undefined : announcementText(input);
 
   // YouTube
   const youtube: BoardPost[] = [];
@@ -464,18 +465,18 @@ export async function boardProject(projectRoot: string, root: string, options: {
     id: 'youtube',
     heading: heading('youtube', b.master),
     at: at('youtube'),
-    files: [...file(b.master, files.master), ...thumbs, ...file(b.subtitles, files.subtitles)],
+    files: [...file(b.master, files.master), ...(meme ? file(b.cover, files.cover) : []), ...thumbs, ...file(b.subtitles, files.subtitles)],
     fields: [
       ...field(b.title, main?.title, { limit: limits.youtube.title, unit: 'chars' }),
       ...field(b.description, description, { limit: limits.youtube.description_bytes, unit: 'bytes' }),
       ...field(b.hashtags, main?.hashtags.join(', ')),
       ...field(b.tags, main?.tags.join(', '), { limit: limits.youtube.tags, unit: 'chars' }),
-      ...field(b.pinned, main?.pinned_comment),
+      ...field(b.pinned, meme ? undefined : main?.pinned_comment),
     ],
-    checklist: [input.premiere ? b.premiere : b.publish, b.synthetic, b.kids, b.category, b.endscreen],
+    checklist: meme ? [b.publish, b.synthetic, b.kids] : [input.premiere ? b.premiere : b.publish, b.synthetic, b.kids, b.category, b.endscreen],
     url: true,
   });
-  if (main?.community_post) youtube.push({ id: 'community', heading: heading('community', l.community), at: at('community'), files: file(b.upload, files.thumbnails[0]), fields: field(b.text, main.community_post), checklist: [], url: true });
+  if (!meme && main?.community_post) youtube.push({ id: 'community', heading: heading('community', l.community), at: at('community'), files: file(b.upload, files.thumbnails[0]), fields: field(b.text, main.community_post), checklist: [], url: true });
   if (music) {
     youtube.push({
       id: 'links',
@@ -504,17 +505,19 @@ export async function boardProject(projectRoot: string, root: string, options: {
       url: false,
     });
   }
-  const firstStory = data?.shorts.find((short) => short.instagram?.story)?.instagram?.story;
-  instagramPosts.push({
-    id: 'story',
-    heading: heading('story', l.ig.story),
-    at: at('story'),
-    files: [...(files.story ? file(b.storyImage, files.story) : file(b.thumb, files.shorts[0]?.thumbnail)), ...file(b.video, files.shorts[0]?.video)],
-    fields: field(b.story, firstStory),
-    checklist: [b.sticker],
-    pointer: videoUrl,
-  });
-  if (data?.instagram_post) {
+  const firstStory = meme ? undefined : data?.shorts.find((short) => short.instagram?.story)?.instagram?.story;
+  if (!meme) {
+    instagramPosts.push({
+      id: 'story',
+      heading: heading('story', l.ig.story),
+      at: at('story'),
+      files: [...(files.story ? file(b.storyImage, files.story) : file(b.thumb, files.shorts[0]?.thumbnail)), ...file(b.video, files.shorts[0]?.video)],
+      fields: field(b.story, firstStory),
+      checklist: [b.sticker],
+      pointer: videoUrl,
+    });
+  }
+  if (!meme && data?.instagram_post) {
     const caption = [data.instagram_post.caption.trim(), data.instagram_post.hashtags.join(' ')].filter(Boolean).join('\n\n');
     instagramPosts.push({
       id: 'instagram-post',
@@ -530,10 +533,10 @@ export async function boardProject(projectRoot: string, root: string, options: {
       url: true,
     });
   }
-  if (announcement && data?.x) {
+  if (!meme && announcement && data?.x) {
     xPosts.push({ id: 'announce:x', heading: heading('announce:x', l.announce.heading), at: at('announce:x'), files: files.teaser ? file(b.teaserFile, files.teaser) : files.announcePost ? file(b.announcePost, files.announcePost) : file(b.cover, files.cover), fields: field(b.post, announcement, { limit: limits.x.post, unit: 'chars', counting: 'x' }), checklist: [], url: true });
   }
-  if (data?.x) {
+  if (!meme && data?.x) {
     const texts = xTexts(data.x, videoUrl);
     xPosts.push({
       id: 'x',
@@ -641,7 +644,7 @@ export async function boardProject(projectRoot: string, root: string, options: {
   }
 
   // LinkedIn
-  const li = data?.linkedin;
+  const li = meme ? undefined : data?.linkedin;
   const linkedin: BoardPost[] = [];
   if (li?.decision === 'post') {
     const text = linkedinPostText(li, videoUrl);
@@ -659,8 +662,8 @@ export async function boardProject(projectRoot: string, root: string, options: {
 
   // Microsite
   const lyrics = music && existsSync(project.paths.lyrics) ? plainLyrics(await readFile(project.paths.lyrics, 'utf8')) : undefined;
-  const microsite = data?.microsite ? micrositeSong(input, { status, calendar, lyrics }) : undefined;
-  const micrositePosts: BoardPost[] = data?.microsite
+  const microsite = !meme && data?.microsite ? micrositeSong(input, { status, calendar, lyrics }) : undefined;
+  const micrositePosts: BoardPost[] = !meme && data?.microsite
     ? [
         {
           id: 'microsite',
@@ -691,7 +694,7 @@ export async function boardProject(projectRoot: string, root: string, options: {
     },
     { id: 'microsite', label: 'Microsite', notes: notes.microsite, posts: micrositePosts },
   ];
-  const autopilot = await boardAutopilot({ root, projectRoot: project.paths.root, calendar, status, schedule, manifest: Boolean(manifest), data: Boolean(data), now: options.now });
+  const autopilot = await boardAutopilot({ root, projectRoot: project.paths.root, calendar, status, schedule, manifest: Boolean(manifest), data: Boolean(data), premiere: input.premiere, now: options.now });
   return {
     autopilot,
     slug: project.config.slug,
@@ -719,6 +722,8 @@ export async function boardAutopilot(options: {
   schedule: Awaited<ReturnType<typeof loadReleaseSchedule>>;
   manifest: boolean;
   data: boolean;
+  /** Whether the main video goes out as a Premiere; a meme is a Short (default: the schedule's flag). */
+  premiere?: boolean;
   now?: Date;
   env?: NodeJS.ProcessEnv;
 }): Promise<BoardAutopilot> {
@@ -733,7 +738,7 @@ export async function boardAutopilot(options: {
   if (!options.calendar) blockers.push('no release calendar yet: run release');
   const log = await loadAutopilotLog(options.projectRoot);
   const plans = options.calendar
-    ? planAutopilot({ calendar: options.calendar, status: options.status, log, settings, now, ready, premiere: options.schedule.release.premiere })
+    ? planAutopilot({ calendar: options.calendar, status: options.status, log, settings, now, ready, premiere: options.premiere ?? options.schedule.release.premiere })
     : [];
   const events: Record<string, BoardAutopilotEvent> = {};
   for (const plan of plans) {

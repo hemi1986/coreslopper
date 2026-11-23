@@ -204,6 +204,8 @@ describe('TODO detection and text limits', () => {
     expect(errors).toContain('instagram: caption has');
     const long = UploadDataSchema.parse({ ...memeUploadYaml(), main: { ...memeUploadYaml().main, description: 'x'.repeat(5001) } });
     expect(platformTextProblems(long, platformLimits(), { kind: 'meme' }).errors.join('\n')).toContain('youtube short: description has');
+    const tagged = UploadDataSchema.parse({ ...memeUploadYaml(), main: { ...memeUploadYaml().main, tags: ['x'.repeat(501)] } });
+    expect(platformTextProblems(tagged, platformLimits(), { kind: 'meme' }).errors.join('\n')).toContain('youtube short: tags have');
   });
 
   it('lays out per-platform texts in the project language with channel links and TODOs', () => {
@@ -557,6 +559,16 @@ describe('release folder', () => {
     }
   });
 
+  it('credits a library sound once, also when it was taken twice and as ambience', async () => {
+    const credit = 'Boom by Jane Doe (CC BY 4.0)';
+    const { dir, root } = await memeFixture({ credit });
+    const take = { source: 'library:vine-boom', duration: 1.4, text_hash: 'prank' };
+    await writeFile(join(dir, 'takes.json'), JSON.stringify({ version: 1, takes: { one: take, two: take, gone: { ...take, source: 'library:gone' } }, ambience: { room: take } }));
+    const result = await buildRelease({ projectDir: dir, root, deps: fakeDeps() });
+    const youtube = await readFile(join(result.dir, 'texts', 'youtube.md'), 'utf8');
+    expect(youtube.match(/Boom by Jane Doe/g)).toHaveLength(1);
+  });
+
   it('checks the meme caption with its credits, and plans it as a Short, not a Premiere', async () => {
     const { dir, root } = await memeFixture({ credit: 'x'.repeat(2200) });
     const result = await buildRelease({ projectDir: dir, root, deps: fakeDeps() });
@@ -652,6 +664,42 @@ describe('release board', () => {
     const youtube = board.platforms.find((platform) => platform.id === 'youtube')!;
     expect(youtube.posts.find((post) => post.id === 'youtube')!.fields.find((field) => field.label === 'Description')?.value).toContain(credit);
     expect(board.calendar.find((event) => event.step === 'youtube')?.label).toBe('Post the video as a YouTube Short (texts/youtube.md)');
+  });
+
+  it("does not ask the user to act on a meme's scheduled Short", async () => {
+    vi.stubEnv('YOUTUBE_CLIENT_ID', 'id');
+    vi.stubEnv('YOUTUBE_CLIENT_SECRET', 'secret');
+    vi.stubEnv('YOUTUBE_REFRESH_TOKEN', 'refresh');
+    const { dir, root } = await memeFixture();
+    await buildRelease({ projectDir: dir, root, deps: fakeDeps() });
+    const calendar = (await loadCalendar(dir))!;
+    await writeFile(
+      join(dir, 'review', 'release-status.json'),
+      JSON.stringify({ version: 1, approval: { at: '2026-12-01T00:00:00Z', release_date: calendar.release_date }, items: {} }),
+    );
+    await writeFile(
+      join(dir, 'review', 'autopilot.json'),
+      JSON.stringify({ version: 1, entries: [{ event: 'youtube', status: 'scheduled', at: '2026-12-10T17:00:00Z', remote_id: 'abcdefghijk', publish_at: '2026-12-11T17:00:00Z' }] }),
+    );
+    const board = await boardProject(dir, root, { now: new Date('2026-12-11T19:10:00Z') });
+    expect(board.autopilot.events.youtube).toMatchObject({ state: 'pending', needsUser: false });
+    vi.unstubAllEnvs();
+  });
+
+  it("shows no music-video posts for a meme", async () => {
+    const { dir, root } = await memeFixture({ withMusicVideoParts: true });
+    await buildRelease({ projectDir: dir, root, deps: fakeDeps() });
+    const board = await boardProject(dir, root);
+    const ids = board.platforms.flatMap((platform) => platform.posts.map((post) => post.id));
+    for (const id of ['community', 'announce:instagram', 'announce:youtube', 'announce:x', 'story', 'instagram-post', 'x', 'linkedin', 'microsite']) {
+      expect(ids).not.toContain(id);
+    }
+    const main = board.platforms.find((platform) => platform.id === 'youtube')!.posts.find((post) => post.id === 'youtube')!;
+    expect(main.files.map((entry) => entry.path)).toContain('cover/office-prank-1080x1920.jpg');
+    expect(main.checklist).toHaveLength(3);
+    expect(main.checklist.join(' ')).toContain('Planen oder veröffentlichen zur Kalenderzeit');
+    expect(main.checklist.join(' ')).not.toMatch(/Kategorie|Abspann/);
+    expect(main.fields.map((field) => field.label)).not.toContain('Angepinnter Kommentar');
   });
 
   it('plans the calendar during release and lays out every platform with files, texts, and limits', async () => {

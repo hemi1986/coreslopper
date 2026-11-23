@@ -232,7 +232,7 @@ async function runProject(dir: string, slug: string, options: AutopilotOptions, 
       settings,
       now: deps.now(),
       ready,
-      premiere: context.schedule.release.premiere,
+      premiere: context.input.premiere,
     });
   };
   if (!context.calendar || !approvalHolds(context.status, context.calendar)) {
@@ -266,7 +266,7 @@ async function runProject(dir: string, slug: string, options: AutopilotOptions, 
         settings,
         now: deps.now(),
         ready,
-        premiere: context.schedule.release.premiere,
+        premiere: context.input.premiere,
       }).find((entry) => entry.id === item.id);
       if (fresh?.state !== 'due') return undefined;
       await appendAutopilotEntryUnlocked(dir, { event: item.id, status: 'running', at: deps.now().toISOString() });
@@ -318,7 +318,8 @@ export const COMMENT_EVENT = 'youtube:comment';
  * a plain failure, which is retried up to `retries` times.
  */
 async function ensurePinnedComment(dir: string, context: Context, deps: AutopilotDeps, ready: Record<string, boolean>) {
-  const pinned = context.data?.main.pinned_comment;
+  // A meme is posted as a Short: its one text is the caption, not a pinned comment under a main video.
+  const pinned = context.input.kind === 'meme' ? undefined : context.data?.main.pinned_comment;
   const settings = context.schedule.autopilot;
   const item = context.status.items.youtube;
   if (!pinned || !item?.done || item.manual || !settings.platforms.includes('youtube') || !ready.youtube) return undefined;
@@ -518,7 +519,7 @@ export async function autopilotOverview(root: string, options: { now?: Date; env
     if (!context.calendar) continue;
     const settings = context.schedule.autopilot;
     const { ready, notes } = autopilotReadiness(settings, options.env, now);
-    const plans = planAutopilot({ calendar: context.calendar, status: context.status, log: await loadAutopilotLog(dir), settings, now, ready, premiere: context.schedule.release.premiere });
+    const plans = planAutopilot({ calendar: context.calendar, status: context.status, log: await loadAutopilotLog(dir), settings, now, ready, premiere: context.input.premiere });
     log(`${context.input.slug}: ${context.status.approval ? `approved ${context.status.approval.at.slice(0, 10)}` : 'not approved'} (release ${context.calendar.release_date})`);
     for (const plan of plans) {
       const when = plan.event.at.slice(0, 16).replace('T', ' ');

@@ -288,6 +288,12 @@ export function memeCaption(data: Pick<UploadData, 'main'> | undefined, credits:
   return [main?.description.trim() ?? '', ...credits, main?.hashtags.join(' ') ?? ''].filter(Boolean).join('\n\n');
 }
 
+/** The hashtags a meme's platform post carries: the list plus any the description already holds (credits are not counted). */
+export function memeHashtags(data: Pick<UploadData, 'main'> | undefined): number {
+  const main = data?.main;
+  return (main?.hashtags.length ?? 0) + (main?.description.match(/#[\p{L}\p{N}_]+/gu)?.length ?? 0);
+}
+
 /**
  * Limit and completeness problems of the platform texts in the upload data:
  * `errors` break a limit, `missing` are texts the skill still has to write.
@@ -307,8 +313,10 @@ export function platformTextProblems(
     const caption = memeCaption(data, options.credits);
     if (chars(main.title) > limits.youtube.title) errors.push(`youtube short: title has ${chars(main.title)} characters, limit ${limits.youtube.title}`);
     if (Buffer.byteLength(caption) > limits.youtube.description_bytes) errors.push(`youtube short: description has ${Buffer.byteLength(caption)} bytes, limit ${limits.youtube.description_bytes}`);
+    const tags = main.tags.join(', ');
+    if (chars(tags) > limits.youtube.tags) errors.push(`youtube short: tags have ${chars(tags)} characters, limit ${limits.youtube.tags}`);
     if (chars(caption) > limits.tiktok.caption) errors.push(`tiktok: caption has ${chars(caption)} characters, limit ${limits.tiktok.caption}`);
-    const hashtags = caption.match(/#[\p{L}\p{N}_]+/gu)?.length ?? 0;
+    const hashtags = memeHashtags(data);
     if (hashtags > limits.tiktok.hashtags) errors.push(`tiktok: ${hashtags} hashtags, limit ${limits.tiktok.hashtags}`);
     if (chars(caption) > limits.instagram.caption) errors.push(`instagram: caption has ${chars(caption)} characters, limit ${limits.instagram.caption}`);
     if (hashtags > limits.instagram.hashtags) errors.push(`instagram: ${hashtags} hashtags, limit ${limits.instagram.hashtags}`);

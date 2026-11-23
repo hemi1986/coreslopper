@@ -2,6 +2,7 @@ import {
   TODO,
   chapterTime,
   memeCaption as captionOf,
+  memeHashtags,
   type CalendarEvent,
   type ChannelConfig,
   type Chapter,
@@ -870,7 +871,7 @@ function memeTiktokText(input: ReleaseTextInput, l: Labels): string {
 
 function memeInstagramText(input: ReleaseTextInput, l: Labels): string {
   const caption = memeCaption(input);
-  const tags = caption.match(/#[\p{L}\p{N}_]+/gu)?.length ?? 0;
+  const tags = memeHashtags(input.data);
   const lines = [`# ${l.meme.instagram}`, '', `**${l.file}:** \`${memeFile(input, l)}\``];
   if (input.files.cover) lines.push(l.meme.cover(input.files.cover));
   lines.push('', `### ${l.ig.caption} (${l.chars(count(caption), input.limits.instagram.caption)}, ${tags}/${input.limits.instagram.hashtags} ${l.hashtags})`, '', ...block(caption || l.todo('main.description')));

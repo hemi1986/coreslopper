@@ -339,7 +339,7 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
     const cover = join(project.paths.root, MEME_COVER_SOURCE);
     if (existsSync(cover)) {
       files.cover = `cover/${slug}-1080x1920.jpg`;
-      await writer.place(cover, files.cover, 'cover', { width: 1080, height: 1920, format: 'jpeg' });
+      await writer.place(cover, files.cover, 'cover', { width: 1080, height: 1920, format: 'jpeg', color: 'rgb' });
     } else todos.push(`${MEME_COVER_SOURCE} is missing: compose it with thumbnail --format 9x16 --out ${MEME_COVER_SOURCE}`);
   }
 

@@ -35,10 +35,10 @@ export interface BoardOptions {
 }
 
 /** The quick refresh after a live URL arrives: texts and microsite data, no renders, no new stills; an internal project has none. */
-async function quickRelease(projectDir: string): Promise<void> {
+async function quickRelease(projectDir: string, root: string): Promise<void> {
   if (!releasedPublicly((await loadProject(projectDir)).config)) return;
   const { buildRelease } = await import('./release.js');
-  await buildRelease({ projectDir, render: false, stills: false, deps: { log: () => undefined } });
+  await buildRelease({ projectDir, root, render: false, stills: false, deps: { log: () => undefined } });
 }
 
 const MIME: Record<string, string> = {
@@ -158,7 +158,7 @@ async function serveMedia(req: IncomingMessage, res: ServerResponse, base: strin
 export function boardHandler(options: BoardOptions = {}) {
   const root = options.root ?? repoRoot();
   const now = options.now ?? (() => new Date());
-  const refresh = options.refresh ?? quickRelease;
+  const refresh = options.refresh ?? ((projectDir: string) => quickRelease(projectDir, root));
   // One refresh per project at a time; a change during a refresh queues one more.
   const refreshing = new Map<string, Promise<void>>();
   const scheduleRefresh = (dir: string) => {

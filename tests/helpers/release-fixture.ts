@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, readFile, readdir, cp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, relative } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { parse, stringify } from 'yaml';
 import { ProjectConfigSchema, ReleaseManifestSchema, createInitialState } from '../../packages/core/src/index.ts';
 import type { ReleaseDeps } from '../../packages/cli/src/release.ts';
@@ -287,7 +287,7 @@ export async function diskTree(dir: string): Promise<string[]> {
   const entries = await readdir(dir, { recursive: true, withFileTypes: true });
   return entries
     .filter((entry) => entry.isFile())
-    .map((entry) => relative(dir, join(entry.parentPath, entry.name)))
+    .map((entry) => relative(dir, join(entry.parentPath, entry.name)).split(sep).join('/'))
     .sort();
 }
 
