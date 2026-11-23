@@ -27,7 +27,7 @@ import { boardProject } from '../packages/cli/src/release-board-data.ts';
 import { appendAutopilotEntry } from '../packages/cli/src/autopilot-state.ts';
 import { boardHandler } from '../packages/cli/src/release-board.ts';
 import { timerPlan } from '../packages/cli/src/release-timer.ts';
-import { cleanupFixtures, fakeDeps, fixture } from './helpers/release-fixture.ts';
+import { cleanupFixtures, fakeDeps, fixture, memeFixture } from './helpers/release-fixture.ts';
 
 afterEach(async () => {
   vi.unstubAllEnvs();
@@ -54,15 +54,16 @@ const ENV = {
 };
 
 /** An approved release with the mock adapters and a clock the test moves. */
-async function setup(options: { env?: Record<string, string> } = {}) {
+async function setup(options: { env?: Record<string, string>; meme?: boolean } = {}) {
   // The board reads the credentials from the environment, like the workspace's .env.
   for (const [key, value] of Object.entries({ ...ENV, ...options.env })) vi.stubEnv(key, value);
-  const dir = await fixture();
-  await buildRelease({ projectDir: dir, deps: fakeDeps() });
-  const root = join(dir, '..', '..');
+  const made = options.meme ? await memeFixture() : undefined;
+  const dir = made ? made.dir : await fixture();
+  const root = made ? made.root : join(dir, '..', '..');
+  await buildRelease({ projectDir: dir, root, deps: fakeDeps() });
   const calendar = (await loadCalendar(dir))!;
   const at = (id: string) => Date.parse(calendar.events.find((event) => event.id === id)!.at);
-  const clock = { now: new Date(at('distributor')) };
+  const clock = { now: new Date(calendar.events[0]!.at) };
   const youtube = new MockPublisher('youtube');
   const tiktok = new MockPublisher('tiktok');
   const social = new Map<SocialPlatform, MockSocialAdapter>(['x', 'linkedin', 'instagram'].map((platform) => [platform as SocialPlatform, new MockSocialAdapter(platform as SocialPlatform)]));
@@ -122,6 +123,20 @@ describe('release autopilot', () => {
     const youtube = (await boardProject(t.dir, t.root, { now: t.clock.now })).autopilot.events['youtube']!;
     expect(youtube).toMatchObject({ state: 'pending', needsUser: true });
     expect(youtube.manualSteps[0]).toMatch(/still makes it public at 2026-12-11T17:00:00.000Z.*studio\.youtube\.com\/video\/abcdefghijk/);
+  });
+
+  it('posts a meme as a YouTube Short, a TikTok, and an Instagram Reel', async () => {
+    const t = await setup({ meme: true });
+    await approveRelease(t.dir, { root: t.root, now: new Date(t.at('youtube')) });
+    t.moveTo('youtube');
+    await t.run();
+    expect(t.publishCalls.map((call) => call.platform).sort()).toEqual(['tiktok', 'youtube']);
+    t.moveTo('instagram');
+    await t.run();
+    const reel = t.social.get('instagram')!.calls.find((call) => call.event === 'instagram')!;
+    expect(reel).toMatchObject({ placement: 'reel' });
+    expect(reel.text).toContain('He printed the report anyway.');
+    expect(reel.media?.path).toMatch(/video\/office-prank-9x16\.mp4$/);
   });
 
   it('runs a whole release: announcement, uploads ahead, posts after the video is public, the links step', async () => {

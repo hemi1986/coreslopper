@@ -547,7 +547,8 @@ describe('release folder', () => {
     expect(files.filter((path) => path.startsWith('texts/')).sort()).toEqual(['texts/instagram.md', 'texts/release-plan.md', 'texts/tiktok.md', 'texts/youtube.md']);
     const calendar = await loadCalendar(dir);
     expect(calendar).toBeDefined();
-    expect(calendar?.events.filter((event) => event.step === 'announce')).toEqual([]);
+    expect(calendar?.events.map((event) => event.id)).toEqual(['youtube', 'tiktok', 'instagram']);
+    expect(calendar?.events.filter((event) => event.step === 'announce' || event.step === 'story')).toEqual([]);
   });
 
   it('ST-015: A sound that needs a credit is credited', async () => {
@@ -686,11 +687,14 @@ describe('release board', () => {
     vi.unstubAllEnvs();
   });
 
-  it("shows no music-video posts for a meme", async () => {
-    const { dir, root } = await memeFixture({ withMusicVideoParts: true });
+  it("shows a meme's three posts with the credit, and no music-video posts", async () => {
+    const credit = 'Boom by Jane Doe (CC BY 4.0)';
+    const { dir, root } = await memeFixture({ credit, withMusicVideoParts: true });
     await buildRelease({ projectDir: dir, root, deps: fakeDeps() });
     const board = await boardProject(dir, root);
+    expect(board.platforms.map((platform) => platform.id)).toEqual(['youtube', 'tiktok', 'instagram']);
     const ids = board.platforms.flatMap((platform) => platform.posts.map((post) => post.id));
+    expect(ids.sort()).toEqual(['instagram', 'tiktok', 'youtube']);
     for (const id of ['community', 'announce:instagram', 'announce:youtube', 'announce:x', 'story', 'instagram-post', 'x', 'linkedin', 'microsite']) {
       expect(ids).not.toContain(id);
     }
@@ -700,6 +704,10 @@ describe('release board', () => {
     expect(main.checklist.join(' ')).toContain('Planen oder veröffentlichen zur Kalenderzeit');
     expect(main.checklist.join(' ')).not.toMatch(/Kategorie|Abspann/);
     expect(main.fields.map((field) => field.label)).not.toContain('Angepinnter Kommentar');
+    for (const platform of ['tiktok', 'instagram']) {
+      const post = board.platforms.find((entry) => entry.id === platform)!.posts[0]!;
+      expect(post.fields.map((field) => field.value).join(' ')).toContain(credit);
+    }
   });
 
   it('plans the calendar during release and lays out every platform with files, texts, and limits', async () => {

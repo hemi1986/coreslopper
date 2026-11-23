@@ -40,7 +40,7 @@ import { acquireHolderLock } from './file-lock.js';
 import { loadStatus, runCalendar, statusPath, updateStatus, withReleaseLock } from './release-calendar.js';
 import { micrositeSong } from './release-microsite.js';
 import { probeVideo } from './short.js';
-import { announcementText, feedVideo, linkedinPostText, mediaFile, xTexts } from './release-texts.js';
+import { announcementText, feedVideo, linkedinPostText, mediaFile, memeCaption, xTexts } from './release-texts.js';
 
 export { appendAutopilotEntry, autopilotLogPath, autopilotReadiness, loadAutopilotLog } from './autopilot-state.js';
 
@@ -450,16 +450,22 @@ async function act(dir: string, item: AutopilotEventPlan, context: Context, deps
   let request: SocialPostRequest;
   if (action.kind === 'instagram') {
     if (action.placement === 'reel') {
-      const short = data.shorts.find((entry) => entry.name === action.item);
-      const video = files.shorts.find((entry) => entry.name === action.item)?.video;
-      if (!short?.instagram || !video) throw new ValidationError(`no Instagram text or video for ${action.item}`);
-      request = {
-        event: item.id,
-        text: [short.instagram.caption.trim(), short.instagram.hashtags.join(' ')].filter(Boolean).join('\n\n'),
-        media: { path: file(video)!, kind: 'video' },
-        placement: 'reel',
-        ...(short.instagram.cover_frame !== undefined ? { coverOffsetMs: Math.round(short.instagram.cover_frame * 1000) } : {}),
-      };
+      if (context.input.kind === 'meme' && action.item === 'main') {
+        // A meme's one video is its Reel: the same caption with the credits as the folder text.
+        if (!files.master) throw new ValidationError('no 9:16 video in the release folder');
+        request = { event: item.id, text: memeCaption(context.input), media: { path: file(files.master)!, kind: 'video' }, placement: 'reel' };
+      } else {
+        const short = data.shorts.find((entry) => entry.name === action.item);
+        const video = files.shorts.find((entry) => entry.name === action.item)?.video;
+        if (!short?.instagram || !video) throw new ValidationError(`no Instagram text or video for ${action.item}`);
+        request = {
+          event: item.id,
+          text: [short.instagram.caption.trim(), short.instagram.hashtags.join(' ')].filter(Boolean).join('\n\n'),
+          media: { path: file(video)!, kind: 'video' },
+          placement: 'reel',
+          ...(short.instagram.cover_frame !== undefined ? { coverOffsetMs: Math.round(short.instagram.cover_frame * 1000) } : {}),
+        };
+      }
     } else if (action.placement === 'feed') {
       if (!data.instagram_post) throw new ValidationError('instagram_post is missing in review/upload.yaml');
       const video = feedVideo(context.input);

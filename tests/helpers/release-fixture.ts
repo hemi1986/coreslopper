@@ -158,6 +158,7 @@ export function memeUploadYaml() {
       description: 'He printed the report anyway.',
       hashtags: ['#officeprank'],
       tags: ['office prank'],
+      platforms: ['youtube', 'tiktok'],
     },
   };
 }

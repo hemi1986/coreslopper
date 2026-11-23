@@ -10,6 +10,7 @@ import {
   loadProject,
   loadReleaseSchedule,
   scheduleZoneWarning,
+  memeHashtags,
   platformLimits,
   plainLyrics,
   planAutopilot,
@@ -607,6 +608,27 @@ export async function boardProject(projectRoot: string, root: string, options: {
       });
     }
   }
+  if (meme) {
+    // One video, three posts: the same caption with its credits on TikTok and Instagram Reels.
+    tiktokPosts.push({
+      id: 'tiktok',
+      heading: heading('tiktok', l.meme.tiktok),
+      at: at('tiktok'),
+      files: [...file(b.video, files.master), ...file(b.cover, files.cover)],
+      fields: field(b.description, description, { limit: limits.tiktok.caption, unit: 'chars' }),
+      checklist: [b.ttCover, b.ttAi, b.publish],
+      url: true,
+    });
+    instagramPosts.push({
+      id: 'instagram',
+      heading: heading('instagram', l.meme.instagram),
+      at: at('instagram'),
+      files: [...file(b.video, files.master), ...file(b.cover, files.cover)],
+      fields: field(b.caption, description, { limit: limits.instagram.caption, unit: 'chars', note: `${memeHashtags(data)}/${limits.instagram.hashtags} Hashtags` }),
+      checklist: [b.igCover(undefined), b.igAi, b.publish],
+      url: true,
+    });
+  }
   const order = (posts: BoardPost[]) => posts.sort((a, c) => (a.at && c.at ? Date.parse(a.at) - Date.parse(c.at) : a.at ? -1 : c.at ? 1 : 0));
 
   // Spotify and the distributor
@@ -677,23 +699,29 @@ export async function boardProject(projectRoot: string, root: string, options: {
       ]
     : [];
 
-  const platforms: BoardPlatform[] = [
-    { id: 'youtube', label: 'YouTube', profile: profile('youtube'), notes: notes.youtube, posts: order(youtube) },
-    { id: 'shorts', label: 'YouTube Shorts', profile: profile('youtube'), notes: notes.shorts, posts: order(shortsPosts) },
-    { id: 'tiktok', label: 'TikTok', profile: profile('tiktok'), notes: [...notes.tiktok, notes.legal], posts: order(tiktokPosts) },
-    { id: 'instagram', label: 'Instagram', profile: profile('instagram'), notes: [...notes.instagram, notes.legal], posts: order(instagramPosts) },
-    ...(music ? [{ id: 'spotify' as const, label: 'Spotify & Distributor', profile: profile('spotify'), notes: notes.spotify, posts: spotify }] : []),
-    { id: 'x', label: 'X', profile: profile('x'), notes: notes.x, posts: order(xPosts) },
-    {
-      id: 'linkedin',
-      label: 'LinkedIn',
-      profile: profile('linkedin'),
-      notes: notes.linkedin,
-      skipped: !li ? b.noLinkedin : li.decision === 'skip' ? `${b.skipLinkedin}: ${li.reason}` : undefined,
-      posts: linkedin,
-    },
-    { id: 'microsite', label: 'Microsite', notes: notes.microsite, posts: micrositePosts },
-  ];
+  const platforms: BoardPlatform[] = meme
+    ? [
+        { id: 'youtube', label: 'YouTube', profile: profile('youtube'), notes: notes.youtube, posts: order(youtube) },
+        { id: 'tiktok', label: 'TikTok', profile: profile('tiktok'), notes: [...notes.tiktok, notes.legal], posts: order(tiktokPosts) },
+        { id: 'instagram', label: 'Instagram', profile: profile('instagram'), notes: [...notes.instagram, notes.legal], posts: order(instagramPosts) },
+      ]
+    : [
+        { id: 'youtube', label: 'YouTube', profile: profile('youtube'), notes: notes.youtube, posts: order(youtube) },
+        { id: 'shorts', label: 'YouTube Shorts', profile: profile('youtube'), notes: notes.shorts, posts: order(shortsPosts) },
+        { id: 'tiktok', label: 'TikTok', profile: profile('tiktok'), notes: [...notes.tiktok, notes.legal], posts: order(tiktokPosts) },
+        { id: 'instagram', label: 'Instagram', profile: profile('instagram'), notes: [...notes.instagram, notes.legal], posts: order(instagramPosts) },
+        ...(music ? [{ id: 'spotify' as const, label: 'Spotify & Distributor', profile: profile('spotify'), notes: notes.spotify, posts: spotify }] : []),
+        { id: 'x', label: 'X', profile: profile('x'), notes: notes.x, posts: order(xPosts) },
+        {
+          id: 'linkedin',
+          label: 'LinkedIn',
+          profile: profile('linkedin'),
+          notes: notes.linkedin,
+          skipped: !li ? b.noLinkedin : li.decision === 'skip' ? `${b.skipLinkedin}: ${li.reason}` : undefined,
+          posts: linkedin,
+        },
+        { id: 'microsite', label: 'Microsite', notes: notes.microsite, posts: micrositePosts },
+      ];
   const autopilot = await boardAutopilot({ root, projectRoot: project.paths.root, calendar, status, schedule, manifest: Boolean(manifest), data: Boolean(data), premiere: input.premiere, now: options.now });
   return {
     autopilot,

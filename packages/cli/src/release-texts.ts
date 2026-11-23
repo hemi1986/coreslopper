@@ -131,9 +131,9 @@ interface Labels {
     ics: string;
   };
   cal: {
-    steps: Record<'distributor' | 'pitch' | 'canvas' | 'song' | 'artist-pick' | 'youtube' | 'youtube-short' | 'premiere' | 'community' | 'story' | 'page' | 'links', string>;
+    steps: Record<'distributor' | 'pitch' | 'canvas' | 'song' | 'artist-pick' | 'youtube' | 'youtube-short' | 'premiere' | 'community' | 'story' | 'reel' | 'page' | 'links', string>;
     announce: Record<'instagram' | 'youtube' | 'x', string>;
-    post: Record<'instagram' | 'x' | 'linkedin', string>;
+    post: Record<'instagram' | 'tiktok' | 'x' | 'linkedin', string>;
     short: (name: string, platform: string) => string;
     platforms: Record<'distributor' | 'spotify' | 'youtube' | 'shorts' | 'tiktok' | 'instagram' | 'x' | 'linkedin' | 'microsite', string>;
   };
@@ -256,11 +256,12 @@ const EN: Labels = {
       premiere: 'Main video as a YouTube Premiere (youtube.md)',
       community: 'YouTube post about the video',
       story: 'Instagram story with a link sticker to the video',
+      reel: 'Post the video as an Instagram Reel (texts/instagram.md)',
       page: 'Publish the song page on the microsite',
       links: 'Add the Spotify link to the YouTube description and the pinned comment',
     },
     announce: { instagram: 'Announcement: Instagram story', youtube: 'Announcement: YouTube post', x: 'Announcement on X' },
-    post: { instagram: 'Instagram feed post', x: 'Post on X with the video; YouTube link in the reply', linkedin: 'LinkedIn post' },
+    post: { instagram: 'Instagram feed post', tiktok: 'Post the video on TikTok (texts/tiktok.md)', x: 'Post on X with the video; YouTube link in the reply', linkedin: 'LinkedIn post' },
     short: (name, platform) => `${name} on ${platform}`,
     platforms: { distributor: 'Distributor', spotify: 'Spotify', youtube: 'YouTube', shorts: 'YouTube Shorts', tiktok: 'TikTok', instagram: 'Instagram', x: 'X', linkedin: 'LinkedIn', microsite: 'Microsite' },
   },
@@ -434,11 +435,12 @@ const DE: Labels = {
       premiere: 'Hauptvideo als YouTube-Premiere (youtube.md)',
       community: 'YouTube-Post zum Video',
       story: 'Instagram-Story mit Link-Sticker zum Video',
+      reel: 'Das Video als Instagram Reel posten (texts/instagram.md)',
       page: 'Song-Seite auf der Microsite veröffentlichen',
       links: 'Spotify-Link in YouTube-Beschreibung und angepinnten Kommentar eintragen',
     },
     announce: { instagram: 'Ankündigung: Instagram-Story', youtube: 'Ankündigung: YouTube-Post', x: 'Ankündigung auf X' },
-    post: { instagram: 'Instagram-Feed-Post', x: 'Post auf X mit Video; YouTube-Link als Antwort', linkedin: 'LinkedIn-Beitrag' },
+    post: { instagram: 'Instagram-Feed-Post', tiktok: 'Das Video auf TikTok posten (texts/tiktok.md)', x: 'Post auf X mit Video; YouTube-Link als Antwort', linkedin: 'LinkedIn-Beitrag' },
     short: (name, platform) => `${name} auf ${platform}`,
     platforms: { distributor: 'Distributor', spotify: 'Spotify', youtube: 'YouTube', shorts: 'YouTube Shorts', tiktok: 'TikTok', instagram: 'Instagram', x: 'X', linkedin: 'LinkedIn', microsite: 'Microsite' },
   },
@@ -729,7 +731,7 @@ export function calendarEventLabel(
 ): string {
   if (event.step === 'short') return l.cal.short(event.item, l.cal.platforms[event.platform]);
   if (event.step === 'announce') return l.cal.announce[event.platform as 'instagram' | 'youtube' | 'x'] ?? `${l.announce.heading}: ${l.cal.platforms[event.platform]}`;
-  if (event.step === 'post') return l.cal.post[event.platform as 'instagram' | 'x' | 'linkedin'] ?? l.cal.platforms[event.platform];
+  if (event.step === 'post') return l.cal.post[event.platform as 'instagram' | 'tiktok' | 'x' | 'linkedin'] ?? l.cal.platforms[event.platform];
   if (event.step === 'youtube' && kind === 'meme') return l.cal.steps['youtube-short'];
   if (event.step === 'youtube' && premiere) return l.cal.steps.premiere;
   return l.cal.steps[event.step as keyof Labels['cal']['steps']] ?? event.step;

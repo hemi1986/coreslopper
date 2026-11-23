@@ -15,8 +15,8 @@ A meme (`kind: meme`) takes this path instead of sections 1–8: it has no thumb
      --out projects/<slug>/renders/cover-1080x1920.jpg
    ```
 
-2. Write `review/upload.yaml` with `version`, `language`, and `main` only: `file: renders/9x16.mp4`, the title (the YouTube Shorts title), the description (the Reel and TikTok caption body, without hashtags), `hashtags`, and `tags`. `release` lays the same text out three times and ignores the music-video entries.
-3. `npm run cli -- release projects/<slug> --no-render` writes `renders/release/`: `video/<slug>-9x16.mp4`, `cover/<slug>-1080x1920.jpg`, and `texts/youtube.md`, `texts/tiktok.md`, `texts/instagram.md`, `texts/release-plan.md`. Every platform text carries the `credit` of each library sound the meme took (`takes.json` → `library/sounds/<id>/sound.yaml`).
+2. Write `review/upload.yaml` with `version`, `language`, and `main` only: `file: renders/9x16.mp4`, the title (the YouTube Shorts title), the description (the Reel and TikTok caption body, without hashtags), `hashtags`, `tags`, and `platforms: [youtube, tiktok]`. `release` lays the same text out three times and ignores the music-video entries.
+3. `npm run cli -- release projects/<slug> --no-render` writes `renders/release/`: `video/<slug>-9x16.mp4`, `cover/<slug>-1080x1920.jpg`, and `texts/youtube.md`, `texts/tiktok.md`, `texts/instagram.md`, `texts/release-plan.md`. Every platform text carries the `credit` of each library sound the meme took (`takes.json` → `library/sounds/<id>/sound.yaml`). The release calendar plans the three posts — YouTube Shorts, TikTok, and Instagram Reels — on the release day, with no story and no announcement.
 4. `npm run cli -- qa projects/<slug>` reports no FAIL; `Release cover`, `Release formats`, and `Release texts` are PASS.
 
 Done when the folder holds the video, the cover, and the three platform texts, and `qa` reports no FAIL in the release checks.
