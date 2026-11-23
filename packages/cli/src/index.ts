@@ -789,7 +789,23 @@ character
 
 const set = program
   .command('set')
-  .description('The workspace set library (library/sets/<id>/): new, add-file.');
+  .description('The workspace set library (library/sets/<id>/): import, new, add-file.');
+
+set
+  .command('import <target>')
+  .description('Take the sets of a project or series canon into the library: new entries, or new files and plates for entries they came from. Runs by itself when style-character is done.')
+  .option('--series', 'The target is a series canon')
+  .option('--id <set>', 'Only this set')
+  .option('--into <library-id>', 'Merge into this library entry (an earlier copy of the same set)')
+  .action((target: string, options: { series?: boolean; id?: string; into?: string }) =>
+    run(async () => {
+      const { importSets } = await import('./set-library.js');
+      const dir = options.series ? seriesDirFromArg(target) : projectDirFromArg(target);
+      const results = await importSets(repoRoot(), dir, { set: options.id, into: options.into });
+      if (!results.length) console.log('No set with files to take into the library.');
+      for (const result of results) printSetImport(result);
+    }),
+  );
 
 set
   .command('new')
@@ -909,8 +925,17 @@ sound
   );
 
 function printImport(result: { character: string; id: string; created: boolean; added: string[]; missing: string[] }): void {
+  printLibraryImport(result.character, result);
+}
+
+function printSetImport(result: { set: string; id: string; created: boolean; added: string[]; missing: string[] }): void {
+  printLibraryImport(result.set, result);
+}
+
+/** What an import took in: one line per item, and the source files it could not find. */
+function printLibraryImport(label: string, result: { id: string; created: boolean; added: string[]; missing: string[] }): void {
   const what = result.created ? `new entry ${result.id}` : result.added.length ? `${result.id}: ${result.added.join(', ')}` : `${result.id}: nothing new`;
-  console.log(`✔ ${result.character} → ${what}`);
+  console.log(`✔ ${label} → ${what}`);
   if (result.missing.length) console.log(`  missing in the source: ${result.missing.join(', ')}`);
 }
 
