@@ -846,13 +846,13 @@ sound
 
 sound
   .command('check')
-  .description('Check the whole library after hand edits: an entry without its file, a file without an entry, a cue or trim outside the length; a swapped file is measured again, nothing is added or removed.')
-  .option('--json', 'Print the issues and the remeasured sounds as JSON')
-  .action((options: { json?: boolean }) =>
+  .description('Check the whole library after hand edits: an entry without its file, a file without an entry, the same file under two ids, a cue or trim outside the length. A swapped file is measured again and its sound.yaml rewritten; nothing is added or removed.')
+  .action(() =>
     run(async () => {
       const { checkSoundLibrary, soundCheckLines } = await import('./sound-library.js');
       const check = await checkSoundLibrary(repoRoot());
-      console.log(options.json ? JSON.stringify(check, null, 2) : soundCheckLines(check).join('\n'));
+      console.log(soundCheckLines(check).join('\n'));
+      if (check.issues.length) process.exitCode = 1;
     }),
   );
 

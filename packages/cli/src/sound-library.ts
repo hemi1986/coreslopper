@@ -26,6 +26,9 @@ import { probeDuration, resolveBinary } from './media.js';
 
 const ID = /^[a-z0-9][a-z0-9_-]*$/;
 
+/** The folder `sound add` converts into before it renames it to the id. */
+const INCOMING = '.incoming-';
+
 export const soundLibraryRoot = (root: string) => join(root, 'library', 'sounds');
 export const soundDir = (root: string, id: string) => join(soundLibraryRoot(root), checkId(id));
 const soundFile = (root: string, id: string) => join(soundDir(root, id), LIBRARY_SOUND_ENTRY);
@@ -189,7 +192,7 @@ function measureLength(wav: string): number {
 
 /** Integrated loudness in LUFS; a sound shorter than the loudness window is looped up to it. */
 function measureLufs(length: number, wav: string): number {
-  const loops = length > 0 && length < LOUDNESS_WINDOW ? Math.ceil(LOUDNESS_WINDOW / length) - 1 : 0;
+  const loops = length < LOUDNESS_WINDOW ? Math.ceil(LOUDNESS_WINDOW / length) - 1 : 0;
   return Math.round(measureLoudness(wav, loops).lufs * 10) / 10;
 }
 
@@ -218,7 +221,7 @@ export async function addLibrarySound(root: string, input: NewLibrarySound, now 
   };
 
   await mkdir(soundLibraryRoot(root), { recursive: true });
-  const incoming = await mkdtemp(join(soundLibraryRoot(root), '.incoming-'));
+  const incoming = await mkdtemp(join(soundLibraryRoot(root), INCOMING));
   try {
     const wav = join(incoming, LIBRARY_SOUND_FILE);
     convertToWav(input.file, wav);
@@ -325,7 +328,7 @@ export async function updateLibrarySound(root: string, id: string, changes: Libr
 }
 
 /** EVT-LibrarySoundRemeasured: a file the user swapped, measured again. */
-export interface RemeasuredSound {
+export interface RemeasuredLibrarySound {
   id: string;
   length: number;
   loudness: number;
@@ -335,11 +338,13 @@ export interface RemeasuredSound {
 /** The result of `sound check`: what is broken, and what it measured again. */
 export interface SoundLibraryCheck {
   issues: SoundLibraryIssue[];
-  remeasured: RemeasuredSound[];
+  remeasured: RemeasuredLibrarySound[];
+  /** How many entries the check looked at. */
+  checked: number;
 }
 
 /** EVT-SoundLibraryChecked: what `sound check` found, by kind. */
-export type SoundLibraryIssueKind = 'missing-file' | 'missing-entry' | 'cue-outside' | 'trim-outside' | 'invalid';
+export type SoundLibraryIssueKind = 'missing-file' | 'missing-entry' | 'duplicate' | 'cue-outside' | 'trim-outside' | 'invalid';
 
 export interface SoundLibraryIssue {
   kind: SoundLibraryIssueKind;
@@ -351,19 +356,24 @@ export interface SoundLibraryIssue {
 
 /**
  * CMD-CheckSoundLibrary (`sound check`): after hand edits, look at the whole
- * library – an entry without its file, a file or folder without an entry, a cue
- * or trim outside the length (EVT-SoundLibraryChecked). A file the user swapped
- * is measured again (EVT-LibrarySoundRemeasured); nothing is ever added or
- * removed here.
+ * library – an entry without its file, a file or folder without an entry, the
+ * same file under two ids, a cue or trim outside the length, an entry that does
+ * not load or measure (EVT-SoundLibraryChecked). A file the user swapped is
+ * measured again (EVT-LibrarySoundRemeasured); nothing is ever added or
+ * removed, and one unreadable entry never ends the check.
  */
 export async function checkSoundLibrary(root: string): Promise<SoundLibraryCheck> {
   const issues: SoundLibraryIssue[] = [];
-  const remeasured: RemeasuredSound[] = [];
+  const remeasured: RemeasuredLibrarySound[] = [];
   const dir = soundLibraryRoot(root);
-  if (!existsSync(dir)) return { issues, remeasured };
-  for (const entry of (await readdir(dir, { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name))) {
-    // The `.incoming-` folder of a running `sound add` is not part of the library.
-    if (entry.name.startsWith('.')) continue;
+  if (!existsSync(dir)) return { issues, remeasured, checked: 0 };
+  const names = (await readdir(dir, { withFileTypes: true }))
+    // A hidden name is never a library entry: the `.incoming-` folder of a running sound add, editor droppings.
+    .filter((entry) => !entry.name.startsWith('.'))
+    // Code-unit order, as `sound list`, so the check prints the same order on every machine.
+    .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  const entries: { id: string; file: string; wav: string; sound: LibrarySound; hash: string }[] = [];
+  for (const entry of names) {
     const folder = join(dir, entry.name);
     if (!entry.isDirectory()) {
       issues.push({ kind: 'missing-entry', id: entry.name, message: `"${entry.name}" is a file without an entry next to the folders – sound add <file> --title … stores it in its own folder` });
@@ -377,48 +387,81 @@ export async function checkSoundLibrary(root: string): Promise<SoundLibraryCheck
       issues.push({ kind: 'missing-file', id: entry.name, message: `"${entry.name}" is an entry without a file: ${LIBRARY_SOUND_FILE} is missing from its folder – copy it back or remove the entry` });
       continue;
     }
-    // The entry loads with its own id, or it is broken in a way the load names.
+    // The rules of a hand edit: the schema, the id is the folder's name, the WAV is there (CMD-ValidateLibrarySound).
     let sound: LibrarySound;
     try {
-      sound = await loadLibrarySound(root, entry.name);
+      sound = await validateLibrarySoundEntry(join(folder, LIBRARY_SOUND_ENTRY));
     } catch (error) {
       issues.push({ kind: 'invalid', id: entry.name, message: `"${entry.name}" is an entry that does not load: ${(error as Error).message}` });
       continue;
     }
-    if (sound.id !== entry.name) {
-      issues.push({ kind: 'invalid', id: entry.name, message: `"${entry.name}" is an entry that does not load: sound.yaml says id "${sound.id}", but the id must be the folder name` });
+    let hash: string;
+    try {
+      hash = await hashFileStream(join(folder, LIBRARY_SOUND_FILE));
+    } catch (error) {
+      issues.push({ kind: 'invalid', id: entry.name, message: `"${entry.name}" is an entry whose ${LIBRARY_SOUND_FILE} cannot be read: ${(error as Error).message}` });
       continue;
     }
-    const wav = join(folder, LIBRARY_SOUND_FILE);
-    const hash = await hashFileStream(wav);
-    if (hash === sound.hash) continue;
+    entries.push({ id: entry.name, file: join(folder, LIBRARY_SOUND_ENTRY), wav: join(folder, LIBRARY_SOUND_FILE), sound, hash });
+  }
+
+  // One sound, one entry: the same file content under a second id is reported, never written as a measurement.
+  const stored = new Map<string, string>();
+  const shadowed = new Set<string>();
+  for (const entry of entries) {
+    const first = stored.get(entry.hash);
+    if (first === undefined) {
+      stored.set(entry.hash, entry.id);
+      continue;
+    }
+    shadowed.add(entry.id);
+    issues.push({ kind: 'duplicate', id: entry.id, message: `"${entry.id}" holds the same file as "${first}" – one sound, one entry; keep one of the two` });
+  }
+
+  for (const entry of entries) {
+    if (shadowed.has(entry.id) || entry.hash === entry.sound.hash) continue;
     // The user swapped the file: measure it again (EVT-LibrarySoundRemeasured).
-    const length = measureLength(wav);
-    if (!(length > 0)) {
-      issues.push({ kind: 'invalid', id: entry.name, message: `"${entry.name}" has no measurable length: ${LIBRARY_SOUND_FILE} holds no audio` });
+    let length: number;
+    try {
+      length = measureLength(entry.wav);
+    } catch (error) {
+      issues.push({ kind: 'invalid', id: entry.id, message: `"${entry.id}" is an entry whose ${LIBRARY_SOUND_FILE} cannot be measured: ${(error as Error).message} – put its old file back or replace it with a readable WAV` });
       continue;
     }
-    const problems = librarySoundTimeProblems({ length, cue: sound.cue, trim: sound.trim });
+    if (!(length > 0)) {
+      issues.push({ kind: 'invalid', id: entry.id, message: `"${entry.id}" has no measurable length: ${LIBRARY_SOUND_FILE} holds no audio – replace it with a readable WAV` });
+      continue;
+    }
+    const problems = librarySoundTimeProblems({ length, cue: entry.sound.cue, trim: entry.sound.trim });
     if (problems.length) {
       // Writing these would break the entry's own rule, so the check reports them and leaves the entry as it was.
       for (const problem of problems) {
         issues.push({
           kind: problem.field === 'cue' ? 'cue-outside' : 'trim-outside',
-          id: entry.name,
-          message: `"${entry.name}": ${problem.message} after the file changed – the entry keeps what it had until sound edit fixes it`,
+          id: entry.id,
+          message: `"${entry.id}": ${problem.message} after the file changed – the entry keeps what it had until sound edit fixes it`,
         });
       }
       continue;
     }
-    const loudness = measureLufs(length, wav);
-    if (!Number.isFinite(loudness)) {
-      issues.push({ kind: 'invalid', id: entry.name, message: `"${entry.name}" is silent: its loudness cannot be measured – put its old file back or add a new one with sound add` });
+    let loudness: number;
+    try {
+      loudness = measureLufs(length, entry.wav);
+    } catch (error) {
+      issues.push({ kind: 'invalid', id: entry.id, message: `"${entry.id}" is an entry whose ${LIBRARY_SOUND_FILE} cannot be measured: ${(error as Error).message} – put its old file back or replace it with a readable WAV` });
       continue;
     }
-    await writeSound(join(folder, LIBRARY_SOUND_ENTRY), LibrarySoundSchema.parse({ ...sound, length, loudness, hash }));
-    remeasured.push({ id: entry.name, length, loudness, hash });
+    if (!Number.isFinite(loudness)) {
+      issues.push({ kind: 'invalid', id: entry.id, message: `"${entry.id}" is silent: its loudness cannot be measured – put its old file back or replace it` });
+      continue;
+    }
+    // The new measurement replaces what the old file said; its original hash described a file the folder no longer holds.
+    const measured = { ...entry.sound, length, loudness, hash: entry.hash };
+    delete measured.original_hash;
+    await writeSound(entry.file, LibrarySoundSchema.parse(measured));
+    remeasured.push({ id: entry.id, length, loudness, hash: entry.hash });
   }
-  return { issues, remeasured };
+  return { issues, remeasured, checked: entries.length };
 }
 
 /** The output of `sound check`: what it measured again, then every issue, or one line when the library is fine. */
@@ -427,7 +470,9 @@ export function soundCheckLines(check: SoundLibraryCheck): string[] {
     ...check.remeasured.map((sound) => `✔ ${sound.id} measured again: ${sound.length} s, ${sound.loudness} LUFS`),
     ...check.issues.map((issue) => `✖ ${issue.message}`),
   ];
-  return lines.length ? lines : ['✔ The sound library is fine: every entry has its file, every file an entry, and every cue and trim lies inside its sound.'];
+  if (lines.length) return lines;
+  if (!check.checked) return ['The library has no sounds yet. `sound add <file> --title <title> --use-when <text>` adds one.'];
+  return [`✔ The sound library is fine: ${check.checked} ${check.checked === 1 ? 'entry' : 'entries'}, every entry has its file, every file an entry, and every cue and trim lies inside its sound.`];
 }
 
 /** RM-SoundLibrary: a library sound and the projects whose takes came from it. */
