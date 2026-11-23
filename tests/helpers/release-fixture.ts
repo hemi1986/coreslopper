@@ -234,6 +234,52 @@ export async function memeFixture(options: { licence?: string; credit?: string; 
   return { dir, root };
 }
 
+/**
+ * The upload data of an episode in German: its 9:16 video on YouTube and the
+ * announcement a week before.
+ */
+export function episodeUploadYaml() {
+  return {
+    version: 1,
+    language: 'de',
+    main: {
+      file: 'renders/9x16.mp4',
+      title: 'After Midnight',
+      description: 'Eine Nachricht kurz vor Geschäftsschluss.',
+      hashtags: ['#nightdesk'],
+      tags: ['night desk'],
+      platforms: ['youtube'],
+    },
+    announcement: { text: 'Freitag: After Midnight.', hashtags: ['#nightdesk'] },
+  };
+}
+
+/**
+ * An episode workspace: the demo's `projects/demo-episode/` beside its series
+ * canon, with the cover recipe and the upload data a release composes its
+ * images from. The episode has no song: its language is the one in
+ * `review/upload.yaml`.
+ */
+export async function episodeFixture(): Promise<{ dir: string; root: string }> {
+  const base = await mkdtemp(join(tmpdir(), 'coreslopper-release-episode-'));
+  temporary.push(base);
+  const root = join(base, 'workspace');
+  await cp(join(process.cwd(), 'projects', 'demo-series'), join(root, 'projects', 'demo-series'), { recursive: true });
+  const dir = join(root, 'projects', 'demo-episode');
+  await cp(join(process.cwd(), 'projects', 'demo-episode'), dir, { recursive: true });
+  await mkdir(join(dir, 'renders', 'thumbnails'), { recursive: true });
+  for (const name of ['a', 'b', 'c']) await writeFile(join(dir, 'renders', 'thumbnails', `${name}.jpg`), jpeg(1280, 720));
+  await mkdir(join(dir, 'assets', 'image'), { recursive: true });
+  await writeFile(join(dir, 'assets', 'image', 'hero.png'), 'still');
+  await writeFile(
+    join(dir, 'renders', 'cover-3000x3000.recipe.json'),
+    JSON.stringify({ version: 1, still: 'assets/image/hero.png', format: '1x1', text: 'AFTER MIDNIGHT', focus: '0.5,0.35' }),
+  );
+  await mkdir(join(dir, 'review'), { recursive: true });
+  await writeFile(join(dir, 'review', 'upload.yaml'), stringify(episodeUploadYaml()));
+  return { dir, root };
+}
+
 export interface FakeDeps extends Partial<ReleaseDeps> {
   ffmpegCalls: string[][];
   renders: string[];
