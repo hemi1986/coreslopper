@@ -803,7 +803,7 @@ set
       const library = await import('./set-library.js');
       const root = repoRoot();
       const entry = await library.addLibrarySet(root, options);
-      console.log(`✔ ${entry.id} in ${relative(process.cwd(), library.entryDir(root, entry.id)) || '.'}`);
+      console.log(`✔ ${entry.id} in ${relative(process.cwd(), library.setEntryDir(root, entry.id)) || '.'}`);
     }),
   );
 

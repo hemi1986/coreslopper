@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdtemp, readdir, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { addLibrarySet, entryDir, loadLibrarySet } from '../packages/cli/src/set-library.ts';
+import { addLibrarySet, loadLibrarySet, setEntryDir } from '../packages/cli/src/set-library.ts';
 import { validateChangedFile } from '../packages/cli/src/validate-file.ts';
 
 const temporary: string[] = [];
@@ -29,16 +29,27 @@ describe('adding a library set by hand', () => {
     const entry = await addLibrarySet(ws, neonBar, new Date('2026-11-23T10:00:00Z'));
 
     expect(entry).toMatchObject({ id: 'neon-bar', name: 'Neon Bar', description: 'a narrow bar in blue neon', prompt: 'narrow bar, blue neon, wet counter', origin: 'manual', refs: [], plates: [] });
-    expect(await loadLibrarySet(ws, 'neon-bar')).toEqual(entry);
-    expect(await validateChangedFile(join(entryDir(ws, 'neon-bar'), 'set.yaml'))).toBe('library set');
+    expect(await loadLibrarySet(ws, 'neon-bar')).toMatchObject({ id: 'neon-bar', name: 'Neon Bar', description: 'a narrow bar in blue neon', prompt: 'narrow bar, blue neon, wet counter', origin: 'manual', added: '2026-11-23T10:00:00.000Z', refs: [], plates: [], tags: [], history: [] });
+    expect(await validateChangedFile(join(setEntryDir(ws, 'neon-bar'), 'set.yaml'))).toBe('library set');
   });
 
   it('ST-024: A taken id is refused', async () => {
     const ws = await workspace();
     await addLibrarySet(ws, neonBar);
-    await expect(addLibrarySet(ws, { name: 'Neon Bar', description: 'another bar', prompt: 'bar' })).rejects.toThrow(/neon-bar/);
+    await expect(addLibrarySet(ws, { name: 'Neon Bar', description: 'another bar', prompt: 'bar' })).rejects.toThrow(/already/);
     expect(await readdir(join(ws, 'library', 'sets'))).toEqual(['neon-bar']);
     expect((await loadLibrarySet(ws, 'neon-bar')).description).toBe('a narrow bar in blue neon');
+  });
+
+  it('refuses a folder with unnamed files, but reuses an empty one', async () => {
+    const ws = await workspace();
+    await mkdir(join(ws, 'library', 'sets', 'neon-bar'), { recursive: true });
+    await expect(addLibrarySet(ws, neonBar)).resolves.toMatchObject({ id: 'neon-bar' });
+
+    const other = await workspace();
+    await mkdir(join(other, 'library', 'sets', 'neon-bar'), { recursive: true });
+    await writeFile(join(other, 'library', 'sets', 'neon-bar', 'stray.png'), 'not named by set.yaml');
+    await expect(addLibrarySet(other, neonBar)).rejects.toThrow(/already/);
   });
 
   it('ST-024: A set without a prompt is refused', async () => {
