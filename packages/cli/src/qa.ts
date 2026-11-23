@@ -341,7 +341,7 @@ async function releasePackageChecks(paths: { root: string; renders: string; revi
       ...shorts.checks,
       await checkUploadText(paths.review, paths.root, shorts.names),
       await checkUploadData(paths.root, shorts.names),
-      ...(await releaseChecks(paths.root)),
+      ...(await releaseChecks(paths.root, undefined, { root: repoRoot() })),
     ],
     thumbnails: thumbnails.files,
     shorts: shorts.files,

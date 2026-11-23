@@ -296,10 +296,20 @@ export function memeCaption(data: Pick<UploadData, 'main'> | undefined, credits:
   return [memeDescription(data, credits), main?.hashtags.join(' ') ?? ''].filter(Boolean).join('\n\n');
 }
 
-/** Whether a licence asks for attribution: the Creative Commons BY family (BY, BY-SA, BY-NC, BY-ND), or a licence named for it. */
+/** Whether a licence is unknown: unset, blank, or a value that starts with "unknown" (e.g. "unknown – ask Jane"). */
+export function licenceUnknown(licence: string | undefined): boolean {
+  const text = licence?.trim().toLowerCase() ?? '';
+  return !text || /^unknown\b/.test(text);
+}
+
+/**
+ * Whether a licence asks for attribution: the Creative Commons BY family under
+ * any of its names (CC BY 4.0, Creative Commons Attribution 4.0, or a licence
+ * named for attribution); "no attribution required" does not.
+ */
 export function licenceNeedsCredit(licence: string | undefined): boolean {
   const text = licence?.trim().toLowerCase() ?? '';
-  return /^cc[- ]?by\b/.test(text) || /^attribution\b/.test(text);
+  return /^cc[- ]?by\b/.test(text) || /^creative commons (by|attribution)\b/.test(text) || /^attribution\b/.test(text);
 }
 
 /** A library sound a project used, as the release check reads it; `licence` is undefined when the entry is gone. */
@@ -317,12 +327,10 @@ export interface UsedSound {
 export function soundLicenceTodos(sounds: UsedSound[]): string[] {
   const todos: string[] = [];
   for (const sound of sounds) {
-    if (sound.licence === undefined) todos.push(`sound ${sound.id}: its entry is missing from the library, so its licence is unknown`);
-    else if (!sound.licence.trim() || sound.licence.trim().toLowerCase() === 'unknown') {
-      todos.push(`sound ${sound.id}: the licence is unknown; decide whether the meme may use it`);
-    } else if (!sound.credit?.trim() && licenceNeedsCredit(sound.licence)) {
-      todos.push(`sound ${sound.id}: the licence "${sound.licence}" asks for a credit that is missing`);
-    }
+    const edit = `sound edit ${sound.id}`;
+    if (sound.licence === undefined) todos.push(`sound ${sound.id}: its entry is missing from the library, so its licence is unknown (sound list)`);
+    else if (licenceUnknown(sound.licence)) todos.push(`sound ${sound.id}: the licence is unknown; decide whether it may be used (${edit} --licence <licence|own>)`);
+    else if (!sound.credit?.trim() && licenceNeedsCredit(sound.licence)) todos.push(`sound ${sound.id}: the licence "${sound.licence}" asks for a credit that is missing (${edit} --credit "...")`);
   }
   return todos;
 }

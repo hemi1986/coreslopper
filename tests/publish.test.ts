@@ -345,6 +345,23 @@ describe('a meme upload', () => {
     expect(tiktokCaption(tt)).toContain(credit);
     expect(tiktokCaption(tt)).toContain('He printed the report anyway.');
   });
+
+  it('posts the release caption also when no sound needs a credit', async () => {
+    const { dir, root } = await memeFixture({ licence: 'own' });
+    const youtube = new MockPublisher('youtube');
+    const tiktok = new MockPublisher('tiktok');
+    await publishProject({ projectDir: dir, root, mock: true, only: 'main', probe: () => VERTICAL, adapters: { youtube, tiktok }, log: quiet });
+    const tt = tiktok.calls.find((call) => call.item.name === 'main')!.item;
+    expect(tiktokCaption(tt)).toBe('He printed the report anyway.\n\n#officeprank');
+    expect(youtubeDescription(youtube.calls[0]!.item)).toBe('He printed the report anyway.\n\n#officeprank');
+  });
+
+  it('warns about a sound whose library entry is gone instead of dropping the credit silently', async () => {
+    const { dir, root } = await memeFixture({ credit: 'Boom by Jane Doe' });
+    await rm(join(root, 'library', 'sounds', 'vine-boom', 'sound.yaml'));
+    const summary = await publishProject({ projectDir: dir, root, dryRun: true, probe: () => VERTICAL, adapters: forbidden, log: quiet });
+    expect(summary.plan.warnings.join('\n')).toMatch(/vine-boom.*its entry is missing/);
+  });
 });
 
 describe('an upload that may have gone out', () => {
@@ -605,6 +622,21 @@ describe('TikTok adapter', () => {
     const put = calls.find((call) => call.url.startsWith('https://upload.tiktok'))!;
     expect(new Headers(put.init!.headers).get('content-range')).toBe('bytes 0-3999/4000');
     expect(statusPolls).toBe(2);
+  });
+
+  it('sends a meme caption as it is, not the title and hashtags', async () => {
+    const video = await bytesFile(100);
+    const caption = 'He printed the report anyway.\n\nBoom by Jane Doe (CC BY 4.0)\n\n#officeprank';
+    const fetchImpl: FetchLike = async (url) => {
+      if (url.endsWith('/oauth/token/')) return json({ access_token: 'act.access', expires_in: 86400 });
+      if (url.endsWith('/inbox/video/init/')) return json({ data: { publish_id: 'v_meme', upload_url: 'https://upload.tiktok.example/u' }, error: { code: 'ok' } });
+      if (url === 'https://upload.tiktok.example/u') return new Response(null, { status: 201 });
+      if (url.endsWith('/status/fetch/')) return json({ data: { status: 'SEND_TO_USER_INBOX' }, error: { code: 'ok' } });
+      throw new Error(`unexpected ${url}`);
+    };
+    const adapter = new TikTokPublisher({ ...credentials, fetchImpl, sleep: noSleep });
+    const result = await adapter.publish({ item: item(video, { title: 'Office prank', hashtags: ['#officeprank'], caption }) });
+    expect(result.manualSteps.join('\n')).toContain(caption);
   });
 
   it('refreshes after access_token_invalid and explains the pending-draft limit', async () => {

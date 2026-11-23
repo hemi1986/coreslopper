@@ -258,15 +258,18 @@ describe('TODO detection and text limits', () => {
 
   it('turns an unknown licence and an attribution without credit into sound TODOs', () => {
     expect(soundLicenceTodos([{ id: 'vine-boom', licence: 'unknown' }])).toEqual([
-      'sound vine-boom: the licence is unknown; decide whether the meme may use it',
+      'sound vine-boom: the licence is unknown; decide whether it may be used (sound edit vine-boom --licence <licence|own>)',
     ]);
+    expect(soundLicenceTodos([{ id: 'vine-boom', licence: 'unknown (to check)' }])[0]).toContain('the licence is unknown');
     expect(soundLicenceTodos([{ id: 'vine-boom', licence: 'CC BY 4.0' }])).toEqual([
-      'sound vine-boom: the licence "CC BY 4.0" asks for a credit that is missing',
+      'sound vine-boom: the licence "CC BY 4.0" asks for a credit that is missing (sound edit vine-boom --credit "...")',
     ]);
+    expect(soundLicenceTodos([{ id: 'vine-boom', licence: 'Creative Commons Attribution 4.0' }])[0]).toContain('asks for a credit');
+    expect(soundLicenceTodos([{ id: 'vine-boom', licence: 'Creative Commons BY 4.0' }])[0]).toContain('asks for a credit');
     expect(soundLicenceTodos([{ id: 'vine-boom', licence: 'cc-by-sa', credit: 'by Jane' }])).toEqual([]);
     expect(soundLicenceTodos([{ id: 'vine-boom', licence: 'own' }])).toEqual([]);
     expect(soundLicenceTodos([{ id: 'vine-boom', licence: 'public domain, no attribution required' }])).toEqual([]);
-    expect(soundLicenceTodos([{ id: 'gone' }])).toEqual(['sound gone: its entry is missing from the library, so its licence is unknown']);
+    expect(soundLicenceTodos([{ id: 'gone' }])).toEqual(['sound gone: its entry is missing from the library, so its licence is unknown (sound list)']);
   });
 });
 
@@ -627,6 +630,15 @@ describe('release folder', () => {
     const sounds = checks.find((check) => check.name === 'Release sounds');
     expect(sounds?.result).toBe('TODO');
     expect(sounds?.evidence).toMatch(/vine-boom.*credit/);
+  });
+
+  it('reports a used sound whose library entry is gone as an unknown licence', async () => {
+    const { dir, root } = await memeFixture({ credit: 'Boom by Jane Doe' });
+    await rm(join(root, 'library', 'sounds', 'vine-boom', 'sound.yaml'));
+    const result = await buildRelease({ projectDir: dir, root, deps: fakeDeps() });
+    expect(result.errors).toEqual([]);
+    expect(result.todos.join('\n')).toMatch(/vine-boom.*its entry is missing/);
+    expect((await boardProject(dir, root)).todos.join('\n')).toContain('vine-boom');
   });
 });
 

@@ -46,7 +46,7 @@ Read all of these before you ask anything:
 - `projects/<slug>/pitch.md`: the idea and the setting. A starting point, never a decision.
 - The user references: `npm run cli -- reference list projects/<slug>`; open the files and links that bear on the joke.
 - The chosen characters: `projects/<slug>/characters.yaml` and the sheets it names.
-- The sound library: `npm run cli -- sound list --json`. Each sound has `use_when`, `tags`, `length`, `trim`, `cue` (where the hit lands, seconds from the trimmed start), and `licence`. An empty library: say so once, now, and plan with generated sounds.
+- The sound library: `npm run cli -- sound list --json`. Each sound has `use_when`, `tags`, `length`, `trim`, `cue` (where the hit lands, seconds from the trimmed start), and `licence`. A sound whose licence is `unknown` (the default) or that asks for attribution without a `credit` becomes a TODO in the release checks; the user decides the licence and the credit (`sound edit <id> --licence … --credit "…"`). An empty library: say so once, now, and plan with generated sounds.
 
 Done when you can name the pitch's joke, every reference's bearing, the characters, and the library's sounds in your own words.
 

@@ -218,7 +218,7 @@ export function projectFormats(project: Pick<LoadedProject, 'config'>): { id: st
  * take was copied from (HS-261, HS-265). A sound whose entry is gone carries
  * only its id, so the release check can report its unknown licence.
  */
-export async function usedLibrarySounds(project: LoadedProject, root: string): Promise<UsedSound[]> {
+export async function usedLibrarySounds(project: Pick<LoadedProject, 'takes' | 'paths'>, root: string): Promise<UsedSound[]> {
   const ids = new Set<string>();
   for (const take of [...Object.values(project.takes?.takes ?? {}), ...Object.values(project.takes?.ambience ?? {})]) {
     const id = libraryTakeSoundId(take.source);
@@ -237,7 +237,7 @@ export async function usedLibrarySounds(project: LoadedProject, root: string): P
  * sound a take was copied from (HS-261, HS-265). A sound without a credit adds
  * none; a missing entry or an unknown licence is the release check's business.
  */
-export async function usedSoundCredits(project: LoadedProject, root: string): Promise<string[]> {
+export async function usedSoundCredits(project: Pick<LoadedProject, 'takes' | 'paths'>, root: string): Promise<string[]> {
   const sounds = await usedLibrarySounds(project, root);
   return sounds.map((sound) => sound.credit).filter((credit): credit is string => Boolean(credit));
 }
