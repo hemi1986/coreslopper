@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { mkdtemp, readdir, rm } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { addLibrarySet, entryDir, loadLibrarySet } from '../packages/cli/src/set-library.ts';
@@ -38,5 +39,11 @@ describe('adding a library set by hand', () => {
     await expect(addLibrarySet(ws, { name: 'Neon Bar', description: 'another bar', prompt: 'bar' })).rejects.toThrow(/neon-bar/);
     expect(await readdir(join(ws, 'library', 'sets'))).toEqual(['neon-bar']);
     expect((await loadLibrarySet(ws, 'neon-bar')).description).toBe('a narrow bar in blue neon');
+  });
+
+  it('ST-024: A set without a prompt is refused', async () => {
+    const ws = await workspace();
+    await expect(addLibrarySet(ws, { name: 'Neon Bar', description: 'a narrow bar in blue neon' })).rejects.toThrow(/prompt is required/);
+    expect(existsSync(join(ws, 'library', 'sets', 'neon-bar'))).toBe(false);
   });
 });
