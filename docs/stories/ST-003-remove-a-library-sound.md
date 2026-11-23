@@ -12,7 +12,7 @@ risk: null
 events: [EVT-LibrarySoundRemoved]
 depends_on: [ST-001]
 labels: [feature:meme]
-status: ready
+status: in-progress
 ---
 
 ## Story
