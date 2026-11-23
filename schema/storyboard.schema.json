@@ -79,7 +79,8 @@
                     "type": "string",
                     "enum": [
                       "start",
-                      "end"
+                      "end",
+                      "cue"
                     ]
                   },
                   "offset": {
@@ -237,7 +238,8 @@
                     "type": "string",
                     "enum": [
                       "start",
-                      "end"
+                      "end",
+                      "cue"
                     ]
                   },
                   "offset": {

@@ -35,7 +35,9 @@ reinvent every time. The feature was grilled with the user on 2026-11-22; the mo
 - **A sound is copied, not linked.** A script's sfx line names either `sound: <id>` or a `prompt`, exactly one.
   `voice-track` copies the trimmed library sound into the meme as a take of source `library:<id>` and records its
   hash: a changed library sound makes the take stale and it is copied again; a removed one only warns (HS-260).
-  The anchor `line:<id>:cue` lands a shot on the sound's hit. Lines stay strictly sequential (ADR 0016, HS-257).
+  The anchor `line:<id>:cue` lands a shot on the sound's hit: it adds the `cue` edge to ADR 0005's line anchors
+  and resolves to the line's start plus the library entry's cue, with an offset. Lines stay strictly sequential
+  (ADR 0016, HS-257).
 - **The licence is the user's call.** The release check turns every used sound with an unknown licence, or one that
   needs a credit, into a TODO and never fails the release (HS-261). The release folder holds one 9:16 video, a
   1080x1920 cover and the TikTok, Shorts and Reels texts – no Shorts, WAV, canvas or lyrics.

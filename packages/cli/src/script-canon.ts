@@ -9,10 +9,12 @@ import {
   librarySoundSeconds,
   readYamlFile,
   scriptLines,
+  soundCuesByLine,
   type LibrarySound,
   type LoadedProject,
   type Script,
   type ScriptCanon,
+  type SoundCues,
 } from '@coreslopper/core';
 import { lineTakePath, takeStatus, textHash } from './takes.js';
 import { findWorkspaceRoot } from './workspace.js';
@@ -76,6 +78,15 @@ export async function keptSounds(project: LoadedProject, script: Script, library
 /** The library entries a project's script names: a meme's, or none for an episode. */
 export async function projectLibrarySounds(project: LoadedProject & { script: Script }): Promise<Record<string, LibrarySound>> {
   return project.config.kind === 'meme' ? scriptLibrarySounds(project.paths.root, project.script) : {};
+}
+
+/**
+ * The sound cues a project's shot anchors resolve against, by script line id: a meme's script lines and library
+ * sounds. Another kind has none, so a `cue` anchor there is refused (CMD-ValidateStoryboard).
+ */
+export async function projectSoundCues(project: LoadedProject): Promise<SoundCues | undefined> {
+  if (project.config.kind !== 'meme' || !project.script) return undefined;
+  return soundCuesByLine(project.script, await scriptLibrarySounds(project.paths.root, project.script));
 }
 
 /**

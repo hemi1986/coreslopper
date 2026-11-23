@@ -181,6 +181,8 @@ storyboard (`storyboard.md`, `review/contact-sheet.svg`) are written once and go
 
 Timing lookups (`sectionAt`, `energyAt`, `beatIndexAt`) and anchor resolution (`resolveAnchor`) are pure
 functions over the effective timing in `packages/core/src/timing.ts`; Remotion has its own copies today (G-59).
+A `cue` edge on a line anchor also reads a meme's sound cues, by script line id (`soundCuesByLine`, ADR 0051);
+`resolveStoryboard` takes them in its `StoryboardContext`, and every caller that resolves shot anchors passes them.
 
 ## Time-based rules
 

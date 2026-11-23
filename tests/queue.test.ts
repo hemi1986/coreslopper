@@ -166,7 +166,7 @@ describe('buildShotItems', () => {
       'canon/characters/robot/states/closed.png',
       'canon/props/scarf/scarf.png',
     ]);
-    const { items, skipped } = buildShotItems(project, { kind: 'keyframe', shots: ['001-003'] });
+    const { items, skipped } = await buildShotItems(project, { kind: 'keyframe', shots: ['001-003'] });
     expect(items.map((item) => [item.id, item.operation, item.role, item.out])).toEqual([
       ['keyframe:shot-001', 'editImage', 'image.edit', 'assets/keyframes/shot-001.png'],
       ['keyframe:shot-003', 'generateImage', 'image.keyframe', 'assets/keyframes/shot-003.png'],
@@ -178,7 +178,7 @@ describe('buildShotItems', () => {
   it('builds clips from the keyframe, chains from the previous clip, and applies overrides', async () => {
     const project = await withCanon();
     const fl2va = { shots: ['The shot begins exactly on Picture 1. At about 2 seconds the robot waves.'], soundscape: 'A servo whirs.' };
-    const { items, skipped } = buildShotItems(project, {
+    const { items, skipped } = await buildShotItems(project, {
       kind: 'clip',
       shots: ['001', '002', '003'],
       workflow: 'pika-h3-flf2va',
@@ -203,10 +203,10 @@ describe('buildShotItems', () => {
     });
     expect(skipped).toEqual([{ shot: 'shot-003', reason: 'no prompts.video' }]);
     // Without an override, a plain prompt becomes a one-shot FL2VA prompt on this workflow.
-    const plain = buildShotItems(project, { kind: 'clip', shots: ['001'], workflow: 'pika-h3-flf2va' }).items[0]!;
+    const plain = (await buildShotItems(project, { kind: 'clip', shots: ['001'], workflow: 'pika-h3-flf2va' })).items[0]!;
     expect(plain).toMatchObject({ fl2va: { shots: ['The shot begins exactly on Picture 1. The robot waves.'], soundscape: expect.stringContaining('ambient') } });
     expect(plain).not.toHaveProperty('prompt');
-    expect(buildShotItems(project, { kind: 'clip', shots: ['001'] }).items[0]).toMatchObject({ prompt: 'The robot waves.' });
+    expect((await buildShotItems(project, { kind: 'clip', shots: ['001'] })).items[0]).toMatchObject({ prompt: 'The robot waves.' });
   });
 
   it('splits the sound out of a plain clip prompt and leaves out stills and reused clips', async () => {
@@ -218,7 +218,7 @@ describe('buildShotItems', () => {
     const project = await withCanon();
     project.storyboard!.shots[0]!.asset = 'assets/keyframes/shot-001.png';
     project.storyboard!.shots[1]!.asset = 'assets/clips/shot-002.mp4';
-    const { items, skipped } = buildShotItems(project, { kind: 'clip', shots: ['001', '002'] });
+    const { items, skipped } = await buildShotItems(project, { kind: 'clip', shots: ['001', '002'] });
     expect(items.map((item) => item.id)).toEqual(['clip:shot-002']);
     expect(skipped[0]).toMatchObject({ shot: 'shot-001', reason: expect.stringContaining('a still') });
   });

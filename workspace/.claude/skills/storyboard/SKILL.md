@@ -51,6 +51,14 @@ For a project with `kind: episode` the storyboard covers the episode track inste
 - Copy lyric `text` from `lyrics.txt` as written, parentheses included. The renderer drops Suno parentheses on screen (`My Machine (my machine)` shows as `My Machine my machine`); leave out a backing vocal you do not want on screen.
 - A lip-sync shot (`lipSync: { character: <id> }`) is driven by that character's speaker stem. Only characters with the display rule `full` or `screen-only` can have one. `validate` rejects a shot longer than `maxDuration` of `video.lipsync` for the selected provider or than `limits.lipsync_seconds_max` of the series; anchor it to the line's `start` and `end`.
 
+## Memes
+
+A project with `kind: meme` covers its episode track like an episode, but is one 9:16 clip of at most 30 seconds.
+
+- A shot may land on the hit of a library sound: give a `line` anchor the edge `cue` (`edge: cue`) on a sound line – an `sfx` line with `sound: <id>`. It resolves to the line's start plus the library entry's cue, and an offset in seconds still applies.
+- `edge: cue` on any other line, on a library sound without a cue, or on a sound the library no longer holds (its cue is gone with the entry) fails validation.
+- The cue comes from the library entry, even when the line's take is an import: the anchor means "where the library sound's hit is", not where the imported audio peaks.
+
 ## Continuity references
 
 A keyframe re-imagines everything its references do not pin down. Pin down what must stay the same (ADR 0025):
