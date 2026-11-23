@@ -54,7 +54,7 @@ import { footerLines, releaseLabels, releaseTexts, type ReleaseTextInput } from 
 import { thumbnailProblems, jpegSize } from '../packages/cli/src/thumbnail-files.ts';
 import { validateChangedFile } from '../packages/cli/src/validate-file.ts';
 import { coverTextProblem, layoutSquare, thumbnailSize, type LineMetrics } from '../packages/remotion/src/lib/thumbnail.ts';
-import { RELEASE, cleanupFixtures, demo, diskTree, fakeDeps, fixture, fixtureProbe, jpeg, memeFixture, memeUploadYaml, tree, uploadYaml, videoProbe, wavProbe } from './helpers/release-fixture.ts';
+import { RELEASE, cleanupFixtures, demo, diskTree, episodeFixture, fakeDeps, fixture, fixtureProbe, jpeg, memeFixture, memeUploadYaml, tree, uploadYaml, videoProbe, wavProbe } from './helpers/release-fixture.ts';
 
 const temporary: string[] = [];
 afterEach(async () => {
@@ -390,13 +390,16 @@ describe('release folder', () => {
   it('composes the announcement with the release date and again only when the date moves', async () => {
     const dir = await fixture();
     const deps = fakeDeps();
-    await buildRelease({ projectDir: dir, deps });
+    const result = await buildRelease({ projectDir: dir, deps });
     // Release day Friday 11 December 2026, the main video at 18:00; the 1:1 render is the feed post, so no feed image.
     expect(deps.thumbnails.map((call) => [call.out.split('/release/')[1], call.format, call.text])).toEqual([
       ['announce/story-9x16.jpg', '9x16', 'NEON RAIN|FR 11.12. 18 UHR'],
       ['announce/post-16x9.jpg', '16x9', 'NEON RAIN|FR 11.12. 18 UHR'],
       ['instagram/story-9x16.jpg', '9x16', 'NEON RAIN|AUF YOUTUBE'],
     ]);
+    // A music video's announcement says "new song".
+    const tag = (path: string) => result.manifest.files.find((file) => file.path === path)!.spec.tag;
+    expect([tag('announce/story-9x16.jpg'), tag('announce/post-16x9.jpg')]).toEqual(['NEUER SONG', 'NEUER SONG']);
     const board = await boardProject(dir, join(dir, '..', '..'));
     const announce = board.platforms.find((platform) => platform.id === 'instagram')!.posts.find((post) => post.id === 'announce:instagram')!;
     expect(announce.files.map((file) => file.path)).toEqual(['announce/story-9x16.jpg', 'announce/teaser-9x16.mp4']);
@@ -425,6 +428,17 @@ describe('release folder', () => {
       'NEON RAIN|FR 18.12. 18 UHR',
       'NEON RAIN|FR 18.12. 18 UHR',
     ]);
+  });
+
+  it('tags an episode announcement "NEUE FOLGE"', async () => {
+    const { dir } = await episodeFixture();
+    const deps = fakeDeps();
+    const result = await buildRelease({ projectDir: dir, deps, render: false });
+    expect(result.todos.filter((todo) => todo.includes('not composed'))).toEqual([]);
+    const tag = (path: string) => result.manifest.files.find((file) => file.path === path)!.spec.tag;
+    expect([tag('announce/story-9x16.jpg'), tag('announce/post-16x9.jpg')]).toEqual(['NEUE FOLGE', 'NEUE FOLGE']);
+    // The story image already fits both kinds.
+    expect(tag('instagram/story-9x16.jpg')).toBe('JETZT');
   });
 
   it('composes a 4:5 feed image without a feed-format render, and asks for a still without a recipe', async () => {

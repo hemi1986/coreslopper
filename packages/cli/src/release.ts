@@ -551,6 +551,7 @@ async function deriveReleaseMedia(context: {
     story: Boolean(data),
     feedVideo: Boolean(files.videos?.['4x5'] ?? files.videos?.['1x1']),
     feedPost: Boolean(data?.instagram_post),
+    episode: project.config.kind === 'episode',
   });
   if (images.length) {
     const recipe = data?.announcement?.image

@@ -31,8 +31,22 @@ export const DERIVED_PATHS = {
 export const TEASER_SECONDS = 10;
 
 const WORDS = {
-  de: { days: ['SO', 'MO', 'DI', 'MI', 'DO', 'FR', 'SA'], newSong: 'NEUER SONG', now: 'JETZT', onYouTube: 'AUF YOUTUBE', fresh: 'NEU' },
-  en: { days: ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'], newSong: 'NEW SONG', now: 'OUT NOW', onYouTube: 'ON YOUTUBE', fresh: 'NEW' },
+  de: {
+    days: ['SO', 'MO', 'DI', 'MI', 'DO', 'FR', 'SA'],
+    newSong: 'NEUER SONG',
+    newEpisode: 'NEUE FOLGE',
+    now: 'JETZT',
+    onYouTube: 'AUF YOUTUBE',
+    fresh: 'NEU',
+  },
+  en: {
+    days: ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'],
+    newSong: 'NEW SONG',
+    newEpisode: 'NEW EPISODE',
+    now: 'OUT NOW',
+    onYouTube: 'ON YOUTUBE',
+    fresh: 'NEW',
+  },
 };
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
@@ -74,15 +88,18 @@ export function derivedImages(options: {
   /** The project has a 4:5 or 1:1 render for the feed post: no feed image needed. */
   feedVideo: boolean;
   feedPost: boolean;
+  /** An episode's announcement says "new episode"; a music video's says "new song". */
+  episode?: boolean;
 }): DerivedImage[] {
   const w = words(options.language);
   const images: DerivedImage[] = [];
   const title = (room: number) => titleLines(options.title, room) ?? [];
+  const announcementTag = options.episode ? w.newEpisode : w.newSong;
   if (options.announcement && options.releaseAt) {
     const date = releaseDateLine(options.releaseAt, options.language);
     const text = [...title(THUMBNAIL_MAX_LINES - 1), date].join('|');
-    images.push({ path: DERIVED_PATHS.announceStory, kind: 'announcement', format: '9x16', text, tag: w.newSong });
-    images.push({ path: DERIVED_PATHS.announcePost, kind: 'announcement', format: '16x9', text, tag: w.newSong, layout: 'left' });
+    images.push({ path: DERIVED_PATHS.announceStory, kind: 'announcement', format: '9x16', text, tag: announcementTag });
+    images.push({ path: DERIVED_PATHS.announcePost, kind: 'announcement', format: '16x9', text, tag: announcementTag, layout: 'left' });
   }
   if (options.story) {
     images.push({ path: DERIVED_PATHS.story, kind: 'story', format: '9x16', text: [...title(THUMBNAIL_MAX_LINES - 1), w.onYouTube].join('|'), tag: w.now });

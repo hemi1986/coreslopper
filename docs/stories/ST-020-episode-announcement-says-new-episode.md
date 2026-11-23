@@ -8,7 +8,7 @@ size: null
 risk: null
 depends_on: []
 labels: [bug]
-status: ready
+status: done
 ---
 
 ## Task
@@ -32,7 +32,7 @@ they are. Words outside `en` come from the channel config under ADR 0045; this f
 exists today.
 
 ## Acceptance Criteria
-- [ ] `derivedImages()` with `episode: true` tags both announcement images with the episode word in `de` and `en` (test)
-- [ ] Without the flag, the tags stay `newSong` (test)
-- [ ] `release <episode> --no-render` writes announcement images tagged "NEUE FOLGE" for a German episode
-- [ ] A music video's announcement images are unchanged
+- [x] `derivedImages()` with `episode: true` tags both announcement images with the episode word in `de` and `en` (test)
+- [x] Without the flag, the tags stay `newSong` (test)
+- [x] `release <episode> --no-render` writes announcement images tagged "NEUE FOLGE" for a German episode
+- [x] A music video's announcement images are unchanged
