@@ -134,6 +134,9 @@ export const ProjectConfigSchema = z
     distribution: DistributionSchema.optional(),
   })
   .superRefine((config, ctx) => {
+    if (config.kind === 'meme' && (config.formats.master.aspect !== '9:16' || config.formats.derivatives.length > 0)) {
+      ctx.addIssue({ code: 'custom', path: ['formats'], message: 'a meme has only the format 9:16' });
+    }
     if (config.kind !== 'episode') return;
     for (const key of ['series', 'episode'] as const) {
       if (config[key] === undefined) {
@@ -269,7 +272,8 @@ export const AnchorSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('line'),
     id: z.string().min(1),
-    edge: z.enum(['start', 'end']).default('start'),
+    /** `cue` is the moment a sound line's library sound lands, counted from the line's start. */
+    edge: z.enum(['start', 'end', 'cue']).default('start'),
     offset: z.number().default(0),
   }),
   z.object({

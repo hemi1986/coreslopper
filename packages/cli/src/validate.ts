@@ -5,6 +5,7 @@ import {
   providerForRole,
   resolveModelRole,
   loadProject,
+  lineCues,
   resolveStoryboard,
   validateScript,
   writeEffectiveTiming,
@@ -15,7 +16,7 @@ import {
   type ProjectConfig,
 } from '@coreslopper/core';
 import { basename } from 'node:path';
-import { scriptCanon } from './script-canon.js';
+import { scriptCanon, scriptLibrarySounds } from './script-canon.js';
 
 /** state.json and project.yaml must agree on the project kind; a mismatch is an error, not a guess. */
 export function assertKindMatches(state: Pick<State, 'kind'>, config: Pick<ProjectConfig, 'kind'>): void {
@@ -79,6 +80,11 @@ export async function validateProject(projectDir: string, options: { write?: boo
     if (!project.sets) throw new ValidationError(`sets.yaml is missing in ${paths.root}, but the style-character stage is done.`);
   }
   if (config.kind === 'meme' && project.script) validateScript(project.script, await scriptCanon(project, project.script));
+  // A meme's `cue` anchors resolve against the sound lines of its script and the cues in the library.
+  const cues =
+    config.kind === 'meme' && project.script
+      ? lineCues(project.script, await scriptLibrarySounds(project.paths.root, project.script))
+      : undefined;
 
   if (!effectiveTiming) {
     throw new ValidationError(
@@ -120,6 +126,7 @@ export async function validateProject(projectDir: string, options: { write?: boo
     1,
     episodeContext,
     project.sets,
+    cues,
   );
 
   if (options.write !== false) {

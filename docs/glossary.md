@@ -117,7 +117,7 @@ A frame-level measure of musical intensity, used to drive visual intensity.
 _Avoid_: loudness, volume
 
 **Anchor**:
-A symbolic reference from a shot boundary to timing: section, line, word, beat, downbeat, or an explicit time escape hatch. Section, line, and word anchors also name the edge (`start` or `end`); every anchor but `time` takes an offset in seconds.
+A symbolic reference from a shot boundary to timing: section, line, word, beat, downbeat, or an explicit time escape hatch. Section, line, and word anchors also name the edge (`start` or `end`); a line anchor on a meme's sound line may name the cue (`cue`, the moment the library sound lands, counted from the line's start). Every anchor but `time` takes an offset in seconds.
 _Avoid_: timestamp
 
 **Shot**:

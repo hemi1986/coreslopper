@@ -13,6 +13,7 @@ import {
   type TimingOverrides,
 } from './schema.js';
 import { ValidationError } from './errors.js';
+import type { LineCues } from './episode.js';
 
 export const TIMING_TOLERANCE_SECONDS = 0.05;
 
@@ -177,7 +178,7 @@ function ensureTime(value: number, timing: Timing, label: string): number {
   return Math.max(0, Math.min(timing.audio.duration, value));
 }
 
-export function resolveAnchor(anchor: Anchor, timing: Timing): number {
+export function resolveAnchor(anchor: Anchor, timing: Timing, cues?: LineCues): number {
   switch (anchor.type) {
     case 'section': {
       const section = findSection(timing, anchor.id);
@@ -186,6 +187,16 @@ export function resolveAnchor(anchor: Anchor, timing: Timing): number {
     }
     case 'line': {
       const line = findLine(timing, anchor.id);
+      if (anchor.edge === 'cue') {
+        const cue = cues?.[anchor.id];
+        if (!cue) {
+          throw new ValidationError(`"${anchor.id}" has no sound cue; a cue anchor needs a sound line with a library sound.`);
+        }
+        if (cue.cue === undefined) {
+          throw new ValidationError(`"${cue.sound}" has no cue, so line "${anchor.id}" cannot anchor on it.`);
+        }
+        return ensureTime(line.start + cue.cue + anchor.offset, timing, `line "${anchor.id}" cue`);
+      }
       const base = anchor.edge === 'start' ? line.start : line.end;
       return ensureTime(base + anchor.offset, timing, `line "${anchor.id}" ${anchor.edge}`);
     }
@@ -495,6 +506,8 @@ export function resolveStoryboard(
   episode?: EpisodeContext,
   /** sets.yaml of a music video; an episode's sets come from `episode`. */
   projectSets?: SetBible,
+  /** A meme's library sounds by line id, for `cue` anchors (CMD-ValidateStoryboard). */
+  cues?: LineCues,
 ): ResolvedStoryboard {
   const sets = episode?.sets ?? projectSets;
   const warnings: string[] = [];
@@ -509,8 +522,8 @@ export function resolveStoryboard(
       throw new ValidationError(`Shot "${shot.id}" references unknown section "${shot.section}".`);
     }
 
-    const startSeconds = resolveAnchor(shot.start, timing);
-    const endSeconds = resolveAnchor(shot.end, timing);
+    const startSeconds = resolveAnchor(shot.start, timing, cues);
+    const endSeconds = resolveAnchor(shot.end, timing, cues);
     if (endSeconds <= startSeconds) {
       throw new ValidationError(`Shot "${shot.id}" ends at or before its start.`);
     }
