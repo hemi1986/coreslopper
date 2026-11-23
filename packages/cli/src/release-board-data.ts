@@ -136,7 +136,7 @@ export interface BoardProject {
   title: string;
   artist?: string;
   language: string;
-  kind: 'music-video' | 'episode';
+  kind: 'music-video' | 'episode' | 'meme';
   releaseDate?: string;
   proposed: boolean;
   hasRelease: boolean;
@@ -395,7 +395,8 @@ const field = (label: string, value: string | undefined, extra: Partial<BoardFie
 /** Everything the release texts of a project are made from: the board and the autopilot read the same. */
 export async function projectReleaseContext(projectRoot: string, root: string) {
   const project = await loadProject(projectRoot);
-  const music = project.config.kind !== 'episode';
+  const kind = project.config.kind;
+  const music = kind === 'music-video';
   const channel = await loadChannel(root);
   const limits = platformLimits(channel);
   const song = await songJson(project);
@@ -413,7 +414,7 @@ export async function projectReleaseContext(projectRoot: string, root: string) {
   const schedule = await loadReleaseSchedule(root);
   const timing = project.effectiveTiming ?? project.timing;
   const input: ReleaseTextInput = {
-    kind: music ? 'music-video' : 'episode',
+    kind,
     language,
     slug: project.config.slug,
     artist: identity.artist,

@@ -50,10 +50,10 @@ import {
   type MediaProbe,
 } from '../packages/cli/src/release-media.ts';
 import { footerLines, releaseLabels, releaseTexts, type ReleaseTextInput } from '../packages/cli/src/release-texts.ts';
-import { thumbnailProblems } from '../packages/cli/src/thumbnail-files.ts';
+import { thumbnailProblems, jpegSize } from '../packages/cli/src/thumbnail-files.ts';
 import { validateChangedFile } from '../packages/cli/src/validate-file.ts';
 import { coverTextProblem, layoutSquare, thumbnailSize, type LineMetrics } from '../packages/remotion/src/lib/thumbnail.ts';
-import { RELEASE, cleanupFixtures, demo, fakeDeps, fixture, fixtureProbe, jpeg, tree, uploadYaml, videoProbe, wavProbe } from './helpers/release-fixture.ts';
+import { RELEASE, cleanupFixtures, demo, fakeDeps, fixture, fixtureProbe, jpeg, memeFixture, tree, uploadYaml, videoProbe, wavProbe } from './helpers/release-fixture.ts';
 
 const temporary: string[] = [];
 afterEach(async () => {
@@ -508,9 +508,50 @@ describe('release folder', () => {
     const result = await buildRelease({ projectDir: dir, deps: fakeDeps() });
     expect(result.errors.join()).toContain('title has 120 characters, limit 100');
   });
+
+  it("ST-015: The folder holds the meme's video, cover and three platform texts", async () => {
+    const { dir, root } = await memeFixture();
+    const result = await buildRelease({ projectDir: dir, root, deps: fakeDeps() });
+    expect(result.errors).toEqual([]);
+    const files = await tree(result.dir);
+    expect(files).toContain('video/office-prank-9x16.mp4');
+    expect(files).toContain('cover/office-prank-1080x1920.jpg');
+    expect(files).toEqual(expect.arrayContaining(['texts/youtube.md', 'texts/tiktok.md', 'texts/instagram.md']));
+    expect(jpegSize(await readFile(join(result.dir, 'cover', 'office-prank-1080x1920.jpg')))).toEqual({ width: 1080, height: 1920 });
+    expect(await readFile(join(result.dir, 'texts', 'youtube.md'), 'utf8')).toContain('Office prank');
+  });
+
+  it('ST-015: No music-video parts are built', async () => {
+    const { dir, root } = await memeFixture();
+    const result = await buildRelease({ projectDir: dir, root, deps: fakeDeps() });
+    const files = await tree(result.dir);
+    expect(files.filter((path) => /^(shorts|audio|streaming|announce|instagram|microsite)\//.test(path))).toEqual([]);
+    expect(files.filter((path) => path.endsWith('.wav'))).toEqual([]);
+    const calendar = await loadCalendar(dir);
+    expect(calendar?.events.filter((event) => event.step === 'announce')).toEqual([]);
+  });
+
+  it('ST-015: A sound that needs a credit is credited', async () => {
+    const credit = 'Boom by Jane Doe (CC BY 4.0)';
+    const { dir, root } = await memeFixture({ licence: 'cc-by', credit });
+    const result = await buildRelease({ projectDir: dir, root, deps: fakeDeps() });
+    for (const name of ['youtube.md', 'tiktok.md', 'instagram.md']) {
+      expect(await readFile(join(result.dir, 'texts', name), 'utf8')).toContain(credit);
+    }
+  });
 });
 
 describe('release QA', () => {
+  it('checks a meme without the music-video parts', async () => {
+    const { dir, root } = await memeFixture();
+    await buildRelease({ projectDir: dir, root, deps: fakeDeps() });
+    const checks = await releaseChecks(dir, fixtureProbe());
+    expect(checks.filter((check) => check.result === 'FAIL')).toEqual([]);
+    expect(checks.map((check) => check.name)).toContain('Release cover');
+    expect(checks.map((check) => check.name)).not.toContain('Release audio');
+    expect(checks.map((check) => check.name)).not.toContain('Release Shorts');
+  });
+
   it('passes a complete package and marks user gaps as TODO', async () => {
     const dir = await fixture();
     const deps = fakeDeps();

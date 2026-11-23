@@ -281,15 +281,26 @@ const chars = (text: string) => [...text].length;
 /**
  * Limit and completeness problems of the platform texts in the upload data:
  * `errors` break a limit, `missing` are texts the skill still has to write.
+ * A meme has one video and no main-video extras: its one description is the
+ * Shorts, TikTok, and Reels caption.
  */
 export function platformTextProblems(
   data: UploadData,
   limits: PlatformLimits,
-  options: { music: boolean } = { music: true },
+  options: { music?: boolean; kind?: 'music-video' | 'episode' | 'meme' } = { music: true },
 ): { errors: string[]; missing: string[] } {
   const errors: string[] = [];
   const missing: string[] = [];
   const main = data.main;
+  const kind = options.kind ?? (options.music === false ? 'episode' : 'music-video');
+  if (kind === 'meme') {
+    if (chars(main.title) > limits.youtube.title) errors.push(`youtube short: title has ${chars(main.title)} characters, limit ${limits.youtube.title}`);
+    const caption = [main.description.trim(), main.hashtags.join(' ')].filter(Boolean).join('\n\n');
+    if (chars(caption) > limits.tiktok.caption) errors.push(`tiktok: caption has ${chars(caption)} characters, limit ${limits.tiktok.caption}`);
+    if (chars(caption) > limits.instagram.caption) errors.push(`instagram: caption has ${chars(caption)} characters, limit ${limits.instagram.caption}`);
+    if (main.hashtags.length > limits.instagram.hashtags) errors.push(`instagram: ${main.hashtags.length} hashtags, limit ${limits.instagram.hashtags}`);
+    return { errors, missing };
+  }
   if (chars(main.title) > limits.youtube.title) errors.push(`youtube main: title has ${chars(main.title)} characters, limit ${limits.youtube.title}`);
   if (!main.pinned_comment) missing.push('main.pinned_comment');
   if (!main.community_post) missing.push('main.community_post');
@@ -351,7 +362,7 @@ export function platformTextProblems(
   else if (data.announcement.hashtags.length > limits.instagram.hashtags) {
     errors.push(`announcement: ${data.announcement.hashtags.length} hashtags, limit ${limits.instagram.hashtags} (Instagram)`);
   }
-  if (options.music) {
+  if (kind === 'music-video') {
     if (!data.spotify?.pitch) missing.push('spotify.pitch');
     else if (chars(data.spotify.pitch) > limits.spotify.pitch) errors.push(`spotify: pitch has ${chars(data.spotify.pitch)} characters, limit ${limits.spotify.pitch}`);
     if (!data.spotify?.artist_pick) missing.push('spotify.artist_pick');

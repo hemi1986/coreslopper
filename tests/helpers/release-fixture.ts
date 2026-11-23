@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, cp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parse, stringify } from 'yaml';
-import { ReleaseManifestSchema } from '../../packages/core/src/index.ts';
+import { ProjectConfigSchema, ReleaseManifestSchema, createInitialState } from '../../packages/core/src/index.ts';
 import type { ReleaseDeps } from '../../packages/cli/src/release.ts';
 import type { MediaProbe } from '../../packages/cli/src/release-media.ts';
 
@@ -145,6 +145,75 @@ export async function fixture(options: { release?: boolean; upload?: boolean } =
   await writeFile(join(dir, 'audio', 'song.wav'), 'RIFF song');
   if (options.upload !== false) await writeFile(join(dir, 'review', 'upload.yaml'), stringify(uploadYaml()));
   return dir;
+}
+
+/** The upload data of a meme: its one 9:16 video, posted on YouTube Shorts, TikTok, and Instagram Reels. */
+export function memeUploadYaml() {
+  return {
+    version: 1,
+    language: 'en',
+    main: {
+      file: 'renders/9x16.mp4',
+      title: 'Office prank',
+      description: 'He printed the report anyway.',
+      hashtags: ['#officeprank'],
+      tags: ['office prank'],
+    },
+  };
+}
+
+/**
+ * A meme workspace: `projects/office-prank/` with a 9:16 render, its cover, the
+ * upload data, one take copied from the library sound `vine-boom`, and the
+ * workspace sound library that take came from.
+ */
+export async function memeFixture(options: { licence?: string; credit?: string } = {}): Promise<{ dir: string; root: string }> {
+  const base = await mkdtemp(join(tmpdir(), 'coreslopper-release-meme-'));
+  temporary.push(base);
+  const root = join(base, 'workspace');
+  const dir = join(root, 'projects', 'office-prank');
+  await mkdir(join(dir, 'renders'), { recursive: true });
+  await mkdir(join(dir, 'review'), { recursive: true });
+  const config = ProjectConfigSchema.parse({
+    version: 1,
+    slug: 'office-prank',
+    kind: 'meme',
+    title: 'Office prank',
+    created: '2026-11-22T00:00:00Z',
+    workflow: { version: '0.1.0' },
+    budget_usd: 10,
+    formats: { master: { aspect: '9:16', width: 1080, height: 1920, fps: 30 } },
+  });
+  await writeFile(join(dir, 'project.yaml'), stringify(config));
+  await writeFile(join(dir, 'state.json'), JSON.stringify(createInitialState(config, '0.1.0')));
+  await cp(join(demo, 'timing.json'), join(dir, 'timing.json'));
+  await writeFile(
+    join(dir, 'takes.json'),
+    JSON.stringify({ version: 1, takes: { reveal: { source: 'library:vine-boom', duration: 1.4, text_hash: 'prank' } }, ambience: {} }),
+  );
+  await writeFile(join(dir, 'renders', '9x16.mp4'), 'render 9x16');
+  await writeFile(join(dir, 'renders', 'cover-1080x1920.jpg'), jpeg(1080, 1920));
+  await writeFile(join(dir, 'review', 'upload.yaml'), stringify(memeUploadYaml()));
+  const sound = join(root, 'library', 'sounds', 'vine-boom');
+  await mkdir(sound, { recursive: true });
+  await writeFile(
+    join(sound, 'sound.yaml'),
+    stringify({
+      version: 1,
+      id: 'vine-boom',
+      title: 'Vine boom',
+      use_when: 'a reveal falls flat',
+      tags: ['boom'],
+      length: 1.4,
+      loudness: -10,
+      licence: options.licence ?? 'cc-by',
+      ...(options.credit ? { credit: options.credit } : {}),
+      hash: 'a'.repeat(64),
+      added: '2026-11-22',
+    }),
+  );
+  await writeFile(join(sound, 'sound.wav'), 'RIFF sound');
+  return { dir, root };
 }
 
 export interface FakeDeps extends Partial<ReleaseDeps> {

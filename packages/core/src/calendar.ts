@@ -99,7 +99,7 @@ const STEP_ORDER = ['distributor', 'pitch', 'canvas', 'announce', 'song', 'artis
 export interface CalendarInput {
   slug: string;
   title: string;
-  kind: 'music-video' | 'episode';
+  kind: 'music-video' | 'episode' | 'meme';
   /** `release.release_date` from project.yaml: the user's date always wins. */
   releaseDate?: string;
   /** Shorts in their order, with the platforms each one goes to. */

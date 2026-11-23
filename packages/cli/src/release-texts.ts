@@ -17,7 +17,7 @@ import {
 // every gap with TODO. Labels follow the project's language.
 
 export interface ReleaseTextInput {
-  kind: 'music-video' | 'episode';
+  kind: 'music-video' | 'episode' | 'meme';
   language: string;
   slug: string;
   artist?: string;
@@ -31,6 +31,8 @@ export interface ReleaseTextInput {
   channel?: ChannelConfig;
   limits: PlatformLimits;
   chapters: Chapter[];
+  /** Credit texts the platform texts must carry, from the library sounds the project took (HS-261, HS-265). */
+  credits?: string[];
   /** Paths inside the release folder. */
   files: {
     master?: string;
@@ -134,10 +136,12 @@ interface Labels {
     platforms: Record<'distributor' | 'spotify' | 'youtube' | 'shorts' | 'tiktok' | 'instagram' | 'x' | 'linkedin' | 'microsite', string>;
   };
   announce: { heading: string; image: string; files: (story?: string, post?: string, teaser?: string) => string };
+  meme: { youtube: string; tiktok: string; instagram: string; cover: (file: string) => string; visibility: string };
+  credits: string;
   videoLink: string;
   x: { heading: string; post: string; reply: string; media: (file: string) => string; replyNote: string; short: string };
   li: { heading: string; skipped: (reason: string) => string; reason: string; post: string; hook: (n: number, limit: number) => string; media: (file: string) => string; noLinkNote: string };
-  readme: { heading: string; folders: Record<'video' | 'thumbnails' | 'shorts' | 'audio' | 'streaming' | 'texts', string>; order: string; steps: string[]; todos: string; none: string; manifest: string };
+  readme: { heading: string; folders: Record<'video' | 'cover' | 'thumbnails' | 'shorts' | 'audio' | 'streaming' | 'texts', string>; order: string; steps: string[]; memeSteps: string[]; todos: string; none: string; manifest: string };
 }
 
 const EN: Labels = {
@@ -265,6 +269,14 @@ const EN: Labels = {
       [story && `Story: \`${story}\``, post && `post image: \`${post}\``, teaser && `teaser for X: \`${teaser}\``].filter(Boolean).join(' · '),
   },
   videoLink: 'link to the main video',
+  meme: {
+    youtube: 'YouTube Shorts',
+    tiktok: 'TikTok',
+    instagram: 'Instagram Reels',
+    cover: (file) => `Cover: \`${file}\` (the video's cover on the platform)`,
+    visibility: 'Public: upload the video as a Short',
+  },
+  credits: 'Credits',
   x: {
     heading: 'X',
     post: 'Post',
@@ -286,6 +298,7 @@ const EN: Labels = {
     heading: 'Release package',
     folders: {
       video: 'the video in every format, and the subtitles',
+      cover: 'the 1080x1920 cover the platforms show',
       thumbnails: 'three 1280x720 thumbnails for the main video (1 = upload, 2 and 3 = Test & compare)',
       shorts: 'three Shorts with their 1080x1920 thumbnails, for YouTube, Instagram Reels, and TikTok',
       audio: 'the song as WAV for the distributor',
@@ -297,6 +310,10 @@ const EN: Labels = {
       'Distributor first (texts/spotify.md), at least three weeks before the release date when you want a pitch.',
       'YouTube main video on the release day (texts/youtube.md).',
       'Shorts, Reels, and TikToks staggered over the following days (texts/release-plan.md).',
+    ],
+    memeSteps: [
+      'Post the video on YouTube Shorts, TikTok, and Instagram Reels on the release day (texts/youtube.md, texts/tiktok.md, texts/instagram.md).',
+      'Set the 1080x1920 cover as the cover on every platform.',
     ],
     todos: 'Open TODOs',
     none: 'None.',
@@ -430,6 +447,14 @@ const DE: Labels = {
       [story && `Story: \`${story}\``, post && `Post-Bild: \`${post}\``, teaser && `Teaser für X: \`${teaser}\``].filter(Boolean).join(' · '),
   },
   videoLink: 'Link zum Hauptvideo',
+  meme: {
+    youtube: 'YouTube Shorts',
+    tiktok: 'TikTok',
+    instagram: 'Instagram Reels',
+    cover: (file) => `Cover: \`${file}\` (das Cover des Videos auf der Plattform)`,
+    visibility: 'Öffentlich: das Video als Short hochladen',
+  },
+  credits: 'Credits',
   x: {
     heading: 'X',
     post: 'Post',
@@ -451,6 +476,7 @@ const DE: Labels = {
     heading: 'Release-Paket',
     folders: {
       video: 'das Video in jedem Format und die Untertitel',
+      cover: 'das Cover 1080x1920, das die Plattformen zeigen',
       thumbnails: 'drei Thumbnails 1280x720 fürs Hauptvideo (1 = Upload, 2 und 3 = Testen und vergleichen)',
       shorts: 'drei Shorts mit Thumbnails 1080x1920, für YouTube, Instagram Reels und TikTok',
       audio: 'der Song als WAV für den Distributor',
@@ -462,6 +488,10 @@ const DE: Labels = {
       'Zuerst der Distributor (texts/spotify.md), mindestens drei Wochen vor dem Release-Datum, wenn ein Pitch gewünscht ist.',
       'YouTube-Hauptvideo am Release-Tag (texts/youtube.md).',
       'Shorts, Reels und TikToks gestaffelt in den Tagen danach (texts/release-plan.md).',
+    ],
+    memeSteps: [
+      'Das Video am Release-Tag auf YouTube Shorts, TikTok und Instagram Reels posten (texts/youtube.md, texts/tiktok.md, texts/instagram.md).',
+      'Auf jeder Plattform das Cover 1080x1920 setzen.',
     ],
     todos: 'Offene TODOs',
     none: 'Keine.',
@@ -798,12 +828,62 @@ function linkedinText(input: ReleaseTextInput, l: Labels): string {
   return `${lines.join('\n')}\n`;
 }
 
+/** The meme's one caption: its description, the credits of the library sounds it took, and the hashtags. */
+export function memeCaption(input: Pick<ReleaseTextInput, 'data' | 'credits'>): string {
+  const main = input.data?.main;
+  return [main?.description.trim() ?? '', ...(input.credits ?? []), main?.hashtags.join(' ') ?? ''].filter(Boolean).join('\n\n');
+}
+
+/** The meme video's file in the folder: its one 9:16 render, or the master when the format list names it. */
+function memeFile(input: ReleaseTextInput, l: Labels): string {
+  return input.files.master ?? input.files.videos?.['9x16'] ?? l.todo('renders/9x16.mp4');
+}
+
+function memeYoutubeText(input: ReleaseTextInput, l: Labels): string {
+  const main = input.data?.main;
+  const caption = memeCaption(input);
+  const synthetic = main?.synthetic_media ?? input.channel?.disclosure.youtube_synthetic ?? true;
+  const lines = [`# ${l.meme.youtube}`, '', `**${l.file}:** \`${memeFile(input, l)}\``];
+  if (input.files.cover) lines.push(l.meme.cover(input.files.cover));
+  lines.push('', `## ${l.title} (${l.chars(count(main?.title ?? ''), input.limits.youtube.title)})`, '', ...block(main?.title ?? l.todo('main.title')));
+  lines.push('', `## ${l.description} (${l.bytes(Buffer.byteLength(caption), input.limits.youtube.description_bytes)})`, '', ...block(caption || l.todo('main.description')));
+  const tags = main?.tags.join(', ') ?? '';
+  lines.push('', `## ${l.tags} (${l.chars(tags.length, input.limits.youtube.tags)})`, '', ...block(tags || l.todo('main.tags')));
+  lines.push('', `## ${l.checklist}`, '', checkbox(l.meme.visibility), checkbox(l.yt.synthetic(synthetic)), checkbox(l.yt.kids(main?.made_for_kids ?? false)));
+  return `${lines.join('\n')}\n`;
+}
+
+function memeTiktokText(input: ReleaseTextInput, l: Labels): string {
+  const caption = memeCaption(input);
+  const lines = [`# ${l.meme.tiktok}`, '', `**${l.file}:** \`${memeFile(input, l)}\``];
+  if (input.files.cover) lines.push(l.tt.coverUpload(input.files.cover));
+  lines.push('', `### ${l.description} (${l.chars(count(caption), input.limits.tiktok.caption)})`, '', ...block(caption || l.todo('main.description')));
+  lines.push('', `### ${l.tt.settings}`, '', checkbox(l.tt.visibility));
+  if (input.channel?.disclosure.tiktok_ai_label ?? true) lines.push(checkbox(l.tt.aiLabel));
+  return `${lines.join('\n')}\n`;
+}
+
+function memeInstagramText(input: ReleaseTextInput, l: Labels): string {
+  const main = input.data?.main;
+  const caption = memeCaption(input);
+  const tags = (main?.hashtags.length ?? 0) + (caption.match(/#[\p{L}\p{N}_]+/gu)?.length ?? 0);
+  const lines = [`# ${l.meme.instagram}`, '', `**${l.file}:** \`${memeFile(input, l)}\``];
+  if (input.files.cover) lines.push(l.meme.cover(input.files.cover));
+  lines.push('', `### ${l.ig.caption} (${l.chars(count(caption), input.limits.instagram.caption)}, ${tags}/${input.limits.instagram.hashtags} ${l.hashtags})`, '', ...block(caption || l.todo('main.description')));
+  lines.push('', `### ${l.checklist}`, '', checkbox(l.ig.cover(undefined)));
+  if (input.channel?.disclosure.instagram_ai_label ?? true) lines.push(checkbox(l.ig.aiLabel));
+  return `${lines.join('\n')}\n`;
+}
+
 /** The README of the release folder: what lies where, the order, and the open TODOs. */
 export function readmeText(input: ReleaseTextInput, todos: string[]): string {
   const l = releaseLabels(input.language);
-  const folders = (['video', 'thumbnails', 'shorts', ...(input.kind === 'music-video' ? (['audio', 'streaming'] as const) : []), 'texts'] as const).map(
-    (folder) => `- \`${folder}/\` — ${l.readme.folders[folder]}`,
-  );
+  const folders = (
+    input.kind === 'meme'
+      ? (['video', 'cover', 'texts'] as const)
+      : (['video', 'thumbnails', 'shorts', ...(input.kind === 'music-video' ? (['audio', 'streaming'] as const) : []), 'texts'] as const)
+  ).map((folder) => `- \`${folder}/\` — ${l.readme.folders[folder]}`);
+  const steps = input.kind === 'meme' ? l.readme.memeSteps : input.kind === 'music-video' ? l.readme.steps : l.readme.steps.slice(1);
   const lines = [
     `# ${l.readme.heading} — ${input.artist ? `${input.artist} – ` : ''}${input.title}`,
     '',
@@ -811,7 +891,7 @@ export function readmeText(input: ReleaseTextInput, todos: string[]): string {
     '',
     `## ${l.readme.order}`,
     '',
-    ...(input.kind === 'music-video' ? l.readme.steps : l.readme.steps.slice(1)).map((step, index) => `${index + 1}. ${step}`),
+    ...steps.map((step, index) => `${index + 1}. ${step}`),
     '',
     `## ${l.readme.todos}`,
     '',
@@ -822,9 +902,17 @@ export function readmeText(input: ReleaseTextInput, todos: string[]): string {
   return `${lines.join('\n')}\n`;
 }
 
-/** Every text file of `texts/`, keyed by file name. Episodes have no streaming release. */
+/** Every text file of `texts/`, keyed by file name. Episodes have no streaming release; a meme has three posts. */
 export function releaseTexts(input: ReleaseTextInput): Record<string, string> {
   const l = releaseLabels(input.language);
+  if (input.kind === 'meme') {
+    return {
+      'youtube.md': memeYoutubeText(input, l),
+      'tiktok.md': memeTiktokText(input, l),
+      'instagram.md': memeInstagramText(input, l),
+      'release-plan.md': planText(input, l),
+    };
+  }
   return {
     'youtube.md': youtubeText(input, l),
     'shorts.md': shortsText(input, l),
