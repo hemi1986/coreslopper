@@ -354,6 +354,13 @@ export interface SoundLibraryIssue {
   message: string;
 }
 
+/** One line for an issue: a failed shell command carries its command and stderr over several lines. */
+function errorLine(error: unknown): string {
+  const message = (error as Error)?.message ?? String(error);
+  const line = message.split('\n').map((part) => part.trim()).filter(Boolean).at(-1) ?? message;
+  return line.length > 200 ? `${line.slice(0, 200)}…` : line;
+}
+
 /**
  * CMD-CheckSoundLibrary (`sound check`): after hand edits, look at the whole
  * library – an entry without its file, a file or folder without an entry, the
@@ -392,14 +399,14 @@ export async function checkSoundLibrary(root: string): Promise<SoundLibraryCheck
     try {
       sound = await validateLibrarySoundEntry(join(folder, LIBRARY_SOUND_ENTRY));
     } catch (error) {
-      issues.push({ kind: 'invalid', id: entry.name, message: `"${entry.name}" is an entry that does not load: ${(error as Error).message}` });
+      issues.push({ kind: 'invalid', id: entry.name, message: `"${entry.name}" is an entry that does not load: ${errorLine(error)}` });
       continue;
     }
     let hash: string;
     try {
       hash = await hashFileStream(join(folder, LIBRARY_SOUND_FILE));
     } catch (error) {
-      issues.push({ kind: 'invalid', id: entry.name, message: `"${entry.name}" is an entry whose ${LIBRARY_SOUND_FILE} cannot be read: ${(error as Error).message}` });
+      issues.push({ kind: 'invalid', id: entry.name, message: `"${entry.name}" is an entry whose ${LIBRARY_SOUND_FILE} cannot be read: ${errorLine(error)}` });
       continue;
     }
     entries.push({ id: entry.name, file: join(folder, LIBRARY_SOUND_ENTRY), wav: join(folder, LIBRARY_SOUND_FILE), sound, hash });
@@ -425,7 +432,7 @@ export async function checkSoundLibrary(root: string): Promise<SoundLibraryCheck
     try {
       length = measureLength(entry.wav);
     } catch (error) {
-      issues.push({ kind: 'invalid', id: entry.id, message: `"${entry.id}" is an entry whose ${LIBRARY_SOUND_FILE} cannot be measured: ${(error as Error).message} – put its old file back or replace it with a readable WAV` });
+      issues.push({ kind: 'invalid', id: entry.id, message: `"${entry.id}" is an entry whose ${LIBRARY_SOUND_FILE} cannot be measured: ${errorLine(error)} – put its old file back or replace it with a readable WAV` });
       continue;
     }
     if (!(length > 0)) {
@@ -448,7 +455,7 @@ export async function checkSoundLibrary(root: string): Promise<SoundLibraryCheck
     try {
       loudness = measureLufs(length, entry.wav);
     } catch (error) {
-      issues.push({ kind: 'invalid', id: entry.id, message: `"${entry.id}" is an entry whose ${LIBRARY_SOUND_FILE} cannot be measured: ${(error as Error).message} – put its old file back or replace it with a readable WAV` });
+      issues.push({ kind: 'invalid', id: entry.id, message: `"${entry.id}" is an entry whose ${LIBRARY_SOUND_FILE} cannot be measured: ${errorLine(error)} – put its old file back or replace it with a readable WAV` });
       continue;
     }
     if (!Number.isFinite(loudness)) {

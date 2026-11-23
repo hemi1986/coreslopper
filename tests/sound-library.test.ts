@@ -507,13 +507,16 @@ describe.skipIf(!hasFfmpeg())('sound check', () => {
     await addLibrarySound(root, { file: tone(join(files, 'boom.mp3'), 1.4), title: 'Vine Boom', useWhen: 'a dramatic reveal' });
     await addLibrarySound(root, { file: tone(join(files, 'scratch.mp3'), 0.9, 660), title: 'Record Scratch', useWhen: 'everything stops' });
     await writeFile(soundWav(root, 'vine-boom'), 'not a wav at all');
+    await rm(soundWav(root, 'record-scratch'));
 
     const check = await checkSoundLibrary(root);
 
-    expect(check.issues).toEqual([expect.objectContaining({ kind: 'invalid', id: 'vine-boom' })]);
-    expect(check.issues[0]?.message).toMatch(/cannot be measured/);
-    // The entry after the broken one is still checked.
-    expect(check.remeasured).toEqual([]);
+    expect(check.issues.map((issue) => [issue.kind, issue.id])).toEqual([
+      ['missing-file', 'record-scratch'],
+      ['invalid', 'vine-boom'],
+    ]);
+    // The message stays one line even though ffprobe reports over several.
+    expect(check.issues[1]?.message).toMatch(/cannot be measured: [^\n]+ – put its old file back/);
   });
 
   it('reports the same file under two ids, and measures neither', async () => {
