@@ -2,17 +2,11 @@
 
 > Generated from `docs/stories/ST-*.md` – **do not edit manually**. Change the story files instead.
 
-**Progress: 10 of 24 domain stories done** · scenarios 37 of 80
+**Progress: 11 of 24 domain stories done** · scenarios 40 of 80
 
-**42 stories** · In Progress: 1 · Ready: 20 · Ready for Human Review: 0 · In Review: 1 · Draft: 0 · Done: 20 · Superseded: 0
+**42 stories** · In Progress: 0 · Ready: 20 · Ready for Human Review: 0 · In Review: 1 · Draft: 0 · Done: 21 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
-
-## In Progress
-
-| ID | Title | Type | Context | Priority | Size | Risk | Depends on |
-|---|---|---|---|---|---|---|---|
-| [ST-003](ST-003-remove-a-library-sound.md) | Remove a library sound | domain | Sound library | should | – | – | ST-001 |
 
 ## Ready
 
@@ -67,5 +61,6 @@ Within each section: by priority, then by story ID, with dependencies pulled in 
 | [ST-036](ST-036-an-internal-project-gets-no-release-package.md) | An internal project gets no release package | domain | Release | must | – | – | – |
 | [ST-037](ST-037-internal-projects-end-after-qa.md) | Internal projects are created as such and end after QA | task | – | must | – | – | ST-036 |
 | [ST-038](ST-038-local-lip-sync-by-default-in-comfyui-projects.md) | ComfyUI projects lip-sync locally by default | task | – | must | – | – | – |
+| [ST-003](ST-003-remove-a-library-sound.md) | Remove a library sound | domain | Sound library | should | – | – | ST-001 |
 | [ST-004](ST-004-check-the-sound-library.md) | Check the sound library after hand edits | domain | Sound library | should | – | – | ST-001 |
 | [ST-039](ST-039-restart-comfyui-only-when-stuck.md) | Restart ComfyUI only when it is stuck | task | – | should | – | – | – |
