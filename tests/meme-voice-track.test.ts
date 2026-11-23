@@ -97,7 +97,7 @@ describe.skipIf(!hasFfmpeg())('the voice track takes library sounds into a meme'
     await voiceTrack(projectDir);
     const before = await readFile(join(projectDir, 'takes.json'), 'utf8');
 
-    await rm(soundDir(workspace, 'vine-boom'), { recursive: true });
+    await removeLibrarySound(workspace, 'vine-boom');
     const warnings: string[] = [];
     vi.spyOn(console, 'warn').mockImplementation((line: unknown) => void warnings.push(String(line)));
     await voiceTrack(projectDir);
@@ -120,13 +120,6 @@ describe.skipIf(!hasFfmpeg())('the voice track takes library sounds into a meme'
     expect((await takesOf(projectDir)).takes['reveal-boom']).toEqual(take);
     expect(existsSync(file)).toBe(true);
     expect(await readFile(file)).toEqual(audio);
-    // Still current: the next voice track copies nothing for the line and only warns.
-    const warnings: string[] = [];
-    vi.spyOn(console, 'warn').mockImplementation((line: unknown) => void warnings.push(String(line)));
-    const registered = await readFile(join(projectDir, 'takes.json'), 'utf8');
-    await voiceTrack(projectDir);
-    expect(await readFile(join(projectDir, 'takes.json'), 'utf8')).toBe(registered);
-    expect(warnings).toEqual([expect.stringMatching(/"vine-boom" is no longer in the library/)]);
   });
 
   it('ST-011: A line naming a sound that never was taken and is gone stops the voice track', async () => {

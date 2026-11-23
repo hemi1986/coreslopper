@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { chmod, copyFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { stringify } from 'yaml';
@@ -298,9 +298,75 @@ describe('sound remove', () => {
     expect(await ids(root)).toEqual(['sad-trombone']);
   });
 
+  it('removes an entry whose sound.yaml does not load', async () => {
+    const root = await holding('vine-boom', 'sad-trombone');
+    await writeFile(join(soundDir(root, 'vine-boom'), 'sound.yaml'), 'version: 1\nid: vine-boom\n');
+
+    const removed = await removeLibrarySound(root, 'vine-boom');
+
+    expect(removed).toMatchObject({ id: 'vine-boom' });
+    expect(removed.sound).toBeUndefined();
+    expect(await ids(root)).toEqual(['sad-trombone']);
+    expect(existsSync(soundDir(root, 'vine-boom'))).toBe(false);
+  });
+
+  it('removes a folder that never held an entry', async () => {
+    const root = await holding('sad-trombone');
+    await mkdir(soundDir(root, 'leftover'), { recursive: true });
+    await writeFile(join(soundDir(root, 'leftover'), 'sound.wav'), 'RIFF');
+
+    await removeLibrarySound(root, 'leftover');
+
+    expect(existsSync(soundDir(root, 'leftover'))).toBe(false);
+  });
+
+  it('refuses an id that is not a library sound id', async () => {
+    const root = await holding('vine-boom', 'sad-trombone');
+
+    for (const id of ['../sad-trombone', '/etc', 'Vine Boom']) {
+      await expect(removeLibrarySound(root, id)).rejects.toThrow(/not a library sound id/);
+    }
+    expect(await ids(root)).toEqual(['sad-trombone', 'vine-boom']);
+  });
+
+  it('names the memes that keep their take', async () => {
+    const root = await holding('vine-boom');
+    const meme = join(root, 'projects', 'office-prank');
+    await mkdir(meme, { recursive: true });
+    await writeFile(join(meme, 'project.yaml'), 'version: 1\nslug: office-prank\n');
+    await writeFile(join(meme, 'takes.json'), JSON.stringify({ version: 1, takes: { 'reveal-boom': { source: 'library:vine-boom', duration: 1.2, text_hash: 'x' } }, ambience: {} }));
+
+    const removed = await removeLibrarySound(root, 'vine-boom');
+
+    expect(removed.used_in).toEqual(['office-prank']);
+  });
+
+  const guarded = process.getuid?.() === 0;
+  it.skipIf(guarded)('leaves the library consistent when the folder cannot be deleted', async () => {
+    const root = await holding('vine-boom', 'sad-trombone');
+    const locked = join(soundDir(root, 'vine-boom'), 'locked');
+    await mkdir(locked);
+    await writeFile(join(locked, 'keep.txt'), 'x');
+    await chmod(locked, 0o500);
+    const leftovers = async () => (await readdir(join(root, 'library', 'sounds'))).filter((name) => name.startsWith('.removing-'));
+    try {
+      await expect(removeLibrarySound(root, 'vine-boom')).rejects.toThrow(/could not be deleted/);
+      // The folder is gone from the library; only a hidden leftover holds what could not be deleted.
+      expect(existsSync(soundDir(root, 'vine-boom'))).toBe(false);
+      expect(await ids(root)).toEqual(['sad-trombone']);
+      expect(await leftovers()).toHaveLength(1);
+    } finally {
+      for (const name of await leftovers()) await chmod(join(root, 'library', 'sounds', name, 'locked'), 0o700);
+    }
+  });
+
   it('removes a sound at the command line', async () => {
     const root = await holding('vine-boom');
     await writeFile(join(root, 'package.json'), JSON.stringify({ name: 'coreslopper' }));
+    const meme = join(root, 'projects', 'office-prank');
+    await mkdir(meme, { recursive: true });
+    await writeFile(join(meme, 'project.yaml'), 'version: 1\nslug: office-prank\n');
+    await writeFile(join(meme, 'takes.json'), JSON.stringify({ version: 1, takes: { 'reveal-boom': { source: 'library:vine-boom', duration: 1.2, text_hash: 'x' } }, ambience: {} }));
     const cli = (...args: string[]) =>
       spawnSync(join(process.cwd(), 'node_modules', '.bin', 'tsx'), [join(process.cwd(), 'packages', 'cli', 'src', 'index.ts'), 'sound', 'remove', ...args], { cwd: root, encoding: 'utf8' });
 
@@ -309,6 +375,7 @@ describe('sound remove', () => {
 
     expect(removed.status).toBe(0);
     expect(removed.stdout).toMatch(/✔ vine-boom removed from the library/);
+    expect(removed.stderr).toMatch(/! office-prank keeps its take; the licence and credit of "vine-boom" are no longer in the library/);
     expect(existsSync(join(root, 'library', 'sounds', 'vine-boom'))).toBe(false);
     expect(unknown.status).not.toBe(0);
     expect(unknown.stderr + unknown.stdout).toMatch(/no library sound "vine-boom"/);

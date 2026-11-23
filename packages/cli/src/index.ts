@@ -787,7 +787,7 @@ character
 
 const sound = program
   .command('sound')
-  .description('The workspace sound library (library/sounds/<id>/): list, add, edit, check.');
+  .description('The workspace sound library (library/sounds/<id>/): list, add, edit, remove, check.');
 
 sound
   .command('list')
@@ -850,8 +850,12 @@ sound
   .action((id: string) =>
     run(async () => {
       const { removeLibrarySound } = await import('./sound-library.js');
-      const sound = await removeLibrarySound(repoRoot(), id);
-      console.log(`✔ ${sound.id} removed from the library`);
+      const removed = await removeLibrarySound(repoRoot(), id);
+      console.log(`✔ ${removed.id} removed from the library`);
+      if (removed.used_in.length) {
+        const memes = removed.used_in.join(', ');
+        console.warn(`! ${memes} ${removed.used_in.length === 1 ? 'keeps its' : 'keep their'} take; the licence and credit of "${removed.id}" are no longer in the library`);
+      }
     }),
   );
 
