@@ -6,9 +6,9 @@ ui: false
 priority: must
 size: null
 risk: null
-depends_on: [ST-001, ST-002, ST-004]
+depends_on: [ST-001, ST-002, ST-003, ST-004]
 labels: [feature:meme]
-status: ready
+status: review
 ---
 
 ## Task
@@ -19,6 +19,7 @@ German `sound-library.de.md` like the board guide) explains:
 - every field, with examples of a good `use when` (what the sound means in a meme, not what it sounds like) and how
   to find a cue (seconds from the trimmed start to the hit)
 - `sound add|edit|remove|list|check` with examples, and that hand edits of `sound.yaml` are allowed and validated
+  (`sound remove` is ST-003's; the page ships after that story, see `OPEN_QUESTIONS.md`)
 - licences: `unknown` by default, what the release check makes of it, where to note a credit
 - what happens to memes when a sound changes or is removed
 
