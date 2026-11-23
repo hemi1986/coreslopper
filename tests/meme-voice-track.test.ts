@@ -8,7 +8,7 @@ import { parse, stringify } from 'yaml';
 import { StateSchema, TakesSchema, readJsonFile } from '@coreslopper/core';
 import { createProject } from '../packages/cli/src/new-project.ts';
 import { resolveBinary } from '../packages/cli/src/media.ts';
-import { addLibrarySound, soundDir, updateLibrarySound } from '../packages/cli/src/sound-library.ts';
+import { addLibrarySound, removeLibrarySound, soundDir, updateLibrarySound } from '../packages/cli/src/sound-library.ts';
 import { episodeTrack } from '../packages/cli/src/episode-track.ts';
 import { voiceTrack } from '../packages/cli/src/voice-track.ts';
 
@@ -105,6 +105,28 @@ describe.skipIf(!hasFfmpeg())('the voice track takes library sounds into a meme'
     expect(await readFile(join(projectDir, 'takes.json'), 'utf8')).toBe(before);
     expect(warnings).toEqual([expect.stringMatching(/"vine-boom" is no longer in the library/)]);
     await expect(episodeTrack(projectDir)).resolves.toBeDefined();
+  });
+
+  it('ST-003: A meme keeps the take of a removed sound', async () => {
+    const { workspace, projectDir } = await officePrank();
+    await addVineBoom(workspace);
+    await voiceTrack(projectDir);
+    const take = (await takesOf(projectDir)).takes['reveal-boom']!;
+    const file = join(projectDir, 'audio', 'lines', 'reveal-boom.wav');
+    const audio = await readFile(file);
+
+    await removeLibrarySound(workspace, 'vine-boom');
+
+    expect((await takesOf(projectDir)).takes['reveal-boom']).toEqual(take);
+    expect(existsSync(file)).toBe(true);
+    expect(await readFile(file)).toEqual(audio);
+    // Still current: the next voice track copies nothing for the line and only warns.
+    const warnings: string[] = [];
+    vi.spyOn(console, 'warn').mockImplementation((line: unknown) => void warnings.push(String(line)));
+    const registered = await readFile(join(projectDir, 'takes.json'), 'utf8');
+    await voiceTrack(projectDir);
+    expect(await readFile(join(projectDir, 'takes.json'), 'utf8')).toBe(registered);
+    expect(warnings).toEqual([expect.stringMatching(/"vine-boom" is no longer in the library/)]);
   });
 
   it('ST-011: A line naming a sound that never was taken and is gone stops the voice track', async () => {
