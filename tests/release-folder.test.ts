@@ -29,6 +29,7 @@ import {
   platformTextProblems,
   readYamlFile,
   releaseTodos,
+  soundLicenceTodos,
   unmarkedPlaceholders,
   withReleaseDefaults,
   releaseIdentity,
@@ -253,6 +254,19 @@ describe('TODO detection and text limits', () => {
     expect(texts['instagram.md']).not.toBe(texts['tiktok.md']);
     expect(footerLines({ ...input, kind: 'episode' }, releaseLabels('de'))).not.toContain('Neon Static – Neon Rain (Suno)');
     expect(footerLines({ ...input, kind: 'episode' }, releaseLabels('de'))).toContain('Gemacht mit coreslopper');
+  });
+
+  it('turns an unknown licence and an attribution without credit into sound TODOs', () => {
+    expect(soundLicenceTodos([{ id: 'vine-boom', licence: 'unknown' }])).toEqual([
+      'sound vine-boom: the licence is unknown; decide whether the meme may use it',
+    ]);
+    expect(soundLicenceTodos([{ id: 'vine-boom', licence: 'CC BY 4.0' }])).toEqual([
+      'sound vine-boom: the licence "CC BY 4.0" asks for a credit that is missing',
+    ]);
+    expect(soundLicenceTodos([{ id: 'vine-boom', licence: 'cc-by-sa', credit: 'by Jane' }])).toEqual([]);
+    expect(soundLicenceTodos([{ id: 'vine-boom', licence: 'own' }])).toEqual([]);
+    expect(soundLicenceTodos([{ id: 'vine-boom', licence: 'public domain, no attribution required' }])).toEqual([]);
+    expect(soundLicenceTodos([{ id: 'gone' }])).toEqual(['sound gone: its entry is missing from the library, so its licence is unknown']);
   });
 });
 
@@ -579,15 +593,51 @@ describe('release folder', () => {
     expect(plan).toContain('Post the video as a YouTube Short');
     expect(plan).not.toContain('Premiere');
   });
+
+  it('ST-016: A sound of unknown licence is a TODO', async () => {
+    const { dir, root } = await memeFixture({ licence: 'unknown' });
+    const result = await buildRelease({ projectDir: dir, root, deps: fakeDeps() });
+    expect(result.errors).toEqual([]);
+    expect(result.todos.join('\n')).toContain('vine-boom');
+    const checks = await releaseChecks(dir, fixtureProbe(), { root });
+    expect(checks.filter((check) => check.result === 'FAIL')).toEqual([]);
+    const sounds = checks.find((check) => check.name === 'Release sounds');
+    expect(sounds?.result).toBe('TODO');
+    expect(sounds?.evidence).toContain('vine-boom');
+    expect((await boardProject(dir, root)).todos.join('\n')).toContain('vine-boom');
+  });
+
+  it('ST-016: A cleared sound needs nothing', async () => {
+    const { dir, root } = await memeFixture({ licence: 'own' });
+    const result = await buildRelease({ projectDir: dir, root, deps: fakeDeps() });
+    expect(result.errors).toEqual([]);
+    expect(result.todos.join('\n')).not.toContain('vine-boom');
+    const checks = await releaseChecks(dir, fixtureProbe(), { root });
+    expect(checks.filter((check) => check.result === 'TODO').map((check) => check.evidence).join('\n')).not.toContain('vine-boom');
+    expect(checks.find((check) => check.name === 'Release sounds')?.result).toBe('PASS');
+  });
+
+  it('ST-016: A missing credit is a TODO', async () => {
+    const { dir, root } = await memeFixture({ licence: 'cc-by' });
+    const result = await buildRelease({ projectDir: dir, root, deps: fakeDeps() });
+    expect(result.errors).toEqual([]);
+    expect(result.todos.join('\n')).toContain('vine-boom');
+    const checks = await releaseChecks(dir, fixtureProbe(), { root });
+    expect(checks.filter((check) => check.result === 'FAIL')).toEqual([]);
+    const sounds = checks.find((check) => check.name === 'Release sounds');
+    expect(sounds?.result).toBe('TODO');
+    expect(sounds?.evidence).toMatch(/vine-boom.*credit/);
+  });
 });
 
 describe('release QA', () => {
   it('checks a meme without the music-video parts', async () => {
     const { dir, root } = await memeFixture();
     await buildRelease({ projectDir: dir, root, deps: fakeDeps() });
-    const checks = await releaseChecks(dir, fixtureProbe());
+    const checks = await releaseChecks(dir, fixtureProbe(), { root });
     expect(checks.filter((check) => check.result === 'FAIL')).toEqual([]);
     expect(checks.map((check) => check.name)).toContain('Release cover');
+    expect(checks.map((check) => check.name)).toContain('Release sounds');
     expect(checks.map((check) => check.name)).not.toContain('Release audio');
     expect(checks.map((check) => check.name)).not.toContain('Release Shorts');
   });

@@ -30,6 +30,7 @@ import {
   resolveAnchor,
   safeFileName,
   sha256,
+  soundLicenceTodos,
   withReleaseDefaults,
   writeJsonAtomic,
   writeTextAtomic,
@@ -40,6 +41,7 @@ import {
   type ReleaseManifest,
   type ReleaseCalendar,
   type UploadData,
+  type UsedSound,
 } from '@coreslopper/core';
 import { listShorts, shortName, shortPaths } from './release-files.js';
 import {
@@ -212,23 +214,32 @@ export function projectFormats(project: Pick<LoadedProject, 'config'>): { id: st
 }
 
 /**
- * The credit texts the project's platform texts must carry: one per library
- * sound a take was copied from (HS-261, HS-265). A sound without a credit adds
- * none; a missing or unreadable entry is the release check's business.
+ * The library sounds the project's platform texts must credit: one per sound a
+ * take was copied from (HS-261, HS-265). A sound whose entry is gone carries
+ * only its id, so the release check can report its unknown licence.
  */
-export async function usedSoundCredits(project: LoadedProject, root: string): Promise<string[]> {
+export async function usedLibrarySounds(project: LoadedProject, root: string): Promise<UsedSound[]> {
   const ids = new Set<string>();
   for (const take of [...Object.values(project.takes?.takes ?? {}), ...Object.values(project.takes?.ambience ?? {})]) {
     const id = libraryTakeSoundId(take.source);
     if (id) ids.add(id);
   }
-  const credits: string[] = [];
+  const sounds: UsedSound[] = [];
   for (const id of [...ids].sort()) {
-    // A missing or unreadable entry adds no credit; the licence check (ST-016) reports it.
     const sound = await loadLibrarySound(root, id).catch(() => undefined);
-    if (sound?.credit) credits.push(sound.credit);
+    sounds.push(sound ? { id, licence: sound.licence, credit: sound.credit } : { id });
   }
-  return credits;
+  return sounds;
+}
+
+/**
+ * The credit texts the project's platform texts must carry: one per library
+ * sound a take was copied from (HS-261, HS-265). A sound without a credit adds
+ * none; a missing entry or an unknown licence is the release check's business.
+ */
+export async function usedSoundCredits(project: LoadedProject, root: string): Promise<string[]> {
+  const sounds = await usedLibrarySounds(project, root);
+  return sounds.map((sound) => sound.credit).filter((credit): credit is string => Boolean(credit));
 }
 
 /**
@@ -247,7 +258,8 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
   // A music video releases a song; an episode and a meme release a video only.
   const music = kind === 'music-video';
   const meme = kind === 'meme';
-  const credits = meme ? await usedSoundCredits(project, root) : [];
+  const usedSounds = meme ? await usedLibrarySounds(project, root) : [];
+  const credits = usedSounds.map((sound) => sound.credit).filter((credit): credit is string => Boolean(credit));
   const dir = releaseDir(project.paths.root);
   const manifestPath = join(dir, 'manifest.json');
   const previous = existsSync(manifestPath) ? await readJsonFile(manifestPath, ReleaseManifestSchema).catch(() => undefined) : undefined;
@@ -270,6 +282,7 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
   const language = project.config.release?.language ?? (typeof song.language === 'string' ? song.language : undefined) ?? data?.language ?? channel?.language ?? 'en';
 
   if (music) todos.push(...releaseTodos(releaseFacts, channel, identity));
+  if (meme) todos.push(...soundLicenceTodos(usedSounds));
   todos.push(...channelTodos(channel));
   await mkdir(dir, { recursive: true });
 
