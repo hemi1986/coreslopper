@@ -266,4 +266,92 @@ describe('taking sets into the library', () => {
     expect(existsSync(join(setEntryDir(ws, 'bar'), entry.plates[1]!.file!))).toBe(true);
   });
 
+  it('ST-026: A different set with a taken id becomes its own entry', async () => {
+    const ws = await workspace();
+    const first = await production(
+      ws,
+      'neon-rain',
+      [bar({ refs: ['sets/bar/start.png'], plates: [{ id: 'counter', angle: 'counter, frontal', ref: 'sets/bar/plates/counter.png' }] })],
+      { 'sets/bar/start.png': 'neon-start', 'sets/bar/plates/counter.png': 'neon-counter' },
+    );
+    await importSets(ws, first);
+    const second = await production(
+      ws,
+      'after-midnight',
+      [bar({ refs: ['sets/bar/start.png'], plates: [{ id: 'counter', angle: 'counter, frontal', ref: 'sets/bar/plates/counter.png' }] })],
+      { 'sets/bar/start.png': 'midnight-start', 'sets/bar/plates/counter.png': 'midnight-counter' },
+    );
+
+    const [result] = await importSets(ws, second);
+
+    expect(result).toMatchObject({ set: 'bar', id: 'bar-after-midnight', created: true });
+    expect((await loadLibrarySet(ws, 'bar')).origin).toBe('projects/neon-rain');
+    expect((await loadLibrarySet(ws, 'bar-after-midnight')).origin).toBe('projects/after-midnight');
+    expect((await readdir(join(ws, 'library', 'sets'))).sort()).toEqual(['bar', 'bar-after-midnight']);
+  });
+
+  it('skips a set without files, but refuses it when it was named', async () => {
+    const ws = await workspace();
+    const dir = await production(
+      ws,
+      'neon-rain',
+      [bar(), bar({ id: 'lobby', name: 'Lobby', refs: ['sets/lobby/start.png'] })],
+      { 'sets/lobby/start.png': 'lobby' },
+    );
+
+    expect((await importSets(ws, dir)).map((result) => result.set)).toEqual(['lobby']);
+    await expect(importSets(ws, dir, { set: 'bar' })).rejects.toThrow(/no files/);
+    expect(existsSync(join(ws, 'library', 'sets', 'bar'))).toBe(false);
+  });
+
+  it('reports a missing file without failing the import', async () => {
+    const ws = await workspace();
+    const dir = await production(
+      ws,
+      'neon-rain',
+      [bar({ refs: ['sets/bar/start.png'], plates: [{ id: 'counter', angle: 'counter, frontal', ref: 'sets/bar/plates/counter.png' }] })],
+      { 'sets/bar/start.png': 'start' },
+    );
+
+    const [result] = await importSets(ws, dir);
+
+    expect(result!.missing).toEqual(['sets/bar/plates/counter.png']);
+    expect((await loadLibrarySet(ws, 'bar')).plates).toEqual([{ id: 'counter', angle: 'counter, frontal' }]);
+  });
+
+  it('refuses a set file outside the production', async () => {
+    const ws = await workspace();
+    await writeFile(join(ws, 'outside.png'), 'outside');
+    const dir = await production(ws, 'neon-rain', [bar({ refs: ['../outside.png'] })], {});
+
+    expect(await importSets(ws, dir)).toEqual([]);
+    const named = await production(ws, 'named', [bar({ refs: ['../outside.png'] })], {});
+    await expect(importSets(ws, named, { set: 'bar' })).rejects.toThrow(/no files/);
+  });
+
+  it('puts a set into the entry the user names', async () => {
+    const ws = await workspace();
+    await libraryBar(ws);
+    const dir = await production(
+      ws,
+      'after-midnight',
+      [bar({ plates: [{ id: 'door', angle: 'door, from inside', ref: 'sets/bar/plates/door.png' }] })],
+      { 'sets/bar/plates/door.png': 'door' },
+    );
+
+    const [result] = await importSets(ws, dir, { into: 'bar' });
+
+    expect(result).toMatchObject({ id: 'bar', created: false, added: ['door.png', 'plate:door'] });
+    await expect(importSets(ws, dir, { into: 'no-such-set' })).rejects.toThrow(/no library set/);
+  });
+
+  it('refuses a production without a set bible or an unknown set', async () => {
+    const ws = await workspace();
+    const dir = join(ws, 'projects', 'neon-rain');
+    await mkdir(dir, { recursive: true });
+    await expect(importSets(ws, dir)).rejects.toThrow(/no sets\.yaml/);
+
+    const other = await production(ws, 'other', [bar()], {});
+    await expect(importSets(ws, other, { set: 'lobby' })).rejects.toThrow(/no set "lobby"/);
+  });
 });
