@@ -407,6 +407,33 @@ describe('taking sets into the library', () => {
     expect((await loadLibrarySet(ws, 'bar')).plates).toEqual([{ id: 'counter', angle: 'counter, frontal', file: 'counter.png' }]);
   });
 
+  it('repairs a plate whose named image is missing on disk', async () => {
+    const ws = await workspace();
+    await addLibrarySet(ws, { name: 'Bar', description: 'A narrow bar in blue neon.', prompt: 'narrow bar, blue neon, wet counter' });
+    await writeFile(
+      join(setEntryDir(ws, 'bar'), 'set.yaml'),
+      stringify({
+        version: 1,
+        id: 'bar',
+        name: 'Bar',
+        description: 'A narrow bar in blue neon.',
+        prompt: 'narrow bar, blue neon, wet counter',
+        plates: [{ id: 'counter', angle: 'counter, frontal', file: 'gone.png' }],
+        origin: 'manual',
+        added: '2026-11-23T09:00:00.000Z',
+      }),
+    );
+    const dir = await production(ws, 'neon-rain', [bar({ library: 'bar', plates: [{ id: 'counter', angle: 'counter, frontal', ref: 'sets/bar/plates/door.png' }] })], {
+      'sets/bar/plates/door.png': 'door',
+    });
+
+    const [result] = await importSets(ws, dir);
+
+    expect(result).toMatchObject({ created: false, added: ['door.png', 'plate:counter'] });
+    expect((await loadLibrarySet(ws, 'bar')).plates).toEqual([{ id: 'counter', angle: 'counter, frontal', file: 'door.png' }]);
+    expect(existsSync(join(setEntryDir(ws, 'bar'), 'door.png'))).toBe(true);
+  });
+
   it('records every later import, even one that brings nothing new', async () => {
     const ws = await workspace();
     await libraryBar(ws);

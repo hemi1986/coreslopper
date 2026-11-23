@@ -275,7 +275,8 @@ export async function importSets(root: string, sourceDir: string, options: Impor
         plateAdds.push(`plate:${plate.id}`);
         continue;
       }
-      if (same.file && target && same.file !== target) {
+      const onDisk = same.file !== undefined && existsSync(join(setEntryDir(root, id), same.file));
+      if (same.file && target && same.file !== target && onDisk) {
         // The same plate id with another image becomes a new plate, never an overwrite.
         const plateId = freePlateId(entry, `${plate.id}-${slug}`);
         entry.plates.push({ id: plateId, angle: plate.angle, ...(plate.prompt ? { prompt: plate.prompt } : {}), file: target });
@@ -283,7 +284,7 @@ export async function importSets(root: string, sourceDir: string, options: Impor
         continue;
       }
       let filled = false;
-      if (!same.file && target) {
+      if ((!same.file || !onDisk) && target) {
         same.file = target;
         filled = true;
       }
