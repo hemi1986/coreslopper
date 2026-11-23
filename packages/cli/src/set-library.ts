@@ -1,9 +1,9 @@
 import { existsSync } from 'node:fs';
-import { mkdir, readdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdir, readdir, stat } from 'node:fs/promises';
+import { basename, extname, join } from 'node:path';
 import { stringify } from 'yaml';
 import { LibrarySetSchema, ValidationError, isScriptId, readYamlFile, writeTextAtomic, type LibrarySet } from '@coreslopper/core';
-import { copyByContent, entryText, fileHash, libraryEntryDir, libraryEntryFile, parseTags, slugOfName } from './library-entry.js';
+import { LIBRARY_FILE_LIMITS, copyByContent, entryText, fileHash, libraryEntryDir, libraryEntryFile, parseTags, slugOfName } from './library-entry.js';
 
 // The workspace's set library: `library/sets/<id>/set.yaml` with the set's
 // files next to it (ADR 0052). The user adds sets and their files by hand
@@ -93,6 +93,14 @@ export async function addLibrarySetFile(root: string, id: string, source: string
   if (!existsSync(source)) throw new ValidationError(`missing file: ${source}`);
   const { role } = options;
   if (role !== 'ref' && role !== 'plate') throw new ValidationError('role must be ref or plate');
+  const extension = extname(source).toLowerCase();
+  if (!(LIBRARY_FILE_LIMITS.images as readonly string[]).includes(extension)) {
+    throw new ValidationError(`a set image is a png, jpg or webp; got ${extension || 'no extension'}`);
+  }
+  const bytes = (await stat(source)).size;
+  if (bytes > LIBRARY_FILE_LIMITS.bytes) {
+    throw new ValidationError(`a set file is at most ${LIBRARY_FILE_LIMITS.bytes / (1024 * 1024)} MB; ${basename(source)} is ${(bytes / (1024 * 1024)).toFixed(1)} MB`);
+  }
   if (role === 'ref' && (options.angle !== undefined || options.plate !== undefined)) {
     throw new ValidationError('--angle and --plate belong to a plate; add --role plate');
   }
