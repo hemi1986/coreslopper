@@ -8,8 +8,9 @@ import { parse, stringify } from 'yaml';
 import { StateSchema, TakesSchema, readJsonFile } from '@coreslopper/core';
 import { createProject } from '../packages/cli/src/new-project.ts';
 import { resolveBinary } from '../packages/cli/src/media.ts';
-import { addLibrarySound, soundDir, updateLibrarySound } from '../packages/cli/src/sound-library.ts';
+import { addLibrarySound, removeLibrarySound, soundDir, updateLibrarySound } from '../packages/cli/src/sound-library.ts';
 import { episodeTrack } from '../packages/cli/src/episode-track.ts';
+import { takeStatus } from '../packages/cli/src/takes.ts';
 import { voiceTrack } from '../packages/cli/src/voice-track.ts';
 
 // ST-011: the voice track copies a sound line's library sound into the meme as a take (POL-TakeChosenLibrarySounds).
@@ -97,7 +98,7 @@ describe.skipIf(!hasFfmpeg())('the voice track takes library sounds into a meme'
     await voiceTrack(projectDir);
     const before = await readFile(join(projectDir, 'takes.json'), 'utf8');
 
-    await rm(soundDir(workspace, 'vine-boom'), { recursive: true });
+    await removeLibrarySound(workspace, 'vine-boom');
     const warnings: string[] = [];
     vi.spyOn(console, 'warn').mockImplementation((line: unknown) => void warnings.push(String(line)));
     await voiceTrack(projectDir);
@@ -105,6 +106,23 @@ describe.skipIf(!hasFfmpeg())('the voice track takes library sounds into a meme'
     expect(await readFile(join(projectDir, 'takes.json'), 'utf8')).toBe(before);
     expect(warnings).toEqual([expect.stringMatching(/"vine-boom" is no longer in the library/)]);
     await expect(episodeTrack(projectDir)).resolves.toBeDefined();
+  });
+
+  it('ST-003: A meme keeps the take of a removed sound', async () => {
+    const { workspace, projectDir } = await officePrank();
+    await addVineBoom(workspace);
+    await voiceTrack(projectDir);
+    const take = (await takesOf(projectDir)).takes['reveal-boom']!;
+    const file = join(projectDir, 'audio', 'lines', 'reveal-boom.wav');
+    const audio = await readFile(file);
+
+    await removeLibrarySound(workspace, 'vine-boom');
+
+    // HS-260: the take keeps what it was made from, so its own text hash is still the expected one.
+    expect((await takesOf(projectDir)).takes['reveal-boom']).toEqual(take);
+    expect(existsSync(file)).toBe(true);
+    expect(await readFile(file)).toEqual(audio);
+    expect(await takeStatus(take, file, take.text_hash)).toBe('current');
   });
 
   it('ST-011: A line naming a sound that never was taken and is gone stops the voice track', async () => {

@@ -1,7 +1,8 @@
+import { randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { existsSync, statSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, readdir, rename, rm } from 'node:fs/promises';
-import { basename, dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, relative, resolve } from 'node:path';
 import { stringify } from 'yaml';
 import {
   LIBRARY_SOUND_ENTRY,
@@ -28,6 +29,8 @@ const ID = /^[a-z0-9][a-z0-9_-]*$/;
 
 /** The folder `sound add` converts into before it renames it to the id. */
 const INCOMING = '.incoming-';
+/** The hidden folder a removal renames into before it deletes it; dot names are no library entry. */
+const REMOVING = '.removing-';
 
 export const soundLibraryRoot = (root: string) => join(root, 'library', 'sounds');
 export const soundDir = (root: string, id: string) => join(soundLibraryRoot(root), checkId(id));
@@ -266,6 +269,43 @@ export async function addLibrarySound(root: string, input: NewLibrarySound, now 
   }
 }
 
+/** EVT-LibrarySoundRemoved: the entry that left the library, and the memes whose take keeps it. */
+export interface RemovedLibrarySound {
+  id: string;
+  /** The entry as it was, when its `sound.yaml` still loaded; a broken entry is removed all the same. */
+  sound?: LibrarySound;
+  /** Slugs of the memes whose take registry has a take of source `library:<id>`, sorted. */
+  used_in: string[];
+}
+
+/**
+ * CMD-RemoveLibrarySound (`sound remove`): delete a library sound's entry and
+ * its file (EVT-LibrarySoundRemoved). The folder's presence decides, not its
+ * `sound.yaml`: an entry a hand edit broke is removed all the same. The folder
+ * is renamed into a hidden `.removing-` first, so a failed delete leaves a
+ * hidden leftover instead of a half-deleted entry. Memes that took the sound
+ * keep their takes (HS-260): nothing outside the library is touched, and the
+ * caller is told which memes they are.
+ */
+export async function removeLibrarySound(root: string, id: string): Promise<RemovedLibrarySound> {
+  const folder = soundDir(root, id);
+  if (!existsSync(folder)) throw new ValidationError(`no library sound "${id}" (${folder})`);
+  const sound = await loadLibrarySound(root, id).catch(() => undefined);
+  const usedIn = (await soundUses(root)).get(id) ?? [];
+  const trash = join(soundLibraryRoot(root), `${REMOVING}${randomUUID()}`);
+  try {
+    await rename(folder, trash);
+  } catch (error) {
+    throw new ValidationError(`could not remove library sound "${id}": ${errorLine(error)}`);
+  }
+  try {
+    await rm(trash, { recursive: true, force: true });
+  } catch (error) {
+    throw new ValidationError(`library sound "${id}" left the library, but its folder ${relative(root, trash)} could not be deleted: ${errorLine(error)}; delete it by hand`);
+  }
+  return { id, ...(sound ? { sound } : {}), used_in: usedIn };
+}
+
 /** What `sound edit` may change; undefined keeps a field, an empty value clears an optional one. */
 export interface LibrarySoundChanges {
   title?: unknown;
@@ -379,19 +419,20 @@ export async function checkSoundLibrary(root: string): Promise<SoundLibraryCheck
     .filter((entry) => !entry.name.startsWith('.'))
     // Code-unit order, as `sound list`, so the check prints the same order on every machine.
     .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  const removeHint = (name: string) => `sound remove ${ID.test(name) ? name : '<id>'}`;
   const entries: { id: string; file: string; wav: string; sound: LibrarySound; hash: string }[] = [];
   for (const entry of names) {
     const folder = join(dir, entry.name);
     if (!entry.isDirectory()) {
-      issues.push({ kind: 'missing-entry', id: entry.name, message: `"${entry.name}" is a file without an entry next to the folders – sound add <file> --title … stores it in its own folder` });
+      issues.push({ kind: 'missing-entry', id: entry.name, message: `"${entry.name}" is a file without an entry next to the folders – sound add <file> --title … stores it in its own folder, ${removeHint(entry.name)} deletes it` });
       continue;
     }
     if (!existsSync(join(folder, LIBRARY_SOUND_ENTRY))) {
-      issues.push({ kind: 'missing-entry', id: entry.name, message: `"${entry.name}" is a file without an entry: the folder holds no ${LIBRARY_SOUND_ENTRY} – sound add <file> --title … adds one, a folder never becomes an entry by itself` });
+      issues.push({ kind: 'missing-entry', id: entry.name, message: `"${entry.name}" is a file without an entry: the folder holds no ${LIBRARY_SOUND_ENTRY} – sound add <file> --title … adds one, ${removeHint(entry.name)} deletes the folder` });
       continue;
     }
     if (!existsSync(join(folder, LIBRARY_SOUND_FILE))) {
-      issues.push({ kind: 'missing-file', id: entry.name, message: `"${entry.name}" is an entry without a file: ${LIBRARY_SOUND_FILE} is missing from its folder – copy it back or remove the entry` });
+      issues.push({ kind: 'missing-file', id: entry.name, message: `"${entry.name}" is an entry without a file: ${LIBRARY_SOUND_FILE} is missing from its folder – copy it back, or ${removeHint(entry.name)} removes the entry` });
       continue;
     }
     // The rules of a hand edit: the schema, the id is the folder's name, the WAV is there (CMD-ValidateLibrarySound).

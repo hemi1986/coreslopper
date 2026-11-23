@@ -787,7 +787,7 @@ character
 
 const sound = program
   .command('sound')
-  .description('The workspace sound library (library/sounds/<id>/): list, add, edit, check.');
+  .description('The workspace sound library (library/sounds/<id>/): list, add, edit, remove, check.');
 
 sound
   .command('list')
@@ -841,6 +841,21 @@ sound
       const { updateLibrarySound } = await import('./sound-library.js');
       const { sound: entry, changed } = await updateLibrarySound(repoRoot(), id, options);
       console.log(changed ? `✔ ${entry.id} updated: ${entry.title} – ${entry.use_when}${entry.tags.length ? ` [${entry.tags.join(', ')}]` : ''}` : `✔ ${entry.id}: nothing changed`);
+    }),
+  );
+
+sound
+  .command('remove <id>')
+  .description('Delete a library sound and its file. A meme that took it keeps its take; the voice track only warns that its library sound is gone.')
+  .action((id: string) =>
+    run(async () => {
+      const { removeLibrarySound } = await import('./sound-library.js');
+      const removed = await removeLibrarySound(repoRoot(), id);
+      console.log(`✔ ${removed.id} removed from the library`);
+      if (removed.used_in.length) {
+        const memes = removed.used_in.join(', ');
+        console.warn(`! ${memes} ${removed.used_in.length === 1 ? 'keeps its' : 'keep their'} take; the licence and credit of "${removed.id}" are no longer in the library`);
+      }
     }),
   );
 
