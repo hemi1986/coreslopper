@@ -73,7 +73,8 @@ state in memory), one core transition (`setStageRunning`, `setStageDone`, `setSt
 - The bibles' rules are schemas in core (`schema.ts`); the character library's rules – entry matching, content
   dedupe, import and use – live in `packages/cli/src/character-library.ts`, and the display rules, file types and
   reference kinds are repeated in the CLI and the board's JS (G-132). The set library (`set-library.ts`, ADR 0052)
-  shares the entry id, field text, tags and name→id with it through `library-entry.ts`. Library, `references.yaml`
+  shares the entry id, field text, tags, name→id, file limits and the content-wise copy with it through
+  `library-entry.ts`. Library, `references.yaml`
   and character-use writes are atomic but unlocked (G-130). An episode's bibles are the canon's: read them through `loadProject`,
   never from the episode folder.
 - Rendering: the CLI owns all input, output and encoding. `buildVideoProps` (`packages/cli/src/render.ts`) turns

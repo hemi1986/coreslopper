@@ -817,8 +817,8 @@ set
     run(async () => {
       const { addLibrarySetFile } = await import('./set-library.js');
       const role = validateChoice(options.role, ['ref', 'plate'] as const, 'role');
-      await addLibrarySetFile(repoRoot(), id, file, { role, angle: options.angle, plate: options.plate });
-      console.log(`✔ ${basename(file)} → ${id} (${role})`);
+      const result = await addLibrarySetFile(repoRoot(), id, file, { role, angle: options.angle, plate: options.plate });
+      console.log(result.changed ? `✔ ${basename(file)} → ${id} (${role})` : `✔ ${basename(file)} is already in ${id}`);
     }),
   );
 

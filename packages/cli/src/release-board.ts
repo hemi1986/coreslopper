@@ -9,6 +9,7 @@ import { loadEvents, loadSnapshot } from './production-watch.js';
 import { editNote, reviewData, submitRound } from './board-review.js';
 import { SLUG, productionDetail, productionOverview, productionSeries, projectDirs, seriesDirs } from './board-production.js';
 import { loadCalendar, updateStatus } from './release-calendar.js';
+import { LIBRARY_FILE_LIMITS } from './library-entry.js';
 import { releaseDir } from './release.js';
 
 // The board: a local web page over the workspace. Its production view shows
@@ -315,7 +316,7 @@ export function boardHandler(options: BoardOptions = {}) {
       if (role !== 'ref' && role !== 'sheet' && role !== 'voice') throw new ValidationError('role must be ref, sheet, or voice');
       const file = await library.libraryFileTarget(root, id, query.get('name') ?? '', role);
       const { receiveUpload } = await import('./board-wizard.js');
-      await receiveUpload(req, file, library.LIBRARY_FILE_LIMITS.bytes);
+      await receiveUpload(req, file, LIBRARY_FILE_LIMITS.bytes);
       try {
         await library.recordLibraryFile(root, id, file, role, query.get('transcript') ?? undefined, now());
       } catch (error) {

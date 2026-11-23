@@ -35,9 +35,6 @@ import {
 // each continuity state only when chosen. Nothing in a project points into
 // the library, so a later change there never touches a finished video.
 
-/** `release-board` serves uploads under the same limit as a manual add. */
-export { LIBRARY_FILE_LIMITS };
-
 export const libraryRoot = (root: string) => join(root, 'library', 'characters');
 export const entryDir = (root: string, id: string) => libraryEntryDir(root, 'characters', id);
 const entryFile = (root: string, id: string) => libraryEntryFile(root, 'characters', id);
@@ -178,7 +175,7 @@ export async function importCharacters(root: string, sourceDir: string, options:
     }
     const id = options.into ?? (await matchEntry(root, character, files, slug));
     const created = !existsSync(entryFile(root, id));
-    const { names, added } = await copyByContent(files, entryDir(root, id), 'character.yaml');
+    const { names, added } = await copyByContent(files, entryDir(root, id), 'characters');
     const name = (path: string | undefined) => (path ? names.get(resolve(sourceDir, path)) : undefined);
     const entry: LibraryCharacter = created
       ? {
@@ -394,7 +391,7 @@ export async function useCharacter(root: string, targetDir: string, id: string, 
   const absent = names.filter((name) => !existsSync(source(name)));
   if (absent.length) throw new ValidationError(`library files of ${id} are missing: ${absent.join(', ')}`);
   const folder = join(targetDir, 'characters', id);
-  const { names: copied, added } = await copyByContent(names.map(source), folder, 'character.yaml');
+  const { names: copied, added } = await copyByContent(names.map(source), folder, 'characters');
   const rel = (name: string | undefined) => (name ? `characters/${id}/${copied.get(source(name))}` : undefined);
 
   const file = join(targetDir, 'characters.yaml');

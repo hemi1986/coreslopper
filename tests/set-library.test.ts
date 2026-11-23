@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, rm, truncate, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -112,9 +112,51 @@ describe('adding a file to a library set', () => {
     const { ws, dir, source } = await withSet();
     const animated = await source('bar.gif');
 
-    await expect(addLibrarySetFile(ws, 'neon-bar', animated, { role: 'ref' })).rejects.toThrow(/png, jpg or webp/);
+    await expect(addLibrarySetFile(ws, 'neon-bar', animated, { role: 'ref' })).rejects.toThrow(/\.png \.jpg \.jpeg \.webp/);
 
     expect((await loadLibrarySet(ws, 'neon-bar')).refs).toEqual([]);
+    expect(await readdir(dir)).toEqual(['set.yaml']);
+  });
+
+  it('takes a plate id given with --plate', async () => {
+    const { ws, source } = await withSet();
+    const image = await source('counter.png');
+
+    await addLibrarySetFile(ws, 'neon-bar', image, { role: 'plate', angle: 'counter, frontal', plate: 'wide-shot' });
+
+    expect((await loadLibrarySet(ws, 'neon-bar')).plates).toMatchObject([{ id: 'wide-shot', angle: 'counter, frontal', file: 'counter.png' }]);
+  });
+
+  it('refuses a file over 512 MB', async () => {
+    const { ws, dir } = await withSet();
+    const huge = join(ws, 'huge.png');
+    await writeFile(huge, '');
+    await truncate(huge, 512 * 1024 * 1024 + 1);
+
+    await expect(addLibrarySetFile(ws, 'neon-bar', huge, { role: 'ref' })).rejects.toThrow(/at most 512 MB/);
+
+    expect(await readdir(dir)).toEqual(['set.yaml']);
+  });
+
+  it('stores a source name the entry schema accepts, not an unnamed file', async () => {
+    const { ws, dir, source } = await withSet();
+    const odd = await source('_bar.png');
+
+    await addLibrarySetFile(ws, 'neon-bar', odd, { role: 'ref' });
+
+    expect((await loadLibrarySet(ws, 'neon-bar')).refs).toEqual(['bar.png']);
+    expect((await readdir(dir)).sort()).toEqual(['bar.png', 'set.yaml']);
+    expect(await validateChangedFile(join(dir, 'set.yaml'))).toBe('library set');
+    await expect(addLibrarySetFile(ws, 'neon-bar', odd, { role: 'ref' })).resolves.toMatchObject({ changed: false, added: [] });
+  });
+
+  it('refuses a source that is not a file', async () => {
+    const { ws, dir } = await withSet();
+    const folder = join(ws, 'bar.png');
+    await mkdir(folder);
+
+    await expect(addLibrarySetFile(ws, 'neon-bar', folder, { role: 'ref' })).rejects.toThrow(/not a file/);
+
     expect(await readdir(dir)).toEqual(['set.yaml']);
   });
 });
