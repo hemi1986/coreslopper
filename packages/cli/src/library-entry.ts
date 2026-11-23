@@ -6,12 +6,12 @@ import { ValidationError, isScriptId } from '@coreslopper/core';
 // required/optional field text, tags, and the id a name becomes. The sound
 // library stays its own context (ADR 0051) and keeps its own refusal type.
 
-export type LibraryEntryKind = 'characters' | 'sets';
-
 const KINDS = {
   characters: { noun: 'character', file: 'character.yaml' },
   sets: { noun: 'set', file: 'set.yaml' },
 } as const;
+
+export type LibraryEntryKind = keyof typeof KINDS;
 
 /** 80 characters keeps an entry id safe as a folder name on every filesystem. */
 const MAX_ID = 80;

@@ -1,6 +1,5 @@
 import { existsSync } from 'node:fs';
 import { mkdir, readdir } from 'node:fs/promises';
-import { join } from 'node:path';
 import { stringify } from 'yaml';
 import { LibrarySetSchema, ValidationError, readYamlFile, writeTextAtomic, type LibrarySet } from '@coreslopper/core';
 import { entryText, libraryEntryDir, libraryEntryFile, parseTags, slugOfName } from './library-entry.js';
@@ -11,7 +10,6 @@ import { entryText, libraryEntryDir, libraryEntryFile, parseTags, slugOfName } f
 // and every plate. Nothing in a production points into the library, so a later
 // change there never touches a finished video.
 
-export const setLibraryRoot = (root: string) => join(root, 'library', 'sets');
 export const setEntryDir = (root: string, id: string) => libraryEntryDir(root, 'sets', id);
 const setEntryFile = (root: string, id: string) => libraryEntryFile(root, 'sets', id);
 
@@ -31,11 +29,11 @@ async function saveLibrarySet(root: string, entry: LibrarySet): Promise<void> {
  * entry would not name (the aggregate's "every file in the entry's folder is
  * named by set.yaml"). An empty folder left by an interrupted write is reused.
  */
-async function idTaken(root: string, id: string): Promise<boolean> {
+async function idTaken(root: string, id: string): Promise<'entry' | 'files' | undefined> {
   const dir = setEntryDir(root, id);
-  if (!existsSync(dir)) return false;
-  if (existsSync(setEntryFile(root, id))) return true;
-  return (await readdir(dir)).length > 0;
+  if (!existsSync(dir)) return undefined;
+  if (existsSync(setEntryFile(root, id))) return 'entry';
+  return (await readdir(dir)).length > 0 ? 'files' : undefined;
 }
 
 export interface NewLibrarySet {
@@ -54,7 +52,9 @@ export interface NewLibrarySet {
 export async function addLibrarySet(root: string, input: NewLibrarySet, now = new Date()): Promise<LibrarySet> {
   const name = entryText(input.name, 'name', 200, true)!;
   const id = slugOfName(name, 'set');
-  if (await idTaken(root, id)) throw new ValidationError(`the library has a set "${id}" already`);
+  const taken = await idTaken(root, id);
+  if (taken === 'entry') throw new ValidationError(`the library has a set "${id}" already`);
+  if (taken === 'files') throw new ValidationError(`the library folder for "${id}" holds files a set.yaml would not name; move them or choose another name`);
   const entry = LibrarySetSchema.parse({
     version: 1,
     id,

@@ -49,7 +49,7 @@ describe('adding a library set by hand', () => {
     const other = await workspace();
     await mkdir(join(other, 'library', 'sets', 'neon-bar'), { recursive: true });
     await writeFile(join(other, 'library', 'sets', 'neon-bar', 'stray.png'), 'not named by set.yaml');
-    await expect(addLibrarySet(other, neonBar)).rejects.toThrow(/already/);
+    await expect(addLibrarySet(other, neonBar)).rejects.toThrow(/holds files/);
   });
 
   it('ST-024: A set without a prompt is refused', async () => {
