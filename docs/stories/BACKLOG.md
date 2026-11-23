@@ -4,15 +4,20 @@
 
 **Progress: 9 of 24 domain stories done** · scenarios 33 of 80
 
-**42 stories** · In Progress: 0 · Ready: 23 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 19 · Superseded: 0
+**42 stories** · In Progress: 1 · Ready: 22 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 19 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
+
+## In Progress
+
+| ID | Title | Type | Context | Priority | Size | Risk | Depends on |
+|---|---|---|---|---|---|---|---|
+| [ST-004](ST-004-check-the-sound-library.md) | Check the sound library after hand edits | domain | Sound library | should | – | – | ST-001 |
 
 ## Ready
 
 | ID | Title | Type | Context | Priority | Size | Risk | Depends on |
 |---|---|---|---|---|---|---|---|
-| [ST-004](ST-004-check-the-sound-library.md) | Check the sound library after hand edits | domain | Sound library | should | – | – | ST-001 |
 | [ST-017](ST-017-document-the-sound-library.md) | Document how the user maintains the sound library | task | – | must | – | – | ST-001, ST-002, ST-004 |
 | [ST-003](ST-003-remove-a-library-sound.md) | Remove a library sound | domain | Sound library | should | – | – | ST-001 |
 | [ST-012](ST-012-a-shot-lands-on-the-sound-cue.md) | A shot lands on a sound's cue | domain | Storyboard | should | – | – | ST-011 |
