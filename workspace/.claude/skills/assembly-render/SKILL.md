@@ -64,6 +64,11 @@ The round and notes files are the user's: read them, write only the replies file
 - Check every `ChatWindow` shot in the preview: the message types itself out and stays readable at the format's size.
 - Record `renders/preview-<format>.mp4` with `stage-done ... assembly`.
 
+## Memes
+
+- The master is the meme's one format, 9:16 (`renders/9x16.mp4`); every step above applies with that format.
+- The render burns in the meme's German subtitles from `subtitles` in `project.yaml` (`de` by default, `off` for none). Do not render a separate `.en.mp4`: English subtitles for a meme are out of scope.
+
 ## Completion criteria
 
 - The preview exists and plays with the song.

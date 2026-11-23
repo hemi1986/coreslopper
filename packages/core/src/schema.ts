@@ -37,6 +37,9 @@ export function isScriptId(value: string): boolean {
 /** What a project produces. A missing kind means `music-video`. */
 export const ProjectKindSchema = z.enum(['music-video', 'episode', 'meme']);
 
+/** The language of a project's subtitles: English (translated), German (as spoken), or none. */
+export const SubtitleLanguageSchema = z.enum(['en', 'de', 'off']);
+
 /** Whether a project is released on the platforms (`public`) or only shared privately (`internal`). */
 export const DistributionSchema = z.enum(['public', 'internal']);
 
@@ -137,10 +140,15 @@ export const ProjectConfigSchema = z
     release: ReleaseMetadataSchema.optional(),
     /** `internal`: never released publicly (a teaser sent by mail or chat), so no release package and no calendar. Unset is `public`. */
     distribution: DistributionSchema.optional(),
+    /** The subtitle language; unset means `de` for a meme and `en` for an episode (HS-263). */
+    subtitles: SubtitleLanguageSchema.optional(),
   })
   .superRefine((config, ctx) => {
     if (config.kind === 'meme') {
       for (const message of memeFormatProblems(config.formats)) ctx.addIssue({ code: 'custom', path: ['formats'], message });
+      if (config.subtitles === 'en') {
+        ctx.addIssue({ code: 'custom', path: ['subtitles'], message: "a meme's subtitles are German (de) or off; an English version is not supported yet" });
+      }
     }
     if (config.kind !== 'episode') return;
     for (const key of ['series', 'episode'] as const) {
@@ -149,6 +157,16 @@ export const ProjectConfigSchema = z
       }
     }
   });
+
+/**
+ * The language of a project's subtitles: its `subtitles` setting, else `de` for a meme (German speech, burned in)
+ * and `en` for an episode; a music video has none (HS-263).
+ */
+export function subtitleLanguage(config: Pick<ProjectConfig, 'kind' | 'subtitles'>): 'en' | 'de' | 'off' {
+  if (config.subtitles) return config.subtitles;
+  if (config.kind === 'meme') return 'de';
+  return config.kind === 'episode' ? 'en' : 'off';
+}
 
 /** `templates/meme/project.yaml`: what every meme starts with – its kind and its one 9:16 format. */
 export const MemeTemplateSchema = z.object({

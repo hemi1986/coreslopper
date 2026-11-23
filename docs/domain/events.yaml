@@ -417,14 +417,14 @@ aggregates:
     context: BC-Render
     status: as-is
     evidence:
-      - one file per format and variant, renders/[preview-]<format>[.en].mp4, written whole – rendered in segments under .cache/render/, joined, the song muxed once, and only then copied over the old file (packages/cli/src/render.ts:182-184,293-445)
-      - a whole render of a format – not a preview, not --frames, not --out – is recorded in state.json artifacts as render:<file>:inputs (the hash of the props, the song's bytes and crf 18) and render:<file>:sha256 (render.ts:267-291,431-433); release renders a format again when it is missing or its recorded inputs hash differs from the current one (packages/cli/src/release.ts:237-262)
+      - one file per format and variant, renders/[preview-]<format>[.en].mp4, written whole – rendered in segments under .cache/render/, joined, the song muxed once, and only then copied over the old file (packages/cli/src/render.ts:193-195,305-456)
+      - a whole render of a format – not a preview, not --frames, not --out – is recorded in state.json artifacts as render:<file>:inputs (the hash of the props, the song's bytes and crf 18) and render:<file>:sha256 (render.ts:279-303,443-445); release renders a format again when it is missing or its recorded inputs hash differs from the current one (packages/cli/src/release.ts:237-262)
     invariants:
       - Every format of a project is a render of the one MusicVideo composition at the format's size and the master's frame rate; a derivative is rendered again, never cropped from the master (the code does this, packages/remotion/src/Root.tsx:7-24; render.ts:60-71)
-      - The song is the only sound – clips and footage are muted, and the song is muxed once after the segments are joined (the code does this, packages/remotion/src/components/MediaLayer.tsx:78; render.ts:375-429)
+      - The song is the only sound – clips and footage are muted, and the song is muxed once after the segments are joined (the code does this, packages/remotion/src/components/MediaLayer.tsx:78; render.ts:428-440)
       - A recorded render is the file it records – only a whole render of the format writes renders/<format>.mp4 (decided 2026-11-22, HS-146; a --frames render overwrites it unrecorded – gap register)
       - A recorded render is current only while everything that decides its pixels and sound is unchanged – the props, the song, the asset files and the renderer's code (decided 2026-11-22, HS-147; the inputs hash leaves out asset bytes and code – gap register)
-      - A preview is never recorded and never goes into the release (the code does this, render.ts:431; release.ts:239-262)
+      - A preview is never recorded and never goes into the release (the code does this, render.ts:443; release.ts:239-262)
       - One render of a project runs at a time (decided 2026-11-22, HS-155; only the skill says so, and two renders of the same output share and delete one work folder – gap register)
   - id: AGG-Short
     name: Short
@@ -888,7 +888,7 @@ events:
     name: Subtitles written
     context: BC-ScriptedAudio
     data: [Cues, Language, File]
-    description: "renders/<slug>.en.srt from the script and the effective timing; render --subtitles en burns the same cues in (packages/cli/src/subtitles.ts; render.ts:155-160)"
+    description: "renders/<slug>.en.srt from the script and the effective timing; render --subtitles en burns the same cues in (packages/cli/src/subtitles.ts; render.ts:156-173)"
   - id: EVT-LipSyncAudioCut
     name: Lip-sync audio cut
     context: BC-ScriptedAudio
@@ -1028,23 +1028,23 @@ events:
     name: Preview rendered
     aggregate: AGG-Render
     data: [Format, Scale, Preview file]
-    description: "render --preview: the whole format at half scale and crf 22 as renders/preview-<format>.mp4, never recorded; the assembly stage's output (packages/cli/src/render.ts:182-184,383-385; packages/core/src/state.ts:75-80)"
+    description: "render --preview: the whole format at half scale and crf 22 as renders/preview-<format>.mp4, never recorded; the assembly stage's output (packages/cli/src/render.ts:193-195,395; packages/core/src/state.ts:75-80)"
   - id: EVT-PassageRendered
     name: Passage rendered
     aggregate: AGG-Render
     data: [Format, Frames, File]
-    description: "render --frames <start>-<end>: a test render of one passage, never recorded; without --out it writes renders/<format>.mp4, the whole render's file (render.ts:301-303,431; HS-146)"
+    description: "render --frames <start>-<end>: a test render of one passage, never recorded; without --out it writes renders/<format>.mp4, the whole render's file (render.ts:311-313,443; HS-146)"
   - id: EVT-FormatRendered
     name: Format rendered
     aggregate: AGG-Render
     pivotal: true
     data: [Format, Width, Height, Frame rate, Subtitles, Inputs hash, File hash]
-    description: "A whole render of one format, recorded in state.json (render.ts:267-291,431-433); with --subtitles en the burned-in version renders/<format>.en.mp4, recorded the same way"
+    description: "A whole render of one format, recorded in state.json (render.ts:279-303,443-445); a meme's render carries its German subtitles, an episode's English ones only with --subtitles en (renders/<format>.en.mp4), recorded the same way"
   - id: EVT-StillRendered
     name: Still rendered
     context: BC-Render
     data: [Format, Frame, Scale, Still file]
-    description: "render --still <frame>: one frame as renders/still-<frame>.png; the name has no format and --out is ignored, so a still of another format replaces it (render.ts:316-331)"
+    description: "render --still <frame>: one frame as renders/still-<frame>.png; the name has no format and --out is ignored, so a still of another format replaces it (render.ts:329-343)"
   - id: EVT-RenderFailed
     name: Render failed
     aggregate: AGG-Render
@@ -1832,7 +1832,7 @@ commands:
     produces: [EVT-SubtitlesWritten]
     description: "subtitles in qa-export; cues from the subtitled lines and the sfx lines with on-screen text, in playing order, timed by the effective timing"
     rules:
-      - Subtitles are English only today (render.ts:42-43; HS-113)
+      - The subtitles this command writes are English (render.ts:43-44; HS-113); burned-in subtitles follow the project's subtitle language (HS-263, ST-014)
   - id: CMD-CutLipSyncAudio
     name: Cut lip-sync audio
     actor: ACT-StageRunner
@@ -2016,7 +2016,7 @@ commands:
     produces: [EVT-PreviewRendered, EVT-RenderFailed]
     description: "render <project> [--format <id>] --preview, after validate, in assembly and in every fix pass (workspace/.claude/skills/assembly-render/SKILL.md)"
     rules:
-      - The project validates first; render runs validateProject (the code does this, packages/cli/src/render.ts:137-180)
+      - The project validates first; render runs validateProject (the code does this, packages/cli/src/render.ts:138-192)
   - id: CMD-RenderPassage
     name: Render a passage
     actor: ACT-StageRunner
@@ -2030,12 +2030,12 @@ commands:
     actor: ACT-StageRunner
     aggregate: AGG-Render
     produces: [EVT-FormatRendered, EVT-RenderFailed]
-    description: "render <project> [--format <id>] [--subtitles en]; without --format the master. The stage runner renders the master in assembly and every configured format in qa-export; release renders a format again when it is missing or stale (render.ts:293-445; packages/cli/src/release.ts:237-262)"
+    description: "render <project> [--format <id>] [--subtitles en]; without --format the master, and a meme burns in subtitles from its project setting while an episode takes --subtitles en. The stage runner renders the master in assembly and every configured format in qa-export; release renders a format again when it is missing or stale (render.ts:305-456; packages/cli/src/release.ts:237-262)"
     rules:
       - The format is the master or a configured derivative, one of 16x9, 9x16, 1x1 and 4x5; the size comes from project.yaml, the frame rate is always the master's (the code does this, render.ts:46-71; HS-150)
-      - Subtitles only for an episode with a script, English only, inside the format's safe area (the code does this, packages/cli/src/index.ts:225-227; packages/remotion/src/components/Subtitles.tsx:16-18)
+      - "Subtitles come from the project's subtitle language (`subtitles` in project.yaml: `de` by default for a meme, `en` by default for an episode, or `off`), inside the format's safe area; a meme's German subtitles are burned into its render, an episode's English ones into renders/<format>.en.mp4 with --subtitles en (the code does this, render.ts:156-173; packages/core/src/episode.ts:346-372; ST-014, HS-263)"
       - Every asset of a shot lies inside the workspace (the code does this, render.ts:88-96)
-      - The render runs in segments of 60 s that resume after an interruption; a 3D shot renders with concurrency 1 and software GL (the code does this, render.ts:333-369)
+      - The render runs in segments of 60 s that resume after an interruption; a 3D shot renders with concurrency 1 and software GL (the code does this, render.ts:344-380)
       - Derivatives come after the master passes, one at a time; a shot whose subject leaves a vertical or square frame gets a focus point (skill rule, assembly-render step 6)
   - id: CMD-RenderStill
     name: Render a still

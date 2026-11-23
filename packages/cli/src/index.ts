@@ -204,7 +204,7 @@ program
   .option('--still-scale <scale>', 'Scale for --still (default 1)', (value) => Number(value))
   .option('--out <path>', 'Override the output path')
   .option('--require-audio', 'Fail if the song (audio/song.wav) or episode track (audio/episode.wav) is missing')
-  .option('--subtitles <language>', 'Burn in episode subtitles (en); writes renders/<format>.en.mp4')
+  .option('--subtitles <language>', 'Burn in subtitle cues in this language (en); an episode writes renders/<format>.en.mp4')
   .option('--frames <range>', 'Render only frames <start>-<end> (inclusive), for test renders')
   .action(
     (
@@ -228,7 +228,9 @@ program
           throw new ValidationError(`Unknown format "${options.format}". Use 16x9, 9x16, 1x1, or 4x5.`);
         }
         if (options.subtitles && options.subtitles !== 'en') {
-          throw new ValidationError(`Unknown subtitle language "${options.subtitles}". Episodes have English subtitles (en).`);
+          throw new ValidationError(
+            `Unknown subtitle language "${options.subtitles}". --subtitles takes en for an episode; a meme burns in its project's subtitle language.`,
+          );
         }
         await renderProject({
           projectDir,

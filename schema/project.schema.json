@@ -320,6 +320,14 @@
         "public",
         "internal"
       ]
+    },
+    "subtitles": {
+      "type": "string",
+      "enum": [
+        "en",
+        "de",
+        "off"
+      ]
     }
   },
   "required": [

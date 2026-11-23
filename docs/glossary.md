@@ -561,7 +561,7 @@ The automated critic that checks coverage, sync, readability, determinism, and m
 _Avoid_: tester
 
 **Render**:
-The encoded video of one whole format of a project: `renders/<format>.mp4`, or `renders/<format>.en.mp4` with burned-in subtitles. Every format is rendered from the same composition at its own size and the master's frame rate; a derivative is rendered again, never cropped from the master. The song is the only sound.
+The encoded video of one whole format of a project: `renders/<format>.mp4`, or `renders/<format>.en.mp4` with English subtitles burned in; a meme's subtitles are burned into its `renders/<format>.mp4`. Every format is rendered from the same composition at its own size and the master's frame rate; a derivative is rendered again, never cropped from the master. The song is the only sound.
 _Avoid_: export, video file
 
 **Master Format**:
@@ -731,8 +731,12 @@ The episode track reduced to one speaker's takes, at full length; the driving au
 _Avoid_: dialogue stem
 
 **Subtitles**:
-The text of the spoken and chat lines, plus on-screen text an sfx line names (a label, a sign), timed by the effective timing, in the project's subtitle language: English (translated) for an episode, German (as spoken) burned in for a meme, or off.
+The text of the spoken and chat lines, timed by the effective timing, in the project's subtitle language: English (translated) for an episode, German (as spoken) burned in for a meme, or off. An sfx line adds a cue only for on-screen text it names in English, so a German meme's cues are its spoken and chat text.
 _Avoid_: captions, lyrics
+
+**Subtitle Language**:
+The language of a project's burned-in subtitles, set as `subtitles` in `project.yaml`: `de` (as spoken, a meme's default), `en` (translated, an episode's default), or `off`. A meme accepts `de` or `off`; English subtitles for a meme are not supported yet.
+_Avoid_: caption language, subtitle mode
 
 ## Memes
 

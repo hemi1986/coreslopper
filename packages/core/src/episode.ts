@@ -8,7 +8,7 @@ import { MEME_MAX_SECONDS } from './state.js';
 
 /** Script line kinds that are spoken and therefore follow the TTS text rule. */
 export const SPOKEN_LINE_KINDS = ['dialogue', 'voiceover', 'announcement'] as const;
-/** Script line kinds that go into the subtitles and need `text_en`. */
+/** Script line kinds that go into the subtitles; the English cue needs `text_en`, the German one uses `text_de`. */
 export const SUBTITLED_LINE_KINDS = [...SPOKEN_LINE_KINDS, 'chat'] as const;
 
 type SpokenLine = Extract<ScriptLine, { kind: (typeof SPOKEN_LINE_KINDS)[number] }>;
@@ -22,13 +22,18 @@ export function isSubtitledLine(line: ScriptLine): line is SubtitledLine {
   return (SUBTITLED_LINE_KINDS as readonly string[]).includes(line.kind);
 }
 
+/** The spoken part of a line: a leading voice description in brackets is a direction, not spoken. */
+function spokenText(text: string): string {
+  return text.replace(/^\s*\([^)]*\)/, '').trim();
+}
+
 /**
  * TTS reads digits, abbreviations, and symbols unreliably, so speech text must
  * spell them out ("2077" -> "zweitausendsiebenundsiebzig"). A leading voice
  * description in brackets is not spoken and is not checked.
  */
 export function checkSpokenText(prompt: string): void {
-  const spoken = prompt.replace(/^\s*\([^)]*\)/, '');
+  const spoken = spokenText(prompt);
   const digits = spoken.match(/\d+/g);
   const symbols = spoken.match(/[%§&€$£@#+=*\/<>~^|_]/g);
   const abbreviations = spoken.match(/\b(?:z\.\s?B|d\.\s?h|u\.\s?a|bzw|usw|ca|evtl|ggf|Nr|Dr|St|etc)\./gi);
@@ -339,21 +344,25 @@ function wrapSubtitle(text: string, width = 42): string {
 }
 
 /**
- * The English subtitles: one cue per dialogue, voice-over, announcement, and
- * chat line, plus sfx lines that carry a `text_en` for on-screen text, timed by
- * the (effective) timing, in playing order.
+ * The subtitles in `language`: one cue per dialogue, voice-over, announcement, and chat line, timed by the
+ * (effective) timing, in playing order. English is the translation (`text_en`); German is as spoken (`text_de`).
+ * An sfx line carries a cue only for on-screen text, which a script writes in English.
  */
-export function subtitleCues(script: Script, timing: Timing): SubtitleCue[] {
+export function subtitleCues(script: Script, timing: Timing, language: 'en' | 'de' = 'en'): SubtitleCue[] {
   const cues: SubtitleCue[] = [];
   for (const { line } of scriptLines(script)) {
+    let text: string | undefined;
     if (line.kind === 'sfx') {
-      // An sfx line carries a subtitle only for on-screen text (a label, a sign).
-      if (!line.text_en?.trim()) continue;
-    } else if (!isSubtitledLine(line)) continue;
+      // An sfx line carries a subtitle only for on-screen text (a label, a sign), and only in English.
+      if (language !== 'en' || !line.text_en?.trim()) continue;
+      text = line.text_en;
+    } else if (isSubtitledLine(line)) {
+      text = language === 'de' ? spokenText(line.text_de) : line.text_en;
+    } else continue;
     const timed = timing.lines.find((candidate) => candidate.id === line.id);
     if (!timed) throw new ValidationError(`Script line "${line.id}" is not in the timing; re-run episode-track.`);
-    if (!line.text_en?.trim()) throw new ValidationError(`Script line "${line.id}" has no text_en.`);
-    cues.push({ id: line.id, start: timed.start, end: timed.end, text: wrapSubtitle(line.text_en) });
+    if (!text?.trim()) throw new ValidationError(`Script line "${line.id}" has no text_${language}.`);
+    cues.push({ id: line.id, start: timed.start, end: timed.end, text: wrapSubtitle(text) });
   }
   return cues.sort((a, b) => a.start - b.start);
 }
