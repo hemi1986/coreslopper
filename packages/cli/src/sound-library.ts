@@ -355,7 +355,14 @@ export async function checkSoundLibrary(root: string): Promise<SoundLibraryCheck
     // The `.incoming-` folder of a running `sound add` is not part of the library.
     if (entry.name.startsWith('.')) continue;
     const folder = join(dir, entry.name);
-    if (!entry.isDirectory() || !existsSync(join(folder, LIBRARY_SOUND_ENTRY))) continue;
+    if (!entry.isDirectory()) {
+      issues.push({ kind: 'missing-entry', id: entry.name, message: `"${entry.name}" is a file without an entry next to the folders – sound add <file> --title … stores it in its own folder` });
+      continue;
+    }
+    if (!existsSync(join(folder, LIBRARY_SOUND_ENTRY))) {
+      issues.push({ kind: 'missing-entry', id: entry.name, message: `"${entry.name}" is a file without an entry: the folder holds no ${LIBRARY_SOUND_ENTRY} – sound add <file> --title … adds one, a folder never becomes an entry by itself` });
+      continue;
+    }
     if (!existsSync(join(folder, LIBRARY_SOUND_FILE))) {
       issues.push({ kind: 'missing-file', id: entry.name, message: `"${entry.name}" is an entry without a file: ${LIBRARY_SOUND_FILE} is missing from its folder – copy it back or remove the entry` });
     }
