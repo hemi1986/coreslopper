@@ -7,12 +7,14 @@ import {
   CharacterBibleSchema,
   LibraryCharacterSchema,
   ValidationError,
+  isScriptId,
   readYamlFile,
   writeTextAtomic,
   type Character,
   type LibraryCharacter,
 } from '@coreslopper/core';
 import { SLUG, projectDirs, seriesDirs } from './board-production.js';
+import { checkLibraryId, entryText, libraryEntryDir, libraryEntryFile, parseTags, slugOfName } from './library-entry.js';
 
 // The workspace's character library: `library/characters/<id>/character.yaml`
 // with the character's files next to it. Characters of finished
@@ -22,7 +24,6 @@ import { SLUG, projectDirs, seriesDirs } from './board-production.js';
 // each continuity state only when chosen. Nothing in a project points into
 // the library, so a later change there never touches a finished video.
 
-const ID = /^[a-z0-9][a-z0-9_-]*$/;
 const MB = 1024 * 1024;
 
 export const LIBRARY_FILE_LIMITS = {
@@ -32,13 +33,8 @@ export const LIBRARY_FILE_LIMITS = {
 } as const;
 
 export const libraryRoot = (root: string) => join(root, 'library', 'characters');
-export const entryDir = (root: string, id: string) => join(libraryRoot(root), checkId(id));
-const entryFile = (root: string, id: string) => join(entryDir(root, id), 'character.yaml');
-
-function checkId(id: unknown): string {
-  if (typeof id !== 'string' || !ID.test(id) || id.length > 80) throw new ValidationError(`not a library character id: ${String(id)}`);
-  return id;
-}
+export const entryDir = (root: string, id: string) => libraryEntryDir(root, 'characters', id);
+const entryFile = (root: string, id: string) => libraryEntryFile(root, 'characters', id);
 
 /** Where a library character is used: a project or series whose characters.yaml names it in `library`. */
 export interface LibraryUse {
@@ -98,7 +94,7 @@ export async function listLibrary(root: string): Promise<{ characters: LibraryEn
   const characters: LibraryEntry[] = [];
   const errors: { id: string; error: string }[] = [];
   for (const dir of dirs) {
-    if (!dir.isDirectory() || !ID.test(dir.name) || !existsSync(join(libraryRoot(root), dir.name, 'character.yaml'))) continue;
+    if (!dir.isDirectory() || !isScriptId(dir.name) || !existsSync(join(libraryRoot(root), dir.name, 'character.yaml'))) continue;
     try {
       const entry = await loadLibraryCharacter(root, dir.name);
       const cover = entry.sheet ?? entry.refs.find(isImage) ?? entry.states.find((state) => state.ref)?.ref;
@@ -281,7 +277,7 @@ export async function importCharacters(root: string, sourceDir: string, options:
 /** The library entry for an incoming character: its link, a same-id entry with shared content, or a new free id. */
 async function matchEntry(root: string, character: Character, files: string[], slug: string): Promise<string> {
   if (character.library && existsSync(entryFile(root, character.library))) return character.library;
-  const base = ID.test(character.id) ? character.id : safeName(character.id).replace(/\./g, '-') || 'character';
+  const base = isScriptId(character.id) ? character.id : safeName(character.id).replace(/\./g, '-') || 'character';
   if (!existsSync(entryFile(root, base))) return base;
   const hashes = new Set<string>();
   for (const name of await readdir(entryDir(root, base))) if (name !== 'character.yaml') hashes.add(await fileHash(join(entryDir(root, base), name)));
@@ -303,31 +299,10 @@ export interface NewLibraryCharacter {
   tags?: unknown;
 }
 
-function text(value: unknown, field: string, max: number, required = false): string | undefined {
-  if (value === undefined || value === null || value === '') {
-    if (required) throw new ValidationError(`${field} is required`);
-    return undefined;
-  }
-  if (typeof value !== 'string' || value.length > max) throw new ValidationError(`${field} must be text up to ${max} characters`);
-  const trimmed = value.trim();
-  if (!trimmed && required) throw new ValidationError(`${field} is required`);
-  return trimmed || undefined;
-}
-
-function parseTags(value: unknown): string[] {
-  const tags = Array.isArray(value) ? value : typeof value === 'string' ? value.split(',') : null;
-  if (!tags) throw new ValidationError('tags must be a list or comma-separated text');
-  return tags.map((tag) => String(tag).trim().slice(0, 60)).filter(Boolean);
-}
-
-function slugOf(name: string): string {
-  return name.normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/ß/g, 'ss').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'character';
-}
-
 /** A new library character without files yet; files follow through `addLibraryFile`. */
 export async function addLibraryCharacter(root: string, input: NewLibraryCharacter, now = new Date()): Promise<LibraryCharacter> {
-  const name = text(input.name, 'name', 200, true)!;
-  const id = input.id ? checkId(input.id) : slugOf(name);
+  const name = entryText(input.name, 'name', 200, true)!;
+  const id = input.id ? checkLibraryId(input.id, 'characters') : slugOfName(name, 'character');
   if (existsSync(entryFile(root, id))) throw new ValidationError(`the library has a character "${id}" already`);
   const face = input.face ?? 'full';
   if (!['full', 'silhouette', 'screen-only', 'voice-only'].includes(String(face))) throw new ValidationError('face must be full, silhouette, screen-only, or voice-only');
@@ -336,8 +311,8 @@ export async function addLibraryCharacter(root: string, input: NewLibraryCharact
     version: 1,
     id,
     name,
-    description: text(input.description, 'description', 4000, true),
-    ...(text(input.prompt, 'prompt', 4000) ? { prompt: text(input.prompt, 'prompt', 4000) } : {}),
+    description: entryText(input.description, 'description', 4000, true),
+    ...(entryText(input.prompt, 'prompt', 4000) ? { prompt: entryText(input.prompt, 'prompt', 4000) } : {}),
     face,
     tags,
     origin: 'manual',
@@ -365,7 +340,7 @@ export async function recordLibraryFile(root: string, id: string, file: string, 
   const name = basename(file);
   if (resolve(entryDir(root, id), name) !== resolve(file)) throw new ValidationError(`${file} is not in the folder of ${id}`);
   if (role === 'voice') {
-    entry.voice = { ref: name, transcript: text(transcript, 'transcript', 2000, true)! };
+    entry.voice = { ref: name, transcript: entryText(transcript, 'transcript', 2000, true)! };
   } else if (role === 'sheet') {
     if (entry.sheet && !entry.refs.includes(entry.sheet)) entry.refs.unshift(entry.sheet);
     entry.sheet = name;
@@ -394,10 +369,10 @@ export async function addLibraryFile(root: string, id: string, source: string, r
 /** Change the words of an entry: name, description, prompt, tags. */
 export async function updateLibraryCharacter(root: string, id: string, change: Partial<NewLibraryCharacter>): Promise<LibraryCharacter> {
   const entry = await loadLibraryCharacter(root, id);
-  if (change.name !== undefined) entry.name = text(change.name, 'name', 200, true)!;
-  if (change.description !== undefined) entry.description = text(change.description, 'description', 4000, true)!;
+  if (change.name !== undefined) entry.name = entryText(change.name, 'name', 200, true)!;
+  if (change.description !== undefined) entry.description = entryText(change.description, 'description', 4000, true)!;
   if (change.prompt !== undefined) {
-    const prompt = text(change.prompt, 'prompt', 4000);
+    const prompt = entryText(change.prompt, 'prompt', 4000);
     if (prompt) entry.prompt = prompt;
     else delete entry.prompt;
   }
