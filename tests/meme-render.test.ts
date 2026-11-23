@@ -112,4 +112,13 @@ describe('subtitles for a meme', () => {
 
     expect(props.subtitles).toEqual([{ start: 2, end: 4, text: 'Ich drucke nicht mehr.' }]);
   });
+
+  it('ST-014: A sound line shows no subtitle', async () => {
+    const projectDir = await officePrank();
+    const { props } = await buildVideoProps({ projectDir });
+
+    expect(props.subtitles).toBeDefined();
+    // "reveal-boom" plays from 5 to 6.4 s and names no on-screen text.
+    expect((props.subtitles ?? []).filter((cue) => cue.start < 6.4 && cue.end > 5)).toEqual([]);
+  });
 });
