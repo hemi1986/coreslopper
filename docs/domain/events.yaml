@@ -1039,7 +1039,7 @@ events:
     aggregate: AGG-Render
     pivotal: true
     data: [Format, Width, Height, Frame rate, Subtitles, Inputs hash, File hash]
-    description: "A whole render of one format, recorded in state.json (render.ts:267-291,431-433); with --subtitles en the burned-in version renders/<format>.en.mp4, recorded the same way"
+    description: "A whole render of one format, recorded in state.json (render.ts:267-291,431-433); a meme's render carries its German subtitles, an episode's English ones only with --subtitles en (renders/<format>.en.mp4), recorded the same way"
   - id: EVT-StillRendered
     name: Still rendered
     context: BC-Render
@@ -2030,10 +2030,10 @@ commands:
     actor: ACT-StageRunner
     aggregate: AGG-Render
     produces: [EVT-FormatRendered, EVT-RenderFailed]
-    description: "render <project> [--format <id>] [--subtitles en]; without --format the master. The stage runner renders the master in assembly and every configured format in qa-export; release renders a format again when it is missing or stale (render.ts:293-445; packages/cli/src/release.ts:237-262)"
+    description: "render <project> [--format <id>] [--subtitles en]; without --format the master, and a meme burns in subtitles from its project setting while an episode takes --subtitles en. The stage runner renders the master in assembly and every configured format in qa-export; release renders a format again when it is missing or stale (render.ts:293-445; packages/cli/src/release.ts:237-262)"
     rules:
       - The format is the master or a configured derivative, one of 16x9, 9x16, 1x1 and 4x5; the size comes from project.yaml, the frame rate is always the master's (the code does this, render.ts:46-71; HS-150)
-      - Subtitles only for an episode with a script, English only, inside the format's safe area (the code does this, packages/cli/src/index.ts:225-227; packages/remotion/src/components/Subtitles.tsx:16-18)
+      - "Subtitles come from the project's subtitle language (`subtitles` in project.yaml: `de` by default for a meme, `en` by default for an episode, or `off`), inside the format's safe area; a meme's German subtitles are burned into its render, an episode's English ones into renders/<format>.en.mp4 with --subtitles en (ST-014, HS-263)"
       - Every asset of a shot lies inside the workspace (the code does this, render.ts:88-96)
       - The render runs in segments of 60 s that resume after an interruption; a 3D shot renders with concurrency 1 and software GL (the code does this, render.ts:333-369)
       - Derivatives come after the master passes, one at a time; a shot whose subject leaves a vertical or square frame gets a focus point (skill rule, assembly-render step 6)
