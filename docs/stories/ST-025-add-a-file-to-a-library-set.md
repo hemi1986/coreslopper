@@ -12,7 +12,7 @@ risk: null
 events: [EVT-LibrarySetFileAdded]
 depends_on: [ST-024]
 labels: [feature:set-library]
-status: ready
+status: in-progress
 ---
 
 ## Story
