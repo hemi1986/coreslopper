@@ -20,7 +20,7 @@ import {
 } from '@coreslopper/core';
 import { shortProblems } from './release-files.js';
 import { canvasProblems, probeMedia, videoFacts, videoProblems, wavProblems, type Prober } from './release-media.js';
-import { projectFormats, releaseDir } from './release.js';
+import { projectFormats, releaseDir, usedSoundCredits } from './release.js';
 import { jpegInfo, thumbnailProblems } from './thumbnail-files.js';
 import { loadUploadData, uploadPaths } from './upload-text.js';
 
@@ -33,8 +33,9 @@ export interface ReleaseCheck {
 }
 
 /** The texts every release folder has; `spotify.md` only for a music video, `linkedin.md` only when the song gets a LinkedIn post. */
-export function expectedTexts(music: boolean): string[] {
-  return ['youtube.md', 'shorts.md', 'instagram.md', 'tiktok.md', ...(music ? ['spotify.md'] : []), 'x.md', 'release-plan.md'];
+export function expectedTexts(kind: 'music-video' | 'episode' | 'meme'): string[] {
+  if (kind === 'meme') return ['youtube.md', 'tiktok.md', 'instagram.md', 'release-plan.md'];
+  return ['youtube.md', 'shorts.md', 'instagram.md', 'tiktok.md', ...(kind === 'music-video' ? ['spotify.md'] : []), 'x.md', 'release-plan.md'];
 }
 
 const check = (name: string, result: CheckResult, evidence: string): ReleaseCheck => ({ name, result, evidence });
@@ -53,9 +54,13 @@ async function song(project: LoadedProject): Promise<{ duration?: number; artist
  * cover, canvas, lyrics, texts, and the release metadata. Gaps the user fills
  * in (metadata, missing texts) are TODO, never FAIL.
  */
-export async function releaseChecks(projectDir: string, probe: Prober = probeMedia): Promise<ReleaseCheck[]> {
+export async function releaseChecks(projectDir: string, probe: Prober = probeMedia, options: { root?: string } = {}): Promise<ReleaseCheck[]> {
   const project = await loadProject(projectDir);
-  const music = project.config.kind !== 'episode';
+  const root = options.root ?? repoRoot();
+  const kind = project.config.kind;
+  const music = kind === 'music-video';
+  const meme = kind === 'meme';
+  const credits = meme ? await usedSoundCredits(project, root) : [];
   const dir = releaseDir(project.paths.root);
   const manifestPath = join(dir, 'manifest.json');
   if (!existsSync(manifestPath)) {
@@ -109,39 +114,51 @@ export async function releaseChecks(projectDir: string, probe: Prober = probeMed
         : check('Release formats', 'PASS', `${projectFormats(project).map((format) => format.id).join(', ')}: size, fps, length, current render`),
   );
 
-  // thumbnails/ and shorts/.
-  const thumbs = byKind('thumbnail');
-  const badThumbs: string[] = [];
-  for (const file of thumbs) {
-    const problems = await thumbnailProblems(at(file.path), '16x9');
-    if (problems.length) badThumbs.push(`${file.path}: ${problems.join(', ')}`);
+  // thumbnails/ and shorts/; a meme has one 9:16 cover and no Shorts.
+  if (meme) {
+    const cover = byKind('cover')[0];
+    if (!cover) checks.push(check('Release cover', 'TODO', 'cover/<slug>-1080x1920.jpg is missing'));
+    else {
+      const info = jpegInfo(await readFile(at(cover.path)));
+      const problems = !info
+        ? ['not a JPEG']
+        : [...(info.width !== 1080 || info.height !== 1920 ? [`${info.width}x${info.height}, expected 1080x1920`] : []), ...(info.components !== 3 ? [`${info.components} colour components, expected RGB`] : [])];
+      checks.push(problems.length ? check('Release cover', 'FAIL', problems.join(', ')) : check('Release cover', 'PASS', '1080x1920 RGB JPEG'));
+    }
+  } else {
+    const thumbs = byKind('thumbnail');
+    const badThumbs: string[] = [];
+    for (const file of thumbs) {
+      const problems = await thumbnailProblems(at(file.path), '16x9');
+      if (problems.length) badThumbs.push(`${file.path}: ${problems.join(', ')}`);
+    }
+    checks.push(
+      badThumbs.length
+        ? check('Release thumbnails', 'FAIL', badThumbs.join('; '))
+        : thumbs.length < 3
+          ? check('Release thumbnails', 'TODO', `${thumbs.length} of 3`)
+          : check('Release thumbnails', 'PASS', '3 JPEGs, 1280x720, under 2 MB'),
+    );
+    const shorts = byKind('short');
+    const badShorts: string[] = [];
+    for (const file of shorts) {
+      const facts = videoFacts(probe(at(file.path)));
+      const problems = shortProblems({ name: file.path, ...facts });
+      const thumb = file.path.replace(/-9x16\.mp4$/, '-thumb.jpg');
+      if (!existsSync(at(thumb))) problems.push('no thumbnail');
+      else problems.push(...(await thumbnailProblems(at(thumb), '9x16')).map((problem) => `thumbnail ${problem}`));
+      const tiktok = file.path.replace(/-9x16\.mp4$/, '-tiktok.jpg');
+      if (existsSync(at(tiktok))) problems.push(...(await thumbnailProblems(at(tiktok), '3x4')).map((problem) => `TikTok cover ${problem}`));
+      if (problems.length) badShorts.push(`${file.path}: ${problems.join(', ')}`);
+    }
+    checks.push(
+      badShorts.length
+        ? check('Release Shorts', 'FAIL', badShorts.join('; '))
+        : shorts.length < 3
+          ? check('Release Shorts', 'TODO', `${shorts.length} of 3`)
+          : check('Release Shorts', 'PASS', '3 Shorts, 9:16, at most 60 s, 1080x1920 thumbnails'),
+    );
   }
-  checks.push(
-    badThumbs.length
-      ? check('Release thumbnails', 'FAIL', badThumbs.join('; '))
-      : thumbs.length < 3
-        ? check('Release thumbnails', 'TODO', `${thumbs.length} of 3`)
-        : check('Release thumbnails', 'PASS', '3 JPEGs, 1280x720, under 2 MB'),
-  );
-  const shorts = byKind('short');
-  const badShorts: string[] = [];
-  for (const file of shorts) {
-    const facts = videoFacts(probe(at(file.path)));
-    const problems = shortProblems({ name: file.path, ...facts });
-    const thumb = file.path.replace(/-9x16\.mp4$/, '-thumb.jpg');
-    if (!existsSync(at(thumb))) problems.push('no thumbnail');
-    else problems.push(...(await thumbnailProblems(at(thumb), '9x16')).map((problem) => `thumbnail ${problem}`));
-    const tiktok = file.path.replace(/-9x16\.mp4$/, '-tiktok.jpg');
-    if (existsSync(at(tiktok))) problems.push(...(await thumbnailProblems(at(tiktok), '3x4')).map((problem) => `TikTok cover ${problem}`));
-    if (problems.length) badShorts.push(`${file.path}: ${problems.join(', ')}`);
-  }
-  checks.push(
-    badShorts.length
-      ? check('Release Shorts', 'FAIL', badShorts.join('; '))
-      : shorts.length < 3
-        ? check('Release Shorts', 'TODO', `${shorts.length} of 3`)
-        : check('Release Shorts', 'PASS', '3 Shorts, 9:16, at most 60 s, 1080x1920 thumbnails'),
-  );
 
   if (music) {
     const meta = await song(project);
@@ -192,10 +209,10 @@ export async function releaseChecks(projectDir: string, probe: Prober = probeMed
   }
 
   // texts/: every file present, limits kept, placeholders marked.
-  const missingTexts = expectedTexts(music).filter((name) => !existsSync(at(`texts/${name}`)));
+  const missingTexts = expectedTexts(kind).filter((name) => !existsSync(at(`texts/${name}`)));
   const unmarked: string[] = [];
   let todoMarks = 0;
-  for (const name of expectedTexts(music)) {
+  for (const name of expectedTexts(kind)) {
     if (!existsSync(at(`texts/${name}`))) continue;
     const text = await readFile(at(`texts/${name}`), 'utf8');
     unmarked.push(...unmarkedPlaceholders(text).map((line) => `${name}: ${line.trim()}`));
@@ -204,7 +221,7 @@ export async function releaseChecks(projectDir: string, probe: Prober = probeMed
   const textErrors: string[] = [];
   let textTodos = 0;
   if (existsSync(uploadPaths(project.paths.root).data)) {
-    const problems = platformTextProblems(await loadUploadData(project.paths.root), platformLimits(await loadChannel(repoRoot())), { music });
+    const problems = platformTextProblems(await loadUploadData(project.paths.root), platformLimits(await loadChannel(root)), { kind, credits });
     textErrors.push(...problems.errors);
     textTodos = problems.missing.length;
   } else textTodos += 1;
@@ -217,12 +234,12 @@ export async function releaseChecks(projectDir: string, probe: Prober = probeMed
         ].join('; '))
       : textTodos || todoMarks
         ? check('Release texts', 'TODO', `${todoMarks} TODO line(s) in texts/; ${textTodos} text(s) still to write in review/upload.yaml`)
-        : check('Release texts', 'PASS', `${expectedTexts(music).length} files, limits kept`),
+        : check('Release texts', 'PASS', `${expectedTexts(kind).length} files, limits kept`),
   );
 
   if (music) {
     const meta = await song(project);
-    const channel = await loadChannel(repoRoot());
+    const channel = await loadChannel(root);
     const facts = withReleaseDefaults(project.config.release, channel);
     const todos = releaseTodos(facts, channel, releaseIdentity({ ...project.config, release: facts }, meta));
     checks.push(todos.length ? check('Release metadata', 'TODO', todos.join('; ')) : check('Release metadata', 'PASS', 'release: block complete'));

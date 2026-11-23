@@ -12,7 +12,7 @@ risk: null
 events: [EVT-ReleasePackageBuilt, EVT-ReleaseRulesBroken, EVT-ReleaseCalendarPlanned]
 depends_on: [ST-007]
 labels: [feature:meme]
-status: ready
+status: done
 ---
 
 ## Story

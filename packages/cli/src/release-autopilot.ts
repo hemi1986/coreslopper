@@ -40,7 +40,7 @@ import { acquireHolderLock } from './file-lock.js';
 import { loadStatus, runCalendar, statusPath, updateStatus, withReleaseLock } from './release-calendar.js';
 import { micrositeSong } from './release-microsite.js';
 import { probeVideo } from './short.js';
-import { announcementText, feedVideo, linkedinPostText, mediaFile, xTexts } from './release-texts.js';
+import { announcementText, feedVideo, linkedinPostText, mediaFile, memeCaption, xTexts } from './release-texts.js';
 
 export { appendAutopilotEntry, autopilotLogPath, autopilotReadiness, loadAutopilotLog } from './autopilot-state.js';
 
@@ -232,7 +232,7 @@ async function runProject(dir: string, slug: string, options: AutopilotOptions, 
       settings,
       now: deps.now(),
       ready,
-      premiere: context.schedule.release.premiere,
+      premiere: context.input.premiere,
     });
   };
   if (!context.calendar || !approvalHolds(context.status, context.calendar)) {
@@ -266,7 +266,7 @@ async function runProject(dir: string, slug: string, options: AutopilotOptions, 
         settings,
         now: deps.now(),
         ready,
-        premiere: context.schedule.release.premiere,
+        premiere: context.input.premiere,
       }).find((entry) => entry.id === item.id);
       if (fresh?.state !== 'due') return undefined;
       await appendAutopilotEntryUnlocked(dir, { event: item.id, status: 'running', at: deps.now().toISOString() });
@@ -318,7 +318,8 @@ export const COMMENT_EVENT = 'youtube:comment';
  * a plain failure, which is retried up to `retries` times.
  */
 async function ensurePinnedComment(dir: string, context: Context, deps: AutopilotDeps, ready: Record<string, boolean>) {
-  const pinned = context.data?.main.pinned_comment;
+  // A meme is posted as a Short: its one text is the caption, not a pinned comment under a main video.
+  const pinned = context.input.kind === 'meme' ? undefined : context.data?.main.pinned_comment;
   const settings = context.schedule.autopilot;
   const item = context.status.items.youtube;
   if (!pinned || !item?.done || item.manual || !settings.platforms.includes('youtube') || !ready.youtube) return undefined;
@@ -414,7 +415,7 @@ async function act(dir: string, item: AutopilotEventPlan, context: Context, deps
     }
     const studio = entry.remote_id ? `https://studio.youtube.com/video/${entry.remote_id}/edit` : 'YouTube Studio';
     const steps: string[] = [];
-    if (action.item === 'main' && context.schedule.release.premiere) steps.push(`Schedule it as a Premiere at ${item.event.at} in ${studio} (the API cannot).`);
+    if (action.item === 'main' && context.input.kind !== 'meme' && context.schedule.release.premiere) steps.push(`Schedule it as a Premiere at ${item.event.at} in ${studio} (the API cannot).`);
     else if (entry.status !== 'scheduled') steps.push(`Switch it to public at ${item.event.at} in ${studio} (an unaudited API project uploads private only).`);
     if (action.item !== 'main') steps.push(`Set the related video to the main video in ${studio}.`);
     return { status: entry.status === 'scheduled' ? 'scheduled' : 'uploaded', remote_id: entry.remote_id, url: entry.url, publish_at: entry.publish_at, warnings: entry.warnings, manual_steps: steps };
@@ -449,16 +450,22 @@ async function act(dir: string, item: AutopilotEventPlan, context: Context, deps
   let request: SocialPostRequest;
   if (action.kind === 'instagram') {
     if (action.placement === 'reel') {
-      const short = data.shorts.find((entry) => entry.name === action.item);
-      const video = files.shorts.find((entry) => entry.name === action.item)?.video;
-      if (!short?.instagram || !video) throw new ValidationError(`no Instagram text or video for ${action.item}`);
-      request = {
-        event: item.id,
-        text: [short.instagram.caption.trim(), short.instagram.hashtags.join(' ')].filter(Boolean).join('\n\n'),
-        media: { path: file(video)!, kind: 'video' },
-        placement: 'reel',
-        ...(short.instagram.cover_frame !== undefined ? { coverOffsetMs: Math.round(short.instagram.cover_frame * 1000) } : {}),
-      };
+      if (context.input.kind === 'meme' && action.item === 'main') {
+        // A meme's one video is its Reel: the same caption with the credits as the folder text.
+        if (!files.master) throw new ValidationError('no 9:16 video in the release folder');
+        request = { event: item.id, text: memeCaption(context.input), media: { path: file(files.master)!, kind: 'video' }, placement: 'reel' };
+      } else {
+        const short = data.shorts.find((entry) => entry.name === action.item);
+        const video = files.shorts.find((entry) => entry.name === action.item)?.video;
+        if (!short?.instagram || !video) throw new ValidationError(`no Instagram text or video for ${action.item}`);
+        request = {
+          event: item.id,
+          text: [short.instagram.caption.trim(), short.instagram.hashtags.join(' ')].filter(Boolean).join('\n\n'),
+          media: { path: file(video)!, kind: 'video' },
+          placement: 'reel',
+          ...(short.instagram.cover_frame !== undefined ? { coverOffsetMs: Math.round(short.instagram.cover_frame * 1000) } : {}),
+        };
+      }
     } else if (action.placement === 'feed') {
       if (!data.instagram_post) throw new ValidationError('instagram_post is missing in review/upload.yaml');
       const video = feedVideo(context.input);
@@ -518,7 +525,7 @@ export async function autopilotOverview(root: string, options: { now?: Date; env
     if (!context.calendar) continue;
     const settings = context.schedule.autopilot;
     const { ready, notes } = autopilotReadiness(settings, options.env, now);
-    const plans = planAutopilot({ calendar: context.calendar, status: context.status, log: await loadAutopilotLog(dir), settings, now, ready, premiere: context.schedule.release.premiere });
+    const plans = planAutopilot({ calendar: context.calendar, status: context.status, log: await loadAutopilotLog(dir), settings, now, ready, premiere: context.input.premiere });
     log(`${context.input.slug}: ${context.status.approval ? `approved ${context.status.approval.at.slice(0, 10)}` : 'not approved'} (release ${context.calendar.release_date})`);
     for (const plan of plans) {
       const when = plan.event.at.slice(0, 16).replace('T', ' ');

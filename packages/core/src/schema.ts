@@ -700,6 +700,11 @@ export function librarySoundTakeSource(id: string): `library:${string}` {
   return `library:${id}`;
 }
 
+/** The library sound id of a take's source, or undefined for a generated or imported take. */
+export function libraryTakeSoundId(source: string): string | undefined {
+  return /^library:(.+)$/.exec(source)?.[1];
+}
+
 export const TakeSchema = z.object({
   /** Generated, imported by the user, or copied from a library sound (`library:<id>`). */
   source: z.union([z.enum(['generated', 'imported']), z.string().regex(/^library:[a-z0-9][a-z0-9_-]*$/) as z.ZodType<`library:${string}`>]),

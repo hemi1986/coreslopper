@@ -93,13 +93,13 @@ export function zonedToday(now: Date, timeZone: string): string {
 /** The local date of an event's `at`. */
 export const eventDay = (event: Pick<CalendarEvent, 'at'>) => event.at.slice(0, 10);
 
-const STEP_ORDER = ['distributor', 'pitch', 'canvas', 'announce', 'song', 'artist-pick', 'youtube', 'community', 'story', 'post', 'page', 'short', 'links'];
+const STEP_ORDER = ['distributor', 'pitch', 'canvas', 'announce', 'song', 'artist-pick', 'youtube', 'community', 'story', 'reel', 'post', 'page', 'short', 'links'];
 
 /** What the calendar needs to know about the project. */
 export interface CalendarInput {
   slug: string;
   title: string;
-  kind: 'music-video' | 'episode';
+  kind: 'music-video' | 'episode' | 'meme';
   /** `release.release_date` from project.yaml: the user's date always wins. */
   releaseDate?: string;
   /** Shorts in their order, with the platforms each one goes to. */
@@ -183,8 +183,14 @@ export function buildCalendar(input: CalendarInput, context: CalendarContext): R
     push('artist-pick', 'spotify', 'artist-pick', at(0, steps.task_time));
   }
   push('youtube', 'youtube', 'youtube', at(0, release.video_time));
+  if (input.kind === 'meme') {
+    // A meme is one video posted the same day on all three vertical platforms: no story, no announcement, no extras.
+    push('tiktok', 'tiktok', 'post', at(0, release.video_time));
+    push('instagram', 'instagram', 'reel', at(0, posts.instagram));
+  } else {
+    push('story', 'instagram', 'story', at(0, release.video_time));
+  }
   if (input.communityPost) push('community', 'youtube', 'community', at(0, release.video_time));
-  push('story', 'instagram', 'story', at(0, release.video_time));
   if (input.instagramPost) push('instagram-post', 'instagram', 'post', at(0, posts.instagram));
   if (input.x) push('x', 'x', 'post', at(0, posts.x));
   if (input.microsite) push('microsite', 'microsite', 'page', at(0, release.video_time));

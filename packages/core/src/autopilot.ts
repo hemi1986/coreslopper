@@ -102,7 +102,9 @@ export function autopilotAction(event: CalendarEvent, settings: Pick<AutopilotSe
   if (platform === 'youtube' && step === 'links') return { kind: 'links' };
   if (platform === 'shorts' && step === 'short') return { kind: 'youtube', item };
   if (platform === 'tiktok' && step === 'short') return { kind: 'tiktok', item };
+  if (platform === 'tiktok' && step === 'post') return { kind: 'tiktok', item: 'main' };
   if (platform === 'instagram' && step === 'short') return { kind: 'instagram', placement: 'reel', item };
+  if (platform === 'instagram' && step === 'reel') return { kind: 'instagram', placement: 'reel', item };
   if (platform === 'instagram' && step === 'post') return { kind: 'instagram', placement: 'feed', item: 'main' };
   // The announcement story needs no link; the release-day story does, and the API cannot add a link sticker.
   if (platform === 'instagram' && step === 'announce') return { kind: 'instagram', placement: 'story', item: 'announcement' };

@@ -186,6 +186,19 @@ describe('autopilot plan', () => {
     expect(off.find((item) => item.id === 'linkedin')!.state).toBe('manual');
   });
 
+  it('plans a meme on YouTube Shorts, TikTok, and Instagram Reels', () => {
+    const meme = buildCalendar(
+      { ...input, kind: 'meme', shorts: [], announcement: false, communityPost: false, instagramPost: false, x: false, linkedin: false, microsite: false },
+      { schedule, now: planned, others: [] },
+    );
+    expect(meme.events.map((event) => event.id)).toEqual(['youtube', 'tiktok', 'instagram']);
+    expect(meme.events.map((event) => autopilotAction(event, settings))).toEqual([
+      { kind: 'youtube', item: 'main' },
+      { kind: 'tiktok', item: 'main' },
+      { kind: 'instagram', placement: 'reel', item: 'main' },
+    ]);
+  });
+
   it('finds the main video ID in the log or the board URL', () => {
     expect(mainVideoId({ version: 1, items: { youtube: { done: true, url: 'https://www.youtube.com/watch?v=abcdefghijk' } } }, emptyLog)).toBe('abcdefghijk');
     expect(mainVideoId({ version: 1, items: {} }, { version: 1, entries: [entry('youtube', 'uploaded', '2026-12-10T17:00:00Z', { remote_id: 'zyxwvutsrqp' })] })).toBe('zyxwvutsrqp');

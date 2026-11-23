@@ -66,6 +66,8 @@ export function calendarInput(options: {
   shorts: string[];
 }): CalendarInput {
   const { data } = options;
+  // A meme is posted, not announced, and has no feed post, X, LinkedIn, or microsite: it has three platform texts.
+  const meme = options.kind === 'meme';
   const shorts = options.shorts.map((name) => {
     const short = data?.shorts.find((entry) => entry.name === name);
     if (!short) return { name, platforms: ['youtube', 'tiktok', 'instagram'] as CalendarInput['shorts'][number]['platforms'] };
@@ -81,12 +83,12 @@ export function calendarInput(options: {
     kind: options.kind,
     releaseDate: options.releaseDate,
     shorts,
-    announcement: Boolean(data?.announcement),
-    communityPost: Boolean(data?.main.community_post),
-    instagramPost: Boolean(data?.instagram_post),
-    x: Boolean(data?.x),
-    linkedin: data?.linkedin?.decision === 'post',
-    microsite: Boolean(data?.microsite),
+    announcement: !meme && Boolean(data?.announcement),
+    communityPost: !meme && Boolean(data?.main.community_post),
+    instagramPost: !meme && Boolean(data?.instagram_post),
+    x: !meme && Boolean(data?.x),
+    linkedin: !meme && data?.linkedin?.decision === 'post',
+    microsite: !meme && Boolean(data?.microsite),
   };
 }
 
@@ -167,7 +169,7 @@ export async function runCalendar(options: {
     calendarInput({
       slug: project.config.slug,
       title: identity.title,
-      kind: project.config.kind === 'episode' ? 'episode' : 'music-video',
+      kind: project.config.kind,
       releaseDate: project.config.release?.release_date,
       data,
       shorts,

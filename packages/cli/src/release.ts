@@ -18,6 +18,7 @@ import {
   loadChannel,
   loadReleaseSchedule,
   loadProject,
+  libraryTakeSoundId,
   platformLimits,
   platformTextProblems,
   plainLyrics,
@@ -64,6 +65,7 @@ import { shortFfmpegArgs } from './short.js';
 import type { ThumbnailOptions } from './thumbnail.js';
 import { loadUploadData, uploadPaths } from './upload-text.js';
 import { parseTimePoint } from './short.js';
+import { loadLibrarySound } from './sound-library.js';
 
 /** The release folder of a project; on CORESLOPPER_MEDIA_DIR when `renders/` is linked there. */
 export function releaseDir(projectDir: string): string {
@@ -72,6 +74,8 @@ export function releaseDir(projectDir: string): string {
 
 /** The cover source the skill composes with `thumbnail --format 1x1`. */
 export const COVER_SOURCE = 'renders/cover-3000x3000.jpg';
+/** A meme's cover: the skill composes it with `thumbnail --format 9x16`. */
+export const MEME_COVER_SOURCE = 'renders/cover-1080x1920.jpg';
 
 export interface ReleaseDeps {
   probe: Prober;
@@ -88,6 +92,8 @@ export interface ReleaseDeps {
 
 export interface ReleaseOptions {
   projectDir: string;
+  /** The workspace root: the channel, the release schedule, and the sound library. Defaults to the repository root. */
+  root?: string;
   /** Render missing or stale formats (default). `false` lists them as TODOs. */
   render?: boolean;
   /** Canvas start: seconds or an anchor such as `section:chorus_1`. */
@@ -206,6 +212,26 @@ export function projectFormats(project: Pick<LoadedProject, 'config'>): { id: st
 }
 
 /**
+ * The credit texts the project's platform texts must carry: one per library
+ * sound a take was copied from (HS-261, HS-265). A sound without a credit adds
+ * none; a missing or unreadable entry is the release check's business.
+ */
+export async function usedSoundCredits(project: LoadedProject, root: string): Promise<string[]> {
+  const ids = new Set<string>();
+  for (const take of [...Object.values(project.takes?.takes ?? {}), ...Object.values(project.takes?.ambience ?? {})]) {
+    const id = libraryTakeSoundId(take.source);
+    if (id) ids.add(id);
+  }
+  const credits: string[] = [];
+  for (const id of [...ids].sort()) {
+    // A missing or unreadable entry adds no credit; the licence check (ST-016) reports it.
+    const sound = await loadLibrarySound(root, id).catch(() => undefined);
+    if (sound?.credit) credits.push(sound.credit);
+  }
+  return credits;
+}
+
+/**
  * Build `renders/release/`: collect the renders, thumbnails, and Shorts; make
  * the WAV, canvas, lyrics, and texts; write README.md and manifest.json.
  * Re-running changes only what changed and removes only files it wrote before.
@@ -216,8 +242,12 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
   if (!releasedPublicly(project.config)) {
     throw new ValidationError(`${project.config.slug} is not released publicly (distribution: internal): it gets no release package.`);
   }
-  const root = repoRoot();
-  const music = project.config.kind !== 'episode';
+  const root = options.root ?? repoRoot();
+  const kind = project.config.kind;
+  // A music video releases a song; an episode and a meme release a video only.
+  const music = kind === 'music-video';
+  const meme = kind === 'meme';
+  const credits = meme ? await usedSoundCredits(project, root) : [];
   const dir = releaseDir(project.paths.root);
   const manifestPath = join(dir, 'manifest.json');
   const previous = existsSync(manifestPath) ? await readJsonFile(manifestPath, ReleaseManifestSchema).catch(() => undefined) : undefined;
@@ -284,8 +314,8 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
     files.videos = { ...files.videos, [format.id]: path };
   }
 
-  // Subtitles: the episode's English subtitles, or the lyrics as SRT.
-  if (!music && project.script && timing) {
+  // Subtitles: the episode's English subtitles, or a music video's lyrics as SRT. A meme has its subtitles burned in.
+  if (kind === 'episode' && project.script && timing) {
     files.subtitles = `video/${slug}.en.srt`;
     await writer.text(files.subtitles, buildSrt(project.script, timing), 'subtitles', { language: 'en' });
   } else if (music && timing?.lines.some((line) => line.text.trim())) {
@@ -293,37 +323,47 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
     await writer.text(files.subtitles, buildLyricsSrt(timing), 'subtitles', { language, lines: timing.lines.length });
   }
 
-  // thumbnails/: the upload thumbnail first, then the alternates (or the folder's order).
-  const available = await listThumbnails(project.paths.renders);
-  const ordered = data?.main.thumbnail
-    ? [data.main.thumbnail, ...data.main.alternate_thumbnails].map((file) => resolve(project.paths.root, file)).filter((file) => existsSync(file))
-    : available;
-  for (const [index, source] of ordered.slice(0, 3).entries()) {
-    const path = `thumbnails/thumb-${index + 1}.jpg`;
-    await writer.place(source, path, 'thumbnail', { width: 1280, height: 720, maxBytes: 2 * 1024 * 1024 });
-    files.thumbnails.push(path);
+  // thumbnails/: the upload thumbnail first, then the alternates (or the folder's order). A meme has a 9:16 cover instead.
+  if (!meme) {
+    const available = await listThumbnails(project.paths.renders);
+    const ordered = data?.main.thumbnail
+      ? [data.main.thumbnail, ...data.main.alternate_thumbnails].map((file) => resolve(project.paths.root, file)).filter((file) => existsSync(file))
+      : available;
+    for (const [index, source] of ordered.slice(0, 3).entries()) {
+      const path = `thumbnails/thumb-${index + 1}.jpg`;
+      await writer.place(source, path, 'thumbnail', { width: 1280, height: 720, maxBytes: 2 * 1024 * 1024 });
+      files.thumbnails.push(path);
+    }
+    if (ordered.length < 3) todos.push(`${ordered.length} of 3 thumbnails: make them with thumbnail (thumbnails.md)`);
+  } else {
+    const cover = join(project.paths.root, MEME_COVER_SOURCE);
+    if (existsSync(cover)) {
+      files.cover = `cover/${slug}-1080x1920.jpg`;
+      await writer.place(cover, files.cover, 'cover', { width: 1080, height: 1920, format: 'jpeg', color: 'rgb' });
+    } else todos.push(`${MEME_COVER_SOURCE} is missing: compose it with thumbnail --format 9x16 --out ${MEME_COVER_SOURCE}`);
   }
-  if (ordered.length < 3) todos.push(`${ordered.length} of 3 thumbnails: make them with thumbnail (thumbnails.md)`);
 
-  // shorts/: each Short with its vertical thumbnail.
-  const shorts = await listShorts(project.paths.renders);
-  for (const video of shorts) {
-    const name = shortName(video)!;
-    const entry: (typeof files.shorts)[number] = { name, video: `shorts/${name}-9x16.mp4` };
-    await writer.place(video, entry.video, 'short', { aspect: '9:16', maxSeconds: 60, measured: videoFacts(deps.probe(video)) });
-    const thumb = shortPaths(project.paths.renders, name).thumbnail;
-    if (existsSync(thumb)) {
-      entry.thumbnail = `shorts/${name}-thumb.jpg`;
-      await writer.place(thumb, entry.thumbnail, 'short-thumbnail', { width: 1080, height: 1920 });
-    } else todos.push(`Short ${name} has no thumbnail: thumbnail --format 9x16`);
-    const tiktok = shortPaths(project.paths.renders, name).tiktok;
-    if (existsSync(tiktok)) {
-      entry.tiktokCover = `shorts/${name}-tiktok.jpg`;
-      await writer.place(tiktok, entry.tiktokCover, 'tiktok-cover', { width: 1080, height: 1440 });
-    } else todos.push(`Short ${name} has no TikTok cover: thumbnail --format 3x4 --out renders/shorts/${name}-tiktok.jpg`);
-    files.shorts.push(entry);
+  // shorts/: each Short with its vertical thumbnail. A meme is one video, not a set of Shorts.
+  if (!meme) {
+    const shorts = await listShorts(project.paths.renders);
+    for (const video of shorts) {
+      const name = shortName(video)!;
+      const entry: (typeof files.shorts)[number] = { name, video: `shorts/${name}-9x16.mp4` };
+      await writer.place(video, entry.video, 'short', { aspect: '9:16', maxSeconds: 60, measured: videoFacts(deps.probe(video)) });
+      const thumb = shortPaths(project.paths.renders, name).thumbnail;
+      if (existsSync(thumb)) {
+        entry.thumbnail = `shorts/${name}-thumb.jpg`;
+        await writer.place(thumb, entry.thumbnail, 'short-thumbnail', { width: 1080, height: 1920 });
+      } else todos.push(`Short ${name} has no thumbnail: thumbnail --format 9x16`);
+      const tiktok = shortPaths(project.paths.renders, name).tiktok;
+      if (existsSync(tiktok)) {
+        entry.tiktokCover = `shorts/${name}-tiktok.jpg`;
+        await writer.place(tiktok, entry.tiktokCover, 'tiktok-cover', { width: 1080, height: 1440 });
+      } else todos.push(`Short ${name} has no TikTok cover: thumbnail --format 3x4 --out renders/shorts/${name}-tiktok.jpg`);
+      files.shorts.push(entry);
+    }
+    if (shorts.length < 3) todos.push(`${shorts.length} of 3 Shorts: cut them with short (release.md)`);
   }
-  if (shorts.length < 3) todos.push(`${shorts.length} of 3 Shorts: cut them with short (release.md)`);
 
   if (music) {
     // audio/: the song as a deliverable WAV, converted only when it is not one already.
@@ -391,13 +431,14 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
 
   // texts/: one file per platform, from upload.yaml plus the facts.
   let chapters: Chapter[] = [];
-  if (data?.main.chapters) {
+  if (meme) chapters = [];
+  else if (data?.main.chapters) {
     chapters = data.main.chapters;
     const problems = timing ? chapterProblems(chapters, timing.audio.duration) : [];
     errors.push(...problems.map((problem) => `youtube chapters: ${problem}`));
   } else if (timing) chapters = chaptersFromSections(timing);
   const input: ReleaseTextInput = {
-    kind: music ? 'music-video' : 'episode',
+    kind,
     language,
     slug,
     artist: identity.artist,
@@ -407,12 +448,14 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
     channel,
     limits,
     chapters,
+    credits,
     files,
     durationSeconds: timing?.audio.duration,
   };
   // The calendar: the next free slots under config/release-schedule.yaml; kept times stay.
   const schedule = await loadReleaseSchedule(root);
-  input.premiere = schedule.release.premiere;
+  // A meme is a Short, never a Premiere.
+  input.premiere = !meme && schedule.release.premiere;
   input.calendar = await planCalendar(
     project.paths.root,
     calendarInput({
@@ -425,24 +468,28 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
     }),
     { root, now: deps.now(), replan: options.replan, schedule },
   );
-  await deriveReleaseMedia({ project, dir, writer, files, data, calendar: input.calendar, language, title: identity.title, deps, todos, stills: options.stills !== false });
+  if (!meme) {
+    await deriveReleaseMedia({ project, dir, writer, files, data, calendar: input.calendar, language, title: identity.title, deps, todos, stills: options.stills !== false });
+  }
   const labels = releaseLabels(language);
-  const ics = calendarIcs([input.calendar], (calendar, event) => `${calendar.title}: ${calendarEventLabel(event, labels, schedule.release.premiere)}`);
+  const ics = calendarIcs([input.calendar], (calendar, event) => `${calendar.title}: ${calendarEventLabel(event, labels, input.premiere, kind)}`);
   await writer.text('calendar.ics', ics, 'calendar', { events: input.calendar.events.length, release_date: input.calendar.release_date });
-  if (data?.microsite) {
+  if (data?.microsite && !meme) {
     const lyrics = existsSync(project.paths.lyrics) ? plainLyrics(await readFile(project.paths.lyrics, 'utf8')) : undefined;
     const song = micrositeSong(input, { status: await loadStatus(project.paths.root), calendar: input.calendar, lyrics: music ? lyrics : undefined });
     await writer.text(`microsite/${slug}.json`, `${JSON.stringify(song, null, 2)}\n`, 'microsite', {});
   }
   if (data) {
-    const problems = platformTextProblems(data, limits, { music });
+    const problems = platformTextProblems(data, limits, { kind, credits });
     errors.push(...problems.errors);
     todos.push(...problems.missing.map((field) => `${field} is missing in review/upload.yaml`));
   }
   const texts = releaseTexts(input);
   for (const [name, content] of Object.entries(texts)) await writer.text(`texts/${name}`, content, 'text', { limits });
-  const youtubeBytes = Buffer.byteLength(youtubeDescriptionText(input, releaseLabels(language)));
-  if (youtubeBytes > limits.youtube.description_bytes) errors.push(`youtube main: description with chapters and footer has ${youtubeBytes} bytes, limit ${limits.youtube.description_bytes}`);
+  if (kind !== 'meme') {
+    const youtubeBytes = Buffer.byteLength(youtubeDescriptionText(input, releaseLabels(language)));
+    if (youtubeBytes > limits.youtube.description_bytes) errors.push(`youtube main: description with chapters and footer has ${youtubeBytes} bytes, limit ${limits.youtube.description_bytes}`);
+  }
 
   await writer.text('README.md', readmeText(input, [...new Set(todos)]), 'readme');
 
