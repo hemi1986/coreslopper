@@ -12,7 +12,7 @@ risk: null
 events: [EVT-SoundLibraryChecked, EVT-LibrarySoundRemeasured]
 depends_on: [ST-001]
 labels: [feature:meme]
-status: ready
+status: done
 ---
 
 ## Story
@@ -50,6 +50,9 @@ Scenario: An entry without its file is reported
 
 ## Out of Scope
 - Fixing the reported entries automatically
+- Catching a hand-typed length or loudness while the file's hash still matches, and reading `sound.wav` as a format
+  rather than a name: both follow ST-005's reading of the entry's rule and are questions for the user in
+  `docs/reviews/ST-004-code-review.md` (findings 3 and 4)
 
 ## Open Questions
 - none

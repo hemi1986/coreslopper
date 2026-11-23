@@ -59,7 +59,8 @@ export function probeDuration(path: string): number {
     execFileSync(
       ffprobe,
       ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', path],
-      { encoding: 'utf8' },
+      // stderr is captured, not inherited: a caller reports the failure itself, without a stray line above its report.
+      { encoding: 'utf8', stdio: 'pipe' },
     ).trim(),
   );
   if (!Number.isFinite(duration) || duration <= 0) {
