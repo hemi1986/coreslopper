@@ -266,9 +266,13 @@ describe('TODO detection and text limits', () => {
     ]);
     expect(soundLicenceTodos([{ id: 'vine-boom', licence: 'Creative Commons Attribution 4.0' }])[0]).toContain('asks for a credit');
     expect(soundLicenceTodos([{ id: 'vine-boom', licence: 'Creative Commons BY 4.0' }])[0]).toContain('asks for a credit');
+    expect(soundLicenceTodos([{ id: 'vine-boom', licence: 'https://creativecommons.org/licenses/by/4.0/' }])[0]).toContain('asks for a credit');
+    expect(soundLicenceTodos([{ id: 'vine-boom', licence: 'credit required' }])[0]).toContain('asks for a credit');
+    expect(soundLicenceTodos([{ id: 'vine-boom', licence: 'attribute to Jane' }])[0]).toContain('asks for a credit');
     expect(soundLicenceTodos([{ id: 'vine-boom', licence: 'cc-by-sa', credit: 'by Jane' }])).toEqual([]);
     expect(soundLicenceTodos([{ id: 'vine-boom', licence: 'own' }])).toEqual([]);
     expect(soundLicenceTodos([{ id: 'vine-boom', licence: 'public domain, no attribution required' }])).toEqual([]);
+    expect(soundLicenceTodos([{ id: 'vine-boom', licence: 'Attribution not required' }])).toEqual([]);
     expect(soundLicenceTodos([{ id: 'gone' }])).toEqual(['sound gone: its entry is missing from the library, so its licence is unknown (sound list)']);
   });
 });

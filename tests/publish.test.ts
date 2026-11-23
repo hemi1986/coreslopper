@@ -23,6 +23,7 @@ import {
 import {
   appendPublishEntry,
   buildPublishPlan,
+  platformProblems,
   publishProject,
   quotaDay,
   youtubeDescription,
@@ -264,6 +265,11 @@ describe('publish plan and dry run', () => {
 
   it('counts YouTube tags like YouTube does', () => {
     expect(youtubeTagChars(['a', 'b c'])).toBe(1 + 1 + 5);
+  });
+
+  it('blocks a TikTok caption over the limit, like the release check', () => {
+    const long = { ...item('/tmp/video.mp4'), caption: 'x'.repeat(2201) };
+    expect(platformProblems('tiktok', long, VERTICAL, { video: 1000 }).errors.join()).toContain('caption has 2201 characters, limit 2200');
   });
 });
 

@@ -304,12 +304,16 @@ export function licenceUnknown(licence: string | undefined): boolean {
 
 /**
  * Whether a licence asks for attribution: the Creative Commons BY family under
- * any of its names (CC BY 4.0, Creative Commons Attribution 4.0, or a licence
- * named for attribution); "no attribution required" does not.
+ * any of its names (CC BY 4.0, Creative Commons Attribution 4.0, a licence URL,
+ * or a licence named for attribution); "no attribution required" does not.
  */
 export function licenceNeedsCredit(licence: string | undefined): boolean {
   const text = licence?.trim().toLowerCase() ?? '';
-  return /^cc[- ]?by\b/.test(text) || /^creative commons (by|attribution)\b/.test(text) || /^attribution\b/.test(text);
+  if (/^cc[- ]?by\b/.test(text) || /^creative commons (by|attribution)\b/.test(text)) return true;
+  if (/creativecommons\.org\/licenses\/by\b/.test(text)) return true;
+  if (/^credit required\b/.test(text) || /^attribute\b/.test(text)) return true;
+  // "Attribution required" asks for one; "Attribution not required" is a public-domain wording.
+  return /^attribution\b/.test(text) && !/\b(not|no)\s+(required|needed)\b/.test(text);
 }
 
 /** A library sound a project used, as the release check reads it; `licence` is undefined when the entry is gone. */
