@@ -1,16 +1,16 @@
 import { existsSync } from 'node:fs';
 import { mkdir, readdir, stat } from 'node:fs/promises';
-import { basename, extname, join } from 'node:path';
+import { basename, extname, join, resolve, sep } from 'node:path';
 import { stringify } from 'yaml';
-import { LibrarySetSchema, ValidationError, isScriptId, readYamlFile, writeTextAtomic, type LibrarySet } from '@coreslopper/core';
-import { LIBRARY_FILE_LIMITS, commitCopies, copyByContent, discardCopies, entryText, fileHash, libraryEntryDir, libraryEntryFile, parseTags, slugOfName } from './library-entry.js';
+import { LibrarySetSchema, SetBibleSchema, ValidationError, isScriptId, readYamlFile, writeTextAtomic, type LibrarySet, type SetDefinition } from '@coreslopper/core';
+import { LIBRARY_FILE_LIMITS, commitCopies, copyByContent, discardCopies, entryText, fileHash, libraryEntryDir, libraryEntryFile, librarySourceLabel, parseTags, slugOfName } from './library-entry.js';
 
 // The workspace's set library: `library/sets/<id>/set.yaml` with the set's
 // files next to it (ADR 0052). The user adds sets and their files by hand
-// (`addLibrarySet`, `addLibrarySetFile`); a project or series canon takes a
-// copy of the entry, with every reference and every plate. Nothing in a
-// production points into the library, so a later change there never touches a
-// finished video.
+// (`addLibrarySet`, `addLibrarySetFile`); the sets of a project or series canon
+// come in through `importSets`; a project or series canon takes a copy of the
+// entry, with every reference and every plate. Nothing in a production points
+// into the library, so a later change there never touches a finished video.
 
 export const setEntryDir = (root: string, id: string) => libraryEntryDir(root, 'sets', id);
 const setEntryFile = (root: string, id: string) => libraryEntryFile(root, 'sets', id);
@@ -161,4 +161,124 @@ export async function addLibrarySetFile(root: string, id: string, source: string
     throw error;
   }
   return { entry, added: changes, changed: true };
+}
+
+// ----------------------------------------------------------------- import
+
+export interface ImportSetResult {
+  /** The set's id in the project or canon. */
+  set: string;
+  /** The library entry it went into. */
+  id: string;
+  created: boolean;
+  /** New files and `plate:<id>` entries. */
+  added: string[];
+  /** Files the set names that do not exist. */
+  missing: string[];
+}
+
+export interface ImportSetsOptions {
+  /** Only this set of the source; all with at least one file otherwise. */
+  set?: string;
+  /** Put it into this library entry (an earlier copy of the same set). */
+  into?: string;
+  now?: Date;
+}
+
+/** A plate id free in the entry, `<plate>-<slug>` with a counter when that too is taken. */
+function freePlateId(entry: LibrarySet, base: string): string {
+  for (let n = 1; ; n += 1) {
+    const candidate = `${base}${n === 1 ? '' : `-${n}`}`.slice(0, 80);
+    if (!entry.plates.some((plate) => plate.id === candidate)) return candidate;
+  }
+}
+
+/**
+ * Bring the sets of a project or series canon into the library (CMD-ImportSets).
+ * A set already taken from the library (`library: <id>`) adds its new files
+ * and plates to that entry; so does one with the same id whose files share
+ * content with the entry. Any other set becomes a new entry, named
+ * `<id>-<slug>` if its id is taken. Name, description and prompt of an existing
+ * entry stay, missing ones are filled in, and every later import is recorded in
+ * the history. A set without a file is skipped; missing files are reported.
+ */
+export async function importSets(root: string, sourceDir: string, options: ImportSetsOptions = {}): Promise<ImportSetResult[]> {
+  const file = join(sourceDir, 'sets.yaml');
+  if (!existsSync(file)) throw new ValidationError(`${librarySourceLabel(root, sourceDir)} has no sets.yaml`);
+  const bible = await readYamlFile(file, SetBibleSchema);
+  const from = librarySourceLabel(root, sourceDir);
+  const slug = basename(sourceDir);
+  const at = (options.now ?? new Date()).toISOString();
+  if (options.set && !bible.sets.some((set) => set.id === options.set)) {
+    throw new ValidationError(`${from} has no set "${options.set}"`);
+  }
+  if (options.into) await loadLibrarySet(root, options.into);
+  const results: ImportSetResult[] = [];
+  for (const set of bible.sets) {
+    if (options.set && set.id !== options.set) continue;
+    const local = (path: string | undefined) => (path ? resolve(sourceDir, path) : undefined);
+    const exists = (path: string | undefined) => Boolean(path && existsSync(path) && resolve(path).startsWith(resolve(sourceDir) + sep));
+    const named = [...set.refs, ...set.plates.map((plate) => plate.ref)].filter(Boolean) as string[];
+    const missing = named.filter((path) => !exists(local(path)));
+    const files = named.map(local).filter(exists) as string[];
+    if (!files.length) {
+      if (options.set) throw new ValidationError(`${set.id} in ${from} has no files to take into the library`);
+      continue;
+    }
+    const id = options.into ?? (await matchSetEntry(root, set, files, slug));
+    const created = !existsSync(setEntryFile(root, id));
+    const { names, added } = await copyByContent(files, setEntryDir(root, id), 'sets');
+    const name = (path: string | undefined) => (path ? names.get(resolve(sourceDir, path)) : undefined);
+    const entry: LibrarySet = created
+      ? {
+          version: 1,
+          id,
+          name: set.name,
+          description: set.description,
+          prompt: set.prompt,
+          refs: [],
+          plates: [],
+          tags: [],
+          origin: from,
+          added: at,
+          history: [],
+        }
+      : await loadLibrarySet(root, id);
+    for (const ref of set.refs) {
+      const target = name(ref);
+      if (target && !entry.refs.includes(target)) entry.refs.push(target);
+    }
+    const plateAdds: string[] = [];
+    for (const plate of set.plates) {
+      const target = name(plate.ref);
+      const same = entry.plates.find((existing) => existing.id === plate.id);
+      if (same && (same.file === target || !target)) continue;
+      const plateId = same ? freePlateId(entry, `${plate.id}-${slug}`) : plate.id;
+      entry.plates.push({ id: plateId, angle: plate.angle, ...(plate.prompt ? { prompt: plate.prompt } : {}), ...(target ? { file: target } : {}) });
+      plateAdds.push(`plate:${plateId}`);
+    }
+    const changes = [...added, ...plateAdds];
+    if (!created && changes.length) entry.history.push({ at, from, added: changes });
+    if (created || changes.length) await saveLibrarySet(root, entry);
+    results.push({ set: set.id, id, created, added: changes, missing });
+  }
+  return results;
+}
+
+/** The library entry for an incoming set: its link, a same-id entry with shared content, or a new free id. */
+async function matchSetEntry(root: string, set: SetDefinition, files: string[], slug: string): Promise<string> {
+  if (set.library && existsSync(setEntryFile(root, set.library))) return set.library;
+  const base = set.id;
+  const taken = await idTaken(root, base);
+  if (!taken) return base;
+  if (taken === 'entry') {
+    const dir = setEntryDir(root, base);
+    const hashes = new Set<string>();
+    for (const name of await readdir(dir)) if (name !== 'set.yaml') hashes.add(await fileHash(join(dir, name)));
+    for (const file of files) if (hashes.has(await fileHash(file))) return base;
+  }
+  for (let n = 1; ; n += 1) {
+    const candidate = `${base}-${slug}${n === 1 ? '' : `-${n}`}`.slice(0, 80);
+    if (!(await idTaken(root, candidate))) return candidate;
+  }
 }

@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { createReadStream, existsSync, type Dirent } from 'node:fs';
 import { copyFile, mkdir, readdir, rename, rm } from 'node:fs/promises';
-import { basename, extname, join } from 'node:path';
+import { basename, extname, join, relative, resolve, sep } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { ValidationError, isScriptId } from '@coreslopper/core';
 
@@ -38,6 +38,11 @@ export function checkLibraryId(id: unknown, kind: LibraryEntryKind): string {
 export const libraryEntryDir = (root: string, kind: LibraryEntryKind, id: string) => join(root, 'library', kind, checkLibraryId(id, kind));
 
 export const libraryEntryFile = (root: string, kind: LibraryEntryKind, id: string) => join(libraryEntryDir(root, kind, id), KINDS[kind].file);
+
+/** `projects/<slug>`, the source of an import as the library records it. */
+export function librarySourceLabel(root: string, dir: string): string {
+  return relative(resolve(root), resolve(dir)).split(sep).join('/');
+}
 
 export function entryText(value: unknown, field: string, max: number, required = false): string | undefined {
   if (value === undefined || value === null || value === '') {

@@ -2,8 +2,9 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { mkdir, mkdtemp, readdir, rm, truncate, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { addLibrarySet, addLibrarySetFile, loadLibrarySet, setEntryDir } from '../packages/cli/src/set-library.ts';
+import { dirname, join } from 'node:path';
+import { stringify } from 'yaml';
+import { addLibrarySet, addLibrarySetFile, importSets, loadLibrarySet, setEntryDir } from '../packages/cli/src/set-library.ts';
 import { validateChangedFile } from '../packages/cli/src/validate-file.ts';
 
 const temporary: string[] = [];
@@ -159,4 +160,62 @@ describe('adding a file to a library set', () => {
 
     expect(await readdir(dir)).toEqual(['set.yaml']);
   });
+});
+
+const bar = (extra: Record<string, unknown> = {}) => ({
+  id: 'bar',
+  name: 'The bar',
+  description: 'A narrow bar in blue neon.',
+  prompt: 'narrow bar, blue neon, wet counter',
+  ...extra,
+});
+
+/** A production in the workspace with a set bible and its files, as `set import <production>` finds it. */
+async function production(ws: string, slug: string, sets: unknown[], files: Record<string, string>): Promise<string> {
+  const dir = join(ws, 'projects', slug);
+  await mkdir(dir, { recursive: true });
+  for (const [path, content] of Object.entries(files)) {
+    await mkdir(dirname(join(dir, path)), { recursive: true });
+    await writeFile(join(dir, path), content);
+  }
+  await writeFile(join(dir, 'sets.yaml'), stringify({ version: 1, sets }));
+  return dir;
+}
+
+/** The library holds "bar" with the plate "counter", its image the given bytes. */
+async function libraryBar(ws: string, counter = 'counter'): Promise<void> {
+  await addLibrarySet(ws, { name: 'Bar', description: 'A narrow bar in blue neon.', prompt: 'narrow bar, blue neon, wet counter' });
+  const image = join(ws, 'counter.png');
+  await writeFile(image, counter);
+  await addLibrarySetFile(ws, 'bar', image, { role: 'plate', angle: 'counter, frontal', plate: 'counter' });
+}
+
+describe('taking sets into the library', () => {
+  it('ST-026: The sets of a music video become library sets', async () => {
+    const ws = await workspace();
+    const dir = await production(
+      ws,
+      'neon-rain',
+      [bar({ refs: ['sets/bar/start.png'], plates: [{ id: 'counter', angle: 'counter, frontal', ref: 'sets/bar/plates/counter.png' }] })],
+      { 'sets/bar/start.png': 'start', 'sets/bar/plates/counter.png': 'counter' },
+    );
+
+    const results = await importSets(ws, dir, { now: new Date('2026-11-23T10:00:00Z') });
+
+    expect(results).toEqual([{ set: 'bar', id: 'bar', created: true, added: ['start.png', 'counter.png', 'plate:counter'], missing: [] }]);
+    expect(await loadLibrarySet(ws, 'bar')).toMatchObject({
+      id: 'bar',
+      name: 'The bar',
+      description: 'A narrow bar in blue neon.',
+      prompt: 'narrow bar, blue neon, wet counter',
+      refs: ['start.png'],
+      plates: [{ id: 'counter', angle: 'counter, frontal', file: 'counter.png' }],
+      tags: [],
+      origin: 'projects/neon-rain',
+      added: '2026-11-23T10:00:00.000Z',
+      history: [],
+    });
+    expect(await validateChangedFile(join(setEntryDir(ws, 'bar'), 'set.yaml'))).toBe('library set');
+  });
+
 });
