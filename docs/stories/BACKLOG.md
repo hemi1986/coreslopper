@@ -4,7 +4,7 @@
 
 **Progress: 13 of 24 domain stories done** · scenarios 47 of 80
 
-**42 stories** · In Progress: 0 · Ready: 17 · Ready for Human Review: 0 · In Review: 1 · Draft: 0 · Done: 24 · Superseded: 0
+**42 stories** · In Progress: 0 · Ready: 16 · Ready for Human Review: 0 · In Review: 1 · Draft: 0 · Done: 25 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
 
@@ -12,7 +12,6 @@ Within each section: by priority, then by story ID, with dependencies pulled in 
 
 | ID | Title | Type | Context | Priority | Size | Risk | Depends on |
 |---|---|---|---|---|---|---|---|
-| [ST-023](ST-023-library-set-entries.md) | Library set entries and their validation | tech-task | – | should | – | – | – |
 | [ST-024](ST-024-add-a-library-set-by-hand.md) | Add a library set by hand | domain | Library | should | – | – | ST-023 |
 | [ST-025](ST-025-add-a-file-to-a-library-set.md) | Add a reference or a plate to a library set | domain | Library | should | – | – | ST-024 |
 | [ST-026](ST-026-take-sets-into-the-library.md) | Take the sets of a production into the library | domain | Library | should | – | – | ST-023 |
@@ -63,4 +62,5 @@ Within each section: by priority, then by story ID, with dependencies pulled in 
 | [ST-012](ST-012-a-shot-lands-on-the-sound-cue.md) | A shot lands on a sound's cue | domain | Storyboard | should | – | – | ST-011 |
 | [ST-014](ST-014-burned-in-subtitles-for-a-meme.md) | A meme's render carries German subtitles | domain | Render | should | – | – | ST-007 |
 | [ST-020](ST-020-episode-announcement-says-new-episode.md) | An episode's announcement images say "new episode", not "new song" | chore | – | should | – | – | – |
+| [ST-023](ST-023-library-set-entries.md) | Library set entries and their validation | tech-task | – | should | – | – | – |
 | [ST-039](ST-039-restart-comfyui-only-when-stuck.md) | Restart ComfyUI only when it is stuck | task | – | should | – | – | – |

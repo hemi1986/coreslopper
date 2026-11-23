@@ -92,6 +92,8 @@ describe('the runtime of this repository', () => {
     for (const rule of rules('workspace/.gitignore')) {
       expect(repository.has(rule), `.gitignore lacks ${rule}`).toBe(true);
     }
+    // A library set's entry stays tracked; its media do not.
+    expect(rules('workspace/.gitignore')).toEqual(expect.arrayContaining(['library/sets/*/*', '!library/sets/*/set.yaml']));
   });
 
   it('ships every file a shipped hook runs', () => {

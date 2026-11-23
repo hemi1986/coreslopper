@@ -566,6 +566,11 @@ export const SetSchema = z.object({
   refs: z.array(z.string()).default([]),
   /** Plates: empty frames of this set from fixed camera angles. */
   plates: z.array(PlateSchema).default([]),
+  /**
+   * The set library entry this set was taken from (`library/sets/<id>/`). Its
+   * references and plates are copies of the library's.
+   */
+  library: ScriptIdSchema.optional(),
 });
 
 /** A recurring object with one look: the reference every shot showing it uses. */
@@ -1421,6 +1426,8 @@ export type Character = z.infer<typeof CharacterSchema>;
 export type CharacterState = z.infer<typeof CharacterStateSchema>;
 export type CharacterBible = z.infer<typeof CharacterBibleSchema>;
 export type LibraryCharacter = z.infer<typeof LibraryCharacterSchema>;
+export type LibraryPlate = z.infer<typeof LibraryPlateSchema>;
+export type LibrarySet = z.infer<typeof LibrarySetSchema>;
 export type BrandKit = z.infer<typeof BrandKitSchema>;
 /** One note on a render: a frame, or a range from `frame` to `end_frame`. Written by the board's review view. */
 export const ReviewNoteSchema = z
@@ -1533,6 +1540,44 @@ export const LibraryCharacterSchema = z
       .default([]),
   })
   .superRefine((entry, ctx) => duplicateIds(entry.states, ctx, ['states'], 'state'));
+
+/** A plate of a library set: its camera angle and the image's plain file name. */
+export const LibraryPlateSchema = z.object({
+  id: ScriptIdSchema,
+  /** Camera position and framing, e.g. "shelf, frontal, waist height, medium". */
+  angle: z.string().min(1),
+  /** Prompt for the plate; the set's prompt plus the angle when absent. */
+  prompt: z.string().optional(),
+  /** The plate image, a file of this folder. */
+  file: LibraryFileSchema.optional(),
+});
+
+/**
+ * `library/sets/<id>/set.yaml`: a set of the workspace's set library. Its
+ * files lie next to it. A project or canon takes a copy (`set use`) with every
+ * reference and every plate, since the plates are the same place in one light.
+ */
+export const LibrarySetSchema = z
+  .object({
+    version: z.literal(1),
+    id: ScriptIdSchema,
+    name: z.string().min(1),
+    description: z.string().min(1),
+    prompt: z.string().min(1),
+    /** Reference start frames, each a file of this folder. */
+    refs: z.array(LibraryFileSchema).default([]),
+    plates: z.array(LibraryPlateSchema).default([]),
+    /** Free words for finding the set on the board: "bar", "night", "neon". */
+    tags: z.array(z.string().min(1)).default([]),
+    /** Where the set came from first: `projects/<slug>` or `manual`. */
+    origin: z.string().min(1),
+    added: z.string().min(1),
+    /** Every later import into this entry: when, from where, which files and plates it brought. */
+    history: z
+      .array(z.object({ at: z.string().min(1), from: z.string().min(1), added: z.array(z.string()).default([]) }))
+      .default([]),
+  })
+  .superRefine((entry, ctx) => duplicateIds(entry.plates, ctx, ['plates'], 'plate'));
 
 /** The one audio file of a library sound, next to its `sound.yaml`. */
 export const LIBRARY_SOUND_FILE = 'sound.wav';

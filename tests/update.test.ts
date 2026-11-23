@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { existsSync } from 'node:fs';
-import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { initWorkspace } from '../packages/cli/src/init.ts';
@@ -156,6 +156,28 @@ describe('workspace update', () => {
     expect(await read(target, 'bench/cases/leaves-upstream.yaml')).toBe('v1\n');
     expect(await read(target, 'bench/cases/my-scene.yaml')).toBe('mine\n');
     expect(existsSync(join(target, 'bench/targets.yaml.coreslopper-new'))).toBe(false);
+  });
+
+  it('leaves an existing set library entry untouched', async () => {
+    const v1 = await runtimeFixture('9.9.0', { 'skills/a.md': 'v1\n' });
+    const target = await workspaceFrom(v1);
+    const entry = 'version: 1\nid: neon-bar\nname: Neon Bar\ndescription: A narrow bar in blue neon.\nprompt: narrow bar, blue neon\n';
+    await put(target, 'library/sets/neon-bar/set.yaml', entry);
+    await put(target, 'library/sets/neon-bar/bar.png', 'reference\n');
+    await put(target, 'library/sets/neon-bar/plates/counter.png', 'plate\n');
+
+    const v2 = await runtimeFixture('9.10.0', {
+      'skills/a.md': 'v2\n',
+      'library/sets/neon-bar/set.yaml': 'version: 1\nid: upstream\n',
+    });
+    const result = await updateWorkspace({ targetDir: target, runtimeDir: v2, install: false });
+
+    expect(actions(result.changes)).toEqual({ 'skills/a.md': 'updated' });
+    expect(await read(target, 'library/sets/neon-bar/set.yaml')).toBe(entry);
+    expect(await read(target, 'library/sets/neon-bar/bar.png')).toBe('reference\n');
+    expect(await read(target, 'library/sets/neon-bar/plates/counter.png')).toBe('plate\n');
+    expect(existsSync(join(target, 'library/sets/neon-bar/set.yaml.coreslopper-new'))).toBe(false);
+    expect((await readdir(join(target, 'library/sets/neon-bar'))).sort()).toEqual(['bar.png', 'plates', 'set.yaml']);
   });
 
   it('writes nothing in a dry run', async () => {
