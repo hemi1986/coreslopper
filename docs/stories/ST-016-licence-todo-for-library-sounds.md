@@ -12,7 +12,7 @@ risk: null
 events: [EVT-ReleaseChecked]
 depends_on: [ST-015]
 labels: [feature:meme]
-status: ready
+status: done
 ---
 
 ## Story

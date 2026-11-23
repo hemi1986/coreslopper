@@ -2,9 +2,9 @@
 
 > Generated from `docs/stories/ST-*.md` – **do not edit manually**. Change the story files instead.
 
-**Progress: 8 of 24 domain stories done** · scenarios 30 of 80
+**Progress: 9 of 24 domain stories done** · scenarios 33 of 80
 
-**42 stories** · In Progress: 0 · Ready: 24 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 18 · Superseded: 0
+**42 stories** · In Progress: 0 · Ready: 23 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 19 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
 
@@ -12,7 +12,6 @@ Within each section: by priority, then by story ID, with dependencies pulled in 
 
 | ID | Title | Type | Context | Priority | Size | Risk | Depends on |
 |---|---|---|---|---|---|---|---|
-| [ST-016](ST-016-licence-todo-for-library-sounds.md) | The release check flags sounds of unknown licence | domain | Release | must | – | – | ST-015 |
 | [ST-004](ST-004-check-the-sound-library.md) | Check the sound library after hand edits | domain | Sound library | should | – | – | ST-001 |
 | [ST-017](ST-017-document-the-sound-library.md) | Document how the user maintains the sound library | task | – | must | – | – | ST-001, ST-002, ST-004 |
 | [ST-003](ST-003-remove-a-library-sound.md) | Remove a library sound | domain | Sound library | should | – | – | ST-001 |
@@ -52,6 +51,7 @@ Within each section: by priority, then by story ID, with dependencies pulled in 
 | [ST-011](ST-011-take-library-sounds-into-a-meme.md) | The voice track takes library sounds into a meme | domain | Scripted audio | must | – | – | ST-009 |
 | [ST-013](ST-013-style-and-characters-for-a-meme.md) | The style-character stage of a meme | task | – | must | – | – | ST-007, ST-010 |
 | [ST-015](ST-015-a-memes-release-folder.md) | A meme's release folder | domain | Release | must | – | – | ST-007 |
+| [ST-016](ST-016-licence-todo-for-library-sounds.md) | The release check flags sounds of unknown licence | domain | Release | must | – | – | ST-015 |
 | [ST-021](ST-021-wizard-leads-to-the-project.md) | The wizard's last step leads to the new project or series | chore | – | must | – | – | – |
 | [ST-022](ST-022-board-shows-loading-and-busy-buttons.md) | The board shows when it loads and when a button is working | chore | – | must | – | – | – |
 | [ST-035](ST-035-level-speech-takes-in-the-episode-track.md) | The episode track levels speech takes to one loudness | task | – | must | – | – | – |

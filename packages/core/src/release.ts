@@ -279,13 +279,64 @@ export function unmarkedPlaceholders(text: string): string[] {
 const chars = (text: string) => [...text].length;
 
 /**
+ * The text a meme's platform post carries before its hashtags: its description
+ * and the credits the library sounds it took need (HS-261, HS-265).
+ */
+export function memeDescription(data: Pick<UploadData, 'main'> | undefined, credits: string[] = []): string {
+  return [data?.main.description.trim() ?? '', ...credits].filter(Boolean).join('\n\n');
+}
+
+/**
  * The caption of a meme's one video: its description, the credits the library
  * sounds it took need, and its hashtags. `release` writes this string and the
  * checks measure it, so the two cannot drift (HS-172, ADR 0045).
  */
 export function memeCaption(data: Pick<UploadData, 'main'> | undefined, credits: string[] = []): string {
   const main = data?.main;
-  return [main?.description.trim() ?? '', ...credits, main?.hashtags.join(' ') ?? ''].filter(Boolean).join('\n\n');
+  return [memeDescription(data, credits), main?.hashtags.join(' ') ?? ''].filter(Boolean).join('\n\n');
+}
+
+/** Whether a licence is unknown: unset, blank, or a value that starts with "unknown" (e.g. "unknown – ask Jane"). */
+export function licenceUnknown(licence: string | undefined): boolean {
+  const text = licence?.trim().toLowerCase() ?? '';
+  return !text || /^unknown\b/.test(text);
+}
+
+/**
+ * Whether a licence asks for attribution: the Creative Commons BY family under
+ * any of its names (CC BY 4.0, Creative Commons Attribution 4.0, a licence URL,
+ * or a licence named for attribution); "no attribution required" does not.
+ */
+export function licenceNeedsCredit(licence: string | undefined): boolean {
+  const text = licence?.trim().toLowerCase() ?? '';
+  if (/^cc[- ]?by\b/.test(text) || /^creative commons (by|attribution)\b/.test(text)) return true;
+  if (/creativecommons\.org\/licenses\/by\b/.test(text)) return true;
+  if (/^credit required\b/.test(text) || /^attribute\b/.test(text)) return true;
+  // "Attribution required" asks for one; "Attribution not required" is a public-domain wording.
+  return /^attribution\b/.test(text) && !/\b(not|no)\s+(required|needed)\b/.test(text);
+}
+
+/** A library sound a project used, as the release check reads it; `licence` is undefined when the entry is gone. */
+export interface UsedSound {
+  id: string;
+  licence?: string;
+  credit?: string;
+}
+
+/**
+ * The TODO lines for the library sounds a project used: an unknown licence, or
+ * one that asks for attribution without its credit; never an error (HS-261,
+ * HS-265). A sound whose entry is gone has no licence either, so it is unknown.
+ */
+export function soundLicenceTodos(sounds: UsedSound[]): string[] {
+  const todos: string[] = [];
+  for (const sound of sounds) {
+    const edit = `sound edit ${sound.id}`;
+    if (sound.licence === undefined) todos.push(`sound ${sound.id}: its entry is missing from the library, so its licence is unknown (sound list)`);
+    else if (licenceUnknown(sound.licence)) todos.push(`sound ${sound.id}: the licence is unknown; decide whether it may be used (${edit} --licence <licence|own>)`);
+    else if (!sound.credit?.trim() && licenceNeedsCredit(sound.licence)) todos.push(`sound ${sound.id}: the licence "${sound.licence}" asks for a credit that is missing (${edit} --credit "...")`);
+  }
+  return todos;
 }
 
 /** The hashtags a meme's platform post carries: the list plus any the description already holds (credits are not counted). */

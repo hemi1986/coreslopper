@@ -10,10 +10,10 @@ import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parse, stringify } from 'yaml';
-import { MockPublisher, MockSocialAdapter, PublishError, markUncertain, type SocialPlatform } from '../packages/providers/src/index.ts';
+import { MockPublisher, MockSocialAdapter, PublishError, markUncertain, tiktokCaption, type SocialPlatform } from '../packages/providers/src/index.ts';
 import { buildRelease } from '../packages/cli/src/release.ts';
 import { loadCalendar, loadStatus, updateStatus } from '../packages/cli/src/release-calendar.ts';
-import { publishProject } from '../packages/cli/src/publish.ts';
+import { publishProject, youtubeDescription } from '../packages/cli/src/publish.ts';
 import {
   approveRelease,
   loadAutopilotLog,
@@ -54,10 +54,10 @@ const ENV = {
 };
 
 /** An approved release with the mock adapters and a clock the test moves. */
-async function setup(options: { env?: Record<string, string>; meme?: boolean } = {}) {
+async function setup(options: { env?: Record<string, string>; meme?: boolean | { licence?: string; credit?: string } } = {}) {
   // The board reads the credentials from the environment, like the workspace's .env.
   for (const [key, value] of Object.entries({ ...ENV, ...options.env })) vi.stubEnv(key, value);
-  const made = options.meme ? await memeFixture() : undefined;
+  const made = options.meme ? await memeFixture(typeof options.meme === 'object' ? options.meme : {}) : undefined;
   const dir = made ? made.dir : await fixture();
   const root = made ? made.root : join(dir, '..', '..');
   await buildRelease({ projectDir: dir, root, deps: fakeDeps() });
@@ -126,16 +126,21 @@ describe('release autopilot', () => {
   });
 
   it('posts a meme as a YouTube Short, a TikTok, and an Instagram Reel', async () => {
-    const t = await setup({ meme: true });
+    const credit = 'Boom by Jane Doe (CC BY 4.0)';
+    const t = await setup({ meme: { licence: 'cc-by', credit } });
     await approveRelease(t.dir, { root: t.root, now: new Date(t.at('youtube')) });
     t.moveTo('youtube');
     await t.run();
     expect(t.publishCalls.map((call) => call.platform).sort()).toEqual(['tiktok', 'youtube']);
+    // The uploads carry the release caption with the credit, not just the folder's text.
+    expect(youtubeDescription(t.youtube.calls.find((call) => call.item.name === 'main')!.item)).toContain(credit);
+    expect(tiktokCaption(t.tiktok.calls.find((call) => call.item.name === 'main')!.item)).toContain(credit);
     t.moveTo('instagram');
     await t.run();
     const reel = t.social.get('instagram')!.calls.find((call) => call.event === 'instagram')!;
     expect(reel).toMatchObject({ placement: 'reel' });
     expect(reel.text).toContain('He printed the report anyway.');
+    expect(reel.text).toContain(credit);
     expect(reel.media?.path).toMatch(/video\/office-prank-9x16\.mp4$/);
   });
 

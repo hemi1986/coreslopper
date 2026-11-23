@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { stringify } from 'yaml';
-import { ConfigError, PublishLogSchema, UploadDataSchema, type PublishLog } from '../packages/core/src/index.ts';
+import { ConfigError, ProjectConfigSchema, PublishLogSchema, UploadDataSchema, type PublishLog } from '../packages/core/src/index.ts';
 import {
   MockPublisher,
   RefreshingToken,
@@ -23,11 +23,14 @@ import {
 import {
   appendPublishEntry,
   buildPublishPlan,
+  platformProblems,
   publishProject,
   quotaDay,
+  youtubeDescription,
   youtubeTagChars,
   type VideoProbe,
 } from '../packages/cli/src/publish.ts';
+import { memeFixture } from './helpers/release-fixture.ts';
 import { renderUploadText, writeUploadText } from '../packages/cli/src/upload-text.ts';
 import { parseUploadText, uploadTextProblems } from '../packages/cli/src/release-files.ts';
 import { checkUploadData } from '../packages/cli/src/qa.ts';
@@ -92,7 +95,21 @@ async function fixture(data: unknown = uploadData()): Promise<string> {
   await mkdir(join(dir, 'review'), { recursive: true });
   await mkdir(join(dir, 'renders', 'shorts'), { recursive: true });
   await mkdir(join(dir, 'renders', 'thumbnails'), { recursive: true });
-  await writeFile(join(dir, 'project.yaml'), 'version: 1\n');
+  await writeFile(
+    join(dir, 'project.yaml'),
+    stringify(
+      ProjectConfigSchema.parse({
+        version: 1,
+        slug: 'neon-rain',
+        kind: 'music-video',
+        title: 'Neon Rain',
+        created: '2026-11-16T00:00:00Z',
+        workflow: { version: '0.1.0' },
+        budget_usd: 40,
+        formats: { master: { aspect: '16:9', width: 1920, height: 1080, fps: 30 } },
+      }),
+    ),
+  );
   await writeFile(join(dir, 'review', 'upload.yaml'), stringify(data));
   for (const [file, content] of Object.entries({
     'renders/16x9.mp4': 'main-video',
@@ -249,6 +266,11 @@ describe('publish plan and dry run', () => {
   it('counts YouTube tags like YouTube does', () => {
     expect(youtubeTagChars(['a', 'b c'])).toBe(1 + 1 + 5);
   });
+
+  it('blocks a TikTok caption over the limit, like the release check', () => {
+    const long = { ...item('/tmp/video.mp4'), caption: 'x'.repeat(2201) };
+    expect(platformProblems('tiktok', long, VERTICAL, { video: 1000 }).errors.join()).toContain('caption has 2201 characters, limit 2200');
+  });
 });
 
 describe('publish run and idempotency', () => {
@@ -313,6 +335,38 @@ describe('publish run and idempotency', () => {
     // A failed attempt is retried on the next run; the YouTube upload is not.
     const next = await publishProject({ projectDir: dir, dryRun: true, only: 'N1-intro', probe, adapters: forbidden, log: quiet });
     expect(next.plan.steps.map((step) => `${step.platform}:${step.action}`)).toEqual(['youtube:skip', 'tiktok:upload']);
+  });
+});
+
+describe('a meme upload', () => {
+  it('posts the release caption with the credit of every sound it took', async () => {
+    const credit = 'Boom by Jane Doe (CC BY 4.0)';
+    const { dir, root } = await memeFixture({ licence: 'cc-by', credit });
+    const youtube = new MockPublisher('youtube');
+    const tiktok = new MockPublisher('tiktok');
+    await publishProject({ projectDir: dir, root, mock: true, only: 'main', probe: () => VERTICAL, adapters: { youtube, tiktok }, log: quiet });
+    const yt = youtube.calls.find((call) => call.item.name === 'main')!.item;
+    const tt = tiktok.calls.find((call) => call.item.name === 'main')!.item;
+    expect(youtubeDescription(yt)).toContain(credit);
+    expect(tiktokCaption(tt)).toContain(credit);
+    expect(tiktokCaption(tt)).toContain('He printed the report anyway.');
+  });
+
+  it('posts the release caption also when no sound needs a credit', async () => {
+    const { dir, root } = await memeFixture({ licence: 'own' });
+    const youtube = new MockPublisher('youtube');
+    const tiktok = new MockPublisher('tiktok');
+    await publishProject({ projectDir: dir, root, mock: true, only: 'main', probe: () => VERTICAL, adapters: { youtube, tiktok }, log: quiet });
+    const tt = tiktok.calls.find((call) => call.item.name === 'main')!.item;
+    expect(tiktokCaption(tt)).toBe('He printed the report anyway.\n\n#officeprank');
+    expect(youtubeDescription(youtube.calls[0]!.item)).toBe('He printed the report anyway.\n\n#officeprank');
+  });
+
+  it('warns about a sound whose library entry is gone instead of dropping the credit silently', async () => {
+    const { dir, root } = await memeFixture({ credit: 'Boom by Jane Doe' });
+    await rm(join(root, 'library', 'sounds', 'vine-boom', 'sound.yaml'));
+    const summary = await publishProject({ projectDir: dir, root, dryRun: true, probe: () => VERTICAL, adapters: forbidden, log: quiet });
+    expect(summary.plan.warnings.join('\n')).toMatch(/vine-boom.*its entry is missing/);
   });
 });
 
@@ -574,6 +628,21 @@ describe('TikTok adapter', () => {
     const put = calls.find((call) => call.url.startsWith('https://upload.tiktok'))!;
     expect(new Headers(put.init!.headers).get('content-range')).toBe('bytes 0-3999/4000');
     expect(statusPolls).toBe(2);
+  });
+
+  it('sends a meme caption as it is, not the title and hashtags', async () => {
+    const video = await bytesFile(100);
+    const caption = 'He printed the report anyway.\n\nBoom by Jane Doe (CC BY 4.0)\n\n#officeprank';
+    const fetchImpl: FetchLike = async (url) => {
+      if (url.endsWith('/oauth/token/')) return json({ access_token: 'act.access', expires_in: 86400 });
+      if (url.endsWith('/inbox/video/init/')) return json({ data: { publish_id: 'v_meme', upload_url: 'https://upload.tiktok.example/u' }, error: { code: 'ok' } });
+      if (url === 'https://upload.tiktok.example/u') return new Response(null, { status: 201 });
+      if (url.endsWith('/status/fetch/')) return json({ data: { status: 'SEND_TO_USER_INBOX' }, error: { code: 'ok' } });
+      throw new Error(`unexpected ${url}`);
+    };
+    const adapter = new TikTokPublisher({ ...credentials, fetchImpl, sleep: noSleep });
+    const result = await adapter.publish({ item: item(video, { title: 'Office prank', hashtags: ['#officeprank'], caption }) });
+    expect(result.manualSteps.join('\n')).toContain(caption);
   });
 
   it('refreshes after access_token_invalid and explains the pending-draft limit', async () => {

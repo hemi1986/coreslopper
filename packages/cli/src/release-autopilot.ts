@@ -387,6 +387,7 @@ async function act(dir: string, item: AutopilotEventPlan, context: Context, deps
     const schedule = platform === 'youtube' && settings.youtube_audited && Date.parse(item.event.at) - deps.now().getTime() > 20 * 60_000 ? item.event.at : undefined;
     const summary = await deps.publish({
       projectDir: dir,
+      root: workspaceRootOf(context),
       platform,
       only: action.item,
       ...(schedule ? { schedule } : {}),

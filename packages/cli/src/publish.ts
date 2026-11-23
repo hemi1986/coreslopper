@@ -4,9 +4,17 @@ import { stat } from 'node:fs/promises';
 import { dirname, extname, isAbsolute, join, relative, resolve } from 'node:path';
 import {
   ConfigError,
+  ProjectConfigSchema,
   PublishLogSchema,
+  TakesSchema,
   ValidationError,
+  memeCaption,
+  memeDescription,
+  projectPaths,
   readJsonFile,
+  readYamlFile,
+  repoRoot,
+  soundLicenceTodos,
   writeJsonAtomic,
   type PublishEntry,
   type PublishLog,
@@ -14,6 +22,7 @@ import {
   type UploadData,
   type UploadMain,
   type UploadShort,
+  type UsedSound,
 } from '@coreslopper/core';
 import {
   MockPublisher,
@@ -31,6 +40,7 @@ import {
   type PublishItem,
 } from '@coreslopper/providers';
 import { withReleaseLock } from './release-calendar.js';
+import { usedLibrarySounds } from './release.js';
 import { loadUploadData, uploadPaths } from './upload-text.js';
 
 /** YouTube limits that `publish` checks before an upload. */
@@ -55,6 +65,8 @@ export interface VideoProbe {
 
 export interface PublishOptions {
   projectDir: string;
+  /** The workspace root the sound library lives in; defaults to the repository root of the working directory. */
+  root?: string;
   platform?: PlatformChoice;
   /** `main`, `shorts`, or a Short name. */
   only?: string;
@@ -156,9 +168,17 @@ export function selectItems(
   projectDir: string,
   data: UploadData,
   only?: string,
+  /** How a meme's main item posts: its release caption, credits included (HS-261, HS-265, HS-172). */
+  main: { meme?: boolean; credits?: string[] } = {},
 ): { item: PublishItem; platforms: PublishPlatform[] }[] {
+  const item = toItem(projectDir, data, data.main, 'main');
+  // A meme posts the one caption the release folder holds, with or without a credit; the platforms never see a different text.
+  if (main.meme) {
+    item.description = memeDescription(data, main.credits);
+    item.caption = memeCaption(data, main.credits);
+  }
   const all = [
-    { item: toItem(projectDir, data, data.main, 'main'), platforms: data.main.platforms },
+    { item, platforms: data.main.platforms },
     ...data.shorts.map((short) => ({ item: toItem(projectDir, data, short, 'short'), platforms: short.platforms })),
   ];
   if (!only) return all;
@@ -210,7 +230,7 @@ export function platformProblems(
       if (Math.abs(probe.width / probe.height - 9 / 16) > 0.01) warnings.push(`${label}: ${probe.width}x${probe.height}; TikTok shows 9:16 full screen`);
     }
     const caption = tiktokCaption(item);
-    if ([...caption].length > TIKTOK_LIMITS.captionChars) warnings.push(`${label}: caption has ${[...caption].length} characters, limit ${TIKTOK_LIMITS.captionChars}`);
+    if ([...caption].length > TIKTOK_LIMITS.captionChars) errors.push(`${label}: caption has ${[...caption].length} characters, limit ${TIKTOK_LIMITS.captionChars}`);
   }
   return { errors, warnings };
 }
@@ -272,7 +292,13 @@ export async function buildPublishPlan(
   projectDir: string,
   data: UploadData,
   log: PublishLog,
-  options: Pick<PublishOptions, 'platform' | 'only' | 'schedule' | 'force' | 'mock' | 'now' | 'probe'> = {},
+  options: Pick<PublishOptions, 'platform' | 'only' | 'schedule' | 'force' | 'mock' | 'now' | 'probe'> & {
+    /** A meme posts its release caption on the main item (see `selectItems`). */
+    meme?: boolean;
+    credits?: string[];
+    /** Open TODOs of the release checks, reported as warnings: a TODO never blocks an upload (HS-172). */
+    todos?: string[];
+  } = {},
 ): Promise<PublishPlan> {
   const root = resolve(projectDir);
   const now = options.now?.() ?? new Date();
@@ -285,7 +311,7 @@ export async function buildPublishPlan(
   const probes = new Map<string, VideoProbe | undefined>();
   let unprobed = 0;
 
-  for (const { item, platforms } of selectItems(root, data, options.only)) {
+  for (const { item, platforms } of selectItems(root, data, options.only, { meme: options.meme, credits: options.credits })) {
     const targets = platforms.filter((platform) => wanted.includes(platform));
     if (targets.length === 0) continue;
     const file = item.file.startsWith(`${root}/`) ? relative(root, item.file) : item.file;
@@ -320,6 +346,7 @@ export async function buildPublishPlan(
     }
   }
   if (unprobed) warnings.push(`${unprobed} video(s) not probed (ffprobe missing): length and aspect ratio unchecked`);
+  warnings.push(...(options.todos ?? []));
 
   const uploads = steps.filter((step) => step.action === 'upload');
   const schedule = scheduleProblems(options.schedule, now, [...new Set(uploads.map((step) => step.platform))]);
@@ -426,6 +453,20 @@ export async function appendPublishEntry(logPath: string, entry: PublishEntry): 
 }
 
 /**
+ * What the upload needs to post a meme's release text: whether the project is a
+ * meme, and the library sounds its takes came from (HS-261, HS-265). Reads only
+ * `project.yaml` and `takes.json`: publish needs the kind and the takes, not the
+ * whole loaded project.
+ */
+async function uploadSounds(projectDir: string, root: string): Promise<{ meme: boolean; sounds: UsedSound[] }> {
+  const config = await readYamlFile(projectPaths(projectDir).config, ProjectConfigSchema);
+  if (config.kind !== 'meme') return { meme: false, sounds: [] };
+  const paths = projectPaths(projectDir, config);
+  const takes = paths.takes && existsSync(paths.takes) ? await readJsonFile(paths.takes, TakesSchema) : undefined;
+  return { meme: true, sounds: await usedLibrarySounds({ takes, paths }, root) };
+}
+
+/**
  * Upload the release package: validate, plan, check quota, then upload each
  * item that is not in the publish log with the same file hash. Every upload
  * is private or a draft. The log is written after each item.
@@ -437,7 +478,9 @@ export async function publishProject(options: PublishOptions): Promise<PublishSu
   const data = await loadUploadData(projectDir);
   const logPath = uploadPaths(projectDir).log;
   let log = await readPublishLog(logPath);
-  const plan = await buildPublishPlan(projectDir, data, log, options);
+  const { meme, sounds } = await uploadSounds(projectDir, options.root ?? repoRoot());
+  const credits = sounds.map((sound) => sound.credit).filter((credit): credit is string => Boolean(credit));
+  const plan = await buildPublishPlan(projectDir, data, log, { ...options, meme, credits, todos: soundLicenceTodos(sounds) });
   for (const line of formatPlan(plan, data.main.title, Boolean(options.dryRun))) print(line);
 
   if (plan.errors.length) {

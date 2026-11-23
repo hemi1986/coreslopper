@@ -13,6 +13,7 @@ import {
   releaseIdentity,
   releaseTodos,
   repoRoot,
+  soundLicenceTodos,
   unmarkedPlaceholders,
   type LoadedProject,
   type ReleaseManifest,
@@ -20,7 +21,7 @@ import {
 } from '@coreslopper/core';
 import { shortProblems } from './release-files.js';
 import { canvasProblems, probeMedia, videoFacts, videoProblems, wavProblems, type Prober } from './release-media.js';
-import { projectFormats, releaseDir, usedSoundCredits } from './release.js';
+import { projectFormats, releaseDir, usedLibrarySounds } from './release.js';
 import { jpegInfo, thumbnailProblems } from './thumbnail-files.js';
 import { loadUploadData, uploadPaths } from './upload-text.js';
 
@@ -60,7 +61,8 @@ export async function releaseChecks(projectDir: string, probe: Prober = probeMed
   const kind = project.config.kind;
   const music = kind === 'music-video';
   const meme = kind === 'meme';
-  const credits = meme ? await usedSoundCredits(project, root) : [];
+  const sounds = meme ? await usedLibrarySounds(project, root) : [];
+  const credits = sounds.map((sound) => sound.credit).filter((credit): credit is string => Boolean(credit));
   const dir = releaseDir(project.paths.root);
   const manifestPath = join(dir, 'manifest.json');
   if (!existsSync(manifestPath)) {
@@ -125,6 +127,12 @@ export async function releaseChecks(projectDir: string, probe: Prober = probeMed
         : [...(info.width !== 1080 || info.height !== 1920 ? [`${info.width}x${info.height}, expected 1080x1920`] : []), ...(info.components !== 3 ? [`${info.components} colour components, expected RGB`] : [])];
       checks.push(problems.length ? check('Release cover', 'FAIL', problems.join(', ')) : check('Release cover', 'PASS', '1080x1920 RGB JPEG'));
     }
+    const licenceTodos = soundLicenceTodos(sounds);
+    checks.push(
+      licenceTodos.length
+        ? check('Release sounds', 'TODO', licenceTodos.join('; '))
+        : check('Release sounds', 'PASS', `${sounds.length} library sound(s), licence and credit cleared`),
+    );
   } else {
     const thumbs = byKind('thumbnail');
     const badThumbs: string[] = [];
