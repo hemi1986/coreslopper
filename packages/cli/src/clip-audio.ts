@@ -5,6 +5,7 @@ import { ValidationError, ensureDir, loadProject, resolveAnchor, scriptLines, ty
 import { measureLoudness } from './episode-track.js';
 import { mediaInfo } from './image-ops.js';
 import { importTakes, resolveBinary } from './media.js';
+import { projectSoundCues } from './script-canon.js';
 import { lineTakePath, requireEpisode } from './takes.js';
 
 /** Loudness the clip sound of an sfx take is brought to; generated sfx takes sit around -16 to -25 LUFS. */
@@ -106,13 +107,14 @@ export async function clipAudioTake(projectDir: string, options: ClipAudioOption
     start: resolveAnchor({ type: 'line', id: options.line, edge: 'start', offset: 0 }, timing),
     end: resolveAnchor({ type: 'line', id: options.line, edge: 'end', offset: 0 }, timing),
   };
+  const cues = await projectSoundCues(project);
   const wanted = options.shots?.length ? new Set(options.shots) : undefined;
   const skipped: string[] = [];
   const candidates: Array<{ id: string; clip: string; start: number; end: number; clipFrom: number; speed: number; seconds: number }> = [];
   for (const shot of project.storyboard.shots) {
     if (wanted && !wanted.has(shot.id)) continue;
-    const start = resolveAnchor(shot.start, timing);
-    const end = resolveAnchor(shot.end, timing);
+    const start = resolveAnchor(shot.start, timing, cues);
+    const end = resolveAnchor(shot.end, timing, cues);
     if (!wanted && (end <= slot.start || start >= slot.end)) continue;
     const asset = shot.asset;
     if (!asset || !/\.(mp4|mov|webm|mkv)$/i.test(asset)) {

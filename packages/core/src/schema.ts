@@ -103,6 +103,11 @@ export const ReleaseMetadataSchema = z.object({
   license_note: z.string().min(1).optional(),
 });
 
+/** A meme has exactly one format, 9:16, and no derivatives (ADR 0051). Shared by the project and its template. */
+export function memeFormatProblems(formats: { master: Format; derivatives: Format[] }): string[] {
+  return formats.master.aspect === '9:16' && formats.derivatives.length === 0 ? [] : ['a meme has only the format 9:16'];
+}
+
 export const ProjectConfigSchema = z
   .object({
     version: z.literal(1),
@@ -134,8 +139,8 @@ export const ProjectConfigSchema = z
     distribution: DistributionSchema.optional(),
   })
   .superRefine((config, ctx) => {
-    if (config.kind === 'meme' && (config.formats.master.aspect !== '9:16' || config.formats.derivatives.length > 0)) {
-      ctx.addIssue({ code: 'custom', path: ['formats'], message: 'a meme has only the format 9:16' });
+    if (config.kind === 'meme') {
+      for (const message of memeFormatProblems(config.formats)) ctx.addIssue({ code: 'custom', path: ['formats'], message });
     }
     if (config.kind !== 'episode') return;
     for (const key of ['series', 'episode'] as const) {
@@ -149,10 +154,14 @@ export const ProjectConfigSchema = z
 export const MemeTemplateSchema = z.object({
   version: z.literal(1),
   kind: z.literal('meme'),
-  formats: z.object({
-    master: FormatSchema.refine((format) => format.aspect === '9:16', 'a meme is 9:16'),
-    derivatives: z.array(FormatSchema).max(0, 'a meme has one format and no derivatives').default([]),
-  }),
+  formats: z
+    .object({
+      master: FormatSchema,
+      derivatives: z.array(FormatSchema).default([]),
+    })
+    .superRefine((formats, ctx) => {
+      for (const message of memeFormatProblems(formats)) ctx.addIssue({ code: 'custom', path: [], message });
+    }),
 });
 
 export const StageStatusSchema = z.enum(['pending', 'running', 'done', 'failed', 'skipped']);

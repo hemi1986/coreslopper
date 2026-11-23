@@ -45,9 +45,7 @@ describe('episode lip-sync rules', () => {
     edit(storyboard.shots[2], characters);
     return () =>
       resolveStoryboard(storyboard, project.effectiveTiming!, project.style!, characters, 30, 1, {
-        script: project.script!,
-        sets: project.sets!,
-        ...limits,
+        episode: { script: project.script!, sets: project.sets!, ...limits },
       });
   }
 

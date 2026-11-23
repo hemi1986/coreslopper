@@ -1433,7 +1433,7 @@ queue
         } else {
           const kind = validateChoice(options.kind!, ['keyframe', 'clip'] as const, 'kind');
           const overrides = options.overrides ? ((await readJsonOrYaml(options.overrides)) as Record<string, Record<string, unknown>>) : undefined;
-          const built = buildShotItems(loaded, { kind, shots: parseCsv(options.shots), role: options.role, workflow: options.workflow, overrides });
+          const built = await buildShotItems(loaded, { kind, shots: parseCsv(options.shots), role: options.role, workflow: options.workflow, overrides });
           for (const skipped of built.skipped) console.log(`  skipped ${skipped.shot}: ${skipped.reason}`);
           items = built.items;
         }

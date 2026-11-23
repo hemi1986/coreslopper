@@ -275,8 +275,7 @@ describe('set rule', () => {
     edit(storyboard.shots);
     return () =>
       resolveStoryboard(storyboard, project.effectiveTiming!, project.style!, project.characters!, 30, 1, {
-        script: project.script!,
-        sets: project.sets!,
+        episode: { script: project.script!, sets: project.sets! },
       });
   }
 

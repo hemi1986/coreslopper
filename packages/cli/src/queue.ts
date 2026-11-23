@@ -13,12 +13,14 @@ import {
   type LoadedProject,
   type ProviderKind,
   type Shot,
+  type SoundCues,
 } from '@coreslopper/core';
 import { pikaVariantOf } from '@coreslopper/providers';
 import { comfyRestart, comfyRestartCommand } from './comfy.js';
 import { BatchItemSchema, projectTarget, resolveOut, runBatch } from './generate.js';
 import { clipFrame } from './image-ops.js';
 import { reviewImage, type ImageVerdict } from './review-image.js';
+import { projectSoundCues } from './script-canon.js';
 
 /**
  * The generation queue of a project: `assets/queue.json`. One `queue run`
@@ -286,11 +288,11 @@ export function shotReferences(project: LoadedProject, shot: Shot): string[] {
   return references;
 }
 
-function clipSeconds(project: LoadedProject, shot: Shot): number {
+function clipSeconds(project: LoadedProject, shot: Shot, cues?: SoundCues): number {
   const planned = Number(shot.motion?.props.clipSeconds);
   if (Number.isFinite(planned) && planned > 0) return planned;
   if (!project.effectiveTiming) throw new ValidationError(`${shot.id}: set motion.props.clipSeconds, or run the timing stage first.`);
-  const seconds = resolveAnchor(shot.end, project.effectiveTiming) - resolveAnchor(shot.start, project.effectiveTiming);
+  const seconds = resolveAnchor(shot.end, project.effectiveTiming, cues) - resolveAnchor(shot.start, project.effectiveTiming, cues);
   return Math.min(10, Math.max(2, Math.ceil(seconds)));
 }
 
@@ -322,9 +324,10 @@ export function fl2vaFromPlain(prompt: string): { shots: string[]; soundscape: s
  * and the keyframe. What the storyboard cannot say (a structured Pika prompt,
  * an end frame, another seed) comes in through `overrides`.
  */
-export function buildShotItems(project: LoadedProject, options: ShotItemOptions): ShotItems {
+export async function buildShotItems(project: LoadedProject, options: ShotItemOptions): Promise<ShotItems> {
   const storyboard = project.storyboard;
   if (!storyboard) throw new ValidationError(`storyboard.yaml is missing in ${project.paths.root}.`);
+  const cues = await projectSoundCues(project);
   const wanted = options.shots?.length ? expandShotIds(options.shots) : undefined;
   for (const id of wanted ?? []) {
     if (!storyboard.shots.some((shot) => shot.id === id)) throw new ValidationError(`Shot ${id} is not in storyboard.yaml.`);
@@ -385,7 +388,7 @@ export function buildShotItems(project: LoadedProject, options: ShotItemOptions)
         role: options.role ?? 'video.image_to_video.quality',
         ...(options.workflow && isFl2va(options.workflow) ? { fl2va: fl2vaFromPlain(shot.prompts.video) } : { prompt: shot.prompts.video }),
         references: [start],
-        durationSeconds: clipSeconds(project, shot),
+        durationSeconds: clipSeconds(project, shot, cues),
         seed: 2000 + number,
         ...(options.workflow ? { params: { workflow: options.workflow } } : {}),
       };

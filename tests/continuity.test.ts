@@ -78,7 +78,7 @@ describe('continuity references in a music video', () => {
       states: [{ id: 'cable', description: 'hatch open, cable to the Walkman', ref: 'characters/robot/states/cable.png' }],
     });
     edit(storyboard.shots[0], characters);
-    return () => resolveStoryboard(storyboard, project.effectiveTiming!, project.style!, characters, 30, 1, undefined, withSets ?? undefined);
+    return () => resolveStoryboard(storyboard, project.effectiveTiming!, project.style!, characters, 30, 1, { sets: withSets ?? undefined });
   }
 
   it('accepts an existing plate, prop, and state', async () => {
@@ -122,8 +122,7 @@ describe('continuity references in an episode', () => {
     storyboard.shots[0]!.refs.plate = 'elevator/doors';
     expect(() =>
       resolveStoryboard(storyboard, project.effectiveTiming!, project.style!, project.characters!, 30, 1, {
-        script: project.script!,
-        sets: canon,
+        episode: { script: project.script!, sets: canon },
       }),
     ).toThrow(/plays in set "office"/);
   });

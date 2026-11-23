@@ -125,8 +125,7 @@ describe('ChatWindow validation', () => {
     if (section) shot.section = section;
     return () =>
       resolveStoryboard(storyboard, project.effectiveTiming!, project.style!, project.characters!, 30, 1, {
-        script: project.script!,
-        sets: project.sets!,
+        episode: { script: project.script!, sets: project.sets! },
       });
   }
 

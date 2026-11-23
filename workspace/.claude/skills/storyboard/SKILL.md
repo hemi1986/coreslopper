@@ -55,8 +55,9 @@ For a project with `kind: episode` the storyboard covers the episode track inste
 
 A project with `kind: meme` covers its episode track like an episode, but is one 9:16 clip of at most 30 seconds.
 
-- A shot may land on the hit of a library sound: give a `line` anchor the edge `cue` (`edge: cue`) on a sound line – an `sfx` line with `sound: <id>`. It resolves to the line's start plus the sound's cue, and an offset in seconds still applies.
-- `edge: cue` on any other line, or on a library sound without a cue, fails validation.
+- A shot may land on the hit of a library sound: give a `line` anchor the edge `cue` (`edge: cue`) on a sound line – an `sfx` line with `sound: <id>`. It resolves to the line's start plus the library entry's cue, and an offset in seconds still applies.
+- `edge: cue` on any other line, on a library sound without a cue, or on a sound the library no longer holds (its cue is gone with the entry) fails validation.
+- The cue comes from the library entry, even when the line's take is an import: the anchor means "where the library sound's hit is", not where the imported audio peaks.
 
 ## Continuity references
 

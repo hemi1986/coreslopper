@@ -13,7 +13,6 @@ import {
   type TimingOverrides,
 } from './schema.js';
 import { ValidationError } from './errors.js';
-import type { LineCues } from './episode.js';
 
 export const TIMING_TOLERANCE_SECONDS = 0.05;
 
@@ -178,7 +177,35 @@ function ensureTime(value: number, timing: Timing, label: string): number {
   return Math.max(0, Math.min(timing.audio.duration, value));
 }
 
-export function resolveAnchor(anchor: Anchor, timing: Timing, cues?: LineCues): number {
+/** A sound line's cue: the moment its library sound lands, and whether the library still holds the sound. */
+export interface SoundCue {
+  sound: string;
+  /** Seconds from the line's start (the sound's trimmed start); undefined when the entry has no cue or is gone. */
+  cue?: number;
+  /** False when the library no longer holds the sound and only the meme's take remains (HS-260). */
+  held: boolean;
+}
+
+/** The sound cue of each sound line of a meme's script, by line id. A line that is not a sound line has no entry. */
+export type SoundCues = Record<string, SoundCue>;
+
+/**
+ * The sound cues a meme's shot anchors resolve against, by script line id. A sound without a cue, or a sound the
+ * library no longer holds, keeps its entry without seconds, so validation can say which one is missing.
+ */
+export function soundCuesByLine(script: Script, sounds: Record<string, { cue?: number }>): SoundCues {
+  const cues: SoundCues = {};
+  for (const scene of script.scenes) {
+    for (const line of scene.lines) {
+      if (line.kind !== 'sfx' || line.sound === undefined) continue;
+      const sound = sounds[line.sound];
+      cues[line.id] = sound?.cue === undefined ? { sound: line.sound, held: sound !== undefined } : { sound: line.sound, cue: sound.cue, held: true };
+    }
+  }
+  return cues;
+}
+
+export function resolveAnchor(anchor: Anchor, timing: Timing, cues?: SoundCues): number {
   switch (anchor.type) {
     case 'section': {
       const section = findSection(timing, anchor.id);
@@ -190,10 +217,13 @@ export function resolveAnchor(anchor: Anchor, timing: Timing, cues?: LineCues): 
       if (anchor.edge === 'cue') {
         const cue = cues?.[anchor.id];
         if (!cue) {
-          throw new ValidationError(`"${anchor.id}" has no sound cue; a cue anchor needs a sound line with a library sound.`);
+          throw new ValidationError(`"${anchor.id}" has no sound cue; a cue anchor needs a sound line with a library sound (memes only).`);
+        }
+        if (!cue.held) {
+          throw new ValidationError(`"${cue.sound}" is no longer in the sound library, so line "${anchor.id}" cannot anchor on its cue.`);
         }
         if (cue.cue === undefined) {
-          throw new ValidationError(`"${cue.sound}" has no cue, so line "${anchor.id}" cannot anchor on it.`);
+          throw new ValidationError(`"${cue.sound}" has no sound cue, so line "${anchor.id}" cannot anchor on it.`);
         }
         return ensureTime(line.start + cue.cue + anchor.offset, timing, `line "${anchor.id}" cue`);
       }
@@ -496,6 +526,16 @@ function validateText(shot: Shot): void {
   }
 }
 
+/** What kind-specific checks read: an episode's script and canon, a music video's sets, a meme's sound cues. */
+export interface StoryboardContext {
+  /** An episode's script, scenes and lip-sync limits (ADR 0016). */
+  episode?: EpisodeContext;
+  /** sets.yaml of a music video; an episode's sets come from `episode`. */
+  sets?: SetBible;
+  /** A meme's sound cues by script line id, for `cue` anchors (CMD-ValidateStoryboard). */
+  cues?: SoundCues;
+}
+
 export function resolveStoryboard(
   storyboard: Storyboard,
   timing: Timing,
@@ -503,13 +543,11 @@ export function resolveStoryboard(
   characters: CharacterBible,
   fps: number,
   toleranceFrames = 1,
-  episode?: EpisodeContext,
-  /** sets.yaml of a music video; an episode's sets come from `episode`. */
-  projectSets?: SetBible,
-  /** A meme's library sounds by line id, for `cue` anchors (CMD-ValidateStoryboard). */
-  cues?: LineCues,
+  context: StoryboardContext = {},
 ): ResolvedStoryboard {
-  const sets = episode?.sets ?? projectSets;
+  const sets = context.episode?.sets ?? context.sets;
+  const episode = context.episode;
+  const cues = context.cues;
   const warnings: string[] = [];
   const resolved: ResolvedShot[] = [];
   const ids = new Set<string>();

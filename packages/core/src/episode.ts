@@ -46,32 +46,6 @@ export function scriptLines(script: Script): Array<{ scene: string; line: Script
   return script.scenes.flatMap((scene) => scene.lines.map((line) => ({ scene: scene.id, line })));
 }
 
-/**
- * What a shot's `line` anchor with edge `cue` resolves against (CMD-ValidateStoryboard): the library sound a
- * sound line names and the moment it lands, when the sound has a cue.
- */
-export interface LineCue {
-  sound: string;
-  cue?: number;
-}
-
-/** By script line id. A line that is not a sound line has no entry. */
-export type LineCues = Record<string, LineCue>;
-
-/**
- * The cue of every sound line of a meme's script, by line id. A sound without a cue keeps its entry without
- * seconds, so validation can tell "not a sound line" from "the sound has no cue".
- */
-export function lineCues(script: Script, sounds: Record<string, { cue?: number }>): LineCues {
-  const cues: LineCues = {};
-  for (const { line } of scriptLines(script)) {
-    if (line.kind !== 'sfx' || line.sound === undefined) continue;
-    const cue = sounds[line.sound]?.cue;
-    cues[line.id] = cue === undefined ? { sound: line.sound } : { sound: line.sound, cue };
-  }
-  return cues;
-}
-
 export interface ScriptCanon {
   /** The project kind; a missing kind means `episode`. */
   kind?: ProjectKind;
