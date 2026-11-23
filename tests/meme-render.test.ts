@@ -121,4 +121,11 @@ describe('subtitles for a meme', () => {
     // "reveal-boom" plays from 5 to 6.4 s and names no on-screen text.
     expect((props.subtitles ?? []).filter((cue) => cue.start < 6.4 && cue.end > 5)).toEqual([]);
   });
+
+  it('ST-014: Subtitles can be turned off', async () => {
+    const projectDir = await officePrank({ subtitles: 'off' });
+    const { props } = await buildVideoProps({ projectDir });
+
+    expect(props.subtitles).toBeUndefined();
+  });
 });

@@ -3,7 +3,7 @@
  * text of an episode; these checks run before any take is generated.
  */
 import { ValidationError } from './errors.js';
-import { isScriptId, type CharacterBible, type Line, type ProjectKind, type Script, type ScriptLine, type Section, type SetBible, type Timing } from './schema.js';
+import { isScriptId, type CharacterBible, type Line, type ProjectConfig, type ProjectKind, type Script, type ScriptLine, type Section, type SetBible, type Timing } from './schema.js';
 import { MEME_MAX_SECONDS } from './state.js';
 
 /** Script line kinds that are spoken and therefore follow the TTS text rule. */
@@ -336,6 +336,16 @@ function wrapSubtitle(text: string, width = 42): string {
     }
   }
   return best;
+}
+
+/**
+ * The language of a project's subtitles: its `subtitles` setting, else `de` for a meme (German speech, burned in)
+ * and `en` for an episode; a music video has none (HS-263).
+ */
+export function subtitleLanguage(config: Pick<ProjectConfig, 'kind' | 'subtitles'>): 'en' | 'de' | 'off' {
+  if (config.subtitles) return config.subtitles;
+  if (config.kind === 'meme') return 'de';
+  return config.kind === 'episode' ? 'en' : 'off';
 }
 
 /**

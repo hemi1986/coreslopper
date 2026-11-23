@@ -37,6 +37,9 @@ export function isScriptId(value: string): boolean {
 /** What a project produces. A missing kind means `music-video`. */
 export const ProjectKindSchema = z.enum(['music-video', 'episode', 'meme']);
 
+/** The language of a project's subtitles: English (translated), German (as spoken), or none. */
+export const SubtitleLanguageSchema = z.enum(['en', 'de', 'off']);
+
 /** Whether a project is released on the platforms (`public`) or only shared privately (`internal`). */
 export const DistributionSchema = z.enum(['public', 'internal']);
 
@@ -137,6 +140,8 @@ export const ProjectConfigSchema = z
     release: ReleaseMetadataSchema.optional(),
     /** `internal`: never released publicly (a teaser sent by mail or chat), so no release package and no calendar. Unset is `public`. */
     distribution: DistributionSchema.optional(),
+    /** The subtitle language; unset means `de` for a meme and `en` for an episode (HS-263). */
+    subtitles: SubtitleLanguageSchema.optional(),
   })
   .superRefine((config, ctx) => {
     if (config.kind === 'meme') {

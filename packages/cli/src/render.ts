@@ -18,6 +18,7 @@ import {
   repoRoot,
   scriptLines,
   subtitleCues,
+  subtitleLanguage,
   type LoadedProject,
   type ProjectConfig,
   type ProjectPaths,
@@ -154,9 +155,9 @@ export async function buildVideoProps(
   const audioSrc = hasAudio ? publicAsset(audioPath, paths.root, root) : undefined;
 
   let subtitles: VideoProps['subtitles'];
-  // A meme's subtitles are burned in (HS-263); an episode asks for them with --subtitles en.
-  const language = options.subtitles ?? (project.config.kind === 'meme' ? 'de' : undefined);
-  if (language) {
+  // A meme's subtitles are burned in its project's subtitle language (HS-263); an episode asks for them with --subtitles en.
+  const language = options.subtitles ?? (project.config.kind === 'meme' ? subtitleLanguage(project.config) : undefined);
+  if (language && language !== 'off') {
     if (!project.script || !project.effectiveTiming) {
       throw new ValidationError('Burned-in subtitles come from a script; this project has none.');
     }
