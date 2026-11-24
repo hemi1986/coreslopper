@@ -2,6 +2,7 @@
 paths:
   - "packages/cli/src/character-library.ts"
   - "packages/cli/src/board/characters.js"
+  - "packages/cli/src/board/sets.js"
   - "workspace/.claude/skills/style-bible/**"
   - "workspace/.claude/skills/character-bible/**"
   - "tests/character-*.test.ts"

@@ -2,8 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { existsSync, lstatSync, statSync } from 'node:fs';
 import { mkdir, readFile, readdir, rename, rm, stat } from 'node:fs/promises';
 import { basename, extname, join, relative, resolve, sep } from 'node:path';
-import { isMap, isSeq, parseDocument, stringify, type YAMLMap, type YAMLSeq } from 'yaml';
+import { isMap, isSeq, parse as parseYaml, parseDocument, stringify, type YAMLMap, type YAMLSeq } from 'yaml';
 import { LibrarySetSchema, SetBibleSchema, ValidationError, isScriptId, readYamlFile, writeTextAtomic, type LibrarySet, type SetDefinition } from '@coreslopper/core';
+import { projectDirs, seriesDirs } from './board-production.js';
 import {
   LIBRARY_FILE_LIMITS,
   checkEntryFileName,
@@ -29,7 +30,8 @@ import {
 // of a project or series canon come in through `importSets`; a project or
 // series canon takes a copy of the entry, with every reference and every plate.
 // Nothing in a production points into the library, so a later change there
-// never touches a finished video.
+// never touches a finished video. The board's Sets view reads `listLibrarySets`
+// (RM-SetLibrary) and writes through the same commands.
 
 export const setEntryDir = (root: string, id: string) => libraryEntryDir(root, 'sets', id);
 const setEntryFile = (root: string, id: string) => libraryEntryFile(root, 'sets', id);
@@ -44,6 +46,66 @@ export async function loadLibrarySet(root: string, id: string): Promise<LibraryS
 async function saveLibrarySet(root: string, entry: LibrarySet): Promise<void> {
   const header = '# A set of the workspace library; its files lie next to this file. See docs/adr/0052-set-library.md.\n';
   await writeTextAtomic(setEntryFile(root, entry.id), header + stringify(LibrarySetSchema.parse(entry)));
+}
+
+// ------------------------------------------------------------- read model
+
+/** Where a library set is used: a project or series canon whose sets.yaml names it in `library`. */
+export interface LibrarySetUse {
+  scope: 'project' | 'series';
+  slug: string;
+  /** The set's id there (usually the library id). */
+  set: string;
+}
+
+export interface LibrarySetEntry extends LibrarySet {
+  /** The picture for cards: the first plate with an image, else the first reference. */
+  cover?: string;
+  usedIn: LibrarySetUse[];
+}
+
+/** Every project and series that uses a library set, by library id. */
+export async function setLibraryUses(root: string): Promise<Map<string, LibrarySetUse[]>> {
+  const uses = new Map<string, LibrarySetUse[]>();
+  const scan = async (dirs: string[], scope: LibrarySetUse['scope']) => {
+    for (const dir of dirs) {
+      const file = join(dir, 'sets.yaml');
+      if (!existsSync(file)) continue;
+      const raw = await readFile(file, 'utf8')
+        .then((content) => parseYaml(content) as { sets?: { id?: unknown; library?: unknown }[] } | null)
+        // An unreadable sets.yaml shows up in the production view; here it uses nothing.
+        .catch(() => null);
+      for (const set of raw?.sets ?? []) {
+        if (typeof set?.library !== 'string') continue;
+        const list = uses.get(set.library) ?? [];
+        list.push({ scope, slug: basename(dir), set: String(set.id) });
+        uses.set(set.library, list);
+      }
+    }
+  };
+  await scan(await projectDirs(root), 'project');
+  await scan(await seriesDirs(root), 'series');
+  return uses;
+}
+
+/** The library (RM-SetLibrary), sorted by name, with where each set is used. Entries that do not load are skipped with a warning in `errors`. */
+export async function listLibrarySets(root: string): Promise<{ sets: LibrarySetEntry[]; errors: { id: string; error: string }[] }> {
+  const dirs = await readdir(setLibraryRoot(root), { withFileTypes: true }).catch(() => []);
+  const uses = await setLibraryUses(root);
+  const sets: LibrarySetEntry[] = [];
+  const errors: { id: string; error: string }[] = [];
+  for (const dir of dirs) {
+    if (!dir.isDirectory() || !isScriptId(dir.name) || !existsSync(setEntryFile(root, dir.name))) continue;
+    try {
+      const entry = await loadLibrarySet(root, dir.name);
+      const cover = entry.plates.find((plate) => plate.file)?.file ?? entry.refs[0];
+      sets.push({ ...entry, ...(cover ? { cover } : {}), usedIn: uses.get(entry.id) ?? [] });
+    } catch (error) {
+      errors.push({ id: dir.name, error: (error as Error).message });
+    }
+  }
+  sets.sort((a, b) => a.name.localeCompare(b.name));
+  return { sets, errors };
 }
 
 /**

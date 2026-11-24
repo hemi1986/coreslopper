@@ -5,6 +5,7 @@
 //   #/p/<slug>/doc/<path>                    a project document (brief, treatment, …)
 //   #/s/<slug>       a series                #/new[/video|series|episode|meme[/<slug>]]  the wizard
 //   #/characters[/<id>]                     the character library
+//   #/sets[/<id>]                           the set library
 //   #/guide[/<doc>]                          the board guide, or another page of docs/
 import { addStrings, api, el, go, loading, showError, t } from './lib.js';
 import { showDocument, showProduction } from './production.js';
@@ -12,11 +13,12 @@ import { onReleaseChange, showCalendar, showRelease } from './release.js';
 import { showReview } from './review.js';
 import { showWizard } from './wizard.js';
 import { showCharacters } from './characters.js';
+import { showSets } from './sets.js';
 import { showGuide } from './guide.js';
 
 addStrings({
-  de: { board: 'Board', navProduction: 'Produktion', navCalendar: 'Release-Kalender', navCharacters: 'Figuren', navNew: '+ Neu', navGuide: 'Anleitung', refresh: 'Aktualisieren', refreshKept: 'Ansicht behalten: ein Video läuft oder eine Eingabe ist nicht gespeichert.', navReleased: 'Fertig' },
-  en: { board: 'Board', navProduction: 'Production', navCalendar: 'Release calendar', navCharacters: 'Characters', navNew: '+ New', navGuide: 'Guide', refresh: 'Refresh', refreshKept: 'View kept: a video is playing or an input is not saved.', navReleased: 'Finished' },
+  de: { board: 'Board', navProduction: 'Produktion', navCalendar: 'Release-Kalender', navCharacters: 'Figuren', navSets: 'Sets', navNew: '+ Neu', navGuide: 'Anleitung', refresh: 'Aktualisieren', refreshKept: 'Ansicht behalten: ein Video läuft oder eine Eingabe ist nicht gespeichert.', navReleased: 'Fertig' },
+  en: { board: 'Board', navProduction: 'Production', navCalendar: 'Release calendar', navCharacters: 'Characters', navSets: 'Sets', navNew: '+ New', navGuide: 'Guide', refresh: 'Refresh', refreshKept: 'View kept: a video is playing or an input is not saved.', navReleased: 'Finished' },
 });
 
 let active = 'overview';
@@ -40,6 +42,7 @@ function renderNav() {
   nav.appendChild(navButton(t('navProduction'), null, active === 'overview', '#/'));
   nav.appendChild(navButton(t('navCalendar'), null, active === 'calendar', '#/calendar'));
   nav.appendChild(navButton(t('navCharacters'), null, active === 'characters', '#/characters'));
+  nav.appendChild(navButton(t('navSets'), null, active === 'sets', '#/sets'));
   nav.appendChild(navButton(t('navNew'), null, active === 'new', '#/new'));
   nav.appendChild(navButton(t('navGuide'), null, active === 'guide', '#/guide'));
   if (overview.projects.length) nav.appendChild(el('h2', { text: t('projects') }));
@@ -92,6 +95,7 @@ function route() {
   else if (hash === '#/calendar') { active = 'calendar'; view = showCalendar(); }
   else if ((match = /^#\/guide(?:\/([a-z][a-z0-9-]*(?:\.de)?))?\/?$/.exec(hash))) { active = 'guide'; view = showGuide(match[1]); }
   else if ((match = /^#\/characters(?:\/([a-z0-9][a-z0-9_-]*))?\/?$/.exec(hash))) { active = 'characters'; view = showCharacters(match[1]); }
+  else if ((match = /^#\/sets(?:\/([a-z0-9][a-z0-9_-]*))?\/?$/.exec(hash))) { active = 'sets'; view = showSets(match[1]); }
   else if ((match = /^#\/p\/([a-z0-9-]+)\/release(?:\/([a-z]+))?(?:\/(.+))?$/.exec(hash))) { active = 'release:' + match[1]; view = showRelease(match[1], match[2], match[3]); }
   else if ((match = /^#\/p\/([a-z0-9-]+)\/doc\/(.+)$/.exec(hash))) { active = 'project:' + match[1]; view = showDocument(match[1], match[2]); }
   else if ((match = /^#\/p\/([a-z0-9-]+)\/review(?:\/(.+))?$/.exec(hash))) { active = 'review:' + match[1]; view = showReview(match[1], match[2]); }

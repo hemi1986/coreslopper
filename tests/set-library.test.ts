@@ -4,10 +4,12 @@ import { chmod, cp, mkdir, mkdtemp, readFile, readdir, rm, truncate, writeFile }
 import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { Readable } from 'node:stream';
 import { parse, stringify } from 'yaml';
 import { ValidationError, loadProject } from '@coreslopper/core';
-import { addLibrarySet, addLibrarySetFile, importSets, loadLibrarySet, removeLibrarySet, removeLibrarySetFile, setEntryDir, updateLibrarySet, useSet } from '../packages/cli/src/set-library.ts';
+import { addLibrarySet, addLibrarySetFile, importSets, listLibrarySets, loadLibrarySet, removeLibrarySet, removeLibrarySetFile, setEntryDir, updateLibrarySet, useSet } from '../packages/cli/src/set-library.ts';
 import { createProject } from '../packages/cli/src/new-project.ts';
+import { boardHandler } from '../packages/cli/src/release-board.ts';
 import { createEpisode, createSeriesCanon } from '../packages/cli/src/board-wizard.ts';
 import { validateChangedFile } from '../packages/cli/src/validate-file.ts';
 
@@ -1013,5 +1015,145 @@ describe('using a library set', () => {
     const bible = parse(await readFile(join(dir, 'sets.yaml'), 'utf8'));
     expect(bible.sets[0]).toMatchObject({ id: 'bar', library: 'bar', refs: ['sets/bar/start.png'] });
     expect(existsSync(join(dir, 'sets', 'bar', 'plates', 'counter.png'))).toBe(true);
+  });
+});
+
+describe('the set library read model', () => {
+  it('lists every set with its cover, plate count and where it is used', async () => {
+    const ws = await cliWorkspace();
+    await libraryBarWith(ws, ['start.png'], [{ id: 'counter', angle: 'counter, frontal' }]);
+    // A set with only a reference takes that as its cover.
+    await addLibrarySet(ws, { name: 'Front', description: 'a shop front', prompt: 'shop front, neon' });
+    await writeFile(join(ws, 'front.png'), 'front');
+    await addLibrarySetFile(ws, 'front', join(ws, 'front.png'), { role: 'ref' });
+    // A set without files has no cover at all.
+    await addLibrarySet(ws, { name: 'Garage', description: 'a dark garage', prompt: 'dark garage' });
+    await video(ws, 'neon-rain');
+    await useSet(ws, join(ws, 'projects', 'neon-rain'), 'bar');
+    await createSeriesCanon(ws, { slug: 'harbor', title: 'Harbor', budget: 50, format: '9x16', imageProvider: 'mock', videoProvider: 'mock', audioProvider: 'mock' } as never);
+    await useSet(ws, join(ws, 'projects', 'harbor'), 'bar');
+
+    const listing = await listLibrarySets(ws);
+
+    expect(listing.errors).toEqual([]);
+    expect(listing.sets.map((entry) => [entry.id, entry.name, entry.cover, entry.plates.length, entry.refs.length])).toEqual([
+      ['bar', 'Bar', 'counter.png', 1, 1],
+      ['front', 'Front', 'front.png', 0, 1],
+      ['garage', 'Garage', undefined, 0, 0],
+    ]);
+    expect(listing.sets[0]!.usedIn).toEqual([
+      { scope: 'project', slug: 'neon-rain', set: 'bar' },
+      { scope: 'series', slug: 'harbor', set: 'bar' },
+    ]);
+    expect(listing.sets[1]!.usedIn).toEqual([]);
+  });
+
+  it('reports a set whose set.yaml does not load and leaves it out', async () => {
+    const ws = await cliWorkspace();
+    await libraryBar(ws);
+    await mkdir(join(ws, 'library', 'sets', 'broken'), { recursive: true });
+    await writeFile(join(ws, 'library', 'sets', 'broken', 'set.yaml'), 'version: 1\nid: broken\n');
+
+    const listing = await listLibrarySets(ws);
+
+    expect(listing.sets.map((entry) => entry.id)).toEqual(['bar']);
+    expect(listing.errors.map((error) => error.id)).toEqual(['broken']);
+  });
+});
+
+describe('the board’s Sets view routes', () => {
+  function board(ws: string) {
+    const handler = boardHandler({ root: ws, refresh: async () => undefined });
+    const call = (method: string, url: string, body?: unknown, headers: Record<string, string> = {}) =>
+      new Promise<{ status: number; headers: Record<string, unknown>; body: string }>((done) => {
+        const raw = typeof body === 'string' ? body : body === undefined ? undefined : JSON.stringify(body);
+        const requestHeaders = {
+          host: '127.0.0.1:4848',
+          ...(raw === undefined ? {} : { 'content-type': 'application/json', origin: 'http://127.0.0.1:4848' }),
+          ...headers,
+        };
+        const req = Object.assign(Readable.from(raw === undefined ? [] : [Buffer.from(raw)]), { method, url, headers: requestHeaders });
+        const res = {
+          statusCode: 200,
+          headers: {} as Record<string, unknown>,
+          setHeader(name: string, value: unknown) { this.headers[name.toLowerCase()] = value; },
+          writeHead(status: number, head: Record<string, unknown> = {}) { this.statusCode = status; Object.assign(this.headers, head); return this; },
+          write(chunk: Buffer | string) { chunks.push(Buffer.from(chunk)); return true; },
+          end(chunk?: Buffer | string) { if (chunk) chunks.push(Buffer.from(chunk)); done({ status: this.statusCode, headers: this.headers, body: Buffer.concat(chunks).toString('utf8') }); },
+          on() { return this; }, once() { return this; }, emit() { return true; }, removeListener() { return this; },
+        };
+        const chunks: Buffer[] = [];
+        void handler(req as never, res as never);
+      });
+    return { call };
+  }
+
+  it('lists sets with targets and serves their files from /set-files, never set.yaml or a dot file', async () => {
+    const ws = await cliWorkspace();
+    await libraryBarWith(ws, ['start.png'], [{ id: 'counter', angle: 'counter, frontal' }]);
+    const { call } = board(ws);
+
+    const listing = JSON.parse((await call('GET', '/api/sets')).body);
+    expect(listing.sets.map((entry: { id: string; cover: string; plates: unknown[] }) => [entry.id, entry.cover, entry.plates.length])).toEqual([['bar', 'counter.png', 1]]);
+    expect(listing.targets).toEqual([]);
+
+    const image = await call('GET', '/set-files/bar/counter.png');
+    expect(image.status).toBe(200);
+    expect(image.headers['content-security-policy']).toContain('sandbox');
+    expect(image.headers['x-content-type-options']).toBe('nosniff');
+    expect((await call('GET', '/set-files/bar/set.yaml')).status).toBe(403);
+    expect((await call('GET', '/set-files/bar/.incoming-x.png')).status).toBe(403);
+    // A character's path does not serve a set's files.
+    expect((await call('GET', '/library-files/bar/counter.png')).status).toBe(404);
+    expect((await call('GET', '/set-files/unknown/counter.png')).status).toBe(404);
+  });
+
+  it('writes through the set commands of ST-024 to ST-031 and shows their refusals', async () => {
+    const ws = await cliWorkspace();
+    await libraryBarWith(ws, ['start.png'], [{ id: 'counter', angle: 'counter, frontal' }]);
+    const dir = await video(ws, 'neon-rain');
+    const { call } = board(ws);
+    const upload = (name: string, bytes: string, query: string) =>
+      call('POST', '/api/upload/sets/' + query, bytes, { 'content-type': 'application/octet-stream', origin: 'http://127.0.0.1:4848' });
+
+    // A set by hand; a taken id is refused with its reason.
+    expect(JSON.parse((await call('POST', '/api/sets/new', { name: 'Garage', description: 'a dark garage', prompt: 'dark garage, neon' })).body)).toEqual({ id: 'garage' });
+    const taken = await call('POST', '/api/sets/new', { name: 'Garage', description: 'again', prompt: 'again' });
+    expect(taken.status).toBe(400);
+    expect(JSON.parse(taken.body).error).toMatch(/already/);
+
+    // An update: an emptied prompt is refused, a description is kept.
+    expect((await call('POST', '/api/sets/garage', { action: 'update', prompt: '' })).status).toBe(400);
+    expect((await loadLibrarySet(ws, 'garage')).prompt).toBe('dark garage, neon');
+    expect((await call('POST', '/api/sets/garage', { action: 'update', description: 'a dark garage at night' })).status).toBe(200);
+    expect((await loadLibrarySet(ws, 'garage')).description).toBe('a dark garage at night');
+
+    // An upload becomes a plate with its angle; without one it is refused. The same image is stored once.
+    expect((await upload('side.png', 'image:side', 'garage?name=side.png&role=plate')).status).toBe(400);
+    expect((await upload('side.png', 'image:side', 'garage?name=side.png&role=plate&angle=garage%2C%20side')).status).toBe(200);
+    expect((await upload('side-copy.png', 'image:side', 'garage?name=side-copy.png&role=ref')).status).toBe(200);
+    expect(await loadLibrarySet(ws, 'garage')).toMatchObject({ plates: [{ id: 'garage-side', angle: 'garage, side', file: 'side.png' }], refs: ['side.png'] });
+
+    // Remove a reference, use the set in the video, and delete another set again.
+    expect((await call('POST', '/api/sets/bar', { action: 'remove-file', name: 'start.png' })).status).toBe(200);
+    expect((await loadLibrarySet(ws, 'bar')).refs).toEqual([]);
+    const used = JSON.parse((await call('POST', '/api/sets/use', { scope: 'project', slug: 'neon-rain', id: 'bar' })).body);
+    expect(used.result).toMatchObject({ set: 'bar', plates: ['counter'] });
+    expect(used.sets[0].usedIn).toEqual([{ scope: 'project', slug: 'neon-rain', set: 'bar' }]);
+    expect(existsSync(join(dir, 'sets', 'bar', 'plates', 'counter.png'))).toBe(true);
+    expect((await call('POST', '/api/sets/garage', { action: 'delete' })).status).toBe(200);
+    expect(existsSync(join(ws, 'library', 'sets', 'garage'))).toBe(false);
+    expect(existsSync(join(dir, 'sets', 'bar', 'plates', 'counter.png'))).toBe(true);
+  });
+
+  it('passes the board’s write guard: a write from another host is refused', async () => {
+    const ws = await cliWorkspace();
+    const { call } = board(ws);
+
+    const refused = await call('POST', '/api/sets/new', { name: 'Garage', description: 'a garage', prompt: 'garage' }, { host: 'rebound.example:4848' });
+
+    expect(refused.status).toBe(403);
+    expect(JSON.parse(refused.body).error).toMatch(/127\.0\.0\.1 only/);
+    expect(existsSync(join(ws, 'library', 'sets'))).toBe(false);
   });
 });
