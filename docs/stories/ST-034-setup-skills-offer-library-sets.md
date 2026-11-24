@@ -8,7 +8,7 @@ size: null
 risk: null
 depends_on: [ST-028]
 labels: [feature:set-library]
-status: in-progress
+status: done
 ---
 
 ## Task
@@ -24,7 +24,7 @@ Decided in the grilling of feature `set-library` (user, 2026-11-22, round 2 Q6; 
 - [x] `new-video` and `new-series` list matching library sets (`set list`) and use the chosen ones before the set bible is written
 - [x] The set bible step keeps a used set's references and plates and only adds
 - [x] The workspace docs and the CLI reference describe `set import|new|add-file|use|remove|list`
-- [ ] The skill changes pass the repository's skill checks (`npm test`)
+- [x] The skill changes pass the repository's skill checks (`npm test`)
 
 ## Out of Scope
 - The wizard step (ST-033)
