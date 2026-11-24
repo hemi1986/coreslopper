@@ -2,17 +2,11 @@
 
 > Generated from `docs/stories/ST-*.md` – **do not edit manually**. Change the story files instead.
 
-**Progress: 18 of 24 domain stories done** · scenarios 65 of 80
+**Progress: 19 of 24 domain stories done** · scenarios 67 of 80
 
-**42 stories** · In Progress: 1 · Ready: 10 · Ready for Human Review: 0 · In Review: 1 · Draft: 0 · Done: 30 · Superseded: 0
+**42 stories** · In Progress: 0 · Ready: 10 · Ready for Human Review: 0 · In Review: 1 · Draft: 0 · Done: 31 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
-
-## In Progress
-
-| ID | Title | Type | Context | Priority | Size | Risk | Depends on |
-|---|---|---|---|---|---|---|---|
-| [ST-029](ST-029-update-a-library-set.md) | Update a library set's name, description, prompt and tags | domain | Library | could | – | – | ST-024 |
 
 ## Ready
 
@@ -69,3 +63,4 @@ Within each section: by priority, then by story ID, with dependencies pulled in 
 | [ST-027](ST-027-finished-set-bibles-go-into-the-library.md) | The sets of a finished set bible go into the library by themselves | domain | Library | should | – | – | ST-026 |
 | [ST-028](ST-028-use-a-library-set.md) | Use a library set in a music video or series canon | domain | Bibles | should | – | – | ST-025 |
 | [ST-039](ST-039-restart-comfyui-only-when-stuck.md) | Restart ComfyUI only when it is stuck | task | – | should | – | – | – |
+| [ST-029](ST-029-update-a-library-set.md) | Update a library set's name, description, prompt and tags | domain | Library | could | – | – | ST-024 |
