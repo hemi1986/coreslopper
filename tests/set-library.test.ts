@@ -1,12 +1,16 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdir, mkdtemp, readdir, rm, truncate, writeFile } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
+import { cp, mkdir, mkdtemp, readFile, readdir, rm, truncate, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { stringify } from 'yaml';
+import { loadProject } from '@coreslopper/core';
 import { addLibrarySet, addLibrarySetFile, importSets, loadLibrarySet, setEntryDir } from '../packages/cli/src/set-library.ts';
+import { createProject } from '../packages/cli/src/new-project.ts';
 import { validateChangedFile } from '../packages/cli/src/validate-file.ts';
 
+const root = process.cwd();
 const temporary: string[] = [];
 afterEach(async () => {
   await Promise.all(temporary.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
@@ -464,5 +468,97 @@ describe('taking sets into the library', () => {
 
     const other = await production(ws, 'other', [bar()], {});
     await expect(importSets(ws, other, { set: 'lobby' })).rejects.toThrow(/no set "lobby"/);
+  });
+});
+
+async function cliWorkspace(): Promise<string> {
+  const ws = await workspace();
+  for (const folder of ['config', 'templates', 'brand']) await cp(join(root, folder), join(ws, folder), { recursive: true });
+  await writeFile(join(ws, 'package.json'), JSON.stringify({ name: 'coreslopper', version: '0.0.0' }));
+  return ws;
+}
+
+async function video(ws: string, slug: string): Promise<string> {
+  return createProject({ root: ws, slug, budget: 40 });
+}
+
+function stageDone(ws: string, dir: string) {
+  return spawnSync(join(root, 'node_modules', '.bin', 'tsx'), [join(root, 'packages', 'cli', 'src', 'index.ts'), 'stage-done', dir, 'style-character'], {
+    cwd: ws,
+    encoding: 'utf8',
+  });
+}
+
+describe('finished set bibles enter the library', () => {
+  it('ST-027: Finishing style-character takes the sets in', async () => {
+    const ws = await cliWorkspace();
+    const dir = await video(ws, 'neon-rain');
+    await production(
+      ws,
+      'neon-rain',
+      [bar({ plates: [{ id: 'counter', angle: 'counter, frontal', ref: 'sets/bar/plates/counter.png' }] })],
+      { 'sets/bar/plates/counter.png': 'counter' },
+    );
+
+    const result = stageDone(ws, dir);
+
+    expect(result.status, result.stderr).toBe(0);
+    expect((await loadProject(dir)).state.stages['style-character']?.status).toBe('done');
+    expect(result.stdout).toMatch(/bar → new entry bar/);
+    expect(await loadLibrarySet(ws, 'bar')).toMatchObject({
+      id: 'bar',
+      name: 'The bar',
+      plates: [{ id: 'counter', angle: 'counter, frontal', file: 'counter.png' }],
+      origin: 'projects/neon-rain',
+    });
+    expect(existsSync(join(setEntryDir(ws, 'bar'), 'counter.png'))).toBe(true);
+  });
+
+  it('ST-027: A failed import does not fail the stage', async () => {
+    const ws = await cliWorkspace();
+    const dir = await video(ws, 'neon-rain');
+    await production(ws, 'neon-rain', [bar({ plates: [{ id: 'counter', angle: 'counter, frontal', ref: 'sets/bar/plates/counter.png' }] })], {});
+
+    const result = stageDone(ws, dir);
+
+    expect(result.status, result.stderr).toBe(0);
+    expect((await loadProject(dir)).state.stages['style-character']?.status).toBe('done');
+    expect(result.stderr).toMatch(/⚠.*bar.*sets\/bar\/plates\/counter\.png/);
+    expect(existsSync(join(ws, 'library', 'sets', 'bar'))).toBe(false);
+  });
+
+  it('warns and keeps the stage done when the set import rejects', async () => {
+    const ws = await cliWorkspace();
+    const dir = await video(ws, 'neon-rain');
+    await production(ws, 'neon-rain', [bar({ refs: ['sets/bar/start.png'] })], { 'sets/bar/start.png': 'start' });
+    await mkdir(join(ws, 'library'), { recursive: true });
+    await writeFile(join(ws, 'library', 'sets'), 'not a directory');
+
+    const result = stageDone(ws, dir);
+
+    expect(result.status, result.stderr).toBe(0);
+    expect((await loadProject(dir)).state.stages['style-character']?.status).toBe('done');
+    expect(result.stderr).toMatch(/⚠ set library:/);
+    expect(await readFile(join(ws, 'library', 'sets'), 'utf8')).toBe('not a directory');
+  });
+
+  it('ST-027: A music video without a set bible takes nothing in', async () => {
+    const ws = await cliWorkspace();
+    await libraryBar(ws);
+    const dir = await video(ws, 'neon-rain');
+    const entryDir = setEntryDir(ws, 'bar');
+    const before = await readFile(join(entryDir, 'set.yaml'), 'utf8');
+    const beforeFiles = await readdir(entryDir);
+    const beforeImage = await readFile(join(entryDir, 'counter.png'));
+    expect(existsSync(join(dir, 'sets.yaml'))).toBe(false);
+
+    const result = stageDone(ws, dir);
+
+    expect(result.status, result.stderr).toBe(0);
+    expect((await loadProject(dir)).state.stages['style-character']?.status).toBe('done');
+    expect(await readFile(join(entryDir, 'set.yaml'), 'utf8')).toBe(before);
+    expect(await readdir(entryDir)).toEqual(beforeFiles);
+    expect(await readFile(join(entryDir, 'counter.png'))).toEqual(beforeImage);
+    expect(await readdir(join(ws, 'library', 'sets'))).toEqual(['bar']);
   });
 });

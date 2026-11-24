@@ -931,10 +931,10 @@ function printImport(result: { character: string; id: string; created: boolean; 
 function printSetImport(result: { set: string; id?: string; created: boolean; skipped?: boolean; added: string[]; missing: string[] }): void {
   if (result.skipped) {
     console.log(`- ${result.set}: skipped, no files`);
-    if (result.missing.length) console.log(`  missing in the source: ${result.missing.join(', ')}`);
-    return;
+  } else {
+    printLibraryImport(result.set, { ...result, id: result.id ?? result.set, missing: [] });
   }
-  printLibraryImport(result.set, { ...result, id: result.id ?? result.set });
+  if (result.missing.length) console.warn(`⚠ ${result.set}: missing in the source: ${result.missing.join(', ')}`);
 }
 
 /** What an import took in: one line per item, and the source files it could not find. */
@@ -967,13 +967,21 @@ program
       setStageDone(loaded.state, stage, parseCsv(options.outputs), options.hash);
       await saveState(loaded.paths.state, loaded.state);
       console.log(`✔ ${stage} done`);
-      // The characters of a finished character bible go into the workspace library.
+      // The characters and sets of finished bibles go into the workspace library.
       if (stage === 'style-character' && existsSync(join(loaded.paths.root, 'characters.yaml'))) {
-        const { importCharacters } = await import('./character-library.js');
         try {
+          const { importCharacters } = await import('./character-library.js');
           for (const result of await importCharacters(repoRoot(), loaded.paths.root)) printImport(result);
         } catch (error) {
           console.warn(`⚠ character library: ${(error as Error).message}`);
+        }
+      }
+      if (stage === 'style-character' && existsSync(join(loaded.paths.root, 'sets.yaml'))) {
+        try {
+          const { importSets } = await import('./set-library.js');
+          for (const result of await importSets(repoRoot(), loaded.paths.root)) printSetImport(result);
+        } catch (error) {
+          console.warn(`⚠ set library: ${(error as Error).message}`);
         }
       }
     }),

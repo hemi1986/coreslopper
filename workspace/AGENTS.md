@@ -68,7 +68,7 @@ packages/
   cli/             validate, status, new, render, contact-sheet, stage-*, estimate, doctor, board (page in src/board/), watch
                    npx entry, onboarding, tool checks, workspace init
   remotion/        MusicVideo composition, motion components, effects, 3D
-library/           The workspace character library: characters/<id>/character.yaml (media gitignored)
+library/           The workspace character and set libraries: characters/<id>/character.yaml, sets/<id>/set.yaml (media gitignored)
 schema/            Generated JSON Schema for cross-language validation
 scripts/           Audio analysis and pose extraction (Python/uv), fixture generators
 templates/project/ Project template used by the new-video skill
@@ -89,7 +89,7 @@ projects/          Every production: music videos and episodes (project.yaml), s
 | 2 | `brief` ✋ | `grilling`, `video-brief` | `brief.md` | Budget/formats present; grilling frontier empty |
 | 3 | `treatment` ✋ | `grilling`, `video-treatment` | `treatment.md` | Critic vs. brief; user accepts |
 | 4 | `audio-analysis` | `audio-analysis` | `timing.json`, `timing.report.md` | Schema; confidence flags |
-| 5 | `style-character` | `style-bible`, `character-bible` | `style.yaml`, `characters.yaml`, `sets.yaml` (plates, props), refs, character states; characters into the library | Schema; image QA per reference |
+| 5 | `style-character` | `style-bible`, `character-bible` | `style.yaml`, `characters.yaml`, `sets.yaml` (plates, props), refs, character states; characters and sets into the library | Schema; image QA per reference |
 | 6 | `storyboard` | `storyboard` | `storyboard.yaml`, `storyboard.md`, contact sheet | Schema, anchors, coverage, refs, source rules |
 | 7 | `assets` | `remotion-motion`, `ai-clips`, `footage` | Components, keyframes, clips, footage | Per-batch cost + QA; cache |
 | 8 | `assembly` | `assembly-render` | `renders/preview-16x9.mp4` | Preview; sync/legibility |
@@ -117,7 +117,7 @@ Partly built ([ADR 0051](docs/adr/0051-memes-and-the-sound-library.md), proposed
 |---|---|---|---|
 | 1 | `setup` ✋ | board wizard, `new-meme` | `project.yaml` (kind `meme`, the one 9:16 format), `pitch.md`, chosen library characters, user references |
 | 2 | `script` ✋ | `grilling`, `new-meme` | `script.yaml` |
-| 3 | `style-character` | `style-bible`, `character-bible` | style, set, and character bible from pitch and script, without asking; every speaker in the character bible; invented characters into the library |
+| 3 | `style-character` | `style-bible`, `character-bible` | style, set, and character bible from pitch and script, without asking; every speaker in the character bible; invented characters and sets into the library |
 | 4–5 | `voice-track`, `episode-track` | as for episodes | takes (generated or copied from the sound library), `timing.json`, `audio/episode.wav`; a track over 30 seconds is a hard stop |
 | 6–9 | `storyboard`, `assets`, `assembly`, `qa-export` | as above | one 9:16 video, a 1080x1920 cover, TikTok, Shorts, and Reels texts |
 
