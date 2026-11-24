@@ -117,6 +117,15 @@ describe('planning around an internal project', () => {
     expect(calendar.release_date).toBe('2026-12-04');
   });
 
+  it("ST-040: An internal project's Short slots are free for another release", async () => {
+    const dir = await fixture();
+    await siblingCalendar(dir, 'teaser', { release_date: '2026-12-04', distribution: 'internal', shortDay: '2026-12-11' });
+
+    const calendar = await planNeon(dir, { releaseDate: '2026-12-11', shorts: ['Z1-intro'] });
+
+    expect(calendar.events.some((event) => event.step === 'short' && event.at.slice(0, 10) === '2026-12-11')).toBe(true);
+  });
+
   it("ST-040: A public project's calendar still books its slots", async () => {
     const dir = await fixture();
     await siblingCalendar(dir, 'other', { release_date: '2026-12-04' });
