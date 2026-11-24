@@ -4,7 +4,7 @@
 
 **Progress: 21 of 24 domain stories done** · scenarios 71 of 80
 
-**42 stories** · In Progress: 0 · Ready: 8 · Ready for Human Review: 0 · In Review: 1 · Draft: 0 · Done: 33 · Superseded: 0
+**42 stories** · In Progress: 0 · Ready: 7 · Ready for Human Review: 0 · In Review: 1 · Draft: 0 · Done: 34 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
 
@@ -12,7 +12,6 @@ Within each section: by priority, then by story ID, with dependencies pulled in 
 
 | ID | Title | Type | Context | Priority | Size | Risk | Depends on |
 |---|---|---|---|---|---|---|---|
-| [ST-032](ST-032-the-boards-sets-view.md) | The board's Sets view | task | – | should | – | – | ST-024, ST-025, ST-026, ST-028, ST-029, ST-030, ST-031 |
 | [ST-033](ST-033-wizard-step-sets-from-the-library.md) | The wizard's step "Sets from the library" | task | – | should | – | – | ST-028 |
 | [ST-034](ST-034-setup-skills-offer-library-sets.md) | The setup skills offer library sets while grilling | task | – | should | – | – | ST-028 |
 | [ST-040](ST-040-an-internal-calendar-books-no-slots.md) | An internal project's calendar books no slots | domain | Release | should | – | – | ST-036 |
@@ -60,7 +59,8 @@ Within each section: by priority, then by story ID, with dependencies pulled in 
 | [ST-026](ST-026-take-sets-into-the-library.md) | Take the sets of a production into the library | domain | Library | should | – | – | ST-023 |
 | [ST-027](ST-027-finished-set-bibles-go-into-the-library.md) | The sets of a finished set bible go into the library by themselves | domain | Library | should | – | – | ST-026 |
 | [ST-028](ST-028-use-a-library-set.md) | Use a library set in a music video or series canon | domain | Bibles | should | – | – | ST-025 |
-| [ST-039](ST-039-restart-comfyui-only-when-stuck.md) | Restart ComfyUI only when it is stuck | task | – | should | – | – | – |
 | [ST-029](ST-029-update-a-library-set.md) | Update a library set's name, description, prompt and tags | domain | Library | could | – | – | ST-024 |
 | [ST-030](ST-030-remove-a-file-from-a-library-set.md) | Remove a reference or a plate from a library set | domain | Library | could | – | – | ST-025 |
 | [ST-031](ST-031-delete-a-library-set.md) | Delete a library set | domain | Library | could | – | – | ST-024 |
+| [ST-032](ST-032-the-boards-sets-view.md) | The board's Sets view | task | – | should | – | – | ST-024, ST-025, ST-026, ST-028, ST-029, ST-030, ST-031 |
+| [ST-039](ST-039-restart-comfyui-only-when-stuck.md) | Restart ComfyUI only when it is stuck | task | – | should | – | – | – |

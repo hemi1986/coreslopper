@@ -8,7 +8,7 @@ size: null
 risk: null
 depends_on: [ST-024, ST-025, ST-026, ST-028, ST-029, ST-030, ST-031]
 labels: [feature:set-library]
-status: in-progress
+status: done
 ---
 
 ## Task
@@ -32,12 +32,12 @@ Decided in the grilling of feature `set-library` (user, 2026-11-22, round 1 Q6, 
   guard.
 
 ## Acceptance Criteria
-- [ ] `#/sets` lists every library set with cover, name, plate count and "used in"; the navigation links it beside Characters
-- [ ] The empty library shows the decided text and the way to add a set
-- [ ] The set page edits, uploads, removes, uses and deletes through the commands of ST-024 to ST-031 and shows their refusals
-- [ ] Deleting asks first and names every production that uses the set
-- [ ] Library set files are served from their own path and only there; `set.yaml` and dot files are never served
-- [ ] The view speaks German and English and passes the board's write guard
+- [x] `#/sets` lists every library set with cover, name, plate count and "used in"; the navigation links it beside Characters
+- [x] The empty library shows the decided text and the way to add a set
+- [x] The set page edits, uploads, removes, uses and deletes through the commands of ST-024 to ST-031 and shows their refusals
+- [x] Deleting asks first and names every production that uses the set
+- [x] Library set files are served from their own path and only there; `set.yaml` and dot files are never served
+- [x] The view speaks German and English and passes the board's write guard
 
 ## Out of Scope
 - One "Library" navigation entry for characters, sets and sounds
