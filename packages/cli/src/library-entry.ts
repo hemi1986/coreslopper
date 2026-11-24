@@ -3,13 +3,14 @@ import { createReadStream, existsSync, type Dirent } from 'node:fs';
 import { copyFile, mkdir, readdir, rename, rm } from 'node:fs/promises';
 import { basename, extname, join, relative, resolve, sep } from 'node:path';
 import { pipeline } from 'node:stream/promises';
-import { ValidationError, isScriptId } from '@coreslopper/core';
+import { ProjectConfigSchema, ValidationError, isScriptId, readYamlFile } from '@coreslopper/core';
 
 // What the character library and the set library share (ADR 0052, one
 // BC-Library): the entry id and folder (`library/<kind>/<id>/`), the
 // required/optional field text, tags, the id a name becomes, the file limits,
 // where an import's source is recorded (`librarySourceLabel`), the guarded scan
-// of an entry's files, and the content-wise copy both use. The sound library
+// of an entry's files, the kind of target a copy may go into
+// (`libraryTargetKind`), and the content-wise copy both use. The sound library
 // stays its own context (ADR 0051) and keeps its own refusal type.
 
 const MB = 1024 * 1024;
@@ -43,6 +44,25 @@ export const libraryEntryFile = (root: string, kind: LibraryEntryKind, id: strin
 /** `projects/<slug>`, the source of an import as the library records it. */
 export function librarySourceLabel(root: string, dir: string): string {
   return relative(resolve(root), resolve(dir)).split(sep).join('/');
+}
+
+/** Where a library copy can go: a music video or meme, a series canon, or an episode. */
+export type LibraryTargetKind = 'project' | 'episode' | 'series';
+
+/**
+ * What a library copy can go into, read once for `character use`, `set use`
+ * and the board's target list. An episode takes its characters and sets from
+ * its series canon, so both uses refuse it. Undefined when the folder is
+ * neither a project nor a series canon; a broken `project.yaml` is a
+ * `ValidationError` naming the file.
+ */
+export async function libraryTargetKind(dir: string): Promise<LibraryTargetKind | undefined> {
+  const projectFile = join(dir, 'project.yaml');
+  if (existsSync(projectFile)) {
+    const config = await readYamlFile(projectFile, ProjectConfigSchema);
+    return config.kind === 'episode' ? 'episode' : 'project';
+  }
+  return existsSync(join(dir, 'series.yaml')) ? 'series' : undefined;
 }
 
 export function entryText(value: unknown, field: string, max: number, required = false): string | undefined {
@@ -113,11 +133,11 @@ export interface CopyOptions {
    */
   stage?: boolean;
   /**
-   * Skip folders instead of refusing them. A library entry's folder holds only
-   * the entry's files, but a copy into a production may hold a set's `plates/`
-   * beside its references.
+   * Copy into a target folder that may hold a nested one, like a production's
+   * `sets/<id>/` with `plates/` beside its references. Only a copy into a
+   * production may set this; a library entry's folder never nests.
    */
-  folders?: 'refuse' | 'skip';
+  nestedFolders?: true;
 }
 
 /**
@@ -125,12 +145,15 @@ export interface CopyOptions {
  * entry file and dot files (a staged copy) are skipped; a link or non-file is
  * refused, since the entry may only name plain files of its folder.
  */
-export async function entryFileHashes(dir: string, kind: LibraryEntryKind, folders: 'refuse' | 'skip' = 'refuse'): Promise<Map<string, string>> {
+export const entryFileHashes = (dir: string, kind: LibraryEntryKind) => scanFileHashes(dir, kind, false);
+
+/** `entryFileHashes`, or with a production target's nested folder skipped (`nestedFolders`). */
+async function scanFileHashes(dir: string, kind: LibraryEntryKind, nestedFolders: boolean): Promise<Map<string, string>> {
   const hashes = new Map<string, string>();
   for (const item of await readdir(dir, { withFileTypes: true }).catch(() => [] as Dirent[])) {
     if (item.name === KINDS[kind].file || item.name.startsWith('.')) continue;
     if (!item.isFile()) {
-      if (folders === 'skip' && item.isDirectory()) continue;
+      if (nestedFolders && item.isDirectory()) continue;
       throw new ValidationError(`the library ${KINDS[kind].noun} folder holds a ${item.isSymbolicLink() ? 'link' : 'non-file'} "${item.name}"; move it away`);
     }
     hashes.set(await fileHash(join(dir, item.name)), item.name);
@@ -151,7 +174,7 @@ export async function copyByContent(
   options: CopyOptions = {},
 ): Promise<{ names: Map<string, string>; added: string[]; staged: StagedCopy[] }> {
   await mkdir(dir, { recursive: true });
-  const known = await entryFileHashes(dir, kind, options.folders ?? 'refuse');
+  const known = await scanFileHashes(dir, kind, options.nestedFolders === true);
   const names = new Map<string, string>();
   const added: string[] = [];
   const staged: StagedCopy[] = [];

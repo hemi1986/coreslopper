@@ -23,6 +23,7 @@ import {
   libraryEntryDir,
   libraryEntryFile,
   librarySourceLabel,
+  libraryTargetKind,
   parseTags,
   safeName,
   slugOfName,
@@ -372,11 +373,9 @@ export interface UseResult {
  */
 export async function useCharacter(root: string, targetDir: string, id: string, options: UseOptions = {}): Promise<UseResult> {
   const entry = await loadLibraryCharacter(root, id);
-  const projectFile = join(targetDir, 'project.yaml');
-  if (existsSync(projectFile) && /^\s*kind:\s*episode\b/m.test(await readFile(projectFile, 'utf8'))) {
-    throw new ValidationError('an episode takes its characters from the series canon; use the character in the series instead');
-  }
-  if (!existsSync(projectFile) && !existsSync(join(targetDir, 'series.yaml'))) throw new ValidationError(`${targetDir} is neither a project nor a series canon`);
+  const kind = await libraryTargetKind(targetDir);
+  if (kind === 'episode') throw new ValidationError('an episode takes its characters from the series canon; use the character in the series instead');
+  if (!kind) throw new ValidationError(`${targetDir} is neither a project nor a series canon`);
   const wanted = options.states === 'all' ? entry.states.map((state) => state.id) : (options.states ?? []);
   const unknown = wanted.filter((state) => !entry.states.some((existing) => existing.id === state));
   if (unknown.length) throw new ValidationError(`${id} has no state ${unknown.join(', ')}; it has ${entry.states.map((state) => state.id).join(', ') || 'none'}`);
@@ -460,11 +459,13 @@ export async function libraryTargets(root: string): Promise<{ scope: 'project' |
   const targets: { scope: 'project' | 'series'; slug: string; title: string }[] = [];
   const head = async (file: string) =>
     readFile(file, 'utf8')
-      .then((content) => (parseYaml(content) ?? {}) as { title?: unknown; kind?: unknown })
-      .catch(() => ({}) as { title?: unknown; kind?: unknown });
+      .then((content) => (parseYaml(content) ?? {}) as { title?: unknown })
+      .catch(() => ({}) as { title?: unknown });
   for (const dir of await projectDirs(root)) {
+    // A broken project.yaml is no target; the board lists what it can read.
+    const kind = await libraryTargetKind(dir).catch(() => undefined);
+    if (kind !== 'project') continue;
     const config = await head(join(dir, 'project.yaml'));
-    if (config.kind === 'episode') continue;
     targets.push({ scope: 'project', slug: basename(dir), title: typeof config.title === 'string' ? config.title : basename(dir) });
   }
   for (const dir of await seriesDirs(root)) {

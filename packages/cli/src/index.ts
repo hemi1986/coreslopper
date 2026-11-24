@@ -789,7 +789,7 @@ character
 
 const set = program
   .command('set')
-  .description('The workspace set library (library/sets/<id>/): import, new, add-file.');
+  .description('The workspace set library (library/sets/<id>/): import, use, new, add-file.');
 
 set
   .command('import <target>')
@@ -816,7 +816,9 @@ set
       const { useSet } = await import('./set-library.js');
       const dir = options.series ? seriesDirFromArg(target) : projectDirFromArg(target);
       const result = await useSet(repoRoot(), dir, id);
-      console.log(`✔ ${result.set} ${result.updated ? 'updated in' : 'added to'} ${basename(dir)}: ${result.files.length} files, ${result.plates.length} plates`);
+      const files = `${result.files.length} ${result.files.length === 1 ? 'file' : 'files'}`;
+      const plates = `${result.plates.length} ${result.plates.length === 1 ? 'plate' : 'plates'}`;
+      console.log(`✔ ${result.set} ${result.updated ? 'updated in' : 'added to'} ${basename(dir)}: ${files}, ${plates}`);
     }),
   );
 

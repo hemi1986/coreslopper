@@ -1,9 +1,23 @@
 import { existsSync, statSync } from 'node:fs';
 import { mkdir, readFile, readdir, rm, stat } from 'node:fs/promises';
 import { basename, extname, join, resolve, sep } from 'node:path';
-import { isMap, isSeq, parse as parseYaml, parseDocument, stringify, type YAMLMap, type YAMLSeq } from 'yaml';
+import { isMap, isSeq, parseDocument, stringify, type YAMLMap, type YAMLSeq } from 'yaml';
 import { LibrarySetSchema, SetBibleSchema, ValidationError, isScriptId, readYamlFile, writeTextAtomic, type LibrarySet, type SetDefinition } from '@coreslopper/core';
-import { LIBRARY_FILE_LIMITS, commitCopies, copyByContent, discardCopies, entryFileHashes, entryText, fileHash, libraryEntryDir, libraryEntryFile, librarySourceLabel, parseTags, slugOfName } from './library-entry.js';
+import {
+  LIBRARY_FILE_LIMITS,
+  commitCopies,
+  copyByContent,
+  discardCopies,
+  entryFileHashes,
+  entryText,
+  fileHash,
+  libraryEntryDir,
+  libraryEntryFile,
+  librarySourceLabel,
+  libraryTargetKind,
+  parseTags,
+  slugOfName,
+} from './library-entry.js';
 
 // The workspace's set library: `library/sets/<id>/set.yaml` with the set's
 // files next to it (ADR 0052). The user adds sets and their files by hand
@@ -336,18 +350,16 @@ export interface UseSetResult {
  */
 export async function useSet(root: string, targetDir: string, id: string): Promise<UseSetResult> {
   const entry = await loadLibrarySet(root, id);
-  const projectFile = join(targetDir, 'project.yaml');
-  if (existsSync(projectFile)) {
-    const config = (parseYaml(await readFile(projectFile, 'utf8')) ?? {}) as { kind?: unknown };
-    if (config.kind === 'episode') {
-      throw new ValidationError('an episode takes its sets from the series canon; use the set in the series instead');
-    }
-  } else if (!existsSync(join(targetDir, 'series.yaml'))) {
-    throw new ValidationError(`${targetDir} is neither a project nor a series canon`);
-  }
+  const target = await libraryTargetKind(targetDir);
+  // EVT-LibrarySetUseRefused: the target is an episode; it takes its sets from the series canon.
+  if (target === 'episode') throw new ValidationError('an episode takes its sets from the series canon; use the set in the series instead');
+  if (!target) throw new ValidationError(`${targetDir} is neither a project nor a series canon`);
+
   const source = (name: string) => join(setEntryDir(root, id), name);
+  // The guarded scan: a link or non-file in the entry's folder is refused, never copied out.
+  const present = new Set((await entryFileHashes(setEntryDir(root, id), 'sets')).values());
   const named = [...entry.refs, ...entry.plates.flatMap((plate) => (plate.file ? [plate.file] : []))];
-  const absent = named.filter((name) => !existsSync(source(name)));
+  const absent = named.filter((name) => !present.has(name));
   if (absent.length) throw new ValidationError(`library files of ${id} are missing: ${absent.join(', ')}`);
 
   const file = join(targetDir, 'sets.yaml');
@@ -359,13 +371,28 @@ export async function useSet(root: string, targetDir: string, id: string): Promi
   list.flow = false;
   const existing = list.items.find((item) => isMap(item) && item.get('id') === id) as YAMLMap | undefined;
   if (existing && existing.get('library') !== id) {
-    throw new ValidationError(`${basename(targetDir)} has its own set "${id}" already; rename it or remove it first`);
+    // EVT-LibrarySetUseRefused: the target has a set of that id that is not linked to the entry.
+    const linked = existing.get('library');
+    throw new ValidationError(
+      typeof linked === 'string'
+        ? `${basename(targetDir)} has the set "${id}" from another library set ("${linked}"); remove it first`
+        : `${basename(targetDir)} has its own set "${id}" already; rename it or remove it first`,
+    );
   }
 
   const folder = join(targetDir, 'sets', id);
-  const refCopies = await copyByContent(entry.refs.map(source), folder, 'sets', { folders: 'skip' });
+  const folderExisted = existsSync(folder);
+  const refCopies = await copyByContent(entry.refs.map(source), folder, 'sets', { stage: true, nestedFolders: true });
   const plateSources = entry.plates.flatMap((plate) => (plate.file ? [source(plate.file)] : []));
-  const plateCopies = await copyByContent(plateSources, join(folder, 'plates'), 'sets');
+  const plateCopies = plateSources.length
+    ? await copyByContent(plateSources, join(folder, 'plates'), 'sets', { stage: true })
+    : { names: new Map<string, string>(), added: [], staged: [] };
+  const staged = [...refCopies.staged, ...plateCopies.staged];
+  /** Discard the staged copies; a folder this use created goes with them. */
+  const cleanup = async () => {
+    await discardCopies(staged);
+    if (!folderExisted) await rm(folder, { recursive: true, force: true });
+  };
   const ref = (name: string) => `sets/${id}/${refCopies.names.get(source(name))!}`;
   const plateRef = (name: string) => `sets/${id}/plates/${plateCopies.names.get(source(name))!}`;
   const plateNode = (plate: (typeof entry.plates)[number]) => ({
@@ -375,6 +402,7 @@ export async function useSet(root: string, targetDir: string, id: string): Promi
     ...(plate.file ? { ref: plateRef(plate.file) } : {}),
   });
 
+  const addedRefs: string[] = [];
   const addedPlates: string[] = [];
   if (existing) {
     const refsNode = existing.get('refs');
@@ -382,7 +410,9 @@ export async function useSet(root: string, targetDir: string, id: string): Promi
     const haveRefs = new Set(refList.items.map((item) => String((item as { value?: unknown }).value ?? item)));
     for (const name of entry.refs) {
       const path = ref(name);
-      if (!haveRefs.has(path)) refList.add(doc.createNode(path));
+      if (haveRefs.has(path)) continue;
+      refList.add(doc.createNode(path));
+      addedRefs.push(path);
     }
     const platesNode = existing.get('plates');
     const plateList = isSeq(platesNode) ? platesNode : (existing.set('plates', doc.createNode([])), existing.get('plates') as YAMLSeq);
@@ -393,28 +423,52 @@ export async function useSet(root: string, targetDir: string, id: string): Promi
       addedPlates.push(plate.id);
     }
   } else {
+    addedRefs.push(...entry.refs.map(ref));
+    addedPlates.push(...entry.plates.map((plate) => plate.id));
     list.add(
       doc.createNode({
         id,
         name: entry.name,
         description: entry.description,
         prompt: entry.prompt,
-        refs: entry.refs.map(ref),
+        refs: addedRefs,
         plates: entry.plates.map(plateNode),
         library: id,
       }),
     );
-    addedPlates.push(...entry.plates.map((plate) => plate.id));
+  }
+  const files = [...refCopies.added.map((name) => `sets/${id}/${name}`), ...plateCopies.added.map((name) => `sets/${id}/plates/${name}`)];
+  if (existing && !addedRefs.length && !addedPlates.length) {
+    // Nothing to add to the bible; the copies above only restore files the target lost.
+    try {
+      await commitCopies(staged);
+    } catch (error) {
+      await cleanup();
+      throw error;
+    }
+    return { set: id, updated: true, files, plates: [] };
   }
   const result = SetBibleSchema.safeParse(doc.toJS());
-  if (!result.success) throw new ValidationError(`sets.yaml would be invalid: ${result.error.issues[0]?.message ?? 'unknown error'}`);
-  await writeTextAtomic(file, doc.toString());
-  return {
-    set: id,
-    updated: Boolean(existing),
-    files: [...refCopies.added.map((name) => `sets/${id}/${name}`), ...plateCopies.added.map((name) => `sets/${id}/plates/${name}`)],
-    plates: addedPlates,
-  };
+  if (!result.success) {
+    await cleanup();
+    throw new ValidationError(`sets.yaml would be invalid: ${result.error.issues[0]?.message ?? 'unknown error'}`);
+  }
+  const before = existsSync(file) ? await readFile(file, 'utf8') : undefined;
+  try {
+    await writeTextAtomic(file, doc.toString());
+  } catch (error) {
+    await cleanup();
+    throw error;
+  }
+  try {
+    await commitCopies(staged);
+  } catch (error) {
+    if (before !== undefined) await writeTextAtomic(file, before);
+    else await rm(file, { force: true });
+    await cleanup();
+    throw error;
+  }
+  return { set: id, updated: Boolean(existing), files, plates: addedPlates };
 }
 
 /** The library entry for an incoming set: its link, a same-id entry with shared content, or a new free id. */

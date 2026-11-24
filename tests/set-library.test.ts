@@ -8,6 +8,7 @@ import { parse, stringify } from 'yaml';
 import { loadProject } from '@coreslopper/core';
 import { addLibrarySet, addLibrarySetFile, importSets, loadLibrarySet, setEntryDir, useSet } from '../packages/cli/src/set-library.ts';
 import { createProject } from '../packages/cli/src/new-project.ts';
+import { createEpisode, createSeriesCanon } from '../packages/cli/src/board-wizard.ts';
 import { validateChangedFile } from '../packages/cli/src/validate-file.ts';
 
 const root = process.cwd();
@@ -654,13 +655,39 @@ describe('using a library set', () => {
   it('ST-028: An episode refuses the use', async () => {
     const ws = await cliWorkspace();
     await libraryBarWith(ws, ['start.png'], []);
-    const dir = await video(ws, 'night-desk-02');
-    const config = await readFile(join(dir, 'project.yaml'), 'utf8');
-    await writeFile(join(dir, 'project.yaml'), config.replace(/^kind: .*$/m, 'kind: episode'));
+    await createSeriesCanon(ws, { slug: 'night-desk', title: 'Night Desk', budget: 50, format: '9x16', imageProvider: 'mock', videoProvider: 'mock', audioProvider: 'mock' } as never);
+    const dir = await createEpisode(ws, { series: 'night-desk', episode: 2, slug: 'night-desk-02', budget: 10 });
 
     await expect(useSet(ws, dir, 'bar')).rejects.toThrow(/series canon/);
 
     expect(existsSync(join(dir, 'sets.yaml'))).toBe(false);
     expect(existsSync(join(dir, 'sets', 'bar'))).toBe(false);
+  });
+
+  it('leaves nothing behind when the target sets.yaml refuses the result', async () => {
+    const ws = await cliWorkspace();
+    await libraryBarWith(ws, ['start.png'], [{ id: 'counter', angle: 'counter, frontal' }]);
+    const dir = await video(ws, 'neon-rain');
+    await writeFile(join(dir, 'sets.yaml'), 'version: 2\nsets: []\n');
+    const before = await readFile(join(dir, 'sets.yaml'), 'utf8');
+
+    await expect(useSet(ws, dir, 'bar')).rejects.toThrow(/sets.yaml would be invalid/);
+
+    expect(await readFile(join(dir, 'sets.yaml'), 'utf8')).toBe(before);
+    expect(existsSync(join(dir, 'sets', 'bar'))).toBe(false);
+  });
+
+  it('copies a set into a series canon', async () => {
+    const ws = await cliWorkspace();
+    await libraryBarWith(ws, ['start.png'], [{ id: 'counter', angle: 'counter, frontal' }]);
+    await createSeriesCanon(ws, { slug: 'harbor', title: 'Harbor', budget: 50, format: '9x16', imageProvider: 'mock', videoProvider: 'mock', audioProvider: 'mock' } as never);
+    const dir = join(ws, 'projects', 'harbor');
+
+    const result = await useSet(ws, dir, 'bar');
+
+    expect(result).toMatchObject({ set: 'bar', updated: false, plates: ['counter'] });
+    const bible = parse(await readFile(join(dir, 'sets.yaml'), 'utf8'));
+    expect(bible.sets[0]).toMatchObject({ id: 'bar', library: 'bar', refs: ['sets/bar/start.png'] });
+    expect(existsSync(join(dir, 'sets', 'bar', 'plates', 'counter.png'))).toBe(true);
   });
 });

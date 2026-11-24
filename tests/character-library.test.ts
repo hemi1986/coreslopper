@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import { parse } from 'yaml';
-import { createSeriesCanon, createVideoProject } from '../packages/cli/src/board-wizard.ts';
+import { createEpisode, createSeriesCanon, createVideoProject } from '../packages/cli/src/board-wizard.ts';
 import {
   addLibraryCharacter,
   addLibraryFile,
@@ -140,8 +140,7 @@ describe('using a library character', () => {
 
     await createSeriesCanon(ws, { slug: 'harbor', title: 'Harbor', budget: 50, format: '9x16', imageProvider: 'mock', videoProvider: 'mock', audioProvider: 'mock' } as never);
     expect((await useCharacter(ws, join(ws, 'projects', 'harbor'), 'nova')).files.length).toBe(3);
-    const episode = await video(ws, 'harbor-01');
-    await writeFile(join(episode, 'project.yaml'), `${await readFile(join(episode, 'project.yaml'), 'utf8')}kind: episode\n`);
+    const episode = await createEpisode(ws, { series: 'harbor', episode: 1, slug: 'harbor-01', budget: 10 });
     await expect(useCharacter(ws, episode, 'nova')).rejects.toThrow(/series canon/);
   });
 
