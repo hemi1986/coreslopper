@@ -1,12 +1,12 @@
 # Code review – ST-027: The sets of a finished set bible go into the library by themselves
 
-Base: main (fdbfc79) · Commits: 5 · Date: 2026-11-24
+Base: main (fdbfc79) · HEAD: 0dc73b3 · Commits: 6 · Date: 2026-11-24
 
-Checks run: `npm test` → 876 passed / 2 skipped; `npm run typecheck` → green;
-`npx vitest run tests/set-library.test.ts` → 30/30 green; `check-language` → “Glossary language OK”;
-story linter and scenario traceability → green (3/3); `git diff --check` → clean. The three scenario tests use
-the public CLI seam on a temp workspace. The command diff also received a second failure-path pass. There are no
-open questions.
+Checks run at HEAD `0dc73b3`: `npm test` → 877 passed / 2 skipped;
+`npx vitest run tests/set-library.test.ts tests/meme-style-character.test.ts` → 35/35 green;
+`npm run typecheck` → green; `check-language` → “Glossary language OK”; scenario traceability → green (3/3).
+The three scenario tests use the public CLI seam on a temp workspace. The command diff also received a second
+failure-path pass. There are no open questions.
 
 ## Findings
 
@@ -17,9 +17,6 @@ open questions.
 | 3 | minor | Skill documentation / stage outputs | workspace/.claude/skills/character-bible/SKILL.md:32 | This line now says `stage-done` imports the project's sets, but still records only `--outputs style.yaml,characters.yaml`. When a set bible was written, `sets.yaml` is omitted from the stage's recorded outputs. The style-bible skill already says to add `sets.yaml` when written (`workspace/.claude/skills/style-bible/SKILL.md:36`). | ADR 0043 (“The set bible is an output of style-character”); HS-129 resolution in `docs/domain/events.yaml:3480-3484` (both skills' stage-done lines must include it) | Make the command conditional, as the style-bible skill does: use `--outputs style.yaml,characters.yaml,sets.yaml` when `sets.yaml` exists, otherwise omit it. |
 | 4 | minor | Test quality / unchanged library | tests/set-library.test.ts:530-542 | The no-set-bible test snapshots `set.yaml` and the list of set ids, but not the existing entry's media. `libraryBar` creates `counter.png`; an erroneous import could overwrite or add media inside `library/sets/bar` while leaving both assertions green. The scenario says the set library is unchanged, which includes its files. | ADR 0052 (the library and its media belong to the user); ST-027 scenario “A music video without a set bible takes nothing in”; tdd skill | Snapshot the whole `bar` entry (directory names and file bytes, including `counter.png`) before and after, or hash every file in the entry and compare. |
 
-**fix blockers first** – 1 blocker, 1 major, 2 minors; no questions.
-Most important: the dynamic set-library import sits outside the warning-only guard, so a module-load failure exits nonzero after the stage has already been saved as done.
-
 ## Resolutions
 
 | # | Resolution | Where |
@@ -28,3 +25,6 @@ Most important: the dynamic set-library import sits outside the warning-only gua
 | 2 | **fixed** – a command-seam regression makes the library destination invalid so `importSets` rejects, then asserts exit 0, the stage remains done, and stderr names the set-library failure. | `tests/set-library.test.ts:530-543` |
 | 3 | **fixed** – the character-bible skill says to append `sets.yaml` to the recorded outputs when the project has a set bible. | `workspace/.claude/skills/character-bible/SKILL.md:32` |
 | 4 | **fixed** – the no-set-bible scenario now compares the entry YAML, every entry filename, and the existing image bytes before and after `stage-done`. | `tests/set-library.test.ts:545-561` |
+
+**ready to merge** — findings 1–4 are resolved; 0 remaining blockers, 0 remaining majors, 0 remaining minors; no questions.
+Most important: the warning-only guard now encloses both dynamic library imports, and the rejected-import regression proves the stage stays done while the command exits 0.

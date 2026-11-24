@@ -2,17 +2,11 @@
 
 > Generated from `docs/stories/ST-*.md` – **do not edit manually**. Change the story files instead.
 
-**Progress: 16 of 24 domain stories done** · scenarios 58 of 80
+**Progress: 17 of 24 domain stories done** · scenarios 61 of 80
 
-**42 stories** · In Progress: 1 · Ready: 12 · Ready for Human Review: 0 · In Review: 1 · Draft: 0 · Done: 28 · Superseded: 0
+**42 stories** · In Progress: 0 · Ready: 12 · Ready for Human Review: 0 · In Review: 1 · Draft: 0 · Done: 29 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
-
-## In Progress
-
-| ID | Title | Type | Context | Priority | Size | Risk | Depends on |
-|---|---|---|---|---|---|---|---|
-| [ST-027](ST-027-finished-set-bibles-go-into-the-library.md) | The sets of a finished set bible go into the library by themselves | domain | Library | should | – | – | ST-026 |
 
 ## Ready
 
@@ -68,4 +62,5 @@ Within each section: by priority, then by story ID, with dependencies pulled in 
 | [ST-024](ST-024-add-a-library-set-by-hand.md) | Add a library set by hand | domain | Library | should | – | – | ST-023 |
 | [ST-025](ST-025-add-a-file-to-a-library-set.md) | Add a reference or a plate to a library set | domain | Library | should | – | – | ST-024 |
 | [ST-026](ST-026-take-sets-into-the-library.md) | Take the sets of a production into the library | domain | Library | should | – | – | ST-023 |
+| [ST-027](ST-027-finished-set-bibles-go-into-the-library.md) | The sets of a finished set bible go into the library by themselves | domain | Library | should | – | – | ST-026 |
 | [ST-039](ST-039-restart-comfyui-only-when-stuck.md) | Restart ComfyUI only when it is stuck | task | – | should | – | – | – |
