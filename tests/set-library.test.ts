@@ -490,6 +490,30 @@ function stageDone(ws: string, dir: string) {
 }
 
 describe('finished set bibles enter the library', () => {
+  it('ST-027: Finishing style-character takes the sets in', async () => {
+    const ws = await cliWorkspace();
+    const dir = await video(ws, 'neon-rain');
+    await production(
+      ws,
+      'neon-rain',
+      [bar({ plates: [{ id: 'counter', angle: 'counter, frontal', ref: 'sets/bar/plates/counter.png' }] })],
+      { 'sets/bar/plates/counter.png': 'counter' },
+    );
+
+    const result = stageDone(ws, dir);
+
+    expect(result.status, result.stderr).toBe(0);
+    expect((await loadProject(dir)).state.stages['style-character']?.status).toBe('done');
+    expect(result.stdout).toMatch(/bar → new entry bar/);
+    expect(await loadLibrarySet(ws, 'bar')).toMatchObject({
+      id: 'bar',
+      name: 'The bar',
+      plates: [{ id: 'counter', angle: 'counter, frontal', file: 'counter.png' }],
+      origin: 'projects/neon-rain',
+    });
+    expect(existsSync(join(setEntryDir(ws, 'bar'), 'counter.png'))).toBe(true);
+  });
+
   it('ST-027: A music video without a set bible takes nothing in', async () => {
     const ws = await cliWorkspace();
     await libraryBar(ws);

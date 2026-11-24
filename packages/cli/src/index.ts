@@ -967,13 +967,21 @@ program
       setStageDone(loaded.state, stage, parseCsv(options.outputs), options.hash);
       await saveState(loaded.paths.state, loaded.state);
       console.log(`✔ ${stage} done`);
-      // The characters of a finished character bible go into the workspace library.
+      // The characters and sets of finished bibles go into the workspace library.
       if (stage === 'style-character' && existsSync(join(loaded.paths.root, 'characters.yaml'))) {
         const { importCharacters } = await import('./character-library.js');
         try {
           for (const result of await importCharacters(repoRoot(), loaded.paths.root)) printImport(result);
         } catch (error) {
           console.warn(`⚠ character library: ${(error as Error).message}`);
+        }
+      }
+      if (stage === 'style-character' && existsSync(join(loaded.paths.root, 'sets.yaml'))) {
+        const { importSets } = await import('./set-library.js');
+        try {
+          for (const result of await importSets(repoRoot(), loaded.paths.root)) printSetImport(result);
+        } catch (error) {
+          console.warn(`⚠ set library: ${(error as Error).message}`);
         }
       }
     }),
