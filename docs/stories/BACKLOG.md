@@ -2,17 +2,11 @@
 
 > Generated from `docs/stories/ST-*.md` – **do not edit manually**. Change the story files instead.
 
-**Progress: 20 of 24 domain stories done** · scenarios 69 of 80
+**Progress: 21 of 24 domain stories done** · scenarios 71 of 80
 
-**42 stories** · In Progress: 1 · Ready: 8 · Ready for Human Review: 0 · In Review: 1 · Draft: 0 · Done: 32 · Superseded: 0
+**42 stories** · In Progress: 0 · Ready: 8 · Ready for Human Review: 0 · In Review: 1 · Draft: 0 · Done: 33 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
-
-## In Progress
-
-| ID | Title | Type | Context | Priority | Size | Risk | Depends on |
-|---|---|---|---|---|---|---|---|
-| [ST-031](ST-031-delete-a-library-set.md) | Delete a library set | domain | Library | could | – | – | ST-024 |
 
 ## Ready
 
@@ -69,3 +63,4 @@ Within each section: by priority, then by story ID, with dependencies pulled in 
 | [ST-039](ST-039-restart-comfyui-only-when-stuck.md) | Restart ComfyUI only when it is stuck | task | – | should | – | – | – |
 | [ST-029](ST-029-update-a-library-set.md) | Update a library set's name, description, prompt and tags | domain | Library | could | – | – | ST-024 |
 | [ST-030](ST-030-remove-a-file-from-a-library-set.md) | Remove a reference or a plate from a library set | domain | Library | could | – | – | ST-025 |
+| [ST-031](ST-031-delete-a-library-set.md) | Delete a library set | domain | Library | could | – | – | ST-024 |
