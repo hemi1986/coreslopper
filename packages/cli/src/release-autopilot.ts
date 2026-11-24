@@ -529,6 +529,11 @@ export async function autopilotOverview(root: string, options: { now?: Date; env
   const now = options.now ?? new Date();
   for (const dir of await boardProjectDirs(root)) {
     const context = await projectReleaseContext(dir, root);
+    // A project that is no longer released publicly has no plan, even with an earlier calendar on disk (ST-041).
+    if (!releasedPublicly(context.project.config)) {
+      log(`${context.project.config.slug}: not released publicly (distribution: internal); nothing to plan`);
+      continue;
+    }
     if (!context.calendar) continue;
     const settings = context.schedule.autopilot;
     const { ready, notes } = autopilotReadiness(settings, options.env, now);

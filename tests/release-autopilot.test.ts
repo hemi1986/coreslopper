@@ -420,6 +420,18 @@ describe('an internal project and the autopilot', () => {
     expect((await loadAutopilotLog(t.dir)).entries).toEqual([]);
     expect(t.lines.join('\n')).toContain('not released publicly');
   });
+
+  it('ST-041: The plan lists no event of an internal project', async () => {
+    const t = await setup();
+    const now = new Date(t.at('distributor'));
+    await approveRelease(t.dir, { root: t.root, now });
+    await setDistribution(t.dir, 'internal');
+    const lines: string[] = [];
+
+    await autopilotOverview(t.root, { now, env: ENV, log: (line) => void lines.push(line) });
+
+    expect(lines.filter((line) => /^\s+\d{4}-\d{2}-\d{2} /.test(line))).toEqual([]);
+  });
 });
 
 describe('release timer', () => {
