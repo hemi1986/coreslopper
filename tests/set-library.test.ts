@@ -1,12 +1,16 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdir, mkdtemp, readdir, rm, truncate, writeFile } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
+import { cp, mkdir, mkdtemp, readFile, readdir, rm, truncate, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { stringify } from 'yaml';
+import { loadProject } from '@coreslopper/core';
 import { addLibrarySet, addLibrarySetFile, importSets, loadLibrarySet, setEntryDir } from '../packages/cli/src/set-library.ts';
+import { createProject } from '../packages/cli/src/new-project.ts';
 import { validateChangedFile } from '../packages/cli/src/validate-file.ts';
 
+const root = process.cwd();
 const temporary: string[] = [];
 afterEach(async () => {
   await Promise.all(temporary.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
@@ -464,5 +468,40 @@ describe('taking sets into the library', () => {
 
     const other = await production(ws, 'other', [bar()], {});
     await expect(importSets(ws, other, { set: 'lobby' })).rejects.toThrow(/no set "lobby"/);
+  });
+});
+
+async function cliWorkspace(): Promise<string> {
+  const ws = await workspace();
+  for (const folder of ['config', 'templates', 'brand']) await cp(join(root, folder), join(ws, folder), { recursive: true });
+  await writeFile(join(ws, 'package.json'), JSON.stringify({ name: 'coreslopper', version: '0.0.0' }));
+  return ws;
+}
+
+async function video(ws: string, slug: string): Promise<string> {
+  return createProject({ root: ws, slug, budget: 40 });
+}
+
+function stageDone(ws: string, dir: string) {
+  return spawnSync(join(root, 'node_modules', '.bin', 'tsx'), [join(root, 'packages', 'cli', 'src', 'index.ts'), 'stage-done', dir, 'style-character'], {
+    cwd: ws,
+    encoding: 'utf8',
+  });
+}
+
+describe('finished set bibles enter the library', () => {
+  it('ST-027: A music video without a set bible takes nothing in', async () => {
+    const ws = await cliWorkspace();
+    await libraryBar(ws);
+    const dir = await video(ws, 'neon-rain');
+    const before = await readFile(join(setEntryDir(ws, 'bar'), 'set.yaml'), 'utf8');
+    expect(existsSync(join(dir, 'sets.yaml'))).toBe(false);
+
+    const result = stageDone(ws, dir);
+
+    expect(result.status, result.stderr).toBe(0);
+    expect((await loadProject(dir)).state.stages['style-character']?.status).toBe('done');
+    expect(await readFile(join(setEntryDir(ws, 'bar'), 'set.yaml'), 'utf8')).toBe(before);
+    expect(await readdir(join(ws, 'library', 'sets'))).toEqual(['bar']);
   });
 });
