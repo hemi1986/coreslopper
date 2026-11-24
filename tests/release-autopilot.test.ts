@@ -432,6 +432,18 @@ describe('an internal project and the autopilot', () => {
 
     expect(lines.filter((line) => /^\s+\d{4}-\d{2}-\d{2} /.test(line))).toEqual([]);
   });
+
+  it('ST-041: An approved public project still posts', async () => {
+    const t = await setup();
+    await approveRelease(t.dir, { root: t.root, now: new Date(t.at('distributor')) });
+    t.moveTo('announce:x');
+
+    const result = await t.run();
+
+    const entries = (await loadAutopilotLog(t.dir)).entries.filter((entry) => entry.event === 'announce:x');
+    expect(entries.map((entry) => entry.status)).toEqual(['running', 'posted']);
+    expect(result.projects[0]).toMatchObject({ approved: true, acted: [{ id: 'announce:x', status: 'posted' }] });
+  });
 });
 
 describe('release timer', () => {
