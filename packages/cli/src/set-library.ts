@@ -349,6 +349,9 @@ export async function useSet(root: string, targetDir: string, id: string): Promi
   // `sets: []` parses as a flow sequence; entries go in block style like a hand-written bible.
   list.flow = false;
   const existing = list.items.find((item) => isMap(item) && item.get('id') === id) as YAMLMap | undefined;
+  if (existing && existing.get('library') !== id) {
+    throw new ValidationError(`${basename(targetDir)} has its own set "${id}" already; rename it or remove it first`);
+  }
 
   const folder = join(targetDir, 'sets', id);
   const refCopies = await copyByContent(entry.refs.map(source), folder, 'sets', { folders: 'skip' });

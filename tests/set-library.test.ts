@@ -634,4 +634,20 @@ describe('using a library set', () => {
     ]);
     expect(await validateChangedFile(join(dir, 'sets.yaml'))).toBe('sets');
   });
+
+  it('ST-028: A set of the same id that is not from the library refuses the use', async () => {
+    const ws = await cliWorkspace();
+    await libraryBarWith(ws, ['start.png'], []);
+    const dir = await video(ws, 'neon-rain');
+    await writeFile(
+      join(dir, 'sets.yaml'),
+      stringify({ version: 1, sets: [{ id: 'bar', name: 'Their bar', description: 'Their own bar, not the library.', prompt: 'their own bar' }] }),
+    );
+    const before = await readFile(join(dir, 'sets.yaml'), 'utf8');
+
+    await expect(useSet(ws, dir, 'bar')).rejects.toThrow(/its own set "bar"/);
+
+    expect(await readFile(join(dir, 'sets.yaml'), 'utf8')).toBe(before);
+    expect(existsSync(join(dir, 'sets', 'bar'))).toBe(false);
+  });
 });
