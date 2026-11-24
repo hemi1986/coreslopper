@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { parse, stringify } from 'yaml';
 import { loadProject } from '@coreslopper/core';
-import { addLibrarySet, addLibrarySetFile, importSets, loadLibrarySet, setEntryDir, updateLibrarySet, useSet } from '../packages/cli/src/set-library.ts';
+import { addLibrarySet, addLibrarySetFile, importSets, loadLibrarySet, removeLibrarySetFile, setEntryDir, updateLibrarySet, useSet } from '../packages/cli/src/set-library.ts';
 import { createProject } from '../packages/cli/src/new-project.ts';
 import { createEpisode, createSeriesCanon } from '../packages/cli/src/board-wizard.ts';
 import { validateChangedFile } from '../packages/cli/src/validate-file.ts';
@@ -243,6 +243,35 @@ describe('adding a file to a library set', () => {
     await expect(addLibrarySetFile(ws, 'neon-bar', folder, { role: 'ref' })).rejects.toThrow(/not a file/);
 
     expect(await readdir(dir)).toEqual(['set.yaml']);
+  });
+});
+
+describe('removing a file from a library set', () => {
+  async function withPlates(): Promise<{ ws: string; dir: string }> {
+    const ws = await workspace();
+    await addLibrarySet(ws, { name: 'bar', description: 'a bar', prompt: 'narrow bar, blue neon' });
+    for (const [id, angle] of [
+      ['counter', 'counter, frontal'],
+      ['door', 'door, from inside'],
+    ] as const) {
+      await writeFile(join(ws, `${id}.png`), `plate:${id}`);
+      await addLibrarySetFile(ws, 'bar', join(ws, `${id}.png`), { role: 'plate', angle, plate: id });
+    }
+    return { ws, dir: setEntryDir(ws, 'bar') };
+  }
+
+  it('ST-030: A plate is removed with its file', async () => {
+    const { ws, dir } = await withPlates();
+    const door = (await loadLibrarySet(ws, 'bar')).plates.find((plate) => plate.id === 'door')!;
+
+    const entry = await removeLibrarySetFile(ws, 'bar', door.file);
+
+    expect(entry.plates).toEqual([{ id: 'counter', angle: 'counter, frontal', file: 'counter.png' }]);
+    expect(entry.refs).toEqual([]);
+    expect(existsSync(join(dir, door.file!))).toBe(false);
+    expect((await readdir(dir)).sort()).toEqual(['counter.png', 'set.yaml']);
+    expect(await loadLibrarySet(ws, 'bar')).toMatchObject({ plates: [{ id: 'counter', angle: 'counter, frontal', file: 'counter.png' }] });
+    expect(await validateChangedFile(join(dir, 'set.yaml'))).toBe('library set');
   });
 });
 
