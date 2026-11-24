@@ -473,6 +473,19 @@ describe('approving a release', () => {
 
     expect((await loadStatus(dir)).approval).toBeUndefined();
   });
+
+  it('ST-042: A public project is still approved', async () => {
+    const dir = await fixture();
+    const root = join(dir, '..', '..');
+    await setReleaseDay(dir, undefined);
+    await buildRelease({ projectDir: dir, root, deps: fakeDeps({ now: () => new Date('2026-11-13T09:00:00Z') }) });
+    expect(await loadCalendar(dir)).toMatchObject({ release_date: '2026-12-04', proposed: true });
+
+    const status = await approveRelease(dir, { root, now: new Date('2026-11-13T10:00:00Z') });
+
+    expect(status.approval?.release_date).toBe('2026-12-04');
+    expect(await releaseDay(dir)).toBe('2026-12-04');
+  });
 });
 
 /** `release.release_date` of a project's project.yaml, or undefined when it has none. */
