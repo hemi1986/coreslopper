@@ -108,6 +108,15 @@ function planNeon(dir: string, input: Partial<Parameters<typeof calendarInput>[0
 }
 
 describe('planning around an internal project', () => {
+  it("ST-040: An internal project's release day is free for another release", async () => {
+    const dir = await fixture();
+    await siblingCalendar(dir, 'teaser', { release_date: '2026-12-04', distribution: 'internal' });
+
+    const calendar = await planNeon(dir);
+
+    expect(calendar.release_date).toBe('2026-12-04');
+  });
+
   it("ST-040: A public project's calendar still books its slots", async () => {
     const dir = await fixture();
     await siblingCalendar(dir, 'other', { release_date: '2026-12-04' });

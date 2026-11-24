@@ -4,11 +4,13 @@ import { dirname, join } from 'node:path';
 import { withFileLock } from './file-lock.js';
 import { stringify } from 'yaml';
 import {
+  ProjectConfigSchema,
   ReleaseCalendarSchema,
   ReleaseStatusSchema,
   ValidationError,
   buildCalendar,
   loadReleaseSchedule,
+  releasedPublicly,
   zonedToday,
   readJsonFile,
   readYamlFile,
@@ -45,11 +47,17 @@ export async function siblingProjects(projectRoot: string): Promise<string[]> {
     .sort();
 }
 
-/** The calendars of every other project in the workspace; an unreadable one is skipped. */
+/**
+ * The calendars of every other project in the workspace that is released publicly; an unreadable one is skipped.
+ * A project with distribution internal is no other release: its calendar books no release day and no slot for
+ * another project's plan, even when it stays on disk (CMD-PlanReleaseCalendar).
+ */
 export async function otherCalendars(projectRoot: string): Promise<ReleaseCalendar[]> {
   const calendars: ReleaseCalendar[] = [];
   for (const dir of await siblingProjects(projectRoot)) {
     if (dir === projectRoot) continue;
+    const config = await readYamlFile(join(dir, 'project.yaml'), ProjectConfigSchema).catch(() => undefined);
+    if (config && !releasedPublicly(config)) continue;
     const calendar = await loadCalendar(dir).catch(() => undefined);
     if (calendar) calendars.push(calendar);
   }
