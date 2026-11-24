@@ -1,7 +1,7 @@
 import { existsSync, statSync } from 'node:fs';
-import { mkdir, readdir, rm, stat } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rm, stat } from 'node:fs/promises';
 import { basename, extname, join, resolve, sep } from 'node:path';
-import { stringify } from 'yaml';
+import { isSeq, parseDocument, stringify, type YAMLSeq } from 'yaml';
 import { LibrarySetSchema, SetBibleSchema, ValidationError, isScriptId, readYamlFile, writeTextAtomic, type LibrarySet, type SetDefinition } from '@coreslopper/core';
 import { LIBRARY_FILE_LIMITS, commitCopies, copyByContent, discardCopies, entryFileHashes, entryText, fileHash, libraryEntryDir, libraryEntryFile, librarySourceLabel, parseTags, slugOfName } from './library-entry.js';
 
@@ -313,6 +313,77 @@ export async function importSets(root: string, sourceDir: string, options: Impor
     results.push({ set: set.id, id, created, added: changes, missing });
   }
   return results;
+}
+
+// -------------------------------------------------------------------- use
+
+export interface UseSetResult {
+  /** The set's id in the target's sets.yaml; the library id, as the story keeps it. */
+  set: string;
+  /** True when the target had the set from the library already and only gained files or plates. */
+  updated: boolean;
+  /** Paths written, relative to the target. */
+  files: string[];
+  /** Plates added to the target's set. */
+  plates: string[];
+}
+
+/**
+ * CMD-UseLibrarySet (`set use`): copy a library set into a music video or a
+ * series canon (EVT-LibrarySetUsed). Its references and every plate come along
+ * – there is no choice of plates – to `sets/<id>/` and `sets/<id>/plates/`, and
+ * the entry goes into the target's sets.yaml with `library: <id>`.
+ */
+export async function useSet(root: string, targetDir: string, id: string): Promise<UseSetResult> {
+  const entry = await loadLibrarySet(root, id);
+  const source = (name: string) => join(setEntryDir(root, id), name);
+  const named = [...entry.refs, ...entry.plates.flatMap((plate) => (plate.file ? [plate.file] : []))];
+  const absent = named.filter((name) => !existsSync(source(name)));
+  if (absent.length) throw new ValidationError(`library files of ${id} are missing: ${absent.join(', ')}`);
+
+  const folder = join(targetDir, 'sets', id);
+  const refCopies = await copyByContent(entry.refs.map(source), folder, 'sets');
+  const plateSources = entry.plates.flatMap((plate) => (plate.file ? [source(plate.file)] : []));
+  const plateCopies = await copyByContent(plateSources, join(folder, 'plates'), 'sets');
+  const ref = (name: string) => `sets/${id}/${refCopies.names.get(source(name))!}`;
+  const plateRef = (name: string) => `sets/${id}/plates/${plateCopies.names.get(source(name))!}`;
+  const plateNode = (plate: (typeof entry.plates)[number]) => ({
+    id: plate.id,
+    angle: plate.angle,
+    ...(plate.prompt ? { prompt: plate.prompt } : {}),
+    ...(plate.file ? { ref: plateRef(plate.file) } : {}),
+  });
+
+  const file = join(targetDir, 'sets.yaml');
+  const doc = parseDocument(existsSync(file) ? await readFile(file, 'utf8') : 'version: 1\nsets: []\n');
+  if (doc.errors.length) throw new ValidationError(`Invalid YAML in ${file}: ${doc.errors[0]!.message}`);
+  if (!isSeq(doc.get('sets'))) doc.set('sets', doc.createNode([]));
+  const list = doc.get('sets') as YAMLSeq;
+  // `sets: []` parses as a flow sequence; entries go in block style like a hand-written bible.
+  list.flow = false;
+  list.add(
+    doc.createNode({
+      id,
+      name: entry.name,
+      description: entry.description,
+      prompt: entry.prompt,
+      refs: entry.refs.map(ref),
+      plates: entry.plates.map(plateNode),
+      library: id,
+    }),
+  );
+  const result = SetBibleSchema.safeParse(doc.toJS());
+  if (!result.success) throw new ValidationError(`sets.yaml would be invalid: ${result.error.issues[0]?.message ?? 'unknown error'}`);
+  await writeTextAtomic(file, doc.toString());
+  return {
+    set: id,
+    updated: false,
+    files: [
+      ...[...refCopies.added].map((name) => `sets/${id}/${name}`),
+      ...plateCopies.added.map((name) => `sets/${id}/plates/${name}`),
+    ],
+    plates: entry.plates.map((plate) => plate.id),
+  };
 }
 
 /** The library entry for an incoming set: its link, a same-id entry with shared content, or a new free id. */
