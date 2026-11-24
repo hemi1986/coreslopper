@@ -8,7 +8,7 @@ size: null
 risk: null
 depends_on: [ST-028]
 labels: [feature:set-library]
-status: ready
+status: done
 ---
 
 ## Task
@@ -20,11 +20,11 @@ wizard gets no such step. An empty set library shows the empty text of ST-032 an
 Decided in the grilling of feature `set-library` (user, 2026-11-22, round 1 Q7, round 2 Q7).
 
 ## Acceptance Criteria
-- [ ] The music video wizard and the series wizard show the step "Sets from the library" after the characters step
-- [ ] Ticking a set uses it in the new production; its sets.yaml names it with `library`
-- [ ] A refused use (an own set of the same id) shows its reason in the step
-- [ ] The episode wizard has no sets step
-- [ ] The step's texts exist in German and English
+- [x] The music video wizard and the series wizard show the step "Sets from the library" after the characters step
+- [x] Ticking a set uses it in the new production; its sets.yaml names it with `library`
+- [x] A refused use (an own set of the same id) shows its reason in the step
+- [x] The episode wizard has no sets step
+- [x] The step's texts exist in German and English
 
 ## Out of Scope
 - Choosing plates

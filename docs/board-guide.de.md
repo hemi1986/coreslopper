@@ -44,7 +44,7 @@ Der Assistent fragt zuerst die Projektdaten ab: Titel, Artist, Budget und Provid
 2. Klicke auf **Tags vorschlagen**: Ein Block, der sich wiederholt, wird `[Chorus]`, jeder andere Block ein `[Verse n]`. Korrigiere die Tags, wo der Song anders aufgebaut ist.
 3. Prüfe die Liste **Sections** und klicke auf **Lyrics speichern**.
 
-Danach lädst du den Song (den Mix) hoch und, falls vorhanden, den Vocal-Stem. MP3, FLAC und die anderen gängigen Formate werden in WAV umgewandelt. Dann folgen Referenzen (Moodboards, Fotos, Links) und Figuren aus der Bibliothek. **Setup abschließen** beendet den Schritt. Danach führst du `/new-video <slug>` in Claude Code aus: Der Agent beginnt mit dem Brief.
+Danach lädst du den Song (den Mix) hoch und, falls vorhanden, den Vocal-Stem. MP3, FLAC und die anderen gängigen Formate werden in WAV umgewandelt. Dann folgen Referenzen (Moodboards, Fotos, Links), danach Figuren und Sets aus der Bibliothek. **Setup abschließen** beendet den Schritt. Danach führst du `/new-video <slug>` in Claude Code aus: Der Agent beginnt mit dem Brief.
 
 ## Ein Projekt verfolgen
 
