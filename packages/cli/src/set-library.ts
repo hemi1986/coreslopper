@@ -21,7 +21,8 @@ import {
 
 // The workspace's set library: `library/sets/<id>/set.yaml` with the set's
 // files next to it (ADR 0052). The user adds sets and their files by hand
-// (`addLibrarySet`, `addLibrarySetFile`); the sets of a project or series canon
+// (`addLibrarySet`, `addLibrarySetFile`) and corrects an entry's words
+// (`updateLibrarySet`); the sets of a project or series canon
 // come in through `importSets`; a project or series canon takes a copy of the
 // entry, with every reference and every plate. Nothing in a production points
 // into the library, so a later change there never touches a finished video.
@@ -83,6 +84,23 @@ export async function addLibrarySet(root: string, input: NewLibrarySet, now = ne
     added: now.toISOString(),
   });
   await mkdir(setEntryDir(root, id), { recursive: true });
+  await saveLibrarySet(root, entry);
+  return entry;
+}
+
+/**
+ * CMD-UpdateLibrarySet (the board's form): change a set's name, description,
+ * prompt and tags (EVT-LibrarySetUpdated). The id stays, so productions that
+ * took the set keep their `library` link; name, description and prompt stay
+ * required, as in a set bible.
+ */
+export async function updateLibrarySet(root: string, id: string, change: Partial<NewLibrarySet>): Promise<LibrarySet> {
+  if (change === null || typeof change !== 'object') throw new ValidationError('an update takes name, description, prompt or tags');
+  const entry = await loadLibrarySet(root, id);
+  if (change.name !== undefined) entry.name = entryText(change.name, 'name', 200, true)!;
+  if (change.description !== undefined) entry.description = entryText(change.description, 'description', 4000, true)!;
+  if (change.prompt !== undefined) entry.prompt = entryText(change.prompt, 'prompt', 4000, true)!;
+  if (change.tags !== undefined) entry.tags = parseTags(change.tags);
   await saveLibrarySet(root, entry);
   return entry;
 }

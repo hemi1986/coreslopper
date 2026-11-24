@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { parse, stringify } from 'yaml';
 import { loadProject } from '@coreslopper/core';
-import { addLibrarySet, addLibrarySetFile, importSets, loadLibrarySet, setEntryDir, useSet } from '../packages/cli/src/set-library.ts';
+import { addLibrarySet, addLibrarySetFile, importSets, loadLibrarySet, setEntryDir, updateLibrarySet, useSet } from '../packages/cli/src/set-library.ts';
 import { createProject } from '../packages/cli/src/new-project.ts';
 import { createEpisode, createSeriesCanon } from '../packages/cli/src/board-wizard.ts';
 import { validateChangedFile } from '../packages/cli/src/validate-file.ts';
@@ -62,6 +62,85 @@ describe('adding a library set by hand', () => {
     const ws = await workspace();
     await expect(addLibrarySet(ws, { name: 'Neon Bar', description: 'a narrow bar in blue neon' })).rejects.toThrow(/prompt is required/);
     expect(existsSync(join(ws, 'library', 'sets', 'neon-bar'))).toBe(false);
+  });
+});
+
+describe('updating a library set', () => {
+  async function withBar(): Promise<string> {
+    const ws = await workspace();
+    await addLibrarySet(ws, { name: 'bar', description: 'a bar', prompt: 'narrow bar, blue neon' });
+    return ws;
+  }
+
+  it('ST-029: The description is corrected', async () => {
+    const ws = await withBar();
+
+    const entry = await updateLibrarySet(ws, 'bar', { description: 'a narrow bar in blue neon' });
+
+    expect(entry).toMatchObject({ id: 'bar', name: 'bar', description: 'a narrow bar in blue neon', prompt: 'narrow bar, blue neon' });
+    expect(await loadLibrarySet(ws, 'bar')).toMatchObject({ id: 'bar', description: 'a narrow bar in blue neon' });
+    expect(await validateChangedFile(join(setEntryDir(ws, 'bar'), 'set.yaml'))).toBe('library set');
+  });
+
+  it('ST-029: An emptied prompt is refused', async () => {
+    const ws = await withBar();
+
+    await expect(updateLibrarySet(ws, 'bar', { prompt: '' })).rejects.toThrow(/prompt is required/);
+
+    expect((await loadLibrarySet(ws, 'bar')).prompt).toBe('narrow bar, blue neon');
+  });
+
+  it('changes the name and the tags, and keeps the id', async () => {
+    const ws = await withBar();
+
+    const entry = await updateLibrarySet(ws, 'bar', { name: 'Neon Bar', tags: 'bar, night,neon' });
+
+    expect(entry).toMatchObject({ id: 'bar', name: 'Neon Bar', tags: ['bar', 'night', 'neon'] });
+    expect(await loadLibrarySet(ws, 'bar')).toMatchObject({ id: 'bar', name: 'Neon Bar', description: 'a bar', prompt: 'narrow bar, blue neon', tags: ['bar', 'night', 'neon'] });
+    expect(existsSync(join(ws, 'library', 'sets', 'neon-bar'))).toBe(false);
+  });
+
+  it('writes a new prompt', async () => {
+    const ws = await withBar();
+
+    const entry = await updateLibrarySet(ws, 'bar', { prompt: 'narrow bar, blue neon, wet counter' });
+
+    expect(entry.prompt).toBe('narrow bar, blue neon, wet counter');
+    expect((await loadLibrarySet(ws, 'bar')).prompt).toBe('narrow bar, blue neon, wet counter');
+  });
+
+  it('refuses an empty name or description', async () => {
+    const ws = await withBar();
+
+    await expect(updateLibrarySet(ws, 'bar', { name: '  ' })).rejects.toThrow(/name is required/);
+    await expect(updateLibrarySet(ws, 'bar', { description: '' })).rejects.toThrow(/description is required/);
+
+    expect(await loadLibrarySet(ws, 'bar')).toMatchObject({ name: 'bar', description: 'a bar' });
+  });
+
+  it('keeps the files, plates and history', async () => {
+    const ws = await withBar();
+    const image = join(ws, 'counter.png');
+    await writeFile(image, 'counter');
+    await addLibrarySetFile(ws, 'bar', image, { role: 'ref' });
+    await addLibrarySetFile(ws, 'bar', image, { role: 'plate', angle: 'counter, frontal' });
+    const before = await loadLibrarySet(ws, 'bar');
+
+    const entry = await updateLibrarySet(ws, 'bar', { description: 'a narrow bar in blue neon' });
+
+    expect(entry.refs).toEqual(['counter.png']);
+    expect(entry.plates).toEqual(before.plates);
+    expect(entry.history).toEqual(before.history);
+    expect(entry).toMatchObject({ id: 'bar', origin: 'manual', added: before.added });
+    expect(existsSync(join(setEntryDir(ws, 'bar'), 'counter.png'))).toBe(true);
+  });
+
+  it('refuses a change that is not an object', async () => {
+    const ws = await withBar();
+
+    await expect(updateLibrarySet(ws, 'bar', null as never)).rejects.toThrow(/an update takes/);
+
+    expect((await loadLibrarySet(ws, 'bar')).description).toBe('a bar');
   });
 });
 
