@@ -261,7 +261,7 @@ Everything a finished song and video need to be published, collected in the **Re
 _Avoid_: deliverables, export bundle
 
 **Distribution**:
-`distribution` in `project.yaml`: `public` (the default) for a project released on the platforms, `internal` for one that never is – a teaser sent by mail or chat. An internal project gets no **Release Package** and no **Release Calendar**: `qa` skips the thumbnail, Shorts, upload and release-package checks, and the project is finished once every stage is done. An earlier calendar stays on disk but books no release day and no slot for another project's plan. `new <slug> --distribution internal` and the board wizard write it; unset is `public`.
+`distribution` in `project.yaml`: `public` (the default) for a project released on the platforms, `internal` for one that never is – a teaser sent by mail or chat. An internal project gets no **Release Package** and no **Release Calendar**: `qa` skips the thumbnail, Shorts, upload and release-package checks, and the project is finished once every stage is done. An earlier calendar stays on disk but books no release day and no slot for another project's plan. The release autopilot leaves an internal project alone: it posts nothing of it, also with an approval from before it became internal, and `release-run --plan` lists no event of it; the autopilot log and the earlier files stay as they are. `new <slug> --distribution internal` and the board wizard write it; unset is `public`.
 _Avoid_: release mode, visibility (a platform's privacy setting)
 
 **Release Folder**:

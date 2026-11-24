@@ -109,7 +109,7 @@ Length and aspect ratio need `ffprobe`; without it the dry run warns that they a
 
 ## Release autopilot
 
-The release autopilot posts an approved release by API at its calendar times, so you do not log in to each platform ([ADR 0029](adr/0029-release-autopilot.md)). Releasing stays one click: **Approve release** on the release board (or `npm run cli -- release-approve <project>`). A proposed release day becomes `release.release_date` in `project.yaml` with that click. The approval holds for that day: when the release moves, nothing goes out until you approve the new day. **Withdraw approval** stops everything that has not gone out. The board takes writes only from its own page on 127.0.0.1, so another website open in your browser cannot approve a release.
+The release autopilot posts an approved release by API at its calendar times, so you do not log in to each platform ([ADR 0029](adr/0029-release-autopilot.md)). A project with `distribution: internal` is left alone: it posts nothing of it, also with an approval from before it became internal, and `release-run --plan` lists no event of it. Releasing stays one click: **Approve release** on the release board (or `npm run cli -- release-approve <project>`). A proposed release day becomes `release.release_date` in `project.yaml` with that click. The approval holds for that day: when the release moves, nothing goes out until you approve the new day. **Withdraw approval** stops everything that has not gone out. The board takes writes only from its own page on 127.0.0.1, so another website open in your browser cannot approve a release.
 
 ```bash
 docker compose up -d                    # the board container: runs the watchdog every 5 minutes

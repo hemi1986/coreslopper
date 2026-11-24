@@ -16,6 +16,7 @@ import { loadCalendar, loadStatus, updateStatus } from '../packages/cli/src/rele
 import { publishProject, youtubeDescription } from '../packages/cli/src/publish.ts';
 import {
   approveRelease,
+  autopilotOverview,
   loadAutopilotLog,
   retryEvent,
   revokeApproval,
@@ -27,7 +28,7 @@ import { boardProject } from '../packages/cli/src/release-board-data.ts';
 import { appendAutopilotEntry } from '../packages/cli/src/autopilot-state.ts';
 import { boardHandler } from '../packages/cli/src/release-board.ts';
 import { timerPlan } from '../packages/cli/src/release-timer.ts';
-import { cleanupFixtures, fakeDeps, fixture, memeFixture } from './helpers/release-fixture.ts';
+import { cleanupFixtures, fakeDeps, fixture, memeFixture, setDistribution, siblingCalendar } from './helpers/release-fixture.ts';
 
 afterEach(async () => {
   vi.unstubAllEnvs();
@@ -262,6 +263,19 @@ describe('release autopilot', () => {
     expect(t.lines.join('\n')).toContain('approve it again');
   });
 
+  it('prints the plan of every release with a calendar, approved or not', async () => {
+    const t = await setup();
+    const approved = new Date(t.at('distributor'));
+    await approveRelease(t.dir, { root: t.root, now: approved });
+    const lines: string[] = [];
+
+    await autopilotOverview(t.root, { now: approved, env: ENV, log: (line) => void lines.push(line) });
+
+    expect(lines[0]).toBe(`neon: approved ${approved.toISOString().slice(0, 10)} (release ${t.calendar.release_date})`);
+    expect(lines).toContainEqual(expect.stringMatching(/^\s+\d{4}-\d{2}-\d{2} \d{2}:\d{2}\s+youtube\s+\w+/));
+    expect(lines.join('\n')).not.toContain('← you');
+  });
+
   it('posts the pinned comment once when the user ticks the main video off first', async () => {
     const t = await setup();
     await approveRelease(t.dir, { root: t.root, now: new Date(t.at('distributor')) });
@@ -381,6 +395,51 @@ describe('release autopilot', () => {
     expect((await call(handler, 'POST', '/api/projects/neon/approve', {}, { ...BOARD_HEADERS, 'sec-fetch-site': 'cross-site' })).status).toBe(403);
     expect((await loadStatus(t.dir)).approval).toBeUndefined();
     expect((await call(handler, 'POST', '/api/projects/neon/approve', {})).status).toBe(200);
+  });
+});
+
+describe('an internal project and the autopilot', () => {
+  it('ST-041: An approved internal project posts nothing', async () => {
+    const t = await setup();
+    await approveRelease(t.dir, { root: t.root, now: new Date(t.at('distributor')) });
+    await setDistribution(t.dir, 'internal');
+    t.moveTo('announce:x');
+
+    const result = await t.run();
+
+    expect(result.projects[0]).toMatchObject({ slug: 'neon', acted: [] });
+    expect(t.social.get('x')!.calls).toEqual([]);
+    expect((await loadAutopilotLog(t.dir)).entries).toEqual([]);
+    expect(t.lines.join('\n')).toContain('not released publicly');
+  });
+
+  it('ST-041: The plan lists no event of an internal project', async () => {
+    const t = await setup();
+    const now = new Date(t.at('distributor'));
+    await approveRelease(t.dir, { root: t.root, now });
+    await setDistribution(t.dir, 'internal');
+    // A public project beside it keeps its plan: the internal one is skipped, not the printer.
+    await siblingCalendar(t.dir, 'other', { release_date: '2026-12-04', shortDay: '2026-12-11' });
+    const lines: string[] = [];
+
+    await autopilotOverview(t.root, { now, env: ENV, log: (line) => void lines.push(line) });
+
+    expect(lines).toContain('neon is not released publicly (distribution: internal); nothing to plan');
+    expect(lines.filter((line) => line.includes('announce:x'))).toEqual([]);
+    expect(lines).toContain('other: not approved (release 2026-12-04)');
+    expect(lines.join('\n')).toContain('short:Z1-intro:youtube');
+  });
+
+  it('ST-041: An approved public project still posts', async () => {
+    const t = await setup();
+    await approveRelease(t.dir, { root: t.root, now: new Date(t.at('distributor')) });
+    t.moveTo('announce:x');
+
+    const result = await t.run();
+
+    const entries = (await loadAutopilotLog(t.dir)).entries.filter((entry) => entry.event === 'announce:x');
+    expect(entries.map((entry) => entry.status)).toEqual(['running', 'posted']);
+    expect(result.projects[0]).toMatchObject({ approved: true, acted: [{ id: 'announce:x', status: 'posted' }] });
   });
 });
 

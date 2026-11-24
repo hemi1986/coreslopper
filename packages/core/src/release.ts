@@ -27,6 +27,11 @@ export function releasedPublicly(config: Pick<ProjectConfig, 'distribution'>): b
   return config.distribution !== 'internal';
 }
 
+/** The one wording for a project with `distribution: internal`, for every command that leaves it alone. */
+export function notReleasedPublicly(slug: string): string {
+  return `${slug} is not released publicly (distribution: internal)`;
+}
+
 /** A link value that still holds the `<ID>` placeholder. */
 export const PLACEHOLDER = /<ID>/;
 

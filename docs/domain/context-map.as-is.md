@@ -410,7 +410,8 @@ Boundaries:
 ### BC-Publish – Publishing
 Purpose (as recovered, decided by recommendation HS-183): gets an approved release onto the platforms – the publish
 command uploads by hand, privately or as drafts; the release autopilot posts every calendar event a platform API can
-post at its time once the user approved the release, without ever posting twice; the platform credentials and the
+post at its time once the user approved the release, without ever posting twice, and leaves a project with
+`distribution: internal` alone (its plan lists no event of it); the platform credentials and the
 watchdog round that runs it every few minutes (ADR 0023, ADR 0029, ADR 0031, ADR 0046 proposed).
 Core terms: Publish, Post, Platform, Publish Adapter, Post Adapter, Publish Log, Publish Plan, Draft, Platform
 Credentials, Release Autopilot, Autopilot State, Autopilot Log, Take-over, Stuck Post, Missed Post, Pinned Comment,
