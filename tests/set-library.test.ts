@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { cp, mkdir, mkdtemp, readFile, readdir, rm, truncate, writeFile } from 'node:fs/promises';
+import { chmod, cp, mkdir, mkdtemp, readFile, readdir, rm, truncate, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -313,6 +313,32 @@ describe('removing a file from a library set', () => {
     expect(await readdir(setEntryDir(ws, 'bar'))).toEqual(['set.yaml']);
   });
 
+  it('removes both plates that name one stored image', async () => {
+    const ws = await workspace();
+    await addLibrarySet(ws, { name: 'bar', description: 'a bar', prompt: 'narrow bar, blue neon' });
+    const image = join(ws, 'counter.png');
+    await writeFile(image, 'counter');
+    await addLibrarySetFile(ws, 'bar', image, { role: 'plate', angle: 'counter, frontal', plate: 'counter' });
+    await addLibrarySetFile(ws, 'bar', image, { role: 'plate', angle: 'counter, wide', plate: 'wide' });
+    expect((await loadLibrarySet(ws, 'bar')).plates.map((plate) => plate.file)).toEqual(['counter.png', 'counter.png']);
+
+    const entry = await removeLibrarySetFile(ws, 'bar', 'counter.png');
+
+    expect(entry.plates).toEqual([]);
+    expect(await readdir(setEntryDir(ws, 'bar'))).toEqual(['set.yaml']);
+  });
+
+  it('repairs an entry whose named file is already gone', async () => {
+    const { ws, dir } = await withPlates();
+    await rm(join(dir, 'counter.png'));
+
+    const entry = await removeLibrarySetFile(ws, 'bar', 'counter.png');
+
+    expect(entry.plates.map((plate) => plate.id)).toEqual(['door']);
+    expect(existsSync(join(dir, 'counter.png'))).toBe(false);
+    expect(await validateChangedFile(join(dir, 'set.yaml'))).toBe('library set');
+  });
+
   it('refuses a name that is not a plain file of the entry', async () => {
     const { ws, dir } = await withPlates();
 
@@ -322,6 +348,21 @@ describe('removing a file from a library set', () => {
 
     expect((await readdir(dir)).sort()).toEqual(['counter.png', 'door.png', 'set.yaml']);
     expect((await loadLibrarySet(ws, 'bar')).plates).toHaveLength(2);
+  });
+
+  const guarded = process.getuid?.() === 0;
+  it.skipIf(guarded)('keeps the entry and the file when the folder refuses the move', async () => {
+    const { ws, dir } = await withPlates();
+    const before = await readFile(join(dir, 'set.yaml'), 'utf8');
+    await chmod(dir, 0o500);
+    try {
+      await expect(removeLibrarySetFile(ws, 'bar', 'counter.png')).rejects.toThrow(/EACCES|permission/i);
+    } finally {
+      await chmod(dir, 0o700);
+    }
+
+    expect(await readFile(join(dir, 'set.yaml'), 'utf8')).toBe(before);
+    expect((await readdir(dir)).sort()).toEqual(['counter.png', 'door.png', 'set.yaml']);
   });
 });
 

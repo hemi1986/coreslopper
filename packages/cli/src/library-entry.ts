@@ -65,6 +65,18 @@ export async function libraryTargetKind(dir: string): Promise<LibraryTargetKind 
   return existsSync(join(dir, 'series.yaml')) ? 'series' : undefined;
 }
 
+/**
+ * A name that may be taken out of an entry (`character remove-file`, `set
+ * remove --file`): a plain file of the entry's folder, never its entry file or
+ * a staged copy (a dot file).
+ */
+export function checkEntryFileName(kind: LibraryEntryKind, name: unknown): string {
+  if (typeof name !== 'string' || name !== basename(name) || name === KINDS[kind].file || name.startsWith('.')) {
+    throw new ValidationError('name a file of the entry');
+  }
+  return name;
+}
+
 export function entryText(value: unknown, field: string, max: number, required = false): string | undefined {
   if (value === undefined || value === null || value === '') {
     if (required) throw new ValidationError(`${field} is required`);
