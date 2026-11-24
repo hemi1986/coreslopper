@@ -87,6 +87,19 @@ export async function addLibrarySet(root: string, input: NewLibrarySet, now = ne
   return entry;
 }
 
+/**
+ * CMD-UpdateLibrarySet (the board's form): change a set's name, description,
+ * prompt and tags (EVT-LibrarySetUpdated). The id stays, so productions that
+ * took the set keep their `library` link; name, description and prompt stay
+ * required, as in a set bible.
+ */
+export async function updateLibrarySet(root: string, id: string, change: Partial<NewLibrarySet>): Promise<LibrarySet> {
+  const entry = await loadLibrarySet(root, id);
+  if (change.description !== undefined) entry.description = entryText(change.description, 'description', 4000, true)!;
+  await saveLibrarySet(root, entry);
+  return entry;
+}
+
 export type SetFileRole = 'ref' | 'plate';
 
 export interface SetFileOptions {

@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { parse, stringify } from 'yaml';
 import { loadProject } from '@coreslopper/core';
-import { addLibrarySet, addLibrarySetFile, importSets, loadLibrarySet, setEntryDir, useSet } from '../packages/cli/src/set-library.ts';
+import { addLibrarySet, addLibrarySetFile, importSets, loadLibrarySet, setEntryDir, updateLibrarySet, useSet } from '../packages/cli/src/set-library.ts';
 import { createProject } from '../packages/cli/src/new-project.ts';
 import { createEpisode, createSeriesCanon } from '../packages/cli/src/board-wizard.ts';
 import { validateChangedFile } from '../packages/cli/src/validate-file.ts';
@@ -62,6 +62,24 @@ describe('adding a library set by hand', () => {
     const ws = await workspace();
     await expect(addLibrarySet(ws, { name: 'Neon Bar', description: 'a narrow bar in blue neon' })).rejects.toThrow(/prompt is required/);
     expect(existsSync(join(ws, 'library', 'sets', 'neon-bar'))).toBe(false);
+  });
+});
+
+describe('updating a library set', () => {
+  async function withBar(): Promise<string> {
+    const ws = await workspace();
+    await addLibrarySet(ws, { name: 'bar', description: 'a bar', prompt: 'narrow bar, blue neon' });
+    return ws;
+  }
+
+  it('ST-029: The description is corrected', async () => {
+    const ws = await withBar();
+
+    const entry = await updateLibrarySet(ws, 'bar', { description: 'a narrow bar in blue neon' });
+
+    expect(entry).toMatchObject({ id: 'bar', name: 'bar', description: 'a narrow bar in blue neon', prompt: 'narrow bar, blue neon' });
+    expect(await loadLibrarySet(ws, 'bar')).toMatchObject({ id: 'bar', description: 'a narrow bar in blue neon' });
+    expect(await validateChangedFile(join(setEntryDir(ws, 'bar'), 'set.yaml'))).toBe('library set');
   });
 });
 
