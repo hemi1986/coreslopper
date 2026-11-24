@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, readFile, readdir, cp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, relative, sep } from 'node:path';
+import { dirname, join, relative, sep } from 'node:path';
 import { parse, stringify } from 'yaml';
 import { ProjectConfigSchema, ReleaseManifestSchema, createInitialState } from '../../packages/core/src/index.ts';
 import type { ReleaseDeps } from '../../packages/cli/src/release.ts';
@@ -105,6 +105,42 @@ export function uploadYaml() {
     },
     microsite: { teaser: 'Zwölf Sekunden Neonregen.', text: 'Ein Spaziergang im Regen.', quote: 'Neon im Regen' },
   };
+}
+
+/**
+ * `distribution: internal` (or another value; `undefined` removes it) in a
+ * fixture's project.yaml. Call it after `buildRelease`, so the earlier release
+ * folder and calendar stay on disk like a project that became internal later.
+ */
+export async function setDistribution(projectDir: string, distribution: string | undefined): Promise<void> {
+  const path = join(projectDir, 'project.yaml');
+  const config = parse(await readFile(path, 'utf8')) as Record<string, unknown>;
+  if (distribution === undefined) delete config.distribution;
+  else config.distribution = distribution;
+  await writeFile(path, stringify(config));
+}
+
+/** A project beside the fixture's, with an earlier calendar and the given distribution. */
+export async function siblingCalendar(
+  projectDir: string,
+  slug: string,
+  calendar: { release_date: string; distribution?: string; shortDay?: string },
+): Promise<{ path: string; text: string }> {
+  const dir = join(dirname(projectDir), slug);
+  await mkdir(join(dir, 'review'), { recursive: true });
+  const config = parse(await readFile(join(projectDir, 'project.yaml'), 'utf8')) as Record<string, unknown>;
+  delete config.release;
+  config.slug = slug;
+  if (calendar.distribution) config.distribution = calendar.distribution;
+  else delete config.distribution;
+  await writeFile(join(dir, 'project.yaml'), stringify(config));
+  const events = calendar.shortDay
+    ? [{ id: 'short:Z1-intro:youtube', at: `${calendar.shortDay}T18:00:00+01:00`, platform: 'shorts', step: 'short', item: 'Z1-intro' }]
+    : [];
+  const path = join(dir, 'review', 'calendar.yaml');
+  const text = stringify({ version: 1, project: slug, title: slug, release_date: calendar.release_date, proposed: false, timezone: 'Europe/Berlin', events });
+  await writeFile(path, text);
+  return { path, text };
 }
 
 /** A project from the demo's text files, with placeholder renders, stills, and Shorts. */

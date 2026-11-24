@@ -28,7 +28,7 @@ import { boardProject } from '../packages/cli/src/release-board-data.ts';
 import { appendAutopilotEntry } from '../packages/cli/src/autopilot-state.ts';
 import { boardHandler } from '../packages/cli/src/release-board.ts';
 import { timerPlan } from '../packages/cli/src/release-timer.ts';
-import { cleanupFixtures, fakeDeps, fixture, memeFixture } from './helpers/release-fixture.ts';
+import { cleanupFixtures, fakeDeps, fixture, memeFixture, setDistribution, siblingCalendar } from './helpers/release-fixture.ts';
 
 afterEach(async () => {
   vi.unstubAllEnvs();
@@ -53,14 +53,6 @@ const ENV = {
   INSTAGRAM_TOKEN_EXPIRES_AT: '2027-06-01T00:00:00Z',
   FAL_KEY: 'fal',
 };
-
-/** The project becomes internal after its release package and approval exist: the earlier files stay on disk. */
-async function setDistribution(projectDir: string, distribution: string): Promise<void> {
-  const path = join(projectDir, 'project.yaml');
-  const config = parse(await readFile(path, 'utf8')) as Record<string, unknown>;
-  config.distribution = distribution;
-  await writeFile(path, stringify(config));
-}
 
 /** An approved release with the mock adapters and a clock the test moves. */
 async function setup(options: { env?: Record<string, string>; meme?: boolean | { licence?: string; credit?: string } } = {}) {
@@ -426,11 +418,16 @@ describe('an internal project and the autopilot', () => {
     const now = new Date(t.at('distributor'));
     await approveRelease(t.dir, { root: t.root, now });
     await setDistribution(t.dir, 'internal');
+    // A public project beside it keeps its plan: the internal one is skipped, not the printer.
+    await siblingCalendar(t.dir, 'other', { release_date: '2026-12-04', shortDay: '2026-12-11' });
     const lines: string[] = [];
 
     await autopilotOverview(t.root, { now, env: ENV, log: (line) => void lines.push(line) });
 
-    expect(lines.filter((line) => /^\s+\d{4}-\d{2}-\d{2} /.test(line))).toEqual([]);
+    expect(lines).toContain('neon is not released publicly (distribution: internal); nothing to plan');
+    expect(lines.filter((line) => line.includes('announce:x'))).toEqual([]);
+    expect(lines).toContain('other: not approved (release 2026-12-04)');
+    expect(lines.join('\n')).toContain('short:Z1-intro:youtube');
   });
 
   it('ST-041: An approved public project still posts', async () => {

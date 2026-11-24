@@ -1177,7 +1177,7 @@ events:
     name: Autopilot round run
     aggregate: AGG-AutopilotRound
     data: [At, Every, Projects, Acted, Needs the user, Locked]
-    description: "release-run, inside every watchdog round: for each approved project the pending YouTube uploads, then the due events in order, then the pinned comment; .cache/release-run.last records it (packages/cli/src/release-autopilot.ts:190-292)"
+    description: "release-run, inside every watchdog round: for each approved publicly released project the pending YouTube uploads, then the due events in order, then the pinned comment; an internal project is left alone; .cache/release-run.last records it (packages/cli/src/release-autopilot.ts:199-303)"
   - id: EVT-PostClaimed
     name: Post claimed
     aggregate: AGG-AutopilotLog
@@ -2183,9 +2183,9 @@ commands:
     produces: [EVT-AutopilotRoundRun]
     description: "release-run [--project] [--dry-run] [--plan], run by every watchdog round (watch, from the board container or release-timer); stage runners, /video-next and agents never run it (ADR 0029). The user means to run the board container (user, 2026-11-22)"
     rules:
-      - A round for a project whose approval does not hold does nothing and says why (the code does this, release-autopilot.ts:237-240)
+      - A round for a project whose approval does not hold does nothing and says why (the code does this, release-autopilot.ts:251-254)
       - A round leaves a project with distribution internal alone – it posts nothing of it, also with an approval from before it became internal, and its plan lists no event of it (user, 2026-11-22, ST-041)
-      - The pending YouTube uploads are read first, so the posts that link to the main video follow in the same round; then the due events, earliest first (the code does this, release-autopilot.ts:242-288)
+      - The pending YouTube uploads are read first, so the posts that link to the main video follow in the same round; then the due events, earliest first (the code does this, release-autopilot.ts:256-302)
       - An error in the autopilot does not stop the production scan of the same watchdog round (the code does this, packages/cli/src/production-watch.ts:99-126)
   - id: CMD-PostCalendarEvent
     name: Post a calendar event
@@ -2774,7 +2774,7 @@ read_models:
     fed_by: [EVT-ReleaseCalendarPlanned, EVT-ReleaseApproved, EVT-PostClaimed, EVT-CalendarEventPosted, EVT-PostAttemptFailed]
     used_by: [ACT-User]
     fields: [Project, Event, Time, Platform, Action, Autopilot state, Due at]
-    description: "release-run --plan: every calendar event of every project with a calendar and its state (release-autopilot.ts:509-525)"
+    description: "release-run --plan: every calendar event of every publicly released project with a calendar and its state; a project with distribution internal gets one skip line and none of its earlier calendar's events (release-autopilot.ts:534-555)"
   - id: RM-PublishPlan
     name: Publish plan
     fed_by: [EVT-PublishPlanned, EVT-VideoUploaded]

@@ -399,7 +399,7 @@ program
   )
   .option('--project <slug>', 'Only this project')
   .option('--dry-run', 'Print what is due; post and write nothing')
-  .option('--plan', 'Print every release event of every project with a calendar, approved or not, with its state, and stop')
+  .option('--plan', 'Print every release event of every publicly released project with a calendar, approved or not, with its state, and stop')
   .action((options: { project?: string; dryRun?: boolean; plan?: boolean }) =>
     run(async () => {
       const { autopilotOverview, runAutopilot } = await import('./release-autopilot.js');

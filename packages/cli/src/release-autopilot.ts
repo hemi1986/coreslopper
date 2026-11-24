@@ -10,6 +10,7 @@ import {
   approvalHolds,
   autopilotAttention,
   mainVideoId,
+  notReleasedPublicly,
   planAutopilot,
   plainLyrics,
   releasedPublicly,
@@ -167,7 +168,13 @@ export interface AutopilotOptions {
 }
 
 export interface AutopilotRunResult {
-  projects: { slug: string; approved: boolean; acted: { id: string; status: AutopilotEntry['status']; url?: string; error?: string }[]; attention: AutopilotEventPlan[] }[];
+  projects: {
+    slug: string;
+    /** The user's approval holds for the calendar; only a publicly released project is acted on. */
+    approved: boolean;
+    acted: { id: string; status: AutopilotEntry['status']; url?: string; error?: string }[];
+    attention: AutopilotEventPlan[];
+  }[];
   /** Another run held the lock. */
   locked?: boolean;
 }
@@ -223,8 +230,8 @@ async function runProject(dir: string, slug: string, options: AutopilotOptions, 
   let context = await projectReleaseContext(dir, options.root);
   // A project that is no longer released publicly is left alone, also with an approval from before (ST-041).
   if (!releasedPublicly(context.project.config)) {
-    deps.log(`${slug}: not released publicly (distribution: internal); nothing to post`);
-    return { slug, approved: false, acted, attention: [] };
+    deps.log(`${notReleasedPublicly(slug)}; nothing to post`);
+    return { slug, approved: Boolean(context.calendar && approvalHolds(context.status, context.calendar)), acted, attention: [] };
   }
   const settings = context.schedule.autopilot;
   const { ready } = autopilotReadiness(settings, deps.env, deps.now());
@@ -529,12 +536,12 @@ export async function autopilotOverview(root: string, options: { now?: Date; env
   const now = options.now ?? new Date();
   for (const dir of await boardProjectDirs(root)) {
     const context = await projectReleaseContext(dir, root);
+    if (!context.calendar) continue;
     // A project that is no longer released publicly has no plan, even with an earlier calendar on disk (ST-041).
     if (!releasedPublicly(context.project.config)) {
-      log(`${context.project.config.slug}: not released publicly (distribution: internal); nothing to plan`);
+      log(`${notReleasedPublicly(context.input.slug)}; nothing to plan`);
       continue;
     }
-    if (!context.calendar) continue;
     const settings = context.schedule.autopilot;
     const { ready, notes } = autopilotReadiness(settings, options.env, now);
     const plans = planAutopilot({ calendar: context.calendar, status: context.status, log: await loadAutopilotLog(dir), settings, now, ready, premiere: context.input.premiere });

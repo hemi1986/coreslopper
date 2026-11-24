@@ -19,6 +19,7 @@ import {
   loadReleaseSchedule,
   loadProject,
   libraryTakeSoundId,
+  notReleasedPublicly,
   platformLimits,
   platformTextProblems,
   plainLyrics,
@@ -251,7 +252,7 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
   const deps = { ...(await defaultDeps()), ...options.deps };
   const project = await loadProject(options.projectDir);
   if (!releasedPublicly(project.config)) {
-    throw new ValidationError(`${project.config.slug} is not released publicly (distribution: internal): it gets no release package.`);
+    throw new ValidationError(`${notReleasedPublicly(project.config.slug)}: it gets no release package.`);
   }
   const root = options.root ?? repoRoot();
   const kind = project.config.kind;
@@ -646,7 +647,7 @@ export async function runRelease(options: ReleaseOptions): Promise<ReleaseResult
   const log = options.deps?.log ?? ((line: string) => console.log(line));
   const { config } = await loadProject(options.projectDir);
   if (!releasedPublicly(config)) {
-    log(`${config.slug} is not released publicly (distribution: internal): no release folder, no release calendar.`);
+    log(`${notReleasedPublicly(config.slug)}: no release folder, no release calendar.`);
     return undefined;
   }
   const result = await buildRelease(options);
