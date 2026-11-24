@@ -7,7 +7,7 @@ import { dirname, join } from 'node:path';
 import { Readable } from 'node:stream';
 import { parse, stringify } from 'yaml';
 import { ValidationError, loadProject } from '@coreslopper/core';
-import { addLibrarySet, addLibrarySetFile, importSets, listLibrarySets, loadLibrarySet, removeLibrarySet, removeLibrarySetFile, setEntryDir, updateLibrarySet, useSet } from '../packages/cli/src/set-library.ts';
+import { addLibrarySet, addLibrarySetFile, importSets, listLibrarySets, loadLibrarySet, removeLibrarySet, removeLibrarySetFile, setEntryDir, setListLines, updateLibrarySet, useSet } from '../packages/cli/src/set-library.ts';
 import { createProject } from '../packages/cli/src/new-project.ts';
 import { boardHandler } from '../packages/cli/src/release-board.ts';
 import { createEpisode, createSeriesCanon } from '../packages/cli/src/board-wizard.ts';
@@ -470,6 +470,17 @@ function runSetCli(ws: string, args: string[]) {
 }
 
 describe('the set command', () => {
+  it('set list prints every set with its files and where it is used', async () => {
+    const ws = await cliWorkspace();
+    await libraryBar(ws);
+
+    const result = runSetCli(ws, ['list']);
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain('bar                  Bar');
+    expect(result.stdout).toContain('0 refs · 1 plate: counter');
+  });
+
   it('set remove <id> deletes the set from the library', async () => {
     const ws = await cliWorkspace();
     await libraryBar(ws);
@@ -1058,6 +1069,30 @@ describe('the set library read model', () => {
 
     expect(listing.sets.map((entry) => entry.id)).toEqual(['bar']);
     expect(listing.errors.map((error) => error.id)).toEqual(['broken']);
+  });
+
+  it('prints one block per set with its files, tags, and productions, then the entries that do not load', async () => {
+    const ws = await cliWorkspace();
+    await libraryBarWith(ws, ['start.png'], [{ id: 'counter', angle: 'counter, frontal' }]);
+    await addLibrarySet(ws, { name: 'Front', description: 'a shop front', prompt: 'shop front, neon', tags: 'street, neon' });
+    await video(ws, 'neon-rain');
+    await useSet(ws, join(ws, 'projects', 'neon-rain'), 'bar');
+    await mkdir(join(ws, 'library', 'sets', 'broken'), { recursive: true });
+    await writeFile(join(ws, 'library', 'sets', 'broken', 'set.yaml'), 'version: 1\nid: broken\n');
+
+    expect(setListLines(await listLibrarySets(ws))).toEqual([
+      'bar                  Bar',
+      '  A narrow bar in blue neon. · 1 ref · 1 plate: counter',
+      '  from manual · used in neon-rain',
+      'front                Front',
+      '  a shop front · 0 refs · 0 plates · tags: street, neon',
+      '  from manual',
+      expect.stringMatching(/^✖ broken: /),
+    ]);
+  });
+
+  it('says how to add a set when the library is empty', async () => {
+    expect(setListLines({ sets: [], errors: [] })).toEqual(['The library has no sets yet. `set import <project>` takes a set bible in, or `set new` adds one by hand.']);
   });
 });
 

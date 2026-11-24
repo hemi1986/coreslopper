@@ -108,6 +108,32 @@ export async function listLibrarySets(root: string): Promise<{ sets: LibrarySetE
   return { sets, errors };
 }
 
+/** The table of `set list`: one block per set (what it is, its files, where it is used), then the entries that did not load; a hint when nothing is there. */
+export function setListLines(listing: { sets: LibrarySetEntry[]; errors: { id: string; error: string }[] }): string[] {
+  if (!listing.sets.length && !listing.errors.length) {
+    return ['The library has no sets yet. `set import <project>` takes a set bible in, or `set new` adds one by hand.'];
+  }
+  const lines: string[] = [];
+  for (const set of listing.sets) {
+    const plates = set.plates.map((plate) => plate.id).join(', ');
+    const used = set.usedIn.map((use) => `${use.scope === 'series' ? 'series/' : ''}${use.slug}`).join(', ');
+    lines.push(
+      `${set.id.padEnd(20)} ${set.name}`,
+      `  ${[
+        set.description,
+        `${set.refs.length} ${set.refs.length === 1 ? 'ref' : 'refs'}`,
+        `${set.plates.length} ${set.plates.length === 1 ? 'plate' : 'plates'}${plates ? `: ${plates}` : ''}`,
+        set.tags.length ? `tags: ${set.tags.join(', ')}` : '',
+      ]
+        .filter(Boolean)
+        .join(' · ')}`,
+      `  from ${set.origin}${used ? ` · used in ${used}` : ''}`,
+    );
+  }
+  for (const error of listing.errors) lines.push(`✖ ${error.id}: ${error.error}`);
+  return lines;
+}
+
 /**
  * Whether the id is taken: its entry exists, or its folder holds files the
  * entry would not name (the aggregate's "every file in the entry's folder is

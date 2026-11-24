@@ -85,6 +85,8 @@ Plates, prop references, and character states are the continuity references ([AD
 
 Characters from the workspace's character library ([ADR 0034](adr/0034-character-library.md)) arrive in `characters.yaml` with `library: <id>`, taken during setup or the brief (`character use`, or the board); the character bible keeps their sheet and references and adds what this video needs. `stage-done … style-character` takes the finished characters back into the library.
 
+Sets from the workspace's set library ([ADR 0052](adr/0052-set-library.md)) arrive in `sets.yaml` with `library: <id>`, taken during the brief or while grilling (`set use`, or the board's set page); the set bible keeps their references and every plate and adds what this production needs on top. `stage-done … style-character` takes the finished sets back into the library.
+
 ## 6. Storyboard
 
 - Skill: `storyboard`

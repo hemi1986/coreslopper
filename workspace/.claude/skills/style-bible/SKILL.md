@@ -39,7 +39,7 @@ license: MIT
 
 A **plate** is an empty frame of a set from one fixed camera angle; a **prop reference** is the one look of a recurring object (see `docs/glossary.md` and ADR 0025). Keyframes in a plate's framing are edits of the plate, so geometry and light stay the same across shots.
 
-1. List the sets from the treatment: per set `id`, `name`, `description`, and `prompt`.
+1. List the sets from the treatment: per set `id`, `name`, `description`, and `prompt`. A set that names a library set in `library` already holds that set's references and every plate: keep them and add only the plates and props this production needs on top.
 2. Per set, list the camera angles the treatment needs more than once, as `plates`: `id`, `angle` (position, height, lens, framing), and an optional `prompt`. Typical: a wide establishing angle, a medium angle on the main action spot, a close angle where objects are handled. Three to five per set is usual.
 3. List the recurring objects as `props`: `id`, `name`, a `description` concrete enough to draw it the same way twice (shape, colour, material, size, what is attached and where), and an optional `prompt`.
 4. Generate each plate empty, with no character, in the set's light and the style's look, at the master format's size; generate each prop alone on a neutral ground. File plates under `sets/<set>/plates/<id>.png` and props under `props/<id>/` through each item's `out` path (in an episode `../<series>/sets/…`), and record the paths in `ref` and `refs`.

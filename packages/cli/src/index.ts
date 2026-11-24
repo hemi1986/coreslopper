@@ -789,7 +789,17 @@ character
 
 const set = program
   .command('set')
-  .description('The workspace set library (library/sets/<id>/): import, use, new, add-file, remove.');
+  .description('The workspace set library (library/sets/<id>/): list, import, use, new, add-file, remove.');
+
+set
+  .command('list')
+  .description('Every library set, sorted by name, with its references, plates, tags, and the productions that used it.')
+  .action(() =>
+    run(async () => {
+      const { listLibrarySets, setListLines } = await import('./set-library.js');
+      console.log(setListLines(await listLibrarySets(repoRoot())).join('\n'));
+    }),
+  );
 
 set
   .command('import <target>')
