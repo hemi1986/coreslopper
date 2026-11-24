@@ -460,6 +460,19 @@ describe('approving a release', () => {
     expect((await loadStatus(dir)).approval).toBeUndefined();
     expect(await loadCalendar(dir)).toMatchObject({ release_date: '2026-12-04', proposed: true });
   });
+
+  it('ST-042: An internal project with a fixed day is refused', async () => {
+    const dir = await fixture();
+    const root = join(dir, '..', '..');
+    await setReleaseDay(dir, '2026-12-04');
+    await buildRelease({ projectDir: dir, root, deps: fakeDeps({ now: () => new Date('2026-11-13T09:00:00Z') }) });
+    expect(await loadCalendar(dir)).toMatchObject({ release_date: '2026-12-04', proposed: false });
+    await setDistribution(dir, 'internal');
+
+    await expect(approveRelease(dir, { root, now: new Date('2026-11-13T10:00:00Z') })).rejects.toThrow('not released publicly');
+
+    expect((await loadStatus(dir)).approval).toBeUndefined();
+  });
 });
 
 /** `release.release_date` of a project's project.yaml, or undefined when it has none. */
