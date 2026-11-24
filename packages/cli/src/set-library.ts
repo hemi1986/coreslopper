@@ -200,12 +200,16 @@ export async function addLibrarySetFile(root: string, id: string, source: string
  * CMD-RemoveLibrarySetFile (`set remove --file`): take a file out of a set
  * (EVT-LibrarySetFileRemoved). The entry stops naming it – as a reference and
  * as the image of a plate – and the file itself is deleted, so the aggregate's
- * "every file in the entry's folder is named by set.yaml" holds again.
+ * "every file in the entry's folder is named by set.yaml" holds again. A name
+ * the entry does not name is refused, so a typo never deletes another file.
  */
 export async function removeLibrarySetFile(root: string, id: string, name: unknown): Promise<LibrarySet> {
   const entry = await loadLibrarySet(root, id);
   if (typeof name !== 'string' || name !== basename(name) || name === 'set.yaml' || name.startsWith('.')) {
     throw new ValidationError('name a file of the entry');
+  }
+  if (!entry.refs.includes(name) && !entry.plates.some((plate) => plate.file === name)) {
+    throw new ValidationError(`the set "${id}" has no file "${name}"`);
   }
   const before = structuredClone(entry);
   entry.refs = entry.refs.filter((ref) => ref !== name);

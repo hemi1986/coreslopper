@@ -273,6 +273,16 @@ describe('removing a file from a library set', () => {
     expect(await loadLibrarySet(ws, 'bar')).toMatchObject({ plates: [{ id: 'counter', angle: 'counter, frontal', file: 'counter.png' }] });
     expect(await validateChangedFile(join(dir, 'set.yaml'))).toBe('library set');
   });
+
+  it('ST-030: A file the set does not name is refused', async () => {
+    const { ws, dir } = await withPlates();
+    const before = await readFile(join(dir, 'set.yaml'), 'utf8');
+
+    await expect(removeLibrarySetFile(ws, 'bar', 'old.png')).rejects.toThrow(/"bar" has no file "old\.png"/);
+
+    expect(await readFile(join(dir, 'set.yaml'), 'utf8')).toBe(before);
+    expect((await readdir(dir)).sort()).toEqual(['counter.png', 'door.png', 'set.yaml']);
+  });
 });
 
 const bar = (extra: Record<string, unknown> = {}) => ({
