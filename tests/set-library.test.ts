@@ -514,6 +514,19 @@ describe('finished set bibles enter the library', () => {
     expect(existsSync(join(setEntryDir(ws, 'bar'), 'counter.png'))).toBe(true);
   });
 
+  it('ST-027: A failed import does not fail the stage', async () => {
+    const ws = await cliWorkspace();
+    const dir = await video(ws, 'neon-rain');
+    await production(ws, 'neon-rain', [bar({ plates: [{ id: 'counter', angle: 'counter, frontal', ref: 'sets/bar/plates/counter.png' }] })], {});
+
+    const result = stageDone(ws, dir);
+
+    expect(result.status, result.stderr).toBe(0);
+    expect((await loadProject(dir)).state.stages['style-character']?.status).toBe('done');
+    expect(result.stderr).toMatch(/⚠.*bar.*sets\/bar\/plates\/counter\.png/);
+    expect(existsSync(join(ws, 'library', 'sets', 'bar'))).toBe(false);
+  });
+
   it('ST-027: A music video without a set bible takes nothing in', async () => {
     const ws = await cliWorkspace();
     await libraryBar(ws);

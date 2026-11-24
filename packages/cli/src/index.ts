@@ -931,10 +931,10 @@ function printImport(result: { character: string; id: string; created: boolean; 
 function printSetImport(result: { set: string; id?: string; created: boolean; skipped?: boolean; added: string[]; missing: string[] }): void {
   if (result.skipped) {
     console.log(`- ${result.set}: skipped, no files`);
-    if (result.missing.length) console.log(`  missing in the source: ${result.missing.join(', ')}`);
-    return;
+  } else {
+    printLibraryImport(result.set, { ...result, id: result.id ?? result.set, missing: [] });
   }
-  printLibraryImport(result.set, { ...result, id: result.id ?? result.set });
+  if (result.missing.length) console.warn(`⚠ ${result.set}: missing in the source: ${result.missing.join(', ')}`);
 }
 
 /** What an import took in: one line per item, and the source files it could not find. */
