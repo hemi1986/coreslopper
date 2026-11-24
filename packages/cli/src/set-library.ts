@@ -96,6 +96,7 @@ export async function addLibrarySet(root: string, input: NewLibrarySet, now = ne
 export async function updateLibrarySet(root: string, id: string, change: Partial<NewLibrarySet>): Promise<LibrarySet> {
   const entry = await loadLibrarySet(root, id);
   if (change.description !== undefined) entry.description = entryText(change.description, 'description', 4000, true)!;
+  if (change.prompt !== undefined) entry.prompt = entryText(change.prompt, 'prompt', 4000, true)!;
   await saveLibrarySet(root, entry);
   return entry;
 }

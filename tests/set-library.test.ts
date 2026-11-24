@@ -81,6 +81,14 @@ describe('updating a library set', () => {
     expect(await loadLibrarySet(ws, 'bar')).toMatchObject({ id: 'bar', description: 'a narrow bar in blue neon' });
     expect(await validateChangedFile(join(setEntryDir(ws, 'bar'), 'set.yaml'))).toBe('library set');
   });
+
+  it('ST-029: An emptied prompt is refused', async () => {
+    const ws = await withBar();
+
+    await expect(updateLibrarySet(ws, 'bar', { prompt: '' })).rejects.toThrow(/prompt is required/);
+
+    expect((await loadLibrarySet(ws, 'bar')).prompt).toBe('narrow bar, blue neon');
+  });
 });
 
 describe('adding a file to a library set', () => {
