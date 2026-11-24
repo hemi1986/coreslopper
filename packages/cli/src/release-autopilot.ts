@@ -9,6 +9,7 @@ import {
   ValidationError,
   approvalHolds,
   autopilotAttention,
+  loadProject,
   mainVideoId,
   notReleasedPublicly,
   planAutopilot,
@@ -67,6 +68,12 @@ async function writeStatus(projectRoot: string, change: (status: ReleaseStatus) 
  * the user's date in project.yaml first, so the calendar no longer moves.
  */
 export async function approveRelease(projectRoot: string, options: { root: string; now: Date; releaseDate?: string }): Promise<ReleaseStatus> {
+  // An internal project is never approved, also with a calendar from before it became internal: the refusal comes
+  // before anything is written (CMD-ApproveRelease, ST-042).
+  const project = await loadProject(projectRoot);
+  if (!releasedPublicly(project.config)) {
+    throw new ValidationError(`${notReleasedPublicly(project.config.slug)}: it is never approved.`);
+  }
   const { loadCalendar } = await import('./release-calendar.js');
   const calendar = await loadCalendar(projectRoot);
   if (!calendar) throw new ValidationError('The project has no release calendar yet: run release first.');

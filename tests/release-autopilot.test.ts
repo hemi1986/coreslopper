@@ -28,7 +28,7 @@ import { boardProject } from '../packages/cli/src/release-board-data.ts';
 import { appendAutopilotEntry } from '../packages/cli/src/autopilot-state.ts';
 import { boardHandler } from '../packages/cli/src/release-board.ts';
 import { timerPlan } from '../packages/cli/src/release-timer.ts';
-import { cleanupFixtures, fakeDeps, fixture, memeFixture, setDistribution, siblingCalendar } from './helpers/release-fixture.ts';
+import { cleanupFixtures, fakeDeps, fixture, memeFixture, setDistribution, setReleaseDay, siblingCalendar } from './helpers/release-fixture.ts';
 
 afterEach(async () => {
   vi.unstubAllEnvs();
@@ -442,6 +442,31 @@ describe('an internal project and the autopilot', () => {
     expect(result.projects[0]).toMatchObject({ approved: true, acted: [{ id: 'announce:x', status: 'posted' }] });
   });
 });
+
+describe('approving a release', () => {
+  it('ST-042: An internal project with a proposed day is refused', async () => {
+    // The calendar proposes 2026-12-04: the first release Friday 21 days after 2026-11-13.
+    const dir = await fixture();
+    const root = join(dir, '..', '..');
+    await setReleaseDay(dir, undefined);
+    await buildRelease({ projectDir: dir, root, deps: fakeDeps({ now: () => new Date('2026-11-13T09:00:00Z') }) });
+    expect(await loadCalendar(dir)).toMatchObject({ release_date: '2026-12-04', proposed: true });
+    // It became internal after that calendar was planned, so the calendar stays on disk.
+    await setDistribution(dir, 'internal');
+
+    await expect(approveRelease(dir, { root, now: new Date('2026-11-13T10:00:00Z') })).rejects.toThrow('not released publicly');
+
+    expect(await releaseDay(dir)).toBeUndefined();
+    expect((await loadStatus(dir)).approval).toBeUndefined();
+    expect(await loadCalendar(dir)).toMatchObject({ release_date: '2026-12-04', proposed: true });
+  });
+});
+
+/** `release.release_date` of a project's project.yaml, or undefined when it has none. */
+async function releaseDay(dir: string): Promise<unknown> {
+  const config = parse(await readFile(join(dir, 'project.yaml'), 'utf8')) as { release?: { release_date?: unknown } };
+  return config.release?.release_date;
+}
 
 describe('release timer', () => {
   it('runs one short script from the Windows Task Scheduler under WSL, with the installing Node on PATH', () => {
