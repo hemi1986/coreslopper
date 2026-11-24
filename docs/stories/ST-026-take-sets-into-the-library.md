@@ -12,14 +12,15 @@ risk: null
 events: [EVT-LibrarySetCreated, EVT-LibrarySetExtended]
 depends_on: [ST-023]
 labels: [feature:set-library]
-status: ready
+status: done
 ---
 
 ## Story
 As a user, I want to take the sets of an existing music video or series canon into the set library, so that places I already made can be used again.
 
 ## Context
-`set import <production> [--series] [--id <set>] [--into <entry>]` and the board's Sets view (ST-032). The same
+`set import <production> [--series] [--id <set>] [--into <entry>]` (`--into` names the entry of the set named
+with `--id`) and the board's Sets view (ST-032). The same
 command runs by itself when a set bible is finished (ST-027).
 
 Rules (CMD-ImportSets): a set with no file is skipped, or refused when it was named with `--id`; missing files are

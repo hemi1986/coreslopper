@@ -1,15 +1,16 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { createReadStream, existsSync, type Dirent } from 'node:fs';
 import { copyFile, mkdir, readdir, rename, rm } from 'node:fs/promises';
-import { basename, extname, join } from 'node:path';
+import { basename, extname, join, relative, resolve, sep } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { ValidationError, isScriptId } from '@coreslopper/core';
 
 // What the character library and the set library share (ADR 0052, one
 // BC-Library): the entry id and folder (`library/<kind>/<id>/`), the
 // required/optional field text, tags, the id a name becomes, the file limits,
-// and the content-wise copy both use. The sound library stays its own context
-// (ADR 0051) and keeps its own refusal type.
+// where an import's source is recorded (`librarySourceLabel`), the guarded scan
+// of an entry's files, and the content-wise copy both use. The sound library
+// stays its own context (ADR 0051) and keeps its own refusal type.
 
 const MB = 1024 * 1024;
 
@@ -38,6 +39,11 @@ export function checkLibraryId(id: unknown, kind: LibraryEntryKind): string {
 export const libraryEntryDir = (root: string, kind: LibraryEntryKind, id: string) => join(root, 'library', kind, checkLibraryId(id, kind));
 
 export const libraryEntryFile = (root: string, kind: LibraryEntryKind, id: string) => join(libraryEntryDir(root, kind, id), KINDS[kind].file);
+
+/** `projects/<slug>`, the source of an import as the library records it. */
+export function librarySourceLabel(root: string, dir: string): string {
+  return relative(resolve(root), resolve(dir)).split(sep).join('/');
+}
 
 export function entryText(value: unknown, field: string, max: number, required = false): string | undefined {
   if (value === undefined || value === null || value === '') {
@@ -109,6 +115,21 @@ export interface CopyOptions {
 }
 
 /**
+ * The files of an entry's folder by content hash, each mapped to its name. The
+ * entry file and dot files (a staged copy) are skipped; a link or non-file is
+ * refused, since the entry may only name plain files of its folder.
+ */
+export async function entryFileHashes(dir: string, kind: LibraryEntryKind): Promise<Map<string, string>> {
+  const hashes = new Map<string, string>();
+  for (const item of await readdir(dir, { withFileTypes: true }).catch(() => [] as Dirent[])) {
+    if (item.name === KINDS[kind].file || item.name.startsWith('.')) continue;
+    if (!item.isFile()) throw new ValidationError(`the library ${KINDS[kind].noun} folder holds a ${item.isSymbolicLink() ? 'link' : 'non-file'} "${item.name}"; move it away`);
+    hashes.set(await fileHash(join(dir, item.name)), item.name);
+  }
+  return hashes;
+}
+
+/**
  * Copy files into an entry's folder, once each by content: a file whose bytes
  * are already there maps to the existing name. Returns the target name per
  * source, the names that are new, and the copies still staged (empty unless
@@ -121,12 +142,7 @@ export async function copyByContent(
   options: CopyOptions = {},
 ): Promise<{ names: Map<string, string>; added: string[]; staged: StagedCopy[] }> {
   await mkdir(dir, { recursive: true });
-  const known = new Map<string, string>();
-  for (const item of await readdir(dir, { withFileTypes: true }).catch(() => [] as Dirent[])) {
-    if (item.name === KINDS[kind].file || item.name.startsWith('.')) continue;
-    if (!item.isFile()) throw new ValidationError(`the library ${KINDS[kind].noun} folder holds a ${item.isSymbolicLink() ? 'link' : 'non-file'} "${item.name}"; move it away`);
-    known.set(await fileHash(join(dir, item.name)), item.name);
-  }
+  const known = await entryFileHashes(dir, kind);
   const names = new Map<string, string>();
   const added: string[] = [];
   const staged: StagedCopy[] = [];

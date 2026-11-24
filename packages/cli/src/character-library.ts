@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { copyFile, mkdir, readFile, readdir, rm } from 'node:fs/promises';
-import { basename, extname, join, relative, resolve, sep } from 'node:path';
+import { basename, extname, join, resolve, sep } from 'node:path';
 import { isMap, isSeq, parse as parseYaml, parseDocument, stringify, type YAMLMap, type YAMLSeq } from 'yaml';
 import {
   CharacterBibleSchema,
@@ -22,6 +22,7 @@ import {
   freeName,
   libraryEntryDir,
   libraryEntryFile,
+  librarySourceLabel,
   parseTags,
   safeName,
   slugOfName,
@@ -134,11 +135,6 @@ export interface ImportOptions {
   now?: Date;
 }
 
-/** `projects/<slug>`, the source as the library records it. */
-function sourceLabel(root: string, dir: string): string {
-  return relative(resolve(root), resolve(dir)).split(sep).join('/');
-}
-
 type RawCharacter = Record<string, unknown> & { states?: Record<string, unknown>[] };
 
 /**
@@ -151,10 +147,10 @@ type RawCharacter = Record<string, unknown> & { states?: Record<string, unknown>
  */
 export async function importCharacters(root: string, sourceDir: string, options: ImportOptions = {}): Promise<ImportResult[]> {
   const file = join(sourceDir, 'characters.yaml');
-  if (!existsSync(file)) throw new ValidationError(`${sourceLabel(root, sourceDir)} has no characters.yaml`);
+  if (!existsSync(file)) throw new ValidationError(`${librarySourceLabel(root, sourceDir)} has no characters.yaml`);
   const bible = await readYamlFile(file, CharacterBibleSchema);
   const raw = (parseYaml(await readFile(file, 'utf8')) as { characters?: RawCharacter[] } | null)?.characters ?? [];
-  const from = sourceLabel(root, sourceDir);
+  const from = librarySourceLabel(root, sourceDir);
   const slug = basename(sourceDir);
   const at = (options.now ?? new Date()).toISOString();
   if (options.character && !bible.characters.some((character) => character.id === options.character)) {
