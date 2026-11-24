@@ -49,3 +49,16 @@ Verdict: **ready to merge** once findings 1 and 2 are fixed — 0 blockers, 2 ma
 Most important: the use copies before it validates and writes, without staging, so a failed run leaves
 `sets/<id>/` files no `sets.yaml` names (finding 1) — stage the copies and commit them after the write, as
 `importSets` already does.
+
+## Follow-up verification
+
+At HEAD `49afb06`: findings 1–9 fixed on the same evidence (staged copies + `cleanup` and a refused-result test,
+one `libraryTargetKind`, `nestedFolders`, the named refusal event, `ProjectConfigSchema`, no-op write skipped,
+guarded scan out, group help, `createEpisode`); question 10 is in `OPEN_QUESTIONS.md`. Both follow-up minors are
+fixed (`libraryTargets` rethrows non-`ValidationError` with a test; conventions name `libraryTargetKind`), as is
+the no-op CLI nit ("bar is already in <target>"); question 3 is accepted — a staged copy left inside
+`copyByContent` on a raw fs error stays, narrow and healed on retry. 44/44 library tests, typecheck,
+`check-language`, `verify.ts` green.
+
+Verdict: **ready to merge** — 0 blockers, 0 majors, 0 open minors.
+Most important: the use stages every copy and commits it only after `sets.yaml` is written, so a refused or failed run leaves the target exactly as it was.
