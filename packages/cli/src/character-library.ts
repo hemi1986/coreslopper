@@ -15,6 +15,7 @@ import {
 import { SLUG, projectDirs, seriesDirs } from './board-production.js';
 import {
   LIBRARY_FILE_LIMITS,
+  checkEntryFileName,
   checkLibraryId,
   copyByContent,
   entryText,
@@ -333,13 +334,13 @@ export async function updateLibraryCharacter(root: string, id: string, change: P
 /** Take one file out of an entry (its reference, sheet, voice, or state image) and delete it. */
 export async function removeLibraryFile(root: string, id: string, name: unknown): Promise<LibraryCharacter> {
   const entry = await loadLibraryCharacter(root, id);
-  if (typeof name !== 'string' || name !== basename(name) || name === 'character.yaml') throw new ValidationError('name a file of the entry');
-  if (entry.sheet === name) delete entry.sheet;
-  entry.refs = entry.refs.filter((ref) => ref !== name);
-  if (entry.voice?.ref === name) delete entry.voice;
-  for (const state of entry.states) if (state.ref === name) delete state.ref;
+  const file = checkEntryFileName('characters', name);
+  if (entry.sheet === file) delete entry.sheet;
+  entry.refs = entry.refs.filter((ref) => ref !== file);
+  if (entry.voice?.ref === file) delete entry.voice;
+  for (const state of entry.states) if (state.ref === file) delete state.ref;
   await saveLibraryCharacter(root, entry);
-  await rm(join(entryDir(root, id), name), { force: true });
+  await rm(join(entryDir(root, id), file), { force: true });
   return entry;
 }
 

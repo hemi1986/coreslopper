@@ -1,10 +1,12 @@
+import { randomUUID } from 'node:crypto';
 import { existsSync, statSync } from 'node:fs';
-import { mkdir, readFile, readdir, rm, stat } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rename, rm, stat } from 'node:fs/promises';
 import { basename, extname, join, resolve, sep } from 'node:path';
 import { isMap, isSeq, parseDocument, stringify, type YAMLMap, type YAMLSeq } from 'yaml';
 import { LibrarySetSchema, SetBibleSchema, ValidationError, isScriptId, readYamlFile, writeTextAtomic, type LibrarySet, type SetDefinition } from '@coreslopper/core';
 import {
   LIBRARY_FILE_LIMITS,
+  checkEntryFileName,
   commitCopies,
   copyByContent,
   discardCopies,
@@ -21,8 +23,9 @@ import {
 
 // The workspace's set library: `library/sets/<id>/set.yaml` with the set's
 // files next to it (ADR 0052). The user adds sets and their files by hand
-// (`addLibrarySet`, `addLibrarySetFile`) and corrects an entry's words
-// (`updateLibrarySet`); the sets of a project or series canon
+// (`addLibrarySet`, `addLibrarySetFile`), corrects an entry's words
+// (`updateLibrarySet`) and takes a reference or a plate out again
+// (`removeLibrarySetFile`); the sets of a project or series canon
 // come in through `importSets`; a project or series canon takes a copy of the
 // entry, with every reference and every plate. Nothing in a production points
 // into the library, so a later change there never touches a finished video.
@@ -194,6 +197,44 @@ export async function addLibrarySetFile(root: string, id: string, source: string
     throw error;
   }
   return { entry, added: changes, changed: true };
+}
+
+/**
+ * CMD-RemoveLibrarySetFile (`set remove --file`): take a file out of a set
+ * (EVT-LibrarySetFileRemoved). The entry stops naming it – every reference and
+ * every plate that names it, which content dedupe can make more than one – and
+ * the file itself is deleted, so the aggregate's "every file in the entry's
+ * folder is named by set.yaml" holds again.
+ *
+ * A name the entry does not name is refused, so a typo never deletes another
+ * file. A name it does name whose file is already gone is repaired: removing
+ * it is the only way back to a consistent entry. No history row is written –
+ * history records imports, as it does for a removed character.
+ */
+export async function removeLibrarySetFile(root: string, id: string, name: unknown): Promise<LibrarySet> {
+  const entry = await loadLibrarySet(root, id);
+  const file = checkEntryFileName('sets', name);
+  if (!entry.refs.includes(file) && !entry.plates.some((plate) => plate.file === file)) {
+    throw new ValidationError(`the set "${id}" has no file "${file}"`);
+  }
+  const dir = setEntryDir(root, id);
+  const path = join(dir, file);
+  // The file goes out of sight first: a dot name is a staged copy, ignored by
+  // the entry's scan, so a failed write never leaves a plain file set.yaml
+  // does not name (the add path stages its copies the same way).
+  const staged = join(dir, `.removed-${randomUUID()}${extname(file)}`);
+  const moved = existsSync(path);
+  if (moved) await rename(path, staged);
+  entry.refs = entry.refs.filter((ref) => ref !== file);
+  entry.plates = entry.plates.filter((plate) => plate.file !== file);
+  try {
+    await saveLibrarySet(root, entry);
+  } catch (error) {
+    if (moved) await rename(staged, path).catch(() => undefined);
+    throw error;
+  }
+  if (moved) await rm(staged, { force: true });
+  return entry;
 }
 
 // ----------------------------------------------------------------- import

@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { cp, mkdir, mkdtemp, readFile, readdir, rm, truncate, writeFile } from 'node:fs/promises';
+import { chmod, cp, mkdir, mkdtemp, readFile, readdir, rm, truncate, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { parse, stringify } from 'yaml';
 import { loadProject } from '@coreslopper/core';
-import { addLibrarySet, addLibrarySetFile, importSets, loadLibrarySet, setEntryDir, updateLibrarySet, useSet } from '../packages/cli/src/set-library.ts';
+import { addLibrarySet, addLibrarySetFile, importSets, loadLibrarySet, removeLibrarySetFile, setEntryDir, updateLibrarySet, useSet } from '../packages/cli/src/set-library.ts';
 import { createProject } from '../packages/cli/src/new-project.ts';
 import { createEpisode, createSeriesCanon } from '../packages/cli/src/board-wizard.ts';
 import { validateChangedFile } from '../packages/cli/src/validate-file.ts';
@@ -243,6 +243,126 @@ describe('adding a file to a library set', () => {
     await expect(addLibrarySetFile(ws, 'neon-bar', folder, { role: 'ref' })).rejects.toThrow(/not a file/);
 
     expect(await readdir(dir)).toEqual(['set.yaml']);
+  });
+});
+
+describe('removing a file from a library set', () => {
+  async function withPlates(): Promise<{ ws: string; dir: string }> {
+    const ws = await workspace();
+    await addLibrarySet(ws, { name: 'bar', description: 'a bar', prompt: 'narrow bar, blue neon' });
+    for (const [id, angle] of [
+      ['counter', 'counter, frontal'],
+      ['door', 'door, from inside'],
+    ] as const) {
+      await writeFile(join(ws, `${id}.png`), `plate:${id}`);
+      await addLibrarySetFile(ws, 'bar', join(ws, `${id}.png`), { role: 'plate', angle, plate: id });
+    }
+    return { ws, dir: setEntryDir(ws, 'bar') };
+  }
+
+  it('ST-030: A plate is removed with its file', async () => {
+    const { ws, dir } = await withPlates();
+    const door = (await loadLibrarySet(ws, 'bar')).plates.find((plate) => plate.id === 'door')!;
+
+    const entry = await removeLibrarySetFile(ws, 'bar', door.file);
+
+    expect(entry.plates).toEqual([{ id: 'counter', angle: 'counter, frontal', file: 'counter.png' }]);
+    expect(entry.refs).toEqual([]);
+    expect(existsSync(join(dir, door.file!))).toBe(false);
+    expect((await readdir(dir)).sort()).toEqual(['counter.png', 'set.yaml']);
+    expect(await loadLibrarySet(ws, 'bar')).toMatchObject({ plates: [{ id: 'counter', angle: 'counter, frontal', file: 'counter.png' }] });
+    expect(await validateChangedFile(join(dir, 'set.yaml'))).toBe('library set');
+  });
+
+  it('ST-030: A file the set does not name is refused', async () => {
+    const { ws, dir } = await withPlates();
+    const before = await readFile(join(dir, 'set.yaml'), 'utf8');
+
+    await expect(removeLibrarySetFile(ws, 'bar', 'old.png')).rejects.toThrow(/"bar" has no file "old\.png"/);
+
+    expect(await readFile(join(dir, 'set.yaml'), 'utf8')).toBe(before);
+    expect((await readdir(dir)).sort()).toEqual(['counter.png', 'door.png', 'set.yaml']);
+  });
+
+  it('removes a reference and keeps the plates', async () => {
+    const { ws, dir } = await withPlates();
+    await writeFile(join(ws, 'start.png'), 'ref:start');
+    await addLibrarySetFile(ws, 'bar', join(ws, 'start.png'), { role: 'ref' });
+
+    const entry = await removeLibrarySetFile(ws, 'bar', 'start.png');
+
+    expect(entry.refs).toEqual([]);
+    expect(entry.plates.map((plate) => plate.id)).toEqual(['counter', 'door']);
+    expect(existsSync(join(dir, 'start.png'))).toBe(false);
+    expect(existsSync(join(dir, 'counter.png'))).toBe(true);
+    expect(await validateChangedFile(join(dir, 'set.yaml'))).toBe('library set');
+  });
+
+  it('removes a file both a reference and a plate name', async () => {
+    const ws = await workspace();
+    await addLibrarySet(ws, { name: 'bar', description: 'a bar', prompt: 'narrow bar, blue neon' });
+    const image = join(ws, 'counter.png');
+    await writeFile(image, 'counter');
+    await addLibrarySetFile(ws, 'bar', image, { role: 'ref' });
+    await addLibrarySetFile(ws, 'bar', image, { role: 'plate', angle: 'counter, frontal', plate: 'counter' });
+
+    const entry = await removeLibrarySetFile(ws, 'bar', 'counter.png');
+
+    expect(entry.refs).toEqual([]);
+    expect(entry.plates).toEqual([]);
+    expect(await readdir(setEntryDir(ws, 'bar'))).toEqual(['set.yaml']);
+  });
+
+  it('removes both plates that name one stored image', async () => {
+    const ws = await workspace();
+    await addLibrarySet(ws, { name: 'bar', description: 'a bar', prompt: 'narrow bar, blue neon' });
+    const image = join(ws, 'counter.png');
+    await writeFile(image, 'counter');
+    await addLibrarySetFile(ws, 'bar', image, { role: 'plate', angle: 'counter, frontal', plate: 'counter' });
+    await addLibrarySetFile(ws, 'bar', image, { role: 'plate', angle: 'counter, wide', plate: 'wide' });
+    expect((await loadLibrarySet(ws, 'bar')).plates.map((plate) => plate.file)).toEqual(['counter.png', 'counter.png']);
+
+    const entry = await removeLibrarySetFile(ws, 'bar', 'counter.png');
+
+    expect(entry.plates).toEqual([]);
+    expect(await readdir(setEntryDir(ws, 'bar'))).toEqual(['set.yaml']);
+  });
+
+  it('repairs an entry whose named file is already gone', async () => {
+    const { ws, dir } = await withPlates();
+    await rm(join(dir, 'counter.png'));
+
+    const entry = await removeLibrarySetFile(ws, 'bar', 'counter.png');
+
+    expect(entry.plates.map((plate) => plate.id)).toEqual(['door']);
+    expect(existsSync(join(dir, 'counter.png'))).toBe(false);
+    expect(await validateChangedFile(join(dir, 'set.yaml'))).toBe('library set');
+  });
+
+  it('refuses a name that is not a plain file of the entry', async () => {
+    const { ws, dir } = await withPlates();
+
+    await expect(removeLibrarySetFile(ws, 'bar', 'set.yaml')).rejects.toThrow(/name a file of the entry/);
+    await expect(removeLibrarySetFile(ws, 'bar', '../bar/counter.png')).rejects.toThrow(/name a file of the entry/);
+    await expect(removeLibrarySetFile(ws, 'bar', '.incoming-1.png')).rejects.toThrow(/name a file of the entry/);
+
+    expect((await readdir(dir)).sort()).toEqual(['counter.png', 'door.png', 'set.yaml']);
+    expect((await loadLibrarySet(ws, 'bar')).plates).toHaveLength(2);
+  });
+
+  const guarded = process.getuid?.() === 0;
+  it.skipIf(guarded)('keeps the entry and the file when the folder refuses the move', async () => {
+    const { ws, dir } = await withPlates();
+    const before = await readFile(join(dir, 'set.yaml'), 'utf8');
+    await chmod(dir, 0o500);
+    try {
+      await expect(removeLibrarySetFile(ws, 'bar', 'counter.png')).rejects.toThrow(/EACCES|permission/i);
+    } finally {
+      await chmod(dir, 0o700);
+    }
+
+    expect(await readFile(join(dir, 'set.yaml'), 'utf8')).toBe(before);
+    expect((await readdir(dir)).sort()).toEqual(['counter.png', 'door.png', 'set.yaml']);
   });
 });
 

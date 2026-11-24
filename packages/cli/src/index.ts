@@ -789,7 +789,7 @@ character
 
 const set = program
   .command('set')
-  .description('The workspace set library (library/sets/<id>/): import, use, new, add-file.');
+  .description('The workspace set library (library/sets/<id>/): import, use, new, add-file, remove.');
 
 set
   .command('import <target>')
@@ -851,6 +851,18 @@ set
       const role = validateChoice(options.role, ['ref', 'plate'] as const, 'role');
       const result = await addLibrarySetFile(repoRoot(), id, file, { role, angle: options.angle, plate: options.plate });
       console.log(result.changed ? `✔ ${basename(file)} → ${id} (${role})` : `✔ ${basename(file)} is already in ${id}`);
+    }),
+  );
+
+set
+  .command('remove <id>')
+  .description('Remove a file from a library set: the entry stops naming it as a reference or a plate, and the file is deleted. Productions keep their copies.')
+  .requiredOption('--file <name>', 'The file name inside the set folder')
+  .action((id: string, options: { file: string }) =>
+    run(async () => {
+      const { removeLibrarySetFile } = await import('./set-library.js');
+      await removeLibrarySetFile(repoRoot(), id, options.file);
+      console.log(`✔ ${options.file} removed from ${id}`);
     }),
   );
 
