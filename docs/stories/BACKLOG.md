@@ -4,15 +4,9 @@
 
 **Progress: 21 of 24 domain stories done** · scenarios 71 of 80
 
-**42 stories** · In Progress: 1 · Ready: 6 · Ready for Human Review: 0 · In Review: 1 · Draft: 0 · Done: 34 · Superseded: 0
+**42 stories** · In Progress: 0 · Ready: 6 · Ready for Human Review: 0 · In Review: 1 · Draft: 0 · Done: 35 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
-
-## In Progress
-
-| ID | Title | Type | Context | Priority | Size | Risk | Depends on |
-|---|---|---|---|---|---|---|---|
-| [ST-033](ST-033-wizard-step-sets-from-the-library.md) | The wizard's step "Sets from the library" | task | – | should | – | – | ST-028 |
 
 ## Ready
 
@@ -68,4 +62,5 @@ Within each section: by priority, then by story ID, with dependencies pulled in 
 | [ST-030](ST-030-remove-a-file-from-a-library-set.md) | Remove a reference or a plate from a library set | domain | Library | could | – | – | ST-025 |
 | [ST-031](ST-031-delete-a-library-set.md) | Delete a library set | domain | Library | could | – | – | ST-024 |
 | [ST-032](ST-032-the-boards-sets-view.md) | The board's Sets view | task | – | should | – | – | ST-024, ST-025, ST-026, ST-028, ST-029, ST-030, ST-031 |
+| [ST-033](ST-033-wizard-step-sets-from-the-library.md) | The wizard's step "Sets from the library" | task | – | should | – | – | ST-028 |
 | [ST-039](ST-039-restart-comfyui-only-when-stuck.md) | Restart ComfyUI only when it is stuck | task | – | should | – | – | – |
