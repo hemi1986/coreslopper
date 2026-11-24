@@ -6,6 +6,7 @@
 //   #/new/meme[/<slug>]
 import { addStrings, api, copyButton, el, go, pending, post, projectFile, setLang, showError, t, upload } from './lib.js';
 import { libraryPicker } from './characters.js';
+import { setsPicker } from './sets.js';
 
 addStrings({
   de: {
@@ -14,7 +15,7 @@ addStrings({
     title: 'Titel', artist: 'Artist', slug: 'Slug', budget: 'Budget (USD)', internal: 'Nur intern (nicht öffentlich, kein Release-Paket)', imageProvider: 'Bilder', videoProvider: 'Clips', audioProvider: 'Stimmen und Sounds',
     language: 'Gesungene Sprache (ISO, z. B. de)', rights: 'Rechte (wem gehört der Song?)', license: 'Lizenz', format: 'Hauptformat',
     create: 'Anlegen', noKey: '(kein Zugang in .env)', minimum: function (v) { return 'mindestens $' + v; }, taken: 'Diesen Slug gibt es schon.',
-    stepData: 'Projekt', stepLyrics: 'Lyrics', stepSong: 'Song und Vocal-Stem', stepRefs: 'Referenzen', stepChars: 'Figuren aus der Bibliothek', stepDone: 'Fertig',
+    stepData: 'Projekt', stepLyrics: 'Lyrics', stepSong: 'Song und Vocal-Stem', stepRefs: 'Referenzen', stepChars: 'Figuren aus der Bibliothek', stepSets: 'Sets aus der Bibliothek', stepDone: 'Fertig',
     lyricsHelp: 'Die kompletten Lyrics einfügen. Jede Zeile gehört unter einen Section-Tag wie [Verse 1] oder [Chorus]; Suno-Klammern bleiben, wie sie sind.',
     propose: 'Tags vorschlagen', saveLyrics: 'Lyrics speichern', sections: 'Sections', saved: 'gespeichert',
     songHelp: 'Den fertigen Mix und, wenn möglich, den Vocal-Stem aus derselben Session. WAV wird direkt genutzt; MP3, FLAC, AIFF, M4A, OGG werden umgewandelt.',
@@ -38,7 +39,7 @@ addStrings({
     title: 'Title', artist: 'Artist', slug: 'Slug', budget: 'Budget (USD)', internal: 'Internal only (not released publicly, no release package)', imageProvider: 'Images', videoProvider: 'Clips', audioProvider: 'Voices and sounds',
     language: 'Sung language (ISO, e.g. en)', rights: 'Rights (who owns the song?)', license: 'License', format: 'Master format',
     create: 'Create', noKey: '(no access in .env)', minimum: function (v) { return 'at least $' + v; }, taken: 'This slug exists already.',
-    stepData: 'Project', stepLyrics: 'Lyrics', stepSong: 'Song and vocal stem', stepRefs: 'References', stepChars: 'Characters from the library', stepDone: 'Done',
+    stepData: 'Project', stepLyrics: 'Lyrics', stepSong: 'Song and vocal stem', stepRefs: 'References', stepChars: 'Characters from the library', stepSets: 'Sets from the library', stepDone: 'Done',
     lyricsHelp: 'Paste the complete lyrics. Every line belongs under a section tag like [Verse 1] or [Chorus]; Suno parentheses stay as they are.',
     propose: 'Propose tags', saveLyrics: 'Save lyrics', sections: 'Sections', saved: 'saved',
     songHelp: 'The finished mix and, if you have it, the vocal stem from the same session. WAV is used as is; MP3, FLAC, AIFF, M4A, and OGG are converted.',
@@ -229,9 +230,10 @@ function videoSteps(slug) {
 
     node.appendChild(referencesStep(4, 'project', slug, state.references, refresh));
     node.appendChild(step(5, t('stepChars'), false, [libraryPicker('project', slug)]));
+    node.appendChild(step(6, t('stepSets'), false, [setsPicker('project', slug)]));
 
     const finishError = el('p', { class: 'error', text: state.missing.length ? t('missing')(state.missing.map(function (m) { return m === 'lyrics' ? t('stepLyrics') : t('stepSong'); }).join(', ')) : '' });
-    node.appendChild(step(6, t('stepDone'), state.setupDone, state.setupDone ? [commandBox(t('setupDone'), '/new-video ' + slug, projectLink(slug))] : [
+    node.appendChild(step(7, t('stepDone'), state.setupDone, state.setupDone ? [commandBox(t('setupDone'), '/new-video ' + slug, projectLink(slug))] : [
       finishError,
       el('div', { class: 'form-row' }, [
         el('button', { class: 'primary', text: t('finish'), disabled: state.missing.length ? true : undefined, onclick: pending(function () { return post('/api/new/video/' + encodeURIComponent(slug) + '/finish', {}).then(refresh).catch(function (e) { finishError.textContent = e.message; }); }) }),
@@ -277,7 +279,8 @@ function seriesSteps(slug) {
     node.appendChild(el('div', { style: 'height:12px' }));
     node.appendChild(referencesStep(1, 'series', slug, refs.references, function () { seriesSteps(slug); }));
     node.appendChild(step(2, t('stepChars'), false, [libraryPicker('series', slug)]));
-    node.appendChild(step(3, t('stepDone'), false, [commandBox(t('seriesNext'), '/new-series ' + slug, seriesLink(slug))]));
+    node.appendChild(step(3, t('stepSets'), false, [setsPicker('series', slug)]));
+    node.appendChild(step(4, t('stepDone'), false, [commandBox(t('seriesNext'), '/new-series ' + slug, seriesLink(slug))]));
   }).catch(showError);
 }
 

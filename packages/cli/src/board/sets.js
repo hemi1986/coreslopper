@@ -19,7 +19,9 @@ addStrings({
     setAddFile: 'Datei hinzufügen', setRole: 'Als', setRoles: { ref: 'Referenz', plate: 'Platte' }, setAngleField: 'Kamerawinkel, z. B. „Tresen, frontal, Hüfthöhe“', setPlateId: 'Platten-id (optional)',
     setEdit: 'Bearbeiten', setSave: 'Speichern', setCancel: 'Abbrechen',
     setDelete: 'Aus der Bibliothek löschen', setConfirmDelete: function (where) { return 'Dieses Set und seine Dateien aus der Bibliothek löschen? ' + (where.length ? 'Verwendet in: ' + where.join(', ') + '.' : 'Es wird nirgends verwendet.') + ' Projekte behalten ihre Kopien.'; },
-    setRemoveFile: 'Entfernen', setConfirmRemoveFile: function (n) { return n + ' aus der Bibliothek löschen?'; }, setBack: '← Alle Sets', setSeries: 'Serie', setProject: 'Video'
+    setRemoveFile: 'Entfernen', setConfirmRemoveFile: function (n) { return n + ' aus der Bibliothek löschen?'; }, setBack: '← Alle Sets', setSeries: 'Serie', setProject: 'Video',
+    setPickHelp: 'Sets aus der Bibliothek übernehmen: Alle Referenzen und alle Kamerawinkel landen in sets/<id>/, der Agent baut beim Set-Bible darauf auf, statt sie neu zu erzeugen.',
+    setOpenLibrary: 'Sets öffnen'
   },
   en: {
     setTitle: 'Sets', setHelp: 'Every set of your videos and series: each place with its references and camera angles. A set comes in by itself once a video\'s set bible is done; add your own here.',
@@ -35,7 +37,9 @@ addStrings({
     setAddFile: 'Add file', setRole: 'As', setRoles: { ref: 'Reference', plate: 'Plate' }, setAngleField: 'Angle, e.g. "counter, frontal, waist height"', setPlateId: 'Plate id (optional)',
     setEdit: 'Edit', setSave: 'Save', setCancel: 'Cancel',
     setDelete: 'Delete from the library', setConfirmDelete: function (where) { return 'Delete this set and its files from the library? ' + (where.length ? 'Used in: ' + where.join(', ') + '.' : 'It is not used anywhere.') + ' Projects keep their copies.'; },
-    setRemoveFile: 'Remove', setConfirmRemoveFile: function (n) { return 'Delete ' + n + ' from the library?'; }, setBack: '← All sets', setSeries: 'Series', setProject: 'Video'
+    setRemoveFile: 'Remove', setConfirmRemoveFile: function (n) { return 'Delete ' + n + ' from the library?'; }, setBack: '← All sets', setSeries: 'Series', setProject: 'Video',
+    setPickHelp: 'Take sets from the library: every reference and every camera angle lands in sets/<id>/, and the set bible builds on them instead of generating them again.',
+    setOpenLibrary: 'Open the Sets'
   }
 });
 
@@ -255,4 +259,57 @@ function detail(id) {
 export function showSets(id) {
   setLang(null);
   return id ? detail(id) : gallery();
+}
+
+// -------------------------------------------------------------- the picker
+
+/**
+ * The wizard's step body: library sets to take into a music video or a series
+ * canon, a card per set. Ticking a set uses it at once (CMD-UseLibrarySet); a
+ * set the target already holds stays ticked, and a refusal shows its reason on
+ * the card. Calls `onChange` after a use.
+ */
+export function setsPicker(scope, slug, onChange) {
+  const box = el('div', { class: 'set-pick' }, [el('p', { class: 'meta', text: '…' })]);
+  load().then(function (data) {
+    box.innerHTML = '';
+    box.appendChild(el('p', { class: 'meta' }, [t('setPickHelp') + ' ', el('a', { href: '#/sets', text: t('setOpenLibrary') })]));
+    if (!data.sets.length) { box.appendChild(el('p', { class: 'empty', text: t('setEmpty') })); return; }
+    const list = el('div', { class: 'refs' });
+    data.sets.forEach(function (entry) {
+      const inside = isUsedIn(entry, scope, slug);
+      const message = el('div', { class: 'meta' });
+      const tick = el('div', { class: 'set-tick' });
+      const card = el('div', { class: 'ref' + (inside ? ' picked' : '') }, [
+        cover(entry, 'pick-cover'),
+        el('div', { class: 'ref-body' }, [
+          el('div', {}, [el('a', { href: '#/sets/' + entry.id, text: entry.name })]),
+          el('div', { class: 'meta clamp', text: entry.description }),
+          el('div', { class: 'meta', text: t('setPlateCount')(entry.plates.length) + (entry.refs.length ? ' · ' + entry.refs.length + ' ' + t('setRefsChip') : '') }),
+          message
+        ]),
+        tick
+      ]);
+      // A used set cannot be taken back from the step, so its tick gives way to the "in this project" chip.
+      const showUsed = function () {
+        tick.innerHTML = '';
+        tick.appendChild(el('span', { class: 'chip', text: '✓ ' + t('setInTarget') }));
+      };
+      if (inside) { showUsed(); list.appendChild(card); return; }
+      const check = el('input', { type: 'checkbox' });
+      check.onchange = pending(function () {
+        return post('/api/sets/use', { scope: scope, slug: slug, id: entry.id }).then(function (r) {
+          card.classList.add('picked');
+          showUsed();
+          message.className = 'meta';
+          message.textContent = t('setUsed')(r.result);
+          if (onChange) onChange();
+        }).catch(function (e) { check.checked = false; message.textContent = e.message; message.className = 'error'; });
+      }, { spinner: false });
+      tick.appendChild(el('label', { class: 'set-tick-label' }, [check, ' ', t('setUseButton')]));
+      list.appendChild(card);
+    });
+    box.appendChild(list);
+  }).catch(function (error) { box.innerHTML = ''; box.appendChild(el('p', { class: 'error', text: error.message })); });
+  return box;
 }

@@ -44,7 +44,7 @@ The wizard asks for the project data first: title, artist, budget, and providers
 2. Click **Propose tags**: a block that repeats becomes `[Chorus]`, every other block a `[Verse n]`. Correct the tags where the song differs.
 3. Check the **Sections** list, then click **Save lyrics**.
 
-Next, upload the song (the mix) and, if you have it, the vocal stem. MP3, FLAC, and the other common formats are converted to WAV. After that, add references (mood boards, photos, links) and characters from the library. **Finish setup** completes the step. Then run `/new-video <slug>` in Claude Code: the agent starts with the brief.
+Next, upload the song (the mix) and, if you have it, the vocal stem. MP3, FLAC, and the other common formats are converted to WAV. After that, add references (mood boards, photos, links), then characters and sets from the library. **Finish setup** completes the step. Then run `/new-video <slug>` in Claude Code: the agent starts with the brief.
 
 ## Follow a project
 
