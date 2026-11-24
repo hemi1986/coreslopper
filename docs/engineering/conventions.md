@@ -235,7 +235,7 @@ directory. `tests/helpers/release-fixture.ts` builds release projects.
 | Series budget | `createSeries` / `createProject` in a temp workspace with copies of `config/`, `templates/` and `brand/` | integration | `tests/series-budget.test.ts` |
 | Bible schema | `StyleBibleSchema`, `CharacterBibleSchema`, `SetBibleSchema`, `ReferencesSchema`, `LibraryCharacterSchema` `.safeParse` on an inline object | unit | `tests/continuity.test.ts`, `tests/character-characterization.test.ts` |
 | Character library | `importCharacters`, `useCharacter`, `addLibraryCharacter`, `addLibraryFile`, `removeLibraryFile` on a temp workspace (a temp folder is enough without projects) | integration | `tests/character-library.test.ts`, `tests/character-characterization.test.ts` |
-| Set library | `addLibrarySet`, `addLibrarySetFile`, `updateLibrarySet`, `importSets`, `useSet` on a temp workspace (a temp folder is enough) | integration | `tests/set-library.test.ts` |
+| Set library | `addLibrarySet`, `addLibrarySetFile`, `updateLibrarySet`, `removeLibrarySetFile`, `importSets`, `useSet` on a temp workspace (a temp folder is enough) | integration | `tests/set-library.test.ts` |
 | Keyframe references | `shotReferences(project, shot)` on an inline `LoadedProject` and `Shot` with files in a temp folder | unit | `tests/character-characterization.test.ts` |
 | Episode audio | `voiceTrack`, `importTakes`, `episodeTrack` on a temp copy of the demo canon and episode, mock provider; skipped without ffmpeg | integration | `tests/episode-track.test.ts` |
 | Provider adapter | the adapter with a fake `fetchImpl` (cloud) or a fake ComfyUI server | unit | `tests/fal-provider.test.ts`, `tests/topview.test.ts`, `tests/comfyui.test.ts` |

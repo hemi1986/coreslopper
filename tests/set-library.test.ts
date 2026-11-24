@@ -283,6 +283,46 @@ describe('removing a file from a library set', () => {
     expect(await readFile(join(dir, 'set.yaml'), 'utf8')).toBe(before);
     expect((await readdir(dir)).sort()).toEqual(['counter.png', 'door.png', 'set.yaml']);
   });
+
+  it('removes a reference and keeps the plates', async () => {
+    const { ws, dir } = await withPlates();
+    await writeFile(join(ws, 'start.png'), 'ref:start');
+    await addLibrarySetFile(ws, 'bar', join(ws, 'start.png'), { role: 'ref' });
+
+    const entry = await removeLibrarySetFile(ws, 'bar', 'start.png');
+
+    expect(entry.refs).toEqual([]);
+    expect(entry.plates.map((plate) => plate.id)).toEqual(['counter', 'door']);
+    expect(existsSync(join(dir, 'start.png'))).toBe(false);
+    expect(existsSync(join(dir, 'counter.png'))).toBe(true);
+    expect(await validateChangedFile(join(dir, 'set.yaml'))).toBe('library set');
+  });
+
+  it('removes a file both a reference and a plate name', async () => {
+    const ws = await workspace();
+    await addLibrarySet(ws, { name: 'bar', description: 'a bar', prompt: 'narrow bar, blue neon' });
+    const image = join(ws, 'counter.png');
+    await writeFile(image, 'counter');
+    await addLibrarySetFile(ws, 'bar', image, { role: 'ref' });
+    await addLibrarySetFile(ws, 'bar', image, { role: 'plate', angle: 'counter, frontal', plate: 'counter' });
+
+    const entry = await removeLibrarySetFile(ws, 'bar', 'counter.png');
+
+    expect(entry.refs).toEqual([]);
+    expect(entry.plates).toEqual([]);
+    expect(await readdir(setEntryDir(ws, 'bar'))).toEqual(['set.yaml']);
+  });
+
+  it('refuses a name that is not a plain file of the entry', async () => {
+    const { ws, dir } = await withPlates();
+
+    await expect(removeLibrarySetFile(ws, 'bar', 'set.yaml')).rejects.toThrow(/name a file of the entry/);
+    await expect(removeLibrarySetFile(ws, 'bar', '../bar/counter.png')).rejects.toThrow(/name a file of the entry/);
+    await expect(removeLibrarySetFile(ws, 'bar', '.incoming-1.png')).rejects.toThrow(/name a file of the entry/);
+
+    expect((await readdir(dir)).sort()).toEqual(['counter.png', 'door.png', 'set.yaml']);
+    expect((await loadLibrarySet(ws, 'bar')).plates).toHaveLength(2);
+  });
 });
 
 const bar = (extra: Record<string, unknown> = {}) => ({
