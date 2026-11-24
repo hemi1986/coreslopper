@@ -54,6 +54,14 @@ const ENV = {
   FAL_KEY: 'fal',
 };
 
+/** The project becomes internal after its release package and approval exist: the earlier files stay on disk. */
+async function setDistribution(projectDir: string, distribution: string): Promise<void> {
+  const path = join(projectDir, 'project.yaml');
+  const config = parse(await readFile(path, 'utf8')) as Record<string, unknown>;
+  config.distribution = distribution;
+  await writeFile(path, stringify(config));
+}
+
 /** An approved release with the mock adapters and a clock the test moves. */
 async function setup(options: { env?: Record<string, string>; meme?: boolean | { licence?: string; credit?: string } } = {}) {
   // The board reads the credentials from the environment, like the workspace's .env.
@@ -395,6 +403,22 @@ describe('release autopilot', () => {
     expect((await call(handler, 'POST', '/api/projects/neon/approve', {}, { ...BOARD_HEADERS, 'sec-fetch-site': 'cross-site' })).status).toBe(403);
     expect((await loadStatus(t.dir)).approval).toBeUndefined();
     expect((await call(handler, 'POST', '/api/projects/neon/approve', {})).status).toBe(200);
+  });
+});
+
+describe('an internal project and the autopilot', () => {
+  it('ST-041: An approved internal project posts nothing', async () => {
+    const t = await setup();
+    await approveRelease(t.dir, { root: t.root, now: new Date(t.at('distributor')) });
+    await setDistribution(t.dir, 'internal');
+    t.moveTo('announce:x');
+
+    const result = await t.run();
+
+    expect(result.projects[0]).toMatchObject({ slug: 'neon', acted: [] });
+    expect(t.social.get('x')!.calls).toEqual([]);
+    expect((await loadAutopilotLog(t.dir)).entries).toEqual([]);
+    expect(t.lines.join('\n')).toContain('not released publicly');
   });
 });
 

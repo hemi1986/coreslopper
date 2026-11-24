@@ -12,6 +12,7 @@ import {
   mainVideoId,
   planAutopilot,
   plainLyrics,
+  releasedPublicly,
   writeJsonAtomic,
   writeTextAtomic,
   type AutopilotEntry,
@@ -220,6 +221,11 @@ export async function runAutopilot(options: AutopilotOptions): Promise<Autopilot
 async function runProject(dir: string, slug: string, options: AutopilotOptions, deps: AutopilotDeps): Promise<AutopilotRunResult['projects'][number]> {
   const acted: AutopilotRunResult['projects'][number]['acted'] = [];
   let context = await projectReleaseContext(dir, options.root);
+  // A project that is no longer released publicly is left alone, also with an approval from before (ST-041).
+  if (!releasedPublicly(context.project.config)) {
+    deps.log(`${slug}: not released publicly (distribution: internal); nothing to post`);
+    return { slug, approved: false, acted, attention: [] };
+  }
   const settings = context.schedule.autopilot;
   const { ready } = autopilotReadiness(settings, deps.env, deps.now());
   const plan = async () => {
