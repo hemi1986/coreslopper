@@ -420,6 +420,38 @@ describe('deleting a library set', () => {
     expect(existsSync(leftover)).toBe(false);
   });
 
+  it('refuses a plain file where the set folder should be', async () => {
+    const ws = await workspace();
+    const stray = join(ws, 'library', 'sets', 'garage');
+    await mkdir(dirname(stray), { recursive: true });
+    await writeFile(stray, 'not a folder');
+
+    await expect(removeLibrarySet(ws, 'garage')).rejects.toThrow(/is not a folder/);
+
+    expect(await readFile(stray, 'utf8')).toBe('not a folder');
+  });
+
+  const guarded = process.getuid?.() === 0;
+  it.skipIf(guarded)('keeps the entry out of the library when its folder cannot be deleted', async () => {
+    const ws = await workspace();
+    await libraryBar(ws);
+    const dir = setEntryDir(ws, 'bar');
+    const locked = join(dir, 'plates');
+    await mkdir(locked);
+    await writeFile(join(locked, 'keep.txt'), 'x');
+    await chmod(locked, 0o500);
+    const leftovers = async () => (await readdir(join(ws, 'library', 'sets'))).filter((name) => name.startsWith('.removing-'));
+    try {
+      await expect(removeLibrarySet(ws, 'bar')).rejects.toThrow(/could not be deleted.*delete it by hand/);
+      // The entry is gone from the library; only a hidden leftover holds what could not be deleted.
+      expect(existsSync(dir)).toBe(false);
+      const [leftover] = await leftovers();
+      expect(leftover).toBeDefined();
+    } finally {
+      for (const name of await leftovers()) await chmod(join(ws, 'library', 'sets', name, 'plates'), 0o700);
+    }
+  });
+
   it('refuses an id that is not a library set id', async () => {
     const ws = await workspace();
     await libraryBar(ws);
