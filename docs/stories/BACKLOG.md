@@ -4,15 +4,20 @@
 
 **Progress: 21 of 24 domain stories done** · scenarios 71 of 80
 
-**42 stories** · In Progress: 0 · Ready: 5 · Ready for Human Review: 0 · In Review: 1 · Draft: 0 · Done: 36 · Superseded: 0
+**42 stories** · In Progress: 1 · Ready: 4 · Ready for Human Review: 0 · In Review: 1 · Draft: 0 · Done: 36 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
+
+## In Progress
+
+| ID | Title | Type | Context | Priority | Size | Risk | Depends on |
+|---|---|---|---|---|---|---|---|
+| [ST-040](ST-040-an-internal-calendar-books-no-slots.md) | An internal project's calendar books no slots | domain | Release | should | – | – | ST-036 |
 
 ## Ready
 
 | ID | Title | Type | Context | Priority | Size | Risk | Depends on |
 |---|---|---|---|---|---|---|---|
-| [ST-040](ST-040-an-internal-calendar-books-no-slots.md) | An internal project's calendar books no slots | domain | Release | should | – | – | ST-036 |
 | [ST-041](ST-041-the-autopilot-leaves-an-internal-project-alone.md) | The autopilot leaves an internal project alone | domain | Publishing | should | – | – | ST-036 |
 | [ST-042](ST-042-an-internal-project-cannot-be-approved.md) | An internal project cannot be approved | domain | Release | should | – | – | ST-036 |
 | [ST-018](ST-018-the-boards-sounds-view.md) | The board's Sounds view | task | – | could | – | – | ST-001, ST-002, ST-003, ST-006 |
