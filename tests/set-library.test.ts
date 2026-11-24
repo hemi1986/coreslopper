@@ -99,6 +99,49 @@ describe('updating a library set', () => {
     expect(await loadLibrarySet(ws, 'bar')).toMatchObject({ id: 'bar', name: 'Neon Bar', description: 'a bar', prompt: 'narrow bar, blue neon', tags: ['bar', 'night', 'neon'] });
     expect(existsSync(join(ws, 'library', 'sets', 'neon-bar'))).toBe(false);
   });
+
+  it('writes a new prompt', async () => {
+    const ws = await withBar();
+
+    const entry = await updateLibrarySet(ws, 'bar', { prompt: 'narrow bar, blue neon, wet counter' });
+
+    expect(entry.prompt).toBe('narrow bar, blue neon, wet counter');
+    expect((await loadLibrarySet(ws, 'bar')).prompt).toBe('narrow bar, blue neon, wet counter');
+  });
+
+  it('refuses an empty name or description', async () => {
+    const ws = await withBar();
+
+    await expect(updateLibrarySet(ws, 'bar', { name: '  ' })).rejects.toThrow(/name is required/);
+    await expect(updateLibrarySet(ws, 'bar', { description: '' })).rejects.toThrow(/description is required/);
+
+    expect(await loadLibrarySet(ws, 'bar')).toMatchObject({ name: 'bar', description: 'a bar' });
+  });
+
+  it('keeps the files, plates and history', async () => {
+    const ws = await withBar();
+    const image = join(ws, 'counter.png');
+    await writeFile(image, 'counter');
+    await addLibrarySetFile(ws, 'bar', image, { role: 'ref' });
+    await addLibrarySetFile(ws, 'bar', image, { role: 'plate', angle: 'counter, frontal' });
+    const before = await loadLibrarySet(ws, 'bar');
+
+    const entry = await updateLibrarySet(ws, 'bar', { description: 'a narrow bar in blue neon' });
+
+    expect(entry.refs).toEqual(['counter.png']);
+    expect(entry.plates).toEqual(before.plates);
+    expect(entry.history).toEqual(before.history);
+    expect(entry).toMatchObject({ id: 'bar', origin: 'manual', added: before.added });
+    expect(existsSync(join(setEntryDir(ws, 'bar'), 'counter.png'))).toBe(true);
+  });
+
+  it('refuses a change that is not an object', async () => {
+    const ws = await withBar();
+
+    await expect(updateLibrarySet(ws, 'bar', null as never)).rejects.toThrow(/an update takes/);
+
+    expect((await loadLibrarySet(ws, 'bar')).description).toBe('a bar');
+  });
 });
 
 describe('adding a file to a library set', () => {

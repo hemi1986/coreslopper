@@ -21,7 +21,8 @@ import {
 
 // The workspace's set library: `library/sets/<id>/set.yaml` with the set's
 // files next to it (ADR 0052). The user adds sets and their files by hand
-// (`addLibrarySet`, `addLibrarySetFile`); the sets of a project or series canon
+// (`addLibrarySet`, `addLibrarySetFile`) and corrects an entry's words
+// (`updateLibrarySet`); the sets of a project or series canon
 // come in through `importSets`; a project or series canon takes a copy of the
 // entry, with every reference and every plate. Nothing in a production points
 // into the library, so a later change there never touches a finished video.
@@ -94,6 +95,7 @@ export async function addLibrarySet(root: string, input: NewLibrarySet, now = ne
  * required, as in a set bible.
  */
 export async function updateLibrarySet(root: string, id: string, change: Partial<NewLibrarySet>): Promise<LibrarySet> {
+  if (change === null || typeof change !== 'object') throw new ValidationError('an update takes name, description, prompt or tags');
   const entry = await loadLibrarySet(root, id);
   if (change.name !== undefined) entry.name = entryText(change.name, 'name', 200, true)!;
   if (change.description !== undefined) entry.description = entryText(change.description, 'description', 4000, true)!;
