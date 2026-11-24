@@ -40,19 +40,12 @@ describe('release of an internal project', () => {
     const dir = await fixture();
     await setDistribution(dir, 'internal');
     // The other project is a real public project beside it, with a planned calendar.
-    const otherDir = join(dirname(dir), 'other');
-    await mkdir(join(otherDir, 'review'), { recursive: true });
-    const otherConfig = parse(await readFile(join(dir, 'project.yaml'), 'utf8')) as Record<string, unknown>;
-    delete otherConfig.distribution;
-    await writeFile(join(otherDir, 'project.yaml'), stringify({ ...otherConfig, slug: 'other' }));
-    const other = join(otherDir, 'review', 'calendar.yaml');
-    const calendar = stringify({ version: 1, project: 'other', release_date: '2026-12-04', proposed: false, timezone: 'Europe/Berlin', events: [] });
-    await writeFile(other, calendar);
+    const other = await siblingCalendar(dir, 'other', { release_date: '2026-12-04' });
 
     await runRelease({ projectDir: dir, deps: fakeDeps() });
 
     expect(existsSync(join(dir, 'review', 'calendar.yaml'))).toBe(false);
-    expect(await readFile(other, 'utf8')).toBe(calendar);
+    expect(await readFile(other.path, 'utf8')).toBe(other.text);
   });
 
   it('ST-036: A project without distribution is released publicly', async () => {
@@ -80,7 +73,7 @@ async function siblingCalendar(
   projectDir: string,
   slug: string,
   calendar: { release_date: string; distribution?: string; shortDay?: string },
-): Promise<void> {
+): Promise<{ path: string; text: string }> {
   const dir = join(dirname(projectDir), slug);
   await mkdir(join(dir, 'review'), { recursive: true });
   const config = parse(await readFile(join(projectDir, 'project.yaml'), 'utf8')) as Record<string, unknown>;
@@ -92,10 +85,10 @@ async function siblingCalendar(
   const events = calendar.shortDay
     ? [{ id: 'short:Z1-intro:youtube', at: `${calendar.shortDay}T18:00:00+01:00`, platform: 'shorts', step: 'short', item: 'Z1-intro' }]
     : [];
-  await writeFile(
-    join(dir, 'review', 'calendar.yaml'),
-    stringify({ version: 1, project: slug, title: slug, release_date: calendar.release_date, proposed: false, timezone: 'Europe/Berlin', events }),
-  );
+  const path = join(dir, 'review', 'calendar.yaml');
+  const text = stringify({ version: 1, project: slug, title: slug, release_date: calendar.release_date, proposed: false, timezone: 'Europe/Berlin', events });
+  await writeFile(path, text);
+  return { path, text };
 }
 
 /** Plan a public project's calendar without a release day of its own: 2026-12-04 is its first free Friday. */
@@ -132,6 +125,16 @@ describe('planning around an internal project', () => {
 
     const calendar = await planNeon(dir);
 
-    expect(calendar.release_date).not.toBe('2026-12-04');
+    expect(calendar.release_date).toBe('2026-12-11');
+  });
+
+  it('counts a sibling whose project.yaml cannot be read as public', async () => {
+    const dir = await fixture();
+    await siblingCalendar(dir, 'other', { release_date: '2026-12-04' });
+    await writeFile(join(dirname(dir), 'other', 'project.yaml'), 'kind: [unclosed');
+
+    const calendar = await planNeon(dir);
+
+    expect(calendar.release_date).toBe('2026-12-11');
   });
 });
