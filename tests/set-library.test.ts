@@ -614,4 +614,24 @@ describe('using a library set', () => {
     expect(await readFile(join(dir, 'sets/bar/plates/door.png'), 'utf8')).toBe('plate:door');
     expect(await validateChangedFile(join(dir, 'sets.yaml'))).toBe('sets');
   });
+
+  it('ST-028: A second use adds only what is missing', async () => {
+    const ws = await cliWorkspace();
+    await libraryBarWith(ws, [], [{ id: 'counter', angle: 'counter, frontal' }]);
+    const dir = await video(ws, 'neon-rain');
+    await useSet(ws, dir, 'bar');
+    await writeFile(join(ws, 'door.png'), 'plate:door');
+    await addLibrarySetFile(ws, 'bar', join(ws, 'door.png'), { role: 'plate', angle: 'door, from inside', plate: 'door' });
+
+    const result = await useSet(ws, dir, 'bar');
+
+    expect(result).toEqual({ set: 'bar', updated: true, files: ['sets/bar/plates/door.png'], plates: ['door'] });
+    const bible = parse(await readFile(join(dir, 'sets.yaml'), 'utf8'));
+    expect(bible.sets).toHaveLength(1);
+    expect(bible.sets[0].plates).toEqual([
+      { id: 'counter', angle: 'counter, frontal', ref: 'sets/bar/plates/counter.png' },
+      { id: 'door', angle: 'door, from inside', ref: 'sets/bar/plates/door.png' },
+    ]);
+    expect(await validateChangedFile(join(dir, 'sets.yaml'))).toBe('sets');
+  });
 });

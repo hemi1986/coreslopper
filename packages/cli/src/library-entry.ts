@@ -112,6 +112,12 @@ export interface CopyOptions {
    * interrupted copy never leaves a plain file the entry does not name.
    */
   stage?: boolean;
+  /**
+   * Skip folders instead of refusing them. A library entry's folder holds only
+   * the entry's files, but a copy into a production may hold a set's `plates/`
+   * beside its references.
+   */
+  folders?: 'refuse' | 'skip';
 }
 
 /**
@@ -119,11 +125,14 @@ export interface CopyOptions {
  * entry file and dot files (a staged copy) are skipped; a link or non-file is
  * refused, since the entry may only name plain files of its folder.
  */
-export async function entryFileHashes(dir: string, kind: LibraryEntryKind): Promise<Map<string, string>> {
+export async function entryFileHashes(dir: string, kind: LibraryEntryKind, folders: 'refuse' | 'skip' = 'refuse'): Promise<Map<string, string>> {
   const hashes = new Map<string, string>();
   for (const item of await readdir(dir, { withFileTypes: true }).catch(() => [] as Dirent[])) {
     if (item.name === KINDS[kind].file || item.name.startsWith('.')) continue;
-    if (!item.isFile()) throw new ValidationError(`the library ${KINDS[kind].noun} folder holds a ${item.isSymbolicLink() ? 'link' : 'non-file'} "${item.name}"; move it away`);
+    if (!item.isFile()) {
+      if (folders === 'skip' && item.isDirectory()) continue;
+      throw new ValidationError(`the library ${KINDS[kind].noun} folder holds a ${item.isSymbolicLink() ? 'link' : 'non-file'} "${item.name}"; move it away`);
+    }
     hashes.set(await fileHash(join(dir, item.name)), item.name);
   }
   return hashes;
@@ -142,7 +151,7 @@ export async function copyByContent(
   options: CopyOptions = {},
 ): Promise<{ names: Map<string, string>; added: string[]; staged: StagedCopy[] }> {
   await mkdir(dir, { recursive: true });
-  const known = await entryFileHashes(dir, kind);
+  const known = await entryFileHashes(dir, kind, options.folders ?? 'refuse');
   const names = new Map<string, string>();
   const added: string[] = [];
   const staged: StagedCopy[] = [];

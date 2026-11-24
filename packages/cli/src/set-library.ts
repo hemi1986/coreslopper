@@ -1,7 +1,7 @@
 import { existsSync, statSync } from 'node:fs';
 import { mkdir, readFile, readdir, rm, stat } from 'node:fs/promises';
 import { basename, extname, join, resolve, sep } from 'node:path';
-import { isSeq, parseDocument, stringify, type YAMLSeq } from 'yaml';
+import { isMap, isSeq, parseDocument, stringify, type YAMLMap, type YAMLSeq } from 'yaml';
 import { LibrarySetSchema, SetBibleSchema, ValidationError, isScriptId, readYamlFile, writeTextAtomic, type LibrarySet, type SetDefinition } from '@coreslopper/core';
 import { LIBRARY_FILE_LIMITS, commitCopies, copyByContent, discardCopies, entryFileHashes, entryText, fileHash, libraryEntryDir, libraryEntryFile, librarySourceLabel, parseTags, slugOfName } from './library-entry.js';
 
@@ -341,8 +341,17 @@ export async function useSet(root: string, targetDir: string, id: string): Promi
   const absent = named.filter((name) => !existsSync(source(name)));
   if (absent.length) throw new ValidationError(`library files of ${id} are missing: ${absent.join(', ')}`);
 
+  const file = join(targetDir, 'sets.yaml');
+  const doc = parseDocument(existsSync(file) ? await readFile(file, 'utf8') : 'version: 1\nsets: []\n');
+  if (doc.errors.length) throw new ValidationError(`Invalid YAML in ${file}: ${doc.errors[0]!.message}`);
+  if (!isSeq(doc.get('sets'))) doc.set('sets', doc.createNode([]));
+  const list = doc.get('sets') as YAMLSeq;
+  // `sets: []` parses as a flow sequence; entries go in block style like a hand-written bible.
+  list.flow = false;
+  const existing = list.items.find((item) => isMap(item) && item.get('id') === id) as YAMLMap | undefined;
+
   const folder = join(targetDir, 'sets', id);
-  const refCopies = await copyByContent(entry.refs.map(source), folder, 'sets');
+  const refCopies = await copyByContent(entry.refs.map(source), folder, 'sets', { folders: 'skip' });
   const plateSources = entry.plates.flatMap((plate) => (plate.file ? [source(plate.file)] : []));
   const plateCopies = await copyByContent(plateSources, join(folder, 'plates'), 'sets');
   const ref = (name: string) => `sets/${id}/${refCopies.names.get(source(name))!}`;
@@ -354,35 +363,45 @@ export async function useSet(root: string, targetDir: string, id: string): Promi
     ...(plate.file ? { ref: plateRef(plate.file) } : {}),
   });
 
-  const file = join(targetDir, 'sets.yaml');
-  const doc = parseDocument(existsSync(file) ? await readFile(file, 'utf8') : 'version: 1\nsets: []\n');
-  if (doc.errors.length) throw new ValidationError(`Invalid YAML in ${file}: ${doc.errors[0]!.message}`);
-  if (!isSeq(doc.get('sets'))) doc.set('sets', doc.createNode([]));
-  const list = doc.get('sets') as YAMLSeq;
-  // `sets: []` parses as a flow sequence; entries go in block style like a hand-written bible.
-  list.flow = false;
-  list.add(
-    doc.createNode({
-      id,
-      name: entry.name,
-      description: entry.description,
-      prompt: entry.prompt,
-      refs: entry.refs.map(ref),
-      plates: entry.plates.map(plateNode),
-      library: id,
-    }),
-  );
+  const addedPlates: string[] = [];
+  if (existing) {
+    const refsNode = existing.get('refs');
+    const refList = isSeq(refsNode) ? refsNode : (existing.set('refs', doc.createNode([])), existing.get('refs') as YAMLSeq);
+    const haveRefs = new Set(refList.items.map((item) => String((item as { value?: unknown }).value ?? item)));
+    for (const name of entry.refs) {
+      const path = ref(name);
+      if (!haveRefs.has(path)) refList.add(doc.createNode(path));
+    }
+    const platesNode = existing.get('plates');
+    const plateList = isSeq(platesNode) ? platesNode : (existing.set('plates', doc.createNode([])), existing.get('plates') as YAMLSeq);
+    const havePlates = new Set(plateList.items.map((item) => (isMap(item) ? String(item.get('id')) : '')));
+    for (const plate of entry.plates) {
+      if (havePlates.has(plate.id)) continue;
+      plateList.add(doc.createNode(plateNode(plate)));
+      addedPlates.push(plate.id);
+    }
+  } else {
+    list.add(
+      doc.createNode({
+        id,
+        name: entry.name,
+        description: entry.description,
+        prompt: entry.prompt,
+        refs: entry.refs.map(ref),
+        plates: entry.plates.map(plateNode),
+        library: id,
+      }),
+    );
+    addedPlates.push(...entry.plates.map((plate) => plate.id));
+  }
   const result = SetBibleSchema.safeParse(doc.toJS());
   if (!result.success) throw new ValidationError(`sets.yaml would be invalid: ${result.error.issues[0]?.message ?? 'unknown error'}`);
   await writeTextAtomic(file, doc.toString());
   return {
     set: id,
-    updated: false,
-    files: [
-      ...[...refCopies.added].map((name) => `sets/${id}/${name}`),
-      ...plateCopies.added.map((name) => `sets/${id}/plates/${name}`),
-    ],
-    plates: entry.plates.map((plate) => plate.id),
+    updated: Boolean(existing),
+    files: [...refCopies.added.map((name) => `sets/${id}/${name}`), ...plateCopies.added.map((name) => `sets/${id}/plates/${name}`)],
+    plates: addedPlates,
   };
 }
 
