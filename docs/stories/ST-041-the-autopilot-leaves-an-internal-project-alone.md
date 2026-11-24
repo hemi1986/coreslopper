@@ -12,7 +12,7 @@ risk: null
 events: [EVT-AutopilotRoundRun]
 depends_on: [ST-036]
 labels: [feature:internal-projects]
-status: in-progress
+status: done
 ---
 
 ## Story
