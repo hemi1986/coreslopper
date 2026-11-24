@@ -67,7 +67,7 @@ Generate through the series budget: `npm run cli -- generate --series <slug> --b
 
 Record the filed paths in `sheet`, `refs`, and `ref`. Review every sheet, set frame, plate, prop, and state as soon as it exists with `npm run cli -- review-image projects/<slug> --image <png> --ref <kind:id>`; it fails an image only for a blocking defect. Regenerate what fails with its `fix_prompt` (a new seed, the same `out`), or repair one region with `npm run cli -- patch --series <slug> --image <png> --box <x,y,w,h> --prompt "…" --ref <kind:id> --replace`. The generation queue (`queue`) works on projects only; a canon is small enough for this loop by hand.
 
-Done when every on-screen character has a sheet and at least one reference, every set has at least one reference frame and every plate its image, every prop and state its reference, every speaking character has a reference voice with its transcript, the art director passed them, and `npm run cli -- character import <slug> --series` took the characters into the workspace library.
+Done when every on-screen character has a sheet and at least one reference, every set has at least one reference frame and every plate its image, every prop and state its reference, every speaking character has a reference voice with its transcript, the art director passed them, and `npm run cli -- character import <slug> --series` and `npm run cli -- set import <slug> --series` took the characters and sets into the workspace library.
 
 ### 5. Hand-over
 

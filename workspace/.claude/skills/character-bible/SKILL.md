@@ -29,7 +29,7 @@ license: MIT
 4. File the sheet and 2–4 usable reference images under the project's gitignored `characters/<id>/` by giving each batch item its `out` path there; never copy generated files by hand. Record them in `characters.yaml` with `sheet`, `refs`, and the prompt.
 5. Every sheet is reviewed before anything derives from it: queue it as a hand-written item with `out` and `review` (`.claude/skills/ai-clips/SKILL.md`, steps 3–6), with `"review": {"ref": "sheet:<id>"}`. The queue reviews it (identity, costume, palette, readability at small sizes), regenerates a failed image with the verdict's `fix_prompt`, and files only an approved one.
 6. Add the **character states** the treatment or script needs (see below).
-7. Update the state with `npm run cli -- stage-done <project> style-character --outputs style.yaml,characters.yaml` when the style bible is also ready. It takes the project's characters into the library by itself and prints what it added.
+7. Update the state with `npm run cli -- stage-done <project> style-character --outputs style.yaml,characters.yaml` when the style bible is also ready. It takes the project's characters and sets into the library by itself and prints what it added.
 
 ## Library characters
 
@@ -42,7 +42,7 @@ A meme (`kind: meme`) has no treatment and no canon: its `style-character` stage
 - **Library characters** stay as they came in (see **Library characters**): a scene's look comes as a new state from their sheet.
 - **Every other speaker** gets an entry with exactly its script id: `name`, `description`, `prompt`, and `face` (`voice-only` for a narrator or an announcement nobody sees). An on-screen character gets its sheet and references through the generation queue, judged by the art director (Process, steps 2–5).
 - **A reference voice** for every speaker without one, a library character included: a user reference of kind `voice` whose `subject` names the character, or else an `audio.voice_design` take ("(voice description)Text", German text) queued as an audio item with `"out": "characters/<id>/voice.wav"`. Record `voice.ref` and the exact `voice.transcript`.
-- `stage-done … style-character` takes the invented characters into the library as new entries; a library character only adds what is new to its entry.
+- `stage-done … style-character` takes the invented characters and sets into the library as new entries; a library character only adds what is new to its entry.
 
 Done when `npm run cli -- validate-file projects/<slug>/script.yaml` passes: every speaker and set of the script is in the bibles.
 
