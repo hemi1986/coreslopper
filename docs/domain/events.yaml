@@ -473,7 +473,7 @@ aggregates:
     context: BC-Release
     status: as-is
     evidence:
-      - review/calendar.yaml, one per project, written whole by planCalendar from buildCalendar, which reads the workspace's release schedule and every other project's calendar (packages/cli/src/release-calendar.ts:49-57,94-110; packages/core/src/calendar.ts:133-225; schema.ts:1033-1055)
+      - review/calendar.yaml, one per project, written whole by planCalendar from buildCalendar, which reads the workspace's release schedule and the calendars of every other publicly released project (packages/cli/src/release-calendar.ts:49-65,94-110; packages/core/src/calendar.ts:133-225; schema.ts:1033-1055)
     invariants:
       - The user's release day wins; without it the calendar proposes the first release weekday at least lead_days ahead, min_gap_weeks from every other release and booked release day, never on a skip day (the code does this, calendar.ts:119-142)
       - A proposed release day stays the project's release day until the user moves it – the user fixes it on the board without approving the autopilot (decided 2026-11-22, HS-165; only the approval fixes it, and --replan or another project's date can move it – gap register)

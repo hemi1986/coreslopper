@@ -12,7 +12,7 @@ risk: null
 events: [EVT-ReleaseCalendarPlanned]
 depends_on: [ST-036]
 labels: [feature:internal-projects]
-status: ready
+status: done
 ---
 
 ## Story
@@ -50,6 +50,7 @@ Scenario: A public project's calendar still books its slots
 
 ## Out of Scope
 - Deleting or archiving the earlier calendar of an internal project
+- The board's calendar of all projects, its `.ics` export and `boardProjectDirs`, which still serve an internal project's earlier calendar (OPEN_QUESTIONS, ST-040)
 - The autopilot (ST-041) and the approval (ST-042)
 
 ## Open Questions

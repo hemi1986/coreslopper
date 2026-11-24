@@ -117,7 +117,7 @@ export interface CalendarContext {
   now: Date;
   /** The project's current calendar, whose event times are kept. */
   existing?: ReleaseCalendar;
-  /** Every other project's calendar in the workspace. */
+  /** The calendars of the other publicly released projects in the workspace. */
   others: ReleaseCalendar[];
   /** Ignore the existing calendar and plan again from scratch. */
   replan?: boolean;

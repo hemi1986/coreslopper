@@ -388,8 +388,8 @@ Evidence:
   the texts are laid out from `review/upload.yaml`, which the agent writes (`packages/cli/src/release-texts.ts`,
   `workspace/.claude/skills/video-qa/release.md`); the rules for facts, limits, chapters and canvas are pure functions
   in core (`packages/core/src/release.ts`)
-- `buildCalendar` plans `review/calendar.yaml` from `config/release-schedule.yaml` and every other project's calendar
-  (`packages/core/src/calendar.ts:119-225`, `packages/cli/src/release-calendar.ts:49-110`)
+- `buildCalendar` plans `review/calendar.yaml` from `config/release-schedule.yaml` and the calendars of every other
+  publicly released project (`packages/core/src/calendar.ts:119-225`, `packages/cli/src/release-calendar.ts:49-110`)
 - the board's release view (`packages/cli/src/release-board.ts:412-503`, `release-board-data.ts:432-703`,
   `board/release.js`) writes `review/release-status.json` under the release lock (`release-calendar.ts:118-142`);
   the approval is written by `approveRelease` (`packages/cli/src/release-autopilot.ts:66-89`) and read by
