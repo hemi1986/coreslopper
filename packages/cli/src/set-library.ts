@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { existsSync, statSync } from 'node:fs';
+import { existsSync, lstatSync, statSync } from 'node:fs';
 import { mkdir, readFile, readdir, rename, rm, stat } from 'node:fs/promises';
-import { basename, extname, join, resolve, sep } from 'node:path';
+import { basename, extname, join, relative, resolve, sep } from 'node:path';
 import { isMap, isSeq, parseDocument, stringify, type YAMLMap, type YAMLSeq } from 'yaml';
 import { LibrarySetSchema, SetBibleSchema, ValidationError, isScriptId, readYamlFile, writeTextAtomic, type LibrarySet, type SetDefinition } from '@coreslopper/core';
 import {
@@ -24,14 +24,16 @@ import {
 // The workspace's set library: `library/sets/<id>/set.yaml` with the set's
 // files next to it (ADR 0052). The user adds sets and their files by hand
 // (`addLibrarySet`, `addLibrarySetFile`), corrects an entry's words
-// (`updateLibrarySet`) and takes a reference or a plate out again
-// (`removeLibrarySetFile`); the sets of a project or series canon
-// come in through `importSets`; a project or series canon takes a copy of the
-// entry, with every reference and every plate. Nothing in a production points
-// into the library, so a later change there never touches a finished video.
+// (`updateLibrarySet`), takes a reference or a plate out again
+// (`removeLibrarySetFile`) and deletes an entry (`removeLibrarySet`); the sets
+// of a project or series canon come in through `importSets`; a project or
+// series canon takes a copy of the entry, with every reference and every plate.
+// Nothing in a production points into the library, so a later change there
+// never touches a finished video.
 
 export const setEntryDir = (root: string, id: string) => libraryEntryDir(root, 'sets', id);
 const setEntryFile = (root: string, id: string) => libraryEntryFile(root, 'sets', id);
+const setLibraryRoot = (root: string) => join(root, 'library', 'sets');
 
 export async function loadLibrarySet(root: string, id: string): Promise<LibrarySet> {
   const file = setEntryFile(root, id);
@@ -237,8 +239,60 @@ export async function removeLibrarySetFile(root: string, id: string, name: unkno
   return entry;
 }
 
-// ----------------------------------------------------------------- import
+/** EVT-LibrarySetDeleted: the entry that left the library, when its set.yaml still loaded. */
+export interface RemovedLibrarySet {
+  id: string;
+  /** The entry as it was; absent when a hand edit broke it or the folder never held one. */
+  set?: LibrarySet;
+}
 
+/**
+ * CMD-DeleteLibrarySet (`set remove <id>`): delete the entry and its files
+ * (EVT-LibrarySetDeleted). Productions keep their copies and their
+ * `library: <id>`; nothing outside the library is touched. The board's set
+ * page names the productions that use the set before it calls this (ST-032).
+ *
+ * The folder's presence decides, not its `set.yaml`: an entry a hand edit broke,
+ * or a folder a failed write left, is removed all the same. The folder is
+ * renamed into a hidden `.removing-` first, so a failed delete leaves a hidden
+ * leftover instead of a half-deleted entry; the gitignore keeps that leftover
+ * out of a commit.
+ */
+export async function removeLibrarySet(root: string, id: string): Promise<RemovedLibrarySet> {
+  const folder = setEntryDir(root, id);
+  // The directory entry decides, so a dangling link or a stray file is not
+  // mistaken for a missing set (and a file is not silently deleted).
+  const present = lstatSync(folder, { throwIfNoEntry: false });
+  if (!present) throw new ValidationError(`no library set "${id}" (${folder})`);
+  if (!present.isDirectory() && !present.isSymbolicLink()) {
+    throw new ValidationError(`the library set "${id}" is not a folder (${folder}); move it away`);
+  }
+  let entry: LibrarySet | undefined;
+  try {
+    entry = await loadLibrarySet(root, id);
+  } catch (error) {
+    // A broken document is removed all the same; an I/O error is not swallowed.
+    if (!(error instanceof ValidationError)) throw error;
+  }
+  const trash = join(setLibraryRoot(root), `.removing-${randomUUID()}`);
+  try {
+    await rename(folder, trash);
+  } catch (error) {
+    // A concurrent delete between the check and the rename reads as unknown.
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw new ValidationError(`no library set "${id}" (${folder})`);
+    throw new ValidationError(`could not remove library set "${id}": ${(error as Error).message}`);
+  }
+  try {
+    await rm(trash, { recursive: true, force: true });
+  } catch (error) {
+    throw new ValidationError(
+      `library set "${id}" left the library, but its folder ${relative(root, trash)} could not be deleted: ${(error as Error).message}; delete it by hand`,
+    );
+  }
+  return { id, ...(entry ? { set: entry } : {}) };
+}
+
+// ----------------------------------------------------------------- import
 export interface ImportSetResult {
   /** The set's id in the project or canon. */
   set: string;

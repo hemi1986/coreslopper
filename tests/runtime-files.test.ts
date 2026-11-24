@@ -93,7 +93,7 @@ describe('the runtime of this repository', () => {
       expect(repository.has(rule), `.gitignore lacks ${rule}`).toBe(true);
     }
     // A library set's entry stays tracked; its media do not.
-    expect(rules('workspace/.gitignore')).toEqual(expect.arrayContaining(['library/sets/*/*', '!library/sets/*/set.yaml']));
+    expect(rules('workspace/.gitignore')).toEqual(expect.arrayContaining(['library/sets/*/*', '!library/sets/*/set.yaml', 'library/sets/.removing-*/']));
   });
 
   it('ships every file a shipped hook runs', () => {

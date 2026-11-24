@@ -68,11 +68,13 @@ library/characters/*/*
 # Set library media; each set.yaml stays tracked
 library/sets/*/*
 !library/sets/*/set.yaml
+library/sets/.removing-*/
 
 # Sound library audio; each sound.yaml stays tracked
 library/sounds/*/*
 !library/sounds/*/sound.yaml
 library/sounds/.incoming-*/
+library/sounds/.removing-*/
 
 # Python
 .venv/

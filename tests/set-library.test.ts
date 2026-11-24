@@ -5,8 +5,8 @@ import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { parse, stringify } from 'yaml';
-import { loadProject } from '@coreslopper/core';
-import { addLibrarySet, addLibrarySetFile, importSets, loadLibrarySet, removeLibrarySetFile, setEntryDir, updateLibrarySet, useSet } from '../packages/cli/src/set-library.ts';
+import { ValidationError, loadProject } from '@coreslopper/core';
+import { addLibrarySet, addLibrarySetFile, importSets, loadLibrarySet, removeLibrarySet, removeLibrarySetFile, setEntryDir, updateLibrarySet, useSet } from '../packages/cli/src/set-library.ts';
 import { createProject } from '../packages/cli/src/new-project.ts';
 import { createEpisode, createSeriesCanon } from '../packages/cli/src/board-wizard.ts';
 import { validateChangedFile } from '../packages/cli/src/validate-file.ts';
@@ -363,6 +363,131 @@ describe('removing a file from a library set', () => {
 
     expect(await readFile(join(dir, 'set.yaml'), 'utf8')).toBe(before);
     expect((await readdir(dir)).sort()).toEqual(['counter.png', 'door.png', 'set.yaml']);
+  });
+});
+
+describe('deleting a library set', () => {
+  it('ST-031: A used set is deleted and its copies stay', async () => {
+    const ws = await workspace();
+    await libraryBar(ws);
+    const dir = await production(
+      ws,
+      'neon-rain',
+      [bar({ library: 'bar', plates: [{ id: 'counter', angle: 'counter, frontal', ref: 'sets/bar/plates/counter.png' }] })],
+      { 'sets/bar/plates/counter.png': 'counter' },
+    );
+    const bible = await readFile(join(dir, 'sets.yaml'), 'utf8');
+
+    const removed = await removeLibrarySet(ws, 'bar');
+
+    expect(removed).toMatchObject({ id: 'bar', set: { id: 'bar', name: 'Bar' } });
+    expect(existsSync(join(ws, 'library', 'sets', 'bar'))).toBe(false);
+    expect(await readdir(join(ws, 'library', 'sets'))).toEqual([]);
+    expect(await readFile(join(dir, 'sets.yaml'), 'utf8')).toBe(bible);
+    expect(await readFile(join(dir, 'sets', 'bar', 'plates', 'counter.png'), 'utf8')).toBe('counter');
+  });
+
+  it('ST-031: An unknown set is refused', async () => {
+    const ws = await workspace();
+    await addLibrarySet(ws, { name: 'bar', description: 'a bar', prompt: 'narrow bar, blue neon' });
+
+    const refused = await removeLibrarySet(ws, 'garage').catch((error: unknown) => error);
+
+    expect(refused).toBeInstanceOf(ValidationError);
+    expect((refused as Error).message).toMatch(/no library set "garage"/);
+    expect(existsSync(join(ws, 'library', 'sets', 'bar'))).toBe(true);
+  });
+
+  it('removes a folder whose set.yaml does not load', async () => {
+    const ws = await workspace();
+    await libraryBar(ws);
+    await writeFile(join(setEntryDir(ws, 'bar'), 'set.yaml'), 'version: 1\nid: bar\n');
+
+    const removed = await removeLibrarySet(ws, 'bar');
+
+    expect(removed.set).toBeUndefined();
+    expect(existsSync(join(ws, 'library', 'sets', 'bar'))).toBe(false);
+  });
+
+  it('removes a folder that never held an entry', async () => {
+    const ws = await workspace();
+    const leftover = join(ws, 'library', 'sets', 'leftover');
+    await mkdir(leftover, { recursive: true });
+    await writeFile(join(leftover, 'stray.png'), 'not named by set.yaml');
+
+    await removeLibrarySet(ws, 'leftover');
+
+    expect(existsSync(leftover)).toBe(false);
+  });
+
+  it('refuses a plain file where the set folder should be', async () => {
+    const ws = await workspace();
+    const stray = join(ws, 'library', 'sets', 'garage');
+    await mkdir(dirname(stray), { recursive: true });
+    await writeFile(stray, 'not a folder');
+
+    await expect(removeLibrarySet(ws, 'garage')).rejects.toThrow(/is not a folder/);
+
+    expect(await readFile(stray, 'utf8')).toBe('not a folder');
+  });
+
+  const guarded = process.getuid?.() === 0;
+  it.skipIf(guarded)('keeps the entry out of the library when its folder cannot be deleted', async () => {
+    const ws = await workspace();
+    await libraryBar(ws);
+    const dir = setEntryDir(ws, 'bar');
+    const locked = join(dir, 'plates');
+    await mkdir(locked);
+    await writeFile(join(locked, 'keep.txt'), 'x');
+    await chmod(locked, 0o500);
+    const leftovers = async () => (await readdir(join(ws, 'library', 'sets'))).filter((name) => name.startsWith('.removing-'));
+    try {
+      await expect(removeLibrarySet(ws, 'bar')).rejects.toThrow(/could not be deleted.*delete it by hand/);
+      // The entry is gone from the library; only a hidden leftover holds what could not be deleted.
+      expect(existsSync(dir)).toBe(false);
+      const [leftover] = await leftovers();
+      expect(leftover).toBeDefined();
+    } finally {
+      for (const name of await leftovers()) await chmod(join(ws, 'library', 'sets', name, 'plates'), 0o700);
+    }
+  });
+
+  it('refuses an id that is not a library set id', async () => {
+    const ws = await workspace();
+    await libraryBar(ws);
+
+    for (const id of ['../bar', '/etc', 'Vine Bar']) {
+      await expect(removeLibrarySet(ws, id)).rejects.toThrow(/not a library set id/);
+    }
+    expect(existsSync(join(ws, 'library', 'sets', 'bar'))).toBe(true);
+  });
+});
+
+function runSetCli(ws: string, args: string[]) {
+  return spawnSync(join(root, 'node_modules', '.bin', 'tsx'), [join(root, 'packages', 'cli', 'src', 'index.ts'), 'set', ...args], { cwd: ws, encoding: 'utf8' });
+}
+
+describe('the set command', () => {
+  it('set remove <id> deletes the set from the library', async () => {
+    const ws = await cliWorkspace();
+    await libraryBar(ws);
+
+    const result = runSetCli(ws, ['remove', 'bar']);
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toMatch(/bar removed from the library/);
+    expect(existsSync(join(ws, 'library', 'sets', 'bar'))).toBe(false);
+  });
+
+  it('set remove <id> --file removes only that file', async () => {
+    const ws = await cliWorkspace();
+    await libraryBar(ws);
+
+    const result = runSetCli(ws, ['remove', 'bar', '--file', 'counter.png']);
+
+    expect(result.status, result.stderr).toBe(0);
+    expect((await loadLibrarySet(ws, 'bar')).plates).toEqual([]);
+    expect(existsSync(join(setEntryDir(ws, 'bar'), 'counter.png'))).toBe(false);
   });
 });
 

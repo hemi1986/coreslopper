@@ -856,13 +856,18 @@ set
 
 set
   .command('remove <id>')
-  .description('Remove a file from a library set: the entry stops naming it as a reference or a plate, and the file is deleted. Productions keep their copies.')
-  .requiredOption('--file <name>', 'The file name inside the set folder')
-  .action((id: string, options: { file: string }) =>
+  .description('Delete a library set and its files, or with --file only that reference or plate. Productions keep their copies.')
+  .option('--file <name>', 'Only this file inside the set folder: the entry stops naming it and the file is deleted')
+  .action((id: string, options: { file?: string }) =>
     run(async () => {
-      const { removeLibrarySetFile } = await import('./set-library.js');
-      await removeLibrarySetFile(repoRoot(), id, options.file);
-      console.log(`✔ ${options.file} removed from ${id}`);
+      const library = await import('./set-library.js');
+      if (options.file === undefined) {
+        await library.removeLibrarySet(repoRoot(), id);
+        console.log(`✔ ${id} removed from the library`);
+      } else {
+        await library.removeLibrarySetFile(repoRoot(), id, options.file);
+        console.log(`✔ ${options.file} removed from ${id}`);
+      }
     }),
   );
 
