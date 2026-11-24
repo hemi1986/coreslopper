@@ -11,7 +11,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { parse, stringify } from 'yaml';
 import { buildRelease, runRelease } from '../packages/cli/src/release.ts';
-import { runCalendar } from '../packages/cli/src/release-calendar.ts';
+import { calendarInput, planCalendar, runCalendar } from '../packages/cli/src/release-calendar.ts';
 import { cleanupFixtures, fakeDeps, fixture } from './helpers/release-fixture.ts';
 
 afterEach(cleanupFixtures);
@@ -72,5 +72,48 @@ describe('release of an internal project', () => {
     await expect(runCalendar({ projectDir: dir, root: join(dir, '..', '..'), log: () => undefined })).rejects.toThrow('not released publicly');
     expect(existsSync(join(dir, 'renders', 'release'))).toBe(false);
     expect(existsSync(join(dir, 'review', 'calendar.yaml'))).toBe(false);
+  });
+});
+
+/** A project beside the fixture's, with an earlier calendar and the given distribution. */
+async function siblingCalendar(
+  projectDir: string,
+  slug: string,
+  calendar: { release_date: string; distribution?: string; shortDay?: string },
+): Promise<void> {
+  const dir = join(dirname(projectDir), slug);
+  await mkdir(join(dir, 'review'), { recursive: true });
+  const config = parse(await readFile(join(projectDir, 'project.yaml'), 'utf8')) as Record<string, unknown>;
+  delete config.release;
+  config.slug = slug;
+  if (calendar.distribution) config.distribution = calendar.distribution;
+  else delete config.distribution;
+  await writeFile(join(dir, 'project.yaml'), stringify(config));
+  const events = calendar.shortDay
+    ? [{ id: 'short:Z1-intro:youtube', at: `${calendar.shortDay}T18:00:00+01:00`, platform: 'shorts', step: 'short', item: 'Z1-intro' }]
+    : [];
+  await writeFile(
+    join(dir, 'review', 'calendar.yaml'),
+    stringify({ version: 1, project: slug, title: slug, release_date: calendar.release_date, proposed: false, timezone: 'Europe/Berlin', events }),
+  );
+}
+
+/** Plan a public project's calendar without a release day of its own: 2026-12-04 is its first free Friday. */
+function planNeon(dir: string, input: Partial<Parameters<typeof calendarInput>[0]> = {}) {
+  return planCalendar(
+    dir,
+    calendarInput({ slug: 'neon', title: 'Neon Rain', kind: 'music-video', shorts: [], ...input }),
+    { root: join(dir, '..', '..'), now: new Date('2026-11-13T09:00:00Z') },
+  );
+}
+
+describe('planning around an internal project', () => {
+  it("ST-040: A public project's calendar still books its slots", async () => {
+    const dir = await fixture();
+    await siblingCalendar(dir, 'other', { release_date: '2026-12-04' });
+
+    const calendar = await planNeon(dir);
+
+    expect(calendar.release_date).not.toBe('2026-12-04');
   });
 });
