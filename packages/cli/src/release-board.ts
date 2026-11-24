@@ -1,6 +1,7 @@
 import { createReadStream, existsSync } from 'node:fs';
-import { readFile, readdir, rm, stat } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rm, stat } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import { tmpdir } from 'node:os';
 import { extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ValidationError, calendarIcs, loadChannel, loadProject, releasedPublicly, repoRoot, type ReleaseCalendar } from '@coreslopper/core';
@@ -9,7 +10,7 @@ import { loadEvents, loadSnapshot } from './production-watch.js';
 import { editNote, reviewData, submitRound } from './board-review.js';
 import { SLUG, productionDetail, productionOverview, productionSeries, projectDirs, seriesDirs } from './board-production.js';
 import { loadCalendar, updateStatus } from './release-calendar.js';
-import { LIBRARY_FILE_LIMITS } from './library-entry.js';
+import { LIBRARY_FILE_LIMITS, safeName } from './library-entry.js';
 import { releaseDir } from './release.js';
 
 // The board: a local web page over the workspace. Its production view shows
@@ -23,7 +24,8 @@ import { releaseDir } from './release.js';
 // trustedWrite): the status files, the approval, and the autopilot's retry and
 // takeover marks (and, on approval of a proposed date,
 // release.release_date in project.yaml), the wizard's new projects and
-// references, and the character library (library/characters/, ADR 0034).
+// references, the character library (library/characters/, ADR 0034) and the
+// set library (library/sets/, ADR 0052).
 
 export interface BoardOptions {
   /** The workspace (or repository) root; projects live in its projects/. */
@@ -327,6 +329,81 @@ export function boardHandler(options: BoardOptions = {}) {
     }
     return false;
   };
+  /**
+   * The set library: list, import, new entries, uploads, edit, remove a file,
+   * use in a project or canon, delete; true when it answered the request.
+   */
+  const setsRoute = async (req: IncomingMessage, res: ServerResponse, path: string, query: URLSearchParams): Promise<boolean> => {
+    const sets = await import('./set-library.js');
+    const library = await import('./character-library.js');
+    const answer = (value: unknown) => {
+      json(res, value);
+      return true;
+    };
+    const listing = async () => ({ ...(await sets.listLibrarySets(root)), targets: await library.libraryTargets(root) });
+    // A set's files are served from their own path, apart from a character's; its entry file is never served.
+    const fileMatch = /^\/set-files\/([^/]+)\/([^/]+)$/.exec(path);
+    if (req.method === 'GET' && fileMatch) {
+      const [, id, name] = fileMatch as unknown as [string, string, string];
+      if (name.startsWith('.') || name === 'set.yaml') {
+        send(res, 403, 'forbidden', 'text/plain');
+        return true;
+      }
+      await serveMedia(req, res, sets.setEntryDir(root, id), name);
+      return true;
+    }
+    if (req.method === 'GET' && path === '/api/sets') return answer(await listing());
+    if (req.method === 'POST' && path === '/api/sets/new') {
+      const entry = await sets.addLibrarySet(root, (await body(req)) as never, now());
+      return answer({ id: entry.id });
+    }
+    if (req.method === 'POST' && path === '/api/sets/import') {
+      const change = (await body(req)) as { scope?: unknown; slug?: unknown; set?: unknown; into?: unknown };
+      const dir = await library.libraryTarget(root, change.scope, change.slug);
+      const results = await sets.importSets(root, dir, {
+        set: typeof change.set === 'string' && change.set ? change.set : undefined,
+        into: typeof change.into === 'string' && change.into ? change.into : undefined,
+        now: now(),
+      });
+      return answer({ results, ...(await listing()) });
+    }
+    if (req.method === 'POST' && path === '/api/sets/use') {
+      const change = (await body(req)) as { scope?: unknown; slug?: unknown; id?: unknown };
+      const dir = await library.libraryTarget(root, change.scope, change.slug);
+      const result = await sets.useSet(root, dir, String(change.id ?? ''));
+      return answer({ result, ...(await listing()) });
+    }
+    const entryMatch = /^\/api\/sets\/([^/]+)$/.exec(path);
+    if (req.method === 'POST' && entryMatch) {
+      const id = entryMatch[1]!;
+      const change = (await body(req)) as Record<string, unknown>;
+      if (change.action === 'update') await sets.updateLibrarySet(root, id, change);
+      else if (change.action === 'remove-file') await sets.removeLibrarySetFile(root, id, change.name);
+      else if (change.action === 'delete') await sets.removeLibrarySet(root, id);
+      else throw new ValidationError('action must be update, remove-file, or delete');
+      return answer(await listing());
+    }
+    const uploadMatch = /^\/api\/upload\/sets\/([^/]+)$/.exec(path);
+    if (req.method === 'POST' && uploadMatch) {
+      const id = uploadMatch[1]!;
+      await sets.loadLibrarySet(root, id);
+      const role = query.get('role') ?? 'ref';
+      if (role !== 'ref' && role !== 'plate') throw new ValidationError('role must be ref or plate');
+      // The image lands in a temporary folder first; `addLibrarySetFile` copies it into the entry by content,
+      // applies the plate rules and names it in set.yaml, so the board adds a file exactly as the command does.
+      const folder = await mkdtemp(join(tmpdir(), 'coreslopper-set-upload-'));
+      try {
+        const file = join(folder, safeName(query.get('name') ?? ''));
+        const { receiveUpload } = await import('./board-wizard.js');
+        await receiveUpload(req, file, LIBRARY_FILE_LIMITS.bytes);
+        await sets.addLibrarySetFile(root, id, file, { role, angle: query.get('angle') ?? undefined, plate: query.get('plate') ?? undefined }, now());
+      } finally {
+        await rm(folder, { recursive: true, force: true });
+      }
+      return answer(await listing());
+    }
+    return false;
+  };
   const projectDir = async (slug: string) => {
     if (!SLUG.test(slug)) throw new ValidationError(`unknown project ${slug}`);
     const dir = join(root, 'projects', slug);
@@ -407,6 +484,10 @@ export function boardHandler(options: BoardOptions = {}) {
       }
       if (path.startsWith('/api/library') || path.startsWith('/library-files/') || path.startsWith('/api/upload/library/')) {
         const handled = await libraryRoute(req, res, path, url.searchParams);
+        if (handled) return;
+      }
+      if (path.startsWith('/api/sets') || path.startsWith('/set-files/') || path.startsWith('/api/upload/sets/')) {
+        const handled = await setsRoute(req, res, path, url.searchParams);
         if (handled) return;
       }
       if (path.startsWith('/api/new') || path.startsWith('/api/upload/')) {
