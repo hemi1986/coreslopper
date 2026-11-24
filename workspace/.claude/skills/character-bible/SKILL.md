@@ -29,7 +29,7 @@ license: MIT
 4. File the sheet and 2–4 usable reference images under the project's gitignored `characters/<id>/` by giving each batch item its `out` path there; never copy generated files by hand. Record them in `characters.yaml` with `sheet`, `refs`, and the prompt.
 5. Every sheet is reviewed before anything derives from it: queue it as a hand-written item with `out` and `review` (`.claude/skills/ai-clips/SKILL.md`, steps 3–6), with `"review": {"ref": "sheet:<id>"}`. The queue reviews it (identity, costume, palette, readability at small sizes), regenerates a failed image with the verdict's `fix_prompt`, and files only an approved one.
 6. Add the **character states** the treatment or script needs (see below).
-7. Update the state with `npm run cli -- stage-done <project> style-character --outputs style.yaml,characters.yaml` when the style bible is also ready. It takes the project's characters and sets into the library by itself and prints what it added.
+7. Update the state with `npm run cli -- stage-done <project> style-character --outputs style.yaml,characters.yaml` when the style bible is also ready, adding `,sets.yaml` when the project has a set bible. It takes the project's characters and sets into the library by itself and prints what it added.
 
 ## Library characters
 

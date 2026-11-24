@@ -969,16 +969,16 @@ program
       console.log(`✔ ${stage} done`);
       // The characters and sets of finished bibles go into the workspace library.
       if (stage === 'style-character' && existsSync(join(loaded.paths.root, 'characters.yaml'))) {
-        const { importCharacters } = await import('./character-library.js');
         try {
+          const { importCharacters } = await import('./character-library.js');
           for (const result of await importCharacters(repoRoot(), loaded.paths.root)) printImport(result);
         } catch (error) {
           console.warn(`⚠ character library: ${(error as Error).message}`);
         }
       }
       if (stage === 'style-character' && existsSync(join(loaded.paths.root, 'sets.yaml'))) {
-        const { importSets } = await import('./set-library.js');
         try {
+          const { importSets } = await import('./set-library.js');
           for (const result of await importSets(repoRoot(), loaded.paths.root)) printSetImport(result);
         } catch (error) {
           console.warn(`⚠ set library: ${(error as Error).message}`);

@@ -527,18 +527,38 @@ describe('finished set bibles enter the library', () => {
     expect(existsSync(join(ws, 'library', 'sets', 'bar'))).toBe(false);
   });
 
+  it('warns and keeps the stage done when the set import rejects', async () => {
+    const ws = await cliWorkspace();
+    const dir = await video(ws, 'neon-rain');
+    await production(ws, 'neon-rain', [bar({ refs: ['sets/bar/start.png'] })], { 'sets/bar/start.png': 'start' });
+    await mkdir(join(ws, 'library'), { recursive: true });
+    await writeFile(join(ws, 'library', 'sets'), 'not a directory');
+
+    const result = stageDone(ws, dir);
+
+    expect(result.status, result.stderr).toBe(0);
+    expect((await loadProject(dir)).state.stages['style-character']?.status).toBe('done');
+    expect(result.stderr).toMatch(/⚠ set library:/);
+    expect(await readFile(join(ws, 'library', 'sets'), 'utf8')).toBe('not a directory');
+  });
+
   it('ST-027: A music video without a set bible takes nothing in', async () => {
     const ws = await cliWorkspace();
     await libraryBar(ws);
     const dir = await video(ws, 'neon-rain');
-    const before = await readFile(join(setEntryDir(ws, 'bar'), 'set.yaml'), 'utf8');
+    const entryDir = setEntryDir(ws, 'bar');
+    const before = await readFile(join(entryDir, 'set.yaml'), 'utf8');
+    const beforeFiles = await readdir(entryDir);
+    const beforeImage = await readFile(join(entryDir, 'counter.png'));
     expect(existsSync(join(dir, 'sets.yaml'))).toBe(false);
 
     const result = stageDone(ws, dir);
 
     expect(result.status, result.stderr).toBe(0);
     expect((await loadProject(dir)).state.stages['style-character']?.status).toBe('done');
-    expect(await readFile(join(setEntryDir(ws, 'bar'), 'set.yaml'), 'utf8')).toBe(before);
+    expect(await readFile(join(entryDir, 'set.yaml'), 'utf8')).toBe(before);
+    expect(await readdir(entryDir)).toEqual(beforeFiles);
+    expect(await readFile(join(entryDir, 'counter.png'))).toEqual(beforeImage);
     expect(await readdir(join(ws, 'library', 'sets'))).toEqual(['bar']);
   });
 });
