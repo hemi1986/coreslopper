@@ -4,15 +4,20 @@
 
 **Progress: 23 of 24 domain stories done** · scenarios 77 of 80
 
-**42 stories** · In Progress: 0 · Ready: 3 · Ready for Human Review: 0 · In Review: 1 · Draft: 0 · Done: 38 · Superseded: 0
+**42 stories** · In Progress: 1 · Ready: 2 · Ready for Human Review: 0 · In Review: 1 · Draft: 0 · Done: 38 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
+
+## In Progress
+
+| ID | Title | Type | Context | Priority | Size | Risk | Depends on |
+|---|---|---|---|---|---|---|---|
+| [ST-042](ST-042-an-internal-project-cannot-be-approved.md) | An internal project cannot be approved | domain | Release | should | – | – | ST-036 |
 
 ## Ready
 
 | ID | Title | Type | Context | Priority | Size | Risk | Depends on |
 |---|---|---|---|---|---|---|---|
-| [ST-042](ST-042-an-internal-project-cannot-be-approved.md) | An internal project cannot be approved | domain | Release | should | – | – | ST-036 |
 | [ST-018](ST-018-the-boards-sounds-view.md) | The board's Sounds view | task | – | could | – | – | ST-001, ST-002, ST-003, ST-006 |
 | [ST-019](ST-019-spike-tiktok-trending-audio.md) | Spike: can a meme use TikTok's trending audio? | spike | – | could | – | – | – |
 
