@@ -1,7 +1,7 @@
 import { existsSync, statSync } from 'node:fs';
 import { mkdir, readFile, readdir, rm, stat } from 'node:fs/promises';
 import { basename, extname, join, resolve, sep } from 'node:path';
-import { isMap, isSeq, parseDocument, stringify, type YAMLMap, type YAMLSeq } from 'yaml';
+import { isMap, isSeq, parse as parseYaml, parseDocument, stringify, type YAMLMap, type YAMLSeq } from 'yaml';
 import { LibrarySetSchema, SetBibleSchema, ValidationError, isScriptId, readYamlFile, writeTextAtomic, type LibrarySet, type SetDefinition } from '@coreslopper/core';
 import { LIBRARY_FILE_LIMITS, commitCopies, copyByContent, discardCopies, entryFileHashes, entryText, fileHash, libraryEntryDir, libraryEntryFile, librarySourceLabel, parseTags, slugOfName } from './library-entry.js';
 
@@ -336,6 +336,15 @@ export interface UseSetResult {
  */
 export async function useSet(root: string, targetDir: string, id: string): Promise<UseSetResult> {
   const entry = await loadLibrarySet(root, id);
+  const projectFile = join(targetDir, 'project.yaml');
+  if (existsSync(projectFile)) {
+    const config = (parseYaml(await readFile(projectFile, 'utf8')) ?? {}) as { kind?: unknown };
+    if (config.kind === 'episode') {
+      throw new ValidationError('an episode takes its sets from the series canon; use the set in the series instead');
+    }
+  } else if (!existsSync(join(targetDir, 'series.yaml'))) {
+    throw new ValidationError(`${targetDir} is neither a project nor a series canon`);
+  }
   const source = (name: string) => join(setEntryDir(root, id), name);
   const named = [...entry.refs, ...entry.plates.flatMap((plate) => (plate.file ? [plate.file] : []))];
   const absent = named.filter((name) => !existsSync(source(name)));

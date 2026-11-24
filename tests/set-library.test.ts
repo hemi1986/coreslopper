@@ -650,4 +650,17 @@ describe('using a library set', () => {
     expect(await readFile(join(dir, 'sets.yaml'), 'utf8')).toBe(before);
     expect(existsSync(join(dir, 'sets', 'bar'))).toBe(false);
   });
+
+  it('ST-028: An episode refuses the use', async () => {
+    const ws = await cliWorkspace();
+    await libraryBarWith(ws, ['start.png'], []);
+    const dir = await video(ws, 'night-desk-02');
+    const config = await readFile(join(dir, 'project.yaml'), 'utf8');
+    await writeFile(join(dir, 'project.yaml'), config.replace(/^kind: .*$/m, 'kind: episode'));
+
+    await expect(useSet(ws, dir, 'bar')).rejects.toThrow(/series canon/);
+
+    expect(existsSync(join(dir, 'sets.yaml'))).toBe(false);
+    expect(existsSync(join(dir, 'sets', 'bar'))).toBe(false);
+  });
 });
