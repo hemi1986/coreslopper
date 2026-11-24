@@ -818,7 +818,8 @@ set
       const result = await useSet(repoRoot(), dir, id);
       const files = `${result.files.length} ${result.files.length === 1 ? 'file' : 'files'}`;
       const plates = `${result.plates.length} ${result.plates.length === 1 ? 'plate' : 'plates'}`;
-      console.log(`✔ ${result.set} ${result.updated ? 'updated in' : 'added to'} ${basename(dir)}: ${files}, ${plates}`);
+      if (result.updated && !result.files.length && !result.plates.length) console.log(`✔ ${result.set} is already in ${basename(dir)}`);
+      else console.log(`✔ ${result.set} ${result.updated ? 'updated in' : 'added to'} ${basename(dir)}: ${files}, ${plates}`);
     }),
   );
 

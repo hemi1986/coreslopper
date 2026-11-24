@@ -463,7 +463,10 @@ export async function libraryTargets(root: string): Promise<{ scope: 'project' |
       .catch(() => ({}) as { title?: unknown });
   for (const dir of await projectDirs(root)) {
     // A broken project.yaml is no target; the board lists what it can read.
-    const kind = await libraryTargetKind(dir).catch(() => undefined);
+    const kind = await libraryTargetKind(dir).catch((error: unknown) => {
+      if (error instanceof ValidationError) return undefined;
+      throw error;
+    });
     if (kind !== 'project') continue;
     const config = await head(join(dir, 'project.yaml'));
     targets.push({ scope: 'project', slug: basename(dir), title: typeof config.title === 'string' ? config.title : basename(dir) });
