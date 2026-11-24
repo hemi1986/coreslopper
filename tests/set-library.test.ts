@@ -89,6 +89,16 @@ describe('updating a library set', () => {
 
     expect((await loadLibrarySet(ws, 'bar')).prompt).toBe('narrow bar, blue neon');
   });
+
+  it('changes the name and the tags, and keeps the id', async () => {
+    const ws = await withBar();
+
+    const entry = await updateLibrarySet(ws, 'bar', { name: 'Neon Bar', tags: 'bar, night,neon' });
+
+    expect(entry).toMatchObject({ id: 'bar', name: 'Neon Bar', tags: ['bar', 'night', 'neon'] });
+    expect(await loadLibrarySet(ws, 'bar')).toMatchObject({ id: 'bar', name: 'Neon Bar', description: 'a bar', prompt: 'narrow bar, blue neon', tags: ['bar', 'night', 'neon'] });
+    expect(existsSync(join(ws, 'library', 'sets', 'neon-bar'))).toBe(false);
+  });
 });
 
 describe('adding a file to a library set', () => {
