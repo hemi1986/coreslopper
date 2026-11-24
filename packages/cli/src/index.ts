@@ -808,6 +808,19 @@ set
   );
 
 set
+  .command('use <target> <id>')
+  .description('Copy a library set into a music video or a series canon: references to sets/<id>/, every plate to sets/<id>/plates/, the entry to sets.yaml with library: <id>.')
+  .option('--series', 'The target is a series canon')
+  .action((target: string, id: string, options: { series?: boolean }) =>
+    run(async () => {
+      const { useSet } = await import('./set-library.js');
+      const dir = options.series ? seriesDirFromArg(target) : projectDirFromArg(target);
+      const result = await useSet(repoRoot(), dir, id);
+      console.log(`✔ ${result.set} ${result.updated ? 'updated in' : 'added to'} ${basename(dir)}: ${result.files.length} files, ${result.plates.length} plates`);
+    }),
+  );
+
+set
   .command('new')
   .description('Add a set to the library by hand; the id comes from the name.')
   .requiredOption('--name <name>', 'Display name')
