@@ -487,12 +487,12 @@ aggregates:
     context: BC-Release
     status: as-is
     evidence:
-      - review/release-status.json, written by updateStatus and writeStatus under the project's release lock review/.release.lock (packages/cli/src/release-calendar.ts:28-31,118-142; packages/cli/src/release-autopilot.ts:52-58,66-89; schema.ts:1058-1085)
+      - review/release-status.json, written by updateStatus and writeStatus under the project's release lock review/.release.lock (packages/cli/src/release-calendar.ts:28-31,118-142; packages/cli/src/release-autopilot.ts:52-58,70-99; schema.ts:1058-1085)
     invariants:
       - An item belongs to one calendar event, or to one checklist line of it named by its content, never by its position (decided 2026-11-22, HS-179; checklist lines are keyed <event>#<index> – gap register)
       - A done mark records when and by whom – the user or the autopilot (decided 2026-11-22, HS-179; calendar --done-until records no one – gap register)
       - A live URL starts with http:// or https:// (the code does this, packages/cli/src/release-board.ts:444)
-      - Done marks are facts – they survive a new release day and a withdrawn approval (the code does this, release-calendar.ts:127-142; release-autopilot.ts:84-88; HS-171)
+      - Done marks are facts – they survive a new release day and a withdrawn approval (the code does this, release-calendar.ts:127-142; release-autopilot.ts:95-99; HS-171)
       - An approval holds for the release day it names only; when the day moves, the user approves again (the code does this, packages/core/src/autopilot.ts:142-144), and everything that reads the approval uses this rule (decided 2026-11-22, HS-169; the production view counts any approval – gap register)
       - An approval covers the release day, not the content – texts, times and files may still change after it (the code does this, autopilot.ts:142-144; HS-168)
       - An approval needs a release folder, upload data and a calendar, wherever it is given (decided 2026-11-22, HS-168; only the board's button checks – gap register)
@@ -1113,7 +1113,7 @@ events:
     name: Release day fixed
     aggregate: AGG-ReleaseCalendar
     data: [Project, Release day]
-    description: "release.release_date written into project.yaml, comments kept – today only by the approval of a proposed day (packages/cli/src/release-autopilot.ts:74-76,91-98); the user may also write it by hand"
+    description: "release.release_date written into project.yaml, comments kept – today only by the approval of a proposed day (packages/cli/src/release-autopilot.ts:86,102-109); the user may also write it by hand"
   - id: EVT-CalendarEventMarkedDone
     name: Calendar event marked done
     aggregate: AGG-ReleaseStatus
@@ -1129,17 +1129,17 @@ events:
     aggregate: AGG-ReleaseStatus
     pivotal: true
     data: [Project, Release day, At]
-    description: "approval {at, release_date} in review/release-status.json, from the board's Approve release or release-approve (release-autopilot.ts:66-82); the release autopilot (publish slice) acts on it"
+    description: "approval {at, release_date} in review/release-status.json, from the board's Approve release or release-approve (release-autopilot.ts:70-92); the release autopilot (publish slice) acts on it"
   - id: EVT-ApprovalWithdrawn
     name: Approval withdrawn
     aggregate: AGG-ReleaseStatus
     data: [Project]
-    description: "The board's Withdraw approval or release-approve --revoke deletes the approval and keeps the done marks (release-autopilot.ts:84-89)"
+    description: "The board's Withdraw approval or release-approve --revoke deletes the approval and keeps the done marks (release-autopilot.ts:95-99)"
   - id: EVT-ApprovalRefused
     name: Approval refused
     context: BC-Release
     data: [Project, Reason]
-    description: "No calendar, a release day that differs from the calendar's (reload the board) (release-autopilot.ts:66-73), or a project with distribution internal (ST-042)"
+    description: "No calendar, a release day that differs from the calendar's (reload the board) (release-autopilot.ts:80-84), or a project with distribution internal (ST-042)"
   - id: EVT-ReleaseChecked
     name: Release checked
     context: BC-Release
@@ -2136,17 +2136,17 @@ commands:
     actor: ACT-User
     aggregate: AGG-ReleaseStatus
     produces: [EVT-ReleaseDayFixed, EVT-ReleaseCalendarPlanned, EVT-ReleaseApproved, EVT-ApprovalRefused]
-    description: "The board's Approve release, or release-approve <project> (release-autopilot.ts:66-82; packages/cli/src/index.ts:421-437); stage runners, /video-next and agents never approve (ADR 0029)"
+    description: "The board's Approve release, or release-approve <project> (release-autopilot.ts:70-92; packages/cli/src/index.ts:421-437); stage runners, /video-next and agents never approve (ADR 0029)"
     rules:
-      - A proposed release day is written into project.yaml first and the calendar planned again – the one place a tool writes the user's project.yaml (the code does this, release-autopilot.ts:74-76,91-98; HS-177)
-      - The day in the request must be the calendar's (the code does this, release-autopilot.ts:70-72)
+      - A proposed release day is written into project.yaml first and the calendar planned again – the one place a tool writes the user's project.yaml (the code does this, release-autopilot.ts:86,102-109; HS-177)
+      - The day in the request must be the calendar's (the code does this, release-autopilot.ts:81-84)
       - A project with distribution internal is never approved – the approval is refused before anything is written, also with a calendar from before it became internal (user, 2026-11-22, ST-042)
   - id: CMD-WithdrawApproval
     name: Withdraw the approval
     actor: ACT-User
     aggregate: AGG-ReleaseStatus
     produces: [EVT-ApprovalWithdrawn]
-    description: "The board's Withdraw approval, or release-approve <project> --revoke; what has not gone out stays (release-autopilot.ts:84-89)"
+    description: "The board's Withdraw approval, or release-approve <project> --revoke; what has not gone out stays (release-autopilot.ts:95-99)"
   - id: CMD-CheckRelease
     name: Check the release package
     actor: ACT-StageRunner

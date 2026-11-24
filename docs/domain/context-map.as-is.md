@@ -392,7 +392,7 @@ Evidence:
   publicly released project (`packages/core/src/calendar.ts:119-225`, `packages/cli/src/release-calendar.ts:49-110`)
 - the board's release view (`packages/cli/src/release-board.ts:412-503`, `release-board-data.ts:432-703`,
   `board/release.js`) writes `review/release-status.json` under the release lock (`release-calendar.ts:118-142`);
-  the approval is written by `approveRelease` (`packages/cli/src/release-autopilot.ts:66-89`) and read by
+  the approval is written by `approveRelease` (`packages/cli/src/release-autopilot.ts:70-99`) and read by
   `approvalHolds` (`packages/core/src/autopilot.ts:142-144`)
 - QA's release checks (`packages/cli/src/release-qa.ts:56-231`, `qa.ts:177-221,379-381`)
 Boundaries:

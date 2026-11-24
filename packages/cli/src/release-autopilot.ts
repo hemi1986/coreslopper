@@ -9,11 +9,11 @@ import {
   ValidationError,
   approvalHolds,
   autopilotAttention,
-  loadProject,
   mainVideoId,
   notReleasedPublicly,
   planAutopilot,
   plainLyrics,
+  readYamlFile,
   releasedPublicly,
   writeJsonAtomic,
   writeTextAtomic,
@@ -69,10 +69,11 @@ async function writeStatus(projectRoot: string, change: (status: ReleaseStatus) 
  */
 export async function approveRelease(projectRoot: string, options: { root: string; now: Date; releaseDate?: string }): Promise<ReleaseStatus> {
   // An internal project is never approved, also with a calendar from before it became internal: the refusal comes
-  // before anything is written (CMD-ApproveRelease, ST-042).
-  const project = await loadProject(projectRoot);
-  if (!releasedPublicly(project.config)) {
-    throw new ValidationError(`${notReleasedPublicly(project.config.slug)}: it is never approved.`);
+  // before anything is written (CMD-ApproveRelease, ST-042). The distribution is read from project.yaml alone, like
+  // the other readers of a project's distribution, so the check adds no other precondition to the approval.
+  const config = await readYamlFile(join(projectRoot, 'project.yaml'), ProjectConfigSchema);
+  if (!releasedPublicly(config)) {
+    throw new ValidationError(`${notReleasedPublicly(config.slug)}: it is never approved.`);
   }
   const { loadCalendar } = await import('./release-calendar.js');
   const calendar = await loadCalendar(projectRoot);
