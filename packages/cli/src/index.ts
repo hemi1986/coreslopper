@@ -789,7 +789,7 @@ character
 
 const set = program
   .command('set')
-  .description('The workspace set library (library/sets/<id>/): import, new, add-file.');
+  .description('The workspace set library (library/sets/<id>/): import, use, new, add-file.');
 
 set
   .command('import <target>')
@@ -804,6 +804,22 @@ set
       const results = await importSets(repoRoot(), dir, { set: options.id, into: options.into });
       if (!results.length) console.log('No set with files to take into the library.');
       for (const result of results) printSetImport(result);
+    }),
+  );
+
+set
+  .command('use <target> <id>')
+  .description('Copy a library set into a music video or a series canon: references to sets/<id>/, every plate to sets/<id>/plates/, the entry to sets.yaml with library: <id>.')
+  .option('--series', 'The target is a series canon')
+  .action((target: string, id: string, options: { series?: boolean }) =>
+    run(async () => {
+      const { useSet } = await import('./set-library.js');
+      const dir = options.series ? seriesDirFromArg(target) : projectDirFromArg(target);
+      const result = await useSet(repoRoot(), dir, id);
+      const files = `${result.files.length} ${result.files.length === 1 ? 'file' : 'files'}`;
+      const plates = `${result.plates.length} ${result.plates.length === 1 ? 'plate' : 'plates'}`;
+      if (result.updated && !result.files.length && !result.plates.length) console.log(`✔ ${result.set} is already in ${basename(dir)}`);
+      else console.log(`✔ ${result.set} ${result.updated ? 'updated in' : 'added to'} ${basename(dir)}: ${files}, ${plates}`);
     }),
   );
 

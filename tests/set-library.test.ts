@@ -4,10 +4,11 @@ import { cp, mkdir, mkdtemp, readFile, readdir, rm, truncate, writeFile } from '
 import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { stringify } from 'yaml';
+import { parse, stringify } from 'yaml';
 import { loadProject } from '@coreslopper/core';
-import { addLibrarySet, addLibrarySetFile, importSets, loadLibrarySet, setEntryDir } from '../packages/cli/src/set-library.ts';
+import { addLibrarySet, addLibrarySetFile, importSets, loadLibrarySet, setEntryDir, useSet } from '../packages/cli/src/set-library.ts';
 import { createProject } from '../packages/cli/src/new-project.ts';
+import { createEpisode, createSeriesCanon } from '../packages/cli/src/board-wizard.ts';
 import { validateChangedFile } from '../packages/cli/src/validate-file.ts';
 
 const root = process.cwd();
@@ -560,5 +561,133 @@ describe('finished set bibles enter the library', () => {
     expect(await readdir(entryDir)).toEqual(beforeFiles);
     expect(await readFile(join(entryDir, 'counter.png'))).toEqual(beforeImage);
     expect(await readdir(join(ws, 'library', 'sets'))).toEqual(['bar']);
+  });
+});
+
+/** The library holds "bar" with the given references and plates, each image its own bytes. */
+async function libraryBarWith(ws: string, refs: string[], plates: { id: string; angle: string }[]): Promise<void> {
+  await addLibrarySet(ws, { name: 'Bar', description: 'A narrow bar in blue neon.', prompt: 'narrow bar, blue neon, wet counter' });
+  for (const name of refs) {
+    await writeFile(join(ws, name), `ref:${name}`);
+    await addLibrarySetFile(ws, 'bar', join(ws, name), { role: 'ref' });
+  }
+  for (const plate of plates) {
+    await writeFile(join(ws, `${plate.id}.png`), `plate:${plate.id}`);
+    await addLibrarySetFile(ws, 'bar', join(ws, `${plate.id}.png`), { role: 'plate', angle: plate.angle, plate: plate.id });
+  }
+}
+
+describe('using a library set', () => {
+  it('ST-028: A library set is copied with every plate', async () => {
+    const ws = await cliWorkspace();
+    await libraryBarWith(ws, ['start.png'], [
+      { id: 'counter', angle: 'counter, frontal' },
+      { id: 'door', angle: 'door, from inside' },
+    ]);
+    const dir = await video(ws, 'neon-rain');
+    expect(existsSync(join(dir, 'sets.yaml'))).toBe(false);
+
+    const result = await useSet(ws, dir, 'bar');
+
+    expect(result).toEqual({
+      set: 'bar',
+      updated: false,
+      files: ['sets/bar/start.png', 'sets/bar/plates/counter.png', 'sets/bar/plates/door.png'],
+      plates: ['counter', 'door'],
+    });
+    const bible = parse(await readFile(join(dir, 'sets.yaml'), 'utf8'));
+    expect(bible.sets).toEqual([
+      {
+        id: 'bar',
+        name: 'Bar',
+        description: 'A narrow bar in blue neon.',
+        prompt: 'narrow bar, blue neon, wet counter',
+        refs: ['sets/bar/start.png'],
+        plates: [
+          { id: 'counter', angle: 'counter, frontal', ref: 'sets/bar/plates/counter.png' },
+          { id: 'door', angle: 'door, from inside', ref: 'sets/bar/plates/door.png' },
+        ],
+        library: 'bar',
+      },
+    ]);
+    expect(await readFile(join(dir, 'sets/bar/start.png'), 'utf8')).toBe('ref:start.png');
+    expect(await readFile(join(dir, 'sets/bar/plates/counter.png'), 'utf8')).toBe('plate:counter');
+    expect(await readFile(join(dir, 'sets/bar/plates/door.png'), 'utf8')).toBe('plate:door');
+    expect(await validateChangedFile(join(dir, 'sets.yaml'))).toBe('sets');
+  });
+
+  it('ST-028: A second use adds only what is missing', async () => {
+    const ws = await cliWorkspace();
+    await libraryBarWith(ws, [], [{ id: 'counter', angle: 'counter, frontal' }]);
+    const dir = await video(ws, 'neon-rain');
+    await useSet(ws, dir, 'bar');
+    await writeFile(join(ws, 'door.png'), 'plate:door');
+    await addLibrarySetFile(ws, 'bar', join(ws, 'door.png'), { role: 'plate', angle: 'door, from inside', plate: 'door' });
+
+    const result = await useSet(ws, dir, 'bar');
+
+    expect(result).toEqual({ set: 'bar', updated: true, files: ['sets/bar/plates/door.png'], plates: ['door'] });
+    const bible = parse(await readFile(join(dir, 'sets.yaml'), 'utf8'));
+    expect(bible.sets).toHaveLength(1);
+    expect(bible.sets[0].plates).toEqual([
+      { id: 'counter', angle: 'counter, frontal', ref: 'sets/bar/plates/counter.png' },
+      { id: 'door', angle: 'door, from inside', ref: 'sets/bar/plates/door.png' },
+    ]);
+    expect(await validateChangedFile(join(dir, 'sets.yaml'))).toBe('sets');
+  });
+
+  it('ST-028: A set of the same id that is not from the library refuses the use', async () => {
+    const ws = await cliWorkspace();
+    await libraryBarWith(ws, ['start.png'], []);
+    const dir = await video(ws, 'neon-rain');
+    await writeFile(
+      join(dir, 'sets.yaml'),
+      stringify({ version: 1, sets: [{ id: 'bar', name: 'Their bar', description: 'Their own bar, not the library.', prompt: 'their own bar' }] }),
+    );
+    const before = await readFile(join(dir, 'sets.yaml'), 'utf8');
+
+    await expect(useSet(ws, dir, 'bar')).rejects.toThrow(/its own set "bar"/);
+
+    expect(await readFile(join(dir, 'sets.yaml'), 'utf8')).toBe(before);
+    expect(existsSync(join(dir, 'sets', 'bar'))).toBe(false);
+  });
+
+  it('ST-028: An episode refuses the use', async () => {
+    const ws = await cliWorkspace();
+    await libraryBarWith(ws, ['start.png'], []);
+    await createSeriesCanon(ws, { slug: 'night-desk', title: 'Night Desk', budget: 50, format: '9x16', imageProvider: 'mock', videoProvider: 'mock', audioProvider: 'mock' } as never);
+    const dir = await createEpisode(ws, { series: 'night-desk', episode: 2, slug: 'night-desk-02', budget: 10 });
+
+    await expect(useSet(ws, dir, 'bar')).rejects.toThrow(/series canon/);
+
+    expect(existsSync(join(dir, 'sets.yaml'))).toBe(false);
+    expect(existsSync(join(dir, 'sets', 'bar'))).toBe(false);
+  });
+
+  it('leaves nothing behind when the target sets.yaml refuses the result', async () => {
+    const ws = await cliWorkspace();
+    await libraryBarWith(ws, ['start.png'], [{ id: 'counter', angle: 'counter, frontal' }]);
+    const dir = await video(ws, 'neon-rain');
+    await writeFile(join(dir, 'sets.yaml'), 'version: 2\nsets: []\n');
+    const before = await readFile(join(dir, 'sets.yaml'), 'utf8');
+
+    await expect(useSet(ws, dir, 'bar')).rejects.toThrow(/sets.yaml would be invalid/);
+
+    expect(await readFile(join(dir, 'sets.yaml'), 'utf8')).toBe(before);
+    expect(existsSync(join(dir, 'sets', 'bar'))).toBe(false);
+  });
+
+  it('copies a set into a series canon', async () => {
+    const ws = await cliWorkspace();
+    await libraryBarWith(ws, ['start.png'], [{ id: 'counter', angle: 'counter, frontal' }]);
+    await createSeriesCanon(ws, { slug: 'harbor', title: 'Harbor', budget: 50, format: '9x16', imageProvider: 'mock', videoProvider: 'mock', audioProvider: 'mock' } as never);
+    const dir = join(ws, 'projects', 'harbor');
+
+    const result = await useSet(ws, dir, 'bar');
+
+    expect(result).toMatchObject({ set: 'bar', updated: false, plates: ['counter'] });
+    const bible = parse(await readFile(join(dir, 'sets.yaml'), 'utf8'));
+    expect(bible.sets[0]).toMatchObject({ id: 'bar', library: 'bar', refs: ['sets/bar/start.png'] });
+    expect(existsSync(join(dir, 'sets', 'bar', 'plates', 'counter.png'))).toBe(true);
   });
 });

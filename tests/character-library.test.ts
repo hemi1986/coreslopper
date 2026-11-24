@@ -5,12 +5,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import { parse } from 'yaml';
-import { createSeriesCanon, createVideoProject } from '../packages/cli/src/board-wizard.ts';
+import { createEpisode, createSeriesCanon, createVideoProject } from '../packages/cli/src/board-wizard.ts';
 import {
   addLibraryCharacter,
   addLibraryFile,
   entryDir,
   importCharacters,
+  libraryTargets,
   listLibrary,
   loadLibraryCharacter,
   removeLibraryFile,
@@ -140,8 +141,7 @@ describe('using a library character', () => {
 
     await createSeriesCanon(ws, { slug: 'harbor', title: 'Harbor', budget: 50, format: '9x16', imageProvider: 'mock', videoProvider: 'mock', audioProvider: 'mock' } as never);
     expect((await useCharacter(ws, join(ws, 'projects', 'harbor'), 'nova')).files.length).toBe(3);
-    const episode = await video(ws, 'harbor-01');
-    await writeFile(join(episode, 'project.yaml'), `${await readFile(join(episode, 'project.yaml'), 'utf8')}kind: episode\n`);
+    const episode = await createEpisode(ws, { series: 'harbor', episode: 1, slug: 'harbor-01', budget: 10 });
     await expect(useCharacter(ws, episode, 'nova')).rejects.toThrow(/series canon/);
   });
 
@@ -157,6 +157,22 @@ describe('using a library character', () => {
     const [result] = await importCharacters(ws, target);
     expect(result).toMatchObject({ id: 'nova', created: false, added: ['state-glow.png', 'state:glow'] });
     expect((await readdir(join(ws, 'library', 'characters'))).sort()).toEqual(['nova']);
+  });
+});
+
+describe('library targets', () => {
+  it('lists music videos and series canons but skips episodes and a broken project', async () => {
+    const ws = await workspace();
+    await video(ws, 'new-song');
+    await createSeriesCanon(ws, { slug: 'harbor', title: 'Harbor', budget: 50, format: '9x16', imageProvider: 'mock', videoProvider: 'mock', audioProvider: 'mock' } as never);
+    await createEpisode(ws, { series: 'harbor', episode: 1, slug: 'harbor-01', budget: 10 });
+    const broken = await video(ws, 'broken');
+    await writeFile(join(broken, 'project.yaml'), 'kind: [unclosed');
+
+    expect(await libraryTargets(ws)).toEqual([
+      { scope: 'project', slug: 'new-song', title: 'new-song' },
+      { scope: 'series', slug: 'harbor', title: 'Harbor' },
+    ]);
   });
 });
 
