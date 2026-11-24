@@ -16,6 +16,7 @@ import { loadCalendar, loadStatus, updateStatus } from '../packages/cli/src/rele
 import { publishProject, youtubeDescription } from '../packages/cli/src/publish.ts';
 import {
   approveRelease,
+  autopilotOverview,
   loadAutopilotLog,
   retryEvent,
   revokeApproval,
@@ -260,6 +261,19 @@ describe('release autopilot', () => {
     expect(t.social.get('x')!.calls).toEqual([]);
     expect((await boardProject(t.dir, t.root, { now: t.clock.now })).autopilot).toMatchObject({ approvalStale: true });
     expect(t.lines.join('\n')).toContain('approve it again');
+  });
+
+  it('prints the plan of every release with a calendar, approved or not', async () => {
+    const t = await setup();
+    const approved = new Date(t.at('distributor'));
+    await approveRelease(t.dir, { root: t.root, now: approved });
+    const lines: string[] = [];
+
+    await autopilotOverview(t.root, { now: approved, env: ENV, log: (line) => void lines.push(line) });
+
+    expect(lines[0]).toBe(`neon: approved ${approved.toISOString().slice(0, 10)} (release ${t.calendar.release_date})`);
+    expect(lines).toContainEqual(expect.stringMatching(/^\s+\d{4}-\d{2}-\d{2} \d{2}:\d{2}\s+youtube\s+\w+/));
+    expect(lines.join('\n')).not.toContain('← you');
   });
 
   it('posts the pinned comment once when the user ticks the main video off first', async () => {
