@@ -8,7 +8,7 @@ size: null
 risk: null
 depends_on: [ST-001, ST-002, ST-003, ST-004]
 labels: [feature:meme]
-status: review
+status: done
 ---
 
 ## Task
@@ -24,6 +24,6 @@ German `sound-library.de.md` like the board guide) explains:
 - what happens to memes when a sound changes or is removed
 
 ## Acceptance Criteria
-- [ ] Both pages exist, are listed in `workspace/AGENTS.md` Documentation and shown in the board's guide view
-- [ ] `scripts/runtime-files.mjs` classifies them as shipped; `tests/runtime-files.test.ts` is green
-- [ ] Every command and field in the page exists in the CLI and the schema (checked against `sound --help` and `LibrarySoundSchema`)
+- [x] Both pages exist, are listed in `workspace/AGENTS.md` Documentation and shown in the board's guide view
+- [x] `scripts/runtime-files.mjs` classifies them as shipped; `tests/runtime-files.test.ts` is green
+- [x] Every command and field in the page exists in the CLI and the schema (checked against `sound --help` and `LibrarySoundSchema`)

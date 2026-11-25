@@ -87,6 +87,8 @@ export const SHIPPED = [
   'docs/providers.md',
   'docs/publishing.md',
   'docs/release-platforms.md',
+  'docs/sound-library.de.md',
+  'docs/sound-library.md',
   'library/',
   'package.json',
   'package-lock.json',
