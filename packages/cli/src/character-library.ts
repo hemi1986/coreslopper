@@ -92,6 +92,7 @@ const kind = defineLibraryKind<LibraryCharacter, 'character', NewLibraryCharacte
     return { face: face as LibraryCharacter['face'] };
   },
   fileMode: 'copy',
+  roles: ['ref', 'sheet', 'voice'],
   role: (role) => ({ extensions: role === 'voice' ? LIBRARY_FILE_LIMITS.audio : LIBRARY_FILE_LIMITS.images, label: role }),
   recordFile: (entry, name, options) => {
     if (options.role === 'voice') {
@@ -218,6 +219,9 @@ const kind = defineLibraryKind<LibraryCharacter, 'character', NewLibraryCharacte
     },
   },
 });
+
+/** The lifecycle descriptor the board's character routes are driven by. */
+export const libraryKind = kind;
 
 export const libraryRoot = kind.root;
 export const entryDir = kind.entryDir;

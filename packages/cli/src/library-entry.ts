@@ -281,6 +281,8 @@ export interface LibraryKindConfig<
   newFields?: (input: NewEntry) => Partial<Entry>;
   /** `copy`: copy then record (`characters`); `stage`: stage the copy then commit (`sets`). */
   fileMode: 'copy' | 'stage';
+  /** The roles the kind takes, as `add-file` and the board name them. */
+  roles: readonly string[];
   /** The role and its extensions, or undefined when the kind does not take it. */
   role: (role: string) => LibraryFileRoleSpec | undefined;
   /** The refusal for a role a kind does not take. */
@@ -709,6 +711,12 @@ export function defineLibraryKind<
   return {
     kind: config.kind,
     noun: config.noun,
+    /** The entry file's name, which a file route never serves. */
+    entryName: config.entryFile,
+    /** The roles a file may take. */
+    roles: config.roles,
+    /** The row key of a use and the import body's field. */
+    useName: config.useName,
     root: libraryRoot,
     entryDir,
     entryFile,

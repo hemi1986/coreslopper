@@ -95,6 +95,7 @@ const kind = defineLibraryKind<LibrarySet, 'set', NewLibrarySet, SetDefinition, 
   filesTakenMessage: (id) => `the library folder for "${id}" holds files a set.yaml would not name; move them or choose another name`,
   idTaken,
   fileMode: 'stage',
+  roles: ['ref', 'plate'],
   role: (role) => (role === 'ref' || role === 'plate' ? { extensions: LIBRARY_FILE_LIMITS.images, label: 'set image' } : undefined),
   roleMessage: 'role must be ref or plate',
   prepareFile: async (entry, options, source, dir) => {
@@ -254,6 +255,9 @@ const kind = defineLibraryKind<LibrarySet, 'set', NewLibrarySet, SetDefinition, 
     },
   },
 });
+
+/** The lifecycle descriptor the board's set routes are driven by. */
+export const libraryKind = kind;
 
 export const setEntryDir = kind.entryDir;
 
