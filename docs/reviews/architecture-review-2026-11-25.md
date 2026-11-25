@@ -1,10 +1,10 @@
 # Architecture review – 2026-11-25
 
-Status: in progress · 01 (`4bf6985`), 03 (`119f693`), 04 (`fbc42d0`) and 05 (`9950c69`) implemented, awaiting review · 02 implementation started: cuts 0–5 landed (`d3a53d1`) – `workspace-dirs.ts`, the kind descriptor and read model, the manual lifecycle, the shared import/use drivers, the `libraryRoutes(kind)` route factory, and the kind fixture with the shared lifecycle and route suites; cut 6 (ADR status, review row) next; ADR 0056 proposed · Source: `/improve-codebase-architecture`, hot spots of the last 250 commits.
+Status: in progress · 01 (`4bf6985`), 02 (`d3a53d1`), 03 (`119f693`), 04 (`fbc42d0`) and 05 (`9950c69`) implemented, awaiting review · 02 is closed: `defineLibraryKind` in `library-entry.ts` is the one lifecycle, `workspace-dirs.ts` carries the paths, the kind modules hold data and hooks, one `libraryRoutes` factory serves both URL families in `release-board.ts`, and `describeLibraryLifecycle` plus one route suite run for both kinds; ADR 0056 proposed · the browser views' deduplication stays a separate follow-up candidate · Source: `/improve-codebase-architecture`, hot spots of the last 250 commits.
 Visual report: [architecture-review-2026-11-25.html](architecture-review-2026-11-25.html) (open in a browser; needs internet for Tailwind and Mermaid).
 Scope: release and publishing, the board, the libraries, generation, the workspace payload.
 
-Candidate 01 now has ADR 0055 (proposed) and code; candidate 02 has ADR 0056 (proposed), the shared lifecycle and the shared lifecycle/route suites (cuts 0–5); candidate 03 has code and `tests/release-records.test.ts`; candidate 04 has `release-facts.ts` and `tests/release-facts.test.ts`; candidate 05 has the core budget rule and `tests/series-budget.test.ts`; the other four are proposals without a story.
+Candidate 01 now has ADR 0055 (proposed) and code; candidate 02 is done with ADR 0056 (proposed), the one lifecycle and the shared lifecycle/route suites (cuts 0–5); candidate 03 has code and `tests/release-records.test.ts`; candidate 04 has `release-facts.ts` and `tests/release-facts.test.ts`; candidate 05 has the core budget rule and `tests/series-budget.test.ts`; the other four are proposals without a story.
 This file is the handoff between sessions. Keep it short and update the status table.
 
 ## Working rules (context discipline)
@@ -22,7 +22,7 @@ This file is the handoff between sessions. Keep it short and update the status t
 | # | Candidate | Strength | Status | Read set |
 |---|---|---|---|---|
 | 01 | Give the release one plan | Strong | done – `buildReleasePlan` in core, persisted as `manifest.plan`; folder, QA, board, autopilot and publish read it; ADR 0055 (proposed); commit 4bf6985 | `release.ts` (cli, core), `release-texts.ts`, `release-qa.ts`, `release-board-data.ts`, `publish.ts`, `release-autopilot.ts` |
-| 02 | Collapse the two library lifecycles | Strong | in progress – cuts 0–5 landed: `workspace-dirs.ts`, `defineLibraryKind` with load/save/list/uses/targets and the manual add/update/file/remove verbs, the shared import/use drivers with per-kind hooks, one `libraryRoutes(kind)` factory for both URL families, and `tests/helpers/library-fixture.ts` with `describeLibraryLifecycle` and `tests/library-routes.test.ts` for both kinds; cut 6 (ADR status, review row) next; ADR 0056 (proposed); commit d3a53d1 | `library-entry.ts`, `character-library.ts`, `set-library.ts`, `board/characters.js`, `board/sets.js`, `release-board.ts` |
+| 02 | Collapse the two library lifecycles | Strong | done – `defineLibraryKind` in `library-entry.ts` is the one lifecycle for characters and sets, with the kind data and hooks; no library module imports `board-production.ts`; one `libraryRoutes` factory in `release-board.ts` serves both URL families; `tests/helpers/library-fixture.ts` with `describeLibraryLifecycle`, `tests/library-lifecycle.test.ts` and `tests/library-routes.test.ts` cover both kinds; the existing suites stay unchanged (963 passed, 2 skipped); ADR 0056 (proposed); commit d3a53d1 | `library-entry.ts`, `character-library.ts`, `set-library.ts`, `board/characters.js`, `board/sets.js`, `release-board.ts` |
 | 03 | Give the release records one owner | Strong | done – `release-records.ts` owns status, the autopilot and publish logs and the lock; the board and production view share `approvalHolds`; checklist keys are by line; `tests/release-records.test.ts`; commit 119f693 | `release-calendar.ts`, `release-autopilot.ts`, `autopilot-state.ts`, `publish.ts`, `board-production.ts`, `board/release.js` |
 | 04 | Lift release facts out of the board view | Strong | done – `release-facts.ts` owns `loadReleaseFacts`, `releasePlan` and `releaseProjectDirs`; the board and the autopilot build on them; one facts load per project per round; commit fbc42d0 | `release-autopilot.ts`, `release-board-data.ts`, `release-board.ts`, `publish.ts`, `board/app.js` |
 | 05 | Make the uncommitted series budget one rule | Strong | done – `uncommittedBudget` in core; `remainingBudget` and `assertAffordable` subtract the committed episode budgets, so canon batches and episode creation check the same amount before any provider; `tests/series-budget.test.ts`; commit 9950c69 | `series.ts`, `new-project.ts`, `generate.ts`, `core/cost.ts`, `core/state.ts`, `board-wizard.ts` |
@@ -153,6 +153,14 @@ Next session: cut 5 — `tests/helpers/library-fixture.ts`, the lifecycle suite 
 **Implementation state (2026-11-25, session 5).** Cut 5 is green on `d3a53d1`: `tests/helpers/library-fixture.ts` holds one `LibraryKindFixture` per kind (`entryFile`, `roles`, `targetArray`, `entryDir`, `listPath`/`filePath`/`uploadPath`, `makeWorkspace`, `makeTarget`, `writeSource`, `makeSource` and the lifecycle verbs). `describeLibraryLifecycle(fixture)` runs add, update, add-file, import, use, remove-file and remove for both kinds; `tests/library-lifecycle.test.ts` invokes it for characters and sets. `tests/library-routes.test.ts` is one table over `boardHandler` for both URL families: list + targets, the entry file and dot files forbidden, cross-kind 404, new/update/remove-file/use/delete, the upload role (and its refusal), and the write guard. The existing character and set suites are unchanged and still the behaviour oracle; the new suites add the shared contract. The sound library and the two browser views are untouched. `npm run typecheck` and the full `npm test` pass (963 passed, 2 skipped).
 Next session: cut 6 — ADR 0056 status and the review row; view dedup stays a separate candidate.
 
+**Implementation state (2026-11-25, session 6).** Cut 6 is documentation only. ADR 0056 now records the implemented
+seam — one `defineLibraryKind` lifecycle in `library-entry.ts`, kind-specific data and hooks, `libraryRoutes(spec)`
+for both URL families, the shared fixture/lifecycle/route suites, and the sound library and both browser views
+deliberately separate — with the cut commits `07140b0`, `e132af5`, `060dfbe` and `d3a53d1`; its status stays
+`proposed` until the user accepts it. Candidate 02 is done: a new kind is config and hooks, no library module imports
+`board-production.ts`, every current test, URL and CLI output is unchanged, and the sound library is untouched.
+Open follow-up, not part of 02: deduplicating `board/characters.js` and `board/sets.js` is its own candidate.
+
 **ADR / context map.** ADR 0052 decides the domain (one `BC-Library`, sound apart) but not the code seam; the
 code-shape decision is hard to reverse, so ADR 0056 (proposed) records it. `docs/domain/context-map.md` needs no
 change: both libraries already sit in `BC-Library`, the sound library stays `BC-SoundLibrary` (ADR 0051), and no
@@ -160,7 +168,8 @@ aggregate, command, event or edge moves. The sound library is untouched.
 
 **Done when (implementation).** One lifecycle in `library-entry.ts`; the kind modules hold data and hooks only; no
 library module imports `board-production.ts`; the lifecycle and route suites run for both kinds; every current test,
-URL and CLI output unchanged; the sound suite untouched.
+URL and CLI output unchanged; the sound suite untouched. Met on `d3a53d1`; the two browser views' deduplication stays
+a separate candidate.
 
 ## 03 – Give the release records one owner
 
