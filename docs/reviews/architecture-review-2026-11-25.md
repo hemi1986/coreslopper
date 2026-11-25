@@ -21,7 +21,7 @@ This file is the handoff between sessions. Keep it short and update the status t
 
 | # | Candidate | Strength | Status | Read set |
 |---|---|---|---|---|
-| 01 | Give the release one plan | Strong | done – `buildReleasePlan` in core, persisted as `manifest.plan`; folder, QA, board, autopilot and publish read it; ADR 0055 (proposed); uncommitted | `release.ts` (cli, core), `release-texts.ts`, `release-qa.ts`, `release-board-data.ts`, `publish.ts`, `release-autopilot.ts` |
+| 01 | Give the release one plan | Strong | done – `buildReleasePlan` in core, persisted as `manifest.plan`; folder, QA, board, autopilot and publish read it; ADR 0055 (proposed); commit 4bf6985 | `release.ts` (cli, core), `release-texts.ts`, `release-qa.ts`, `release-board-data.ts`, `publish.ts`, `release-autopilot.ts` |
 | 02 | Collapse the two library lifecycles | Strong | open | `library-entry.ts`, `character-library.ts`, `set-library.ts`, `board/characters.js`, `board/sets.js`, `release-board.ts` |
 | 03 | Give the release records one owner | Strong | open | `release-calendar.ts`, `release-autopilot.ts`, `autopilot-state.ts`, `publish.ts`, `board-production.ts`, `board/release.js` |
 | 04 | Lift release facts out of the board view | Strong | open | `release-autopilot.ts`, `release-board-data.ts`, `release-board.ts`, `publish.ts`, `board/app.js` |
