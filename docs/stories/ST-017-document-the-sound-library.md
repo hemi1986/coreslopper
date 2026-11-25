@@ -8,7 +8,7 @@ size: null
 risk: null
 depends_on: [ST-001, ST-002, ST-003, ST-004]
 labels: [feature:meme]
-status: review
+status: ready
 ---
 
 ## Task
