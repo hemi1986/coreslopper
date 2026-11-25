@@ -6,11 +6,13 @@ paths:
   - "packages/cli/src/publish-setup.ts"
   - "packages/cli/src/social-auth.ts"
   - "packages/cli/src/release-autopilot.ts"
+  - "packages/cli/src/release-records.ts"
   - "packages/cli/src/autopilot-state.ts"
   - "packages/cli/src/release-timer.ts"
   - "packages/providers/src/publish/**"
   - "tests/publish*.test.ts"
   - "tests/release-autopilot*.test.ts"
+  - "tests/release-records.test.ts"
 ---
 
 # Publishing (BC-Publish)
