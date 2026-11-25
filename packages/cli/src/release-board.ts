@@ -4,7 +4,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { tmpdir } from 'node:os';
 import { extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ValidationError, calendarIcs, loadChannel, loadProject, releasedPublicly, repoRoot, type ReleaseCalendar } from '@coreslopper/core';
+import { ValidationError, calendarIcs, loadChannel, loadProject, releasedPublicly, repoRoot, LIBRARY_SOUND_FILE, type ReleaseCalendar } from '@coreslopper/core';
 import { boardProject, type BoardProject } from './release-board-data.js';
 import { loadEvents, loadSnapshot } from './production-watch.js';
 import { editNote, reviewData, submitRound } from './board-review.js';
@@ -24,8 +24,9 @@ import { releaseDir } from './release.js';
 // trustedWrite): the status files, the approval, and the autopilot's retry and
 // takeover marks (and, on approval of a proposed date,
 // release.release_date in project.yaml), the wizard's new projects and
-// references, the character library (library/characters/, ADR 0034) and the
-// set library (library/sets/, ADR 0052).
+// references, the character library (library/characters/, ADR 0034), the
+// set library (library/sets/, ADR 0052) and the sound library
+// (library/sounds/, ADR 0051).
 
 export interface BoardOptions {
   /** The workspace (or repository) root; projects live in its projects/. */
@@ -404,6 +405,74 @@ export function boardHandler(options: BoardOptions = {}) {
     }
     return false;
   };
+  /**
+   * The sound library: list, upload through `sound add`, edit and remove, and
+   * the one WAV of an entry; true when it answered the request.
+   */
+  const soundsRoute = async (req: IncomingMessage, res: ServerResponse, path: string, query: URLSearchParams): Promise<boolean> => {
+    const sounds = await import('./sound-library.js');
+    const answer = (value: unknown) => {
+      json(res, value);
+      return true;
+    };
+    const listing = () => sounds.listLibrarySounds(root);
+    // Only the WAV is served; an entry file or a dot file never is.
+    const fileMatch = /^\/sound-files\/([^/]+)\/([^/]+)$/.exec(path);
+    if (req.method === 'GET' && fileMatch) {
+      const [, id, name] = fileMatch as unknown as [string, string, string];
+      if (name !== LIBRARY_SOUND_FILE) {
+        send(res, 403, 'forbidden', 'text/plain');
+        return true;
+      }
+      await serveMedia(req, res, sounds.soundDir(root, id), name);
+      return true;
+    }
+    if (req.method === 'GET' && path === '/api/sounds') return answer(await listing());
+    // The upload lands in a temporary folder and `addLibrarySound` converts and stores it exactly as `sound add` does.
+    if (req.method === 'POST' && path === '/api/upload/sounds') {
+      const { receiveUpload, UPLOAD_LIMITS } = await import('./board-wizard.js');
+      const folder = await mkdtemp(join(tmpdir(), 'coreslopper-sound-upload-'));
+      try {
+        const file = join(folder, safeName(query.get('name') ?? 'sound'));
+        await receiveUpload(req, file, UPLOAD_LIMITS.audio.bytes);
+        const sound = await sounds.addLibrarySound(root, {
+          file,
+          title: query.get('title'),
+          useWhen: query.get('use-when'),
+          tags: query.get('tags'),
+          cue: query.get('cue'),
+          trim: query.get('trim'),
+          licence: query.get('licence'),
+          source: query.get('source'),
+          credit: query.get('credit'),
+        }, now());
+        return answer({ sound, ...(await listing()) });
+      } finally {
+        await rm(folder, { recursive: true, force: true });
+      }
+    }
+    const entryMatch = /^\/api\/sounds\/([^/]+)$/.exec(path);
+    if (req.method === 'POST' && entryMatch) {
+      const id = entryMatch[1]!;
+      const change = (await body(req)) as Record<string, unknown>;
+      if (change.action === 'update') {
+        await sounds.updateLibrarySound(root, id, {
+          title: change.title,
+          useWhen: change.useWhen,
+          tags: change.tags,
+          cue: change.cue,
+          trim: change.trim,
+          licence: change.licence,
+          source: change.source,
+          credit: change.credit,
+        });
+      } else if (change.action === 'delete') {
+        await sounds.removeLibrarySound(root, id);
+      } else throw new ValidationError('action must be update or delete');
+      return answer(await listing());
+    }
+    return false;
+  };
   const projectDir = async (slug: string) => {
     if (!SLUG.test(slug)) throw new ValidationError(`unknown project ${slug}`);
     const dir = join(root, 'projects', slug);
@@ -488,6 +557,10 @@ export function boardHandler(options: BoardOptions = {}) {
       }
       if (path.startsWith('/api/sets') || path.startsWith('/set-files/') || path.startsWith('/api/upload/sets/')) {
         const handled = await setsRoute(req, res, path, url.searchParams);
+        if (handled) return;
+      }
+      if (path.startsWith('/api/sounds') || path.startsWith('/sound-files/') || path.startsWith('/api/upload/sounds')) {
+        const handled = await soundsRoute(req, res, path, url.searchParams);
         if (handled) return;
       }
       if (path.startsWith('/api/new') || path.startsWith('/api/upload/')) {

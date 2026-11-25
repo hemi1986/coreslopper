@@ -6,6 +6,7 @@
 //   #/s/<slug>       a series                #/new[/video|series|episode|meme[/<slug>]]  the wizard
 //   #/characters[/<id>]                     the character library
 //   #/sets[/<id>]                           the set library
+//   #/sounds[/<id>]                         the sound library
 //   #/guide[/<doc>]                          the board guide, or another page of docs/
 import { addStrings, api, el, go, loading, showError, t } from './lib.js';
 import { showDocument, showProduction } from './production.js';
@@ -14,11 +15,12 @@ import { showReview } from './review.js';
 import { showWizard } from './wizard.js';
 import { showCharacters } from './characters.js';
 import { showSets } from './sets.js';
+import { showSounds } from './sounds.js';
 import { showGuide } from './guide.js';
 
 addStrings({
-  de: { board: 'Board', navProduction: 'Produktion', navCalendar: 'Release-Kalender', navCharacters: 'Figuren', navSets: 'Sets', navNew: '+ Neu', navGuide: 'Anleitung', refresh: 'Aktualisieren', refreshKept: 'Ansicht behalten: ein Video läuft oder eine Eingabe ist nicht gespeichert.', navReleased: 'Fertig' },
-  en: { board: 'Board', navProduction: 'Production', navCalendar: 'Release calendar', navCharacters: 'Characters', navSets: 'Sets', navNew: '+ New', navGuide: 'Guide', refresh: 'Refresh', refreshKept: 'View kept: a video is playing or an input is not saved.', navReleased: 'Finished' },
+  de: { board: 'Board', navProduction: 'Produktion', navCalendar: 'Release-Kalender', navCharacters: 'Figuren', navSets: 'Sets', navSounds: 'Sounds', navNew: '+ Neu', navGuide: 'Anleitung', refresh: 'Aktualisieren', refreshKept: 'Ansicht behalten: ein Video läuft oder eine Eingabe ist nicht gespeichert.', navReleased: 'Fertig' },
+  en: { board: 'Board', navProduction: 'Production', navCalendar: 'Release calendar', navCharacters: 'Characters', navSets: 'Sets', navSounds: 'Sounds', navNew: '+ New', navGuide: 'Guide', refresh: 'Refresh', refreshKept: 'View kept: a video is playing or an input is not saved.', navReleased: 'Finished' },
 });
 
 let active = 'overview';
@@ -43,6 +45,7 @@ function renderNav() {
   nav.appendChild(navButton(t('navCalendar'), null, active === 'calendar', '#/calendar'));
   nav.appendChild(navButton(t('navCharacters'), null, active === 'characters', '#/characters'));
   nav.appendChild(navButton(t('navSets'), null, active === 'sets', '#/sets'));
+  nav.appendChild(navButton(t('navSounds'), null, active === 'sounds', '#/sounds'));
   nav.appendChild(navButton(t('navNew'), null, active === 'new', '#/new'));
   nav.appendChild(navButton(t('navGuide'), null, active === 'guide', '#/guide'));
   if (overview.projects.length) nav.appendChild(el('h2', { text: t('projects') }));
@@ -96,6 +99,7 @@ function route() {
   else if ((match = /^#\/guide(?:\/([a-z][a-z0-9-]*(?:\.de)?))?\/?$/.exec(hash))) { active = 'guide'; view = showGuide(match[1]); }
   else if ((match = /^#\/characters(?:\/([a-z0-9][a-z0-9_-]*))?\/?$/.exec(hash))) { active = 'characters'; view = showCharacters(match[1]); }
   else if ((match = /^#\/sets(?:\/([a-z0-9][a-z0-9_-]*))?\/?$/.exec(hash))) { active = 'sets'; view = showSets(match[1]); }
+  else if ((match = /^#\/sounds(?:\/([a-z0-9][a-z0-9_-]*))?\/?$/.exec(hash))) { active = 'sounds'; view = showSounds(match[1]); }
   else if ((match = /^#\/p\/([a-z0-9-]+)\/release(?:\/([a-z]+))?(?:\/(.+))?$/.exec(hash))) { active = 'release:' + match[1]; view = showRelease(match[1], match[2], match[3]); }
   else if ((match = /^#\/p\/([a-z0-9-]+)\/doc\/(.+)$/.exec(hash))) { active = 'project:' + match[1]; view = showDocument(match[1], match[2]); }
   else if ((match = /^#\/p\/([a-z0-9-]+)\/review(?:\/(.+))?$/.exec(hash))) { active = 'review:' + match[1]; view = showReview(match[1], match[2]); }
@@ -114,13 +118,13 @@ api('/api/channel').then(function (channel) {
 }).catch(function () {});
 
 // The pipeline runs elsewhere (Claude Code, the queue, renders), and the page does not poll (ADR 0049): the user
-// refreshes. A refresh reloads the navigation and the current view, but keeps a view with a playing video or an
-// edited field, so it never restarts the video or discards what the user typed.
+// refreshes. A refresh reloads the navigation and the current view, but keeps a view with a playing video or audio or
+// an edited field, so it never restarts the media or discards what the user typed.
 const main = document.getElementById('main');
 main.addEventListener('input', function (event) { if (event.target && event.target.setAttribute) event.target.setAttribute('data-edited', ''); });
 
 function busy() {
-  const playing = Array.prototype.some.call(main.querySelectorAll('video'), function (video) { return !video.paused && !video.ended; });
+  const playing = Array.prototype.some.call(main.querySelectorAll('video, audio'), function (media) { return !media.paused && !media.ended; });
   return playing || main.querySelector('[data-edited]') !== null;
 }
 
