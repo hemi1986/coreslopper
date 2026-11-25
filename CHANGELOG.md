@@ -1,5 +1,43 @@
 # Changelog
 
+## [0.10.0](https://github.com/hemi1986/coreslopper/compare/v0.9.0...v0.10.0) (2026-11-25)
+
+
+### Features
+
+* **board:** the wizard's last step links to the new project or series (ST-021) ([236a8b3](https://github.com/hemi1986/coreslopper/commit/236a8b3cade33ede49d6812490d2f24664ab3450))
+* **board:** the wizard's last step links to the new project or series (ST-021) ([948400c](https://github.com/hemi1986/coreslopper/commit/948400c3c31d93feee33242d8c603216408950c0))
+* **episode:** clip-audio takes an effect's sound from its clips; frame --at; patch keeps aspect ([730224a](https://github.com/hemi1986/coreslopper/commit/730224ad1053b7651307fdbaa9de8f82a9711208))
+* **episode:** clip-audio, frame --at, patch keeps aspect; bench test for workspaces ([d5ee0f7](https://github.com/hemi1986/coreslopper/commit/d5ee0f7abcca628c37946181aedb1d240443ac03))
+* pose-extract command for pose tracks from reference clips ([add79d6](https://github.com/hemi1986/coreslopper/commit/add79d6bca5eccdbaf92623bfbcf62f283d84dba))
+* pose-extract command for pose tracks from reference clips ([1893ef3](https://github.com/hemi1986/coreslopper/commit/1893ef3d0ea1175f874186442e0ab1e59079ab3d))
+
+
+### Bug Fixes
+
+* **bench:** check only the shipped example cases in the tracked-cases test ([33adfd7](https://github.com/hemi1986/coreslopper/commit/33adfd7cc6096cba5470e84c5517e6671c4e0b4c))
+* **generate:** take the Pika aspect from the master format, not the project kind ([838e17c](https://github.com/hemi1986/coreslopper/commit/838e17cd5fcac6bdc939b8dcc71075cd83fd829c))
+* **generate:** take the Pika aspect from the master format, not the project kind ([70d3273](https://github.com/hemi1986/coreslopper/commit/70d327369ed3ffba89ad0d175241dc9c142e42ce))
+* **transcribe:** decode audio with librosa instead of PyAV ([1a4ca7b](https://github.com/hemi1986/coreslopper/commit/1a4ca7b089f64ae528597bc454ad6c0f30de1b32))
+* **transcribe:** decode audio with librosa instead of PyAV ([153c16b](https://github.com/hemi1986/coreslopper/commit/153c16b1917768f41ebdd6a6f8e4fc79d4fe57b3))
+
+
+### Documentation
+
+* accept ADR 0054 ([09c8146](https://github.com/hemi1986/coreslopper/commit/09c8146afddea66b590f43fd3f1c7a845dc2e616))
+* accept ADR 0054 (pose tracks from reference clips) ([daef5e2](https://github.com/hemi1986/coreslopper/commit/daef5e2caab39a7ff6df90b0300287cf8fbd74be))
+* **adr:** accept ADR 0052, the set library ([01f88be](https://github.com/hemi1986/coreslopper/commit/01f88be8c3b0b37d97aa9682e3953f03cc9557e8))
+* describe the Kataster workflow and fix drifted texts (G-157, G-171, G-186) ([630be0b](https://github.com/hemi1986/coreslopper/commit/630be0b17d8acb993d767f3e5c77b2a2e287ca32))
+* describe the Kataster workflow and fix drifted texts (G-157, G-171, G-186) ([2629e43](https://github.com/hemi1986/coreslopper/commit/2629e4314d4d31838922289ca4416855ac604157))
+* **meme:** discover memes and the sound library ([37fe60c](https://github.com/hemi1986/coreslopper/commit/37fe60c92c60528cfe923a3c25fcdf0762d273b9))
+* **meme:** discover memes and the sound library ([400af9c](https://github.com/hemi1986/coreslopper/commit/400af9cd5320c2a54cb11c2eb680bfa0dbcdf6ab))
+* **set-library:** discover the set library and the board's loading feedback ([02880cd](https://github.com/hemi1986/coreslopper/commit/02880cd7a50d8cd1074f55fc852091769995cdd7))
+* **set-library:** discover the set library and the board's loading feedback ([780898a](https://github.com/hemi1986/coreslopper/commit/780898a8834839002072668179b8330cf38fc92d))
+* **set-library:** ST-022 to ST-034 approved ([f05ee6c](https://github.com/hemi1986/coreslopper/commit/f05ee6cd3855820d5389094dea40094dde652932))
+* ST-017 ready (approved by the user) ([643adc1](https://github.com/hemi1986/coreslopper/commit/643adc15f6af77393744df893ef5a99c4f72e0b1))
+* ST-036 to ST-039 ready (approved by the user) ([fea54f1](https://github.com/hemi1986/coreslopper/commit/fea54f18a9313c7d01c3973d343f0c077370c4c3))
+* stories ST-036 to ST-039 from the workspace's upstream features ([0ab73fc](https://github.com/hemi1986/coreslopper/commit/0ab73fc14c28b2bfb1ff94ee855881386fbfa5ec))
+
 ## [0.9.0](https://github.com/hemi1986/coreslopper/compare/v0.8.0...v0.9.0) (2026-11-22)
 
 
