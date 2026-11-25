@@ -3,7 +3,7 @@ import { createReadStream, existsSync, lstatSync, type Dirent } from 'node:fs';
 import { copyFile, mkdir, readFile, readdir, rename, rm, stat } from 'node:fs/promises';
 import { basename, extname, join, relative, resolve, sep } from 'node:path';
 import { pipeline } from 'node:stream/promises';
-import { parse as parseYaml, stringify } from 'yaml';
+import { isMap, isSeq, parse as parseYaml, parseDocument, stringify, type Document, type YAMLMap, type YAMLSeq } from 'yaml';
 import type { ZodType } from 'zod';
 import { ProjectConfigSchema, ValidationError, isScriptId, readYamlFile, writeTextAtomic } from '@coreslopper/core';
 import { SLUG, projectDirs, seriesDirs } from './workspace-dirs.js';
@@ -117,13 +117,145 @@ export interface LibraryFileResult<Entry> {
   changed: boolean;
 }
 
+/** One item of a production's bible on its way into the library. */
+export interface LibraryIncoming<Data = unknown> {
+  /** The item's id in the production, e.g. `nova`. */
+  sourceId: string;
+  name: string;
+  description: string;
+  prompt?: string;
+  /** What the item names, relative to the production. */
+  named: (string | undefined)[];
+  /** The kind's own parsed item. */
+  data: Data;
+}
+
+/** What a kind's import merge needs from the lifecycle. */
+export interface LibraryImportContext {
+  /** The library entry the item went into. */
+  id: string;
+  /** The source's folder name, for a suffixed state or plate id. */
+  slug: string;
+  /** When the import runs, ISO. */
+  at: string;
+  /** The entry's folder. */
+  dir: string;
+  /** The stored name of a source path, when it was copied. */
+  name: (path: string | undefined) => string | undefined;
+}
+
+/**
+ * How one kind reads a production's bible and merges an item into an entry.
+ * The lifecycle owns the loop, the file copies, the history row and the result;
+ * the kind owns its fields, its matching rule and what an item means.
+ */
+export interface LibraryImportConfig<Entry, Data = unknown> {
+  /** Read and validate the production's bible; refuses a missing one. */
+  read: (root: string, sourceDir: string) => Promise<LibraryIncoming<Data>[]>;
+  /** Whether the source names a file the import may take (inside the production, a plain file for sets). */
+  present: (sourceDir: string, path: string) => boolean;
+  /** The library entry an incoming item belongs in. */
+  match: (root: string, incoming: LibraryIncoming<Data>, files: string[], slug: string) => Promise<string>;
+  /** Fields a kind adds to a new entry (refs, states, plates, face). */
+  fields: (incoming: LibraryIncoming<Data>) => Partial<Entry>;
+  /** Merge an incoming item's words and files into an entry; return the labels added (`state:<id>`, `plate:<id>`). */
+  merge: (entry: Entry, incoming: LibraryIncoming<Data>, context: LibraryImportContext) => string[] | Promise<string[]>;
+  /** A source item without files is left out (`omit`), or reported as skipped (`report`). */
+  skipWithoutFiles: 'omit' | 'report';
+  /** The refusal when `--into` comes without naming the item (sets). */
+  intoNeedsNamed?: string;
+  /** Record a history row even when an import brings nothing (sets). */
+  historyAlways?: boolean;
+}
+
+/** The options of `library import`: one item, or every item with files. */
+export interface LibraryImportOptions {
+  sourceId?: string;
+  into?: string;
+  now?: Date;
+}
+
+/** One import's result, before a kind maps it to its own words. */
+export interface LibraryImportOutcome {
+  sourceId: string;
+  /** Absent when the item was skipped. */
+  id?: string;
+  created: boolean;
+  skipped?: boolean;
+  added: string[];
+  missing: string[];
+}
+
+/** The options of `library use`: the character states to take along. */
+export interface LibraryUseOptions {
+  states?: string[] | 'all';
+}
+
+/** One file to copy into a target: its name in the entry's folder and the subfolder it goes to. */
+export interface LibraryUseFile {
+  name: string;
+  /** `plates` for a set's plates; empty for the entry's own folder. */
+  sub?: string;
+}
+
+/** What a kind takes from an entry, and what its row therefore knows. */
+export interface LibraryUsePlan<Data = unknown> {
+  files: LibraryUseFile[];
+  /** The kind's chosen items (a character's chosen states), for the row and its labels. */
+  data: Data;
+  /** Whether the entry's own folder may hold a nested folder, like a set's `plates/`. */
+  nestedFolders?: boolean;
+}
+
+/**
+ * How one kind copies an entry into a production. The lifecycle owns the
+ * target check, the staged copies, the bible document, the write and the
+ * rollback; the kind owns what to take and how its row looks.
+ */
+export interface LibraryUseConfig<Entry, Data = unknown> {
+  /** The refusal when the target is an episode. */
+  episodeRefusal: string;
+  /** The empty target bible when it has none yet. */
+  empty: string;
+  /** The bible schema the written document must satisfy. */
+  schema: ZodType;
+  /** What to copy, with the kind's choice rule; refuses missing or unknown files. */
+  plan: (entry: Entry, options: LibraryUseOptions, dir: string) => Promise<LibraryUsePlan<Data>>;
+  /** Refuse a target row of the same id that does not come from this entry. */
+  refuse?: (existing: YAMLMap, targetDir: string) => void;
+  /** The row for a target that takes the entry afresh. */
+  row: (entry: Entry, plan: LibraryUsePlan<Data>, copied: (name: string) => string) => { node: Record<string, unknown>; labels: string[] };
+  /** Add what the target lacks; the labels added and whether the row changed. */
+  merge: (
+    existing: YAMLMap,
+    doc: Document,
+    entry: Entry,
+    plan: LibraryUsePlan<Data>,
+    copied: (name: string) => string,
+  ) => { labels: string[]; changed: boolean };
+}
+
+/** One use's result, before a kind maps it to its own words. */
+export interface LibraryUseOutcome {
+  id: string;
+  updated: boolean;
+  files: string[];
+  labels: string[];
+}
+
 /**
  * The data and hooks that tell one bible library from another (ADR 0056). The
  * lifecycle owns add/update/file/remove; a kind supplies only what is genuinely
  * its semantics: the entry's fields, its file roles and strategy, its plate or
  * state rules.
  */
-export interface LibraryKindConfig<Entry extends LibraryEntryBase, UseName extends string = string, NewEntry extends LibraryEntryInput = LibraryEntryInput> {
+export interface LibraryKindConfig<
+  Entry extends LibraryEntryBase,
+  UseName extends string = string,
+  NewEntry extends LibraryEntryInput = LibraryEntryInput,
+  ImportData = unknown,
+  UseData = unknown,
+> {
   kind: LibraryEntryKind;
   noun: string;
   entryFile: string;
@@ -163,6 +295,10 @@ export interface LibraryKindConfig<Entry extends LibraryEntryBase, UseName exten
   refuseUnnamed?: boolean;
   /** `strict`: load first (`characters`); `tolerant`: the folder decides (`sets`). */
   removeMode: 'strict' | 'tolerant';
+  /** How the kind reads a production's bible and merges its items. */
+  importSource: LibraryImportConfig<Entry, ImportData>;
+  /** What the kind takes from an entry into a production. */
+  use: LibraryUseConfig<Entry, UseData>;
 }
 
 export type LibraryListEntry<Entry, Name extends string> = Entry & { cover?: string; usedIn: LibraryUseLink<Name>[] };
@@ -172,9 +308,13 @@ export type LibraryListEntry<Entry, Name extends string> = Entry & { cover?: str
  * add/update/file/remove verbs and the card cover. A kind supplies its data and
  * hooks; the sound library stays its own context (ADR 0051).
  */
-export function defineLibraryKind<Entry extends LibraryEntryBase, UseName extends string, NewEntry extends LibraryEntryInput = LibraryEntryInput>(
-  config: LibraryKindConfig<Entry, UseName, NewEntry>,
-) {
+export function defineLibraryKind<
+  Entry extends LibraryEntryBase,
+  UseName extends string,
+  NewEntry extends LibraryEntryInput = LibraryEntryInput,
+  ImportData = unknown,
+  UseData = unknown,
+>(config: LibraryKindConfig<Entry, UseName, NewEntry, ImportData, UseData>) {
   const libraryRoot = (root: string) => join(root, 'library', config.kind);
   const entryDir = (root: string, id: string) => libraryEntryDir(root, config.kind, id);
   const entryFile = (root: string, id: string) => libraryEntryFile(root, config.kind, id);
@@ -396,6 +536,176 @@ export function defineLibraryKind<Entry extends LibraryEntryBase, UseName extend
     return { id, ...(entry ? { entry } : {}) };
   };
 
+  /**
+   * Bring the items of a production or series canon into the library. The
+   * kind reads its bible, says which entry an item belongs in and merges it;
+   * the lifecycle copies the files, keeps the history and maps the results.
+   * A file mode of `stage` makes the entry's write and the copies one step:
+   * a failed write leaves neither.
+   */
+  const importFrom = async (root: string, sourceDir: string, options: LibraryImportOptions = {}): Promise<LibraryImportOutcome[]> => {
+    const incoming = await config.importSource.read(root, sourceDir);
+    const from = librarySourceLabel(root, sourceDir);
+    const slug = basename(sourceDir);
+    const at = (options.now ?? new Date()).toISOString();
+    if (options.sourceId && !incoming.some((item) => item.sourceId === options.sourceId)) {
+      throw new ValidationError(`${from} has no ${config.noun} "${options.sourceId}"`);
+    }
+    if (options.into && config.importSource.intoNeedsNamed && !options.sourceId) throw new ValidationError(config.importSource.intoNeedsNamed);
+    if (options.into) await load(root, options.into);
+    const outcomes: LibraryImportOutcome[] = [];
+    for (const item of incoming) {
+      if (options.sourceId && item.sourceId !== options.sourceId) continue;
+      const named = item.named.filter((path): path is string => Boolean(path));
+      const missing = named.filter((path) => !config.importSource.present(sourceDir, path));
+      const files = named.filter((path) => config.importSource.present(sourceDir, path)).map((path) => resolve(sourceDir, path));
+      if (!files.length) {
+        if (options.sourceId) throw new ValidationError(`${item.sourceId} in ${from} has no files to take into the library`);
+        if (config.importSource.skipWithoutFiles === 'report') outcomes.push({ sourceId: item.sourceId, created: false, skipped: true, added: [], missing });
+        continue;
+      }
+      const id = options.into ?? (await config.importSource.match(root, item, files, slug));
+      const created = !existsSync(entryFile(root, id));
+      const dir = entryDir(root, id);
+      const copies = await copyByContent(files, dir, config.kind, config.fileMode === 'stage' ? { stage: true } : {});
+      const context: LibraryImportContext = {
+        id,
+        slug,
+        at,
+        dir,
+        name: (path) => (path ? copies.names.get(resolve(sourceDir, path)) : undefined),
+      };
+      const before = created ? undefined : await load(root, id);
+      const entry: Entry = before
+        ? structuredClone(before)
+        : config.schema.parse({
+            version: 1,
+            id,
+            name: item.name,
+            description: item.description,
+            ...(item.prompt ? { prompt: item.prompt } : {}),
+            tags: [],
+            origin: from,
+            added: at,
+            history: [],
+            ...config.importSource.fields(item),
+          });
+      let changes = copies.added;
+      let saved = false;
+      try {
+        changes = [...new Set([...copies.added, ...(await config.importSource.merge(entry, item, context))])];
+        if (!created && (changes.length || config.importSource.historyAlways)) entry.history.push({ at, from, added: changes });
+        if (created || changes.length || config.importSource.historyAlways) {
+          await save(root, entry);
+          saved = true;
+        }
+        if (copies.staged.length) await commitCopies(copies.staged);
+        outcomes.push({ sourceId: item.sourceId, id, created, added: changes, missing });
+      } catch (error) {
+        if (copies.staged.length) {
+          if (saved) {
+            if (before) await save(root, before);
+            else await rm(entryFile(root, id), { force: true });
+          }
+          await discardCopies(copies.staged);
+        }
+        throw error;
+      }
+    }
+    return outcomes;
+  };
+
+  /**
+   * Copy an entry into a music video or a series canon: the files to
+   * `<kind>/<id>/` (staged until the bible names them), the row into its bible
+   * with `library: <id>`. Taking the same entry again adds what the target
+   * lacks. The kind says what to take and how its row looks; the lifecycle
+   * checks the target, copies, validates, writes and rolls back.
+   */
+  const useIn = async (root: string, targetDir: string, id: string, options: LibraryUseOptions = {}): Promise<LibraryUseOutcome> => {
+    const entry = await load(root, id);
+    const target = await libraryTargetKind(targetDir);
+    if (target === 'episode') throw new ValidationError(config.use.episodeRefusal);
+    if (!target) throw new ValidationError(`${targetDir} is neither a project nor a series canon`);
+
+    const sourceDir = entryDir(root, id);
+    const plan = await config.use.plan(entry, options, sourceDir);
+    const folder = join(targetDir, config.kind, id);
+    const folderExisted = existsSync(folder);
+    const subs = [...new Set(plan.files.map((file) => file.sub ?? ''))];
+    const copies = new Map<string, Awaited<ReturnType<typeof copyByContent>>>();
+    for (const sub of subs) {
+      const sources = plan.files.filter((file) => (file.sub ?? '') === sub).map((file) => join(sourceDir, file.name));
+      const copyOptions: CopyOptions = { stage: true, ...(plan.nestedFolders && !sub ? { nestedFolders: true as const } : {}) };
+      copies.set(sub, await copyByContent(sources, sub ? join(folder, sub) : folder, config.kind, copyOptions));
+    }
+    const staged = [...copies.values()].flatMap((copy) => copy.staged);
+    /** Discard the staged copies; a folder this use created goes with them. */
+    const cleanup = async () => {
+      await discardCopies(staged);
+      if (!folderExisted) await rm(folder, { recursive: true, force: true });
+    };
+    const copied = (name: string) => {
+      const sub = plan.files.find((file) => file.name === name)?.sub ?? '';
+      const target = copies.get(sub)!.names.get(join(sourceDir, name));
+      if (!target) throw new ValidationError(`the library ${config.noun} "${id}" lost ${name} during the copy`);
+      return `${config.kind}/${id}/${sub ? `${sub}/` : ''}${target}`;
+    };
+    const files = subs.flatMap((sub) => copies.get(sub)!.added.map((name) => `${config.kind}/${id}/${sub ? `${sub}/` : ''}${name}`));
+
+    try {
+      const file = join(targetDir, config.useFile);
+      const doc = parseDocument(existsSync(file) ? await readFile(file, 'utf8') : config.use.empty);
+      if (doc.errors.length) throw new ValidationError(`Invalid YAML in ${file}: ${doc.errors[0]!.message}`);
+      if (!isSeq(doc.get(config.kind))) doc.set(config.kind, doc.createNode([]));
+      const list = doc.get(config.kind) as YAMLSeq;
+      // `characters: []` parses as a flow sequence; entries go in block style like a hand-written bible.
+      list.flow = false;
+      const existing = list.items.find((item) => isMap(item) && item.get('id') === id) as YAMLMap | undefined;
+      let updated = false;
+      let labels: string[] = [];
+      let changed = false;
+      if (existing) {
+        updated = true;
+        config.use.refuse?.(existing, targetDir);
+        const merged = config.use.merge(existing, doc, entry, plan, copied);
+        labels = merged.labels;
+        changed = merged.changed;
+      } else {
+        const row = config.use.row(entry, plan, copied);
+        labels = row.labels;
+        list.add(doc.createNode(row.node));
+        changed = true;
+      }
+      if (updated && !changed) {
+        // Nothing to add to the bible; the copies above only restore files the target lost.
+        await commitCopies(staged);
+        return { id, updated, files, labels: [] };
+      }
+      const parsed = config.use.schema.safeParse(doc.toJS());
+      if (!parsed.success) throw new ValidationError(`${config.useFile} would be invalid: ${parsed.error.issues[0]?.message ?? 'unknown error'}`);
+      const before = existsSync(file) ? await readFile(file, 'utf8') : undefined;
+      try {
+        await writeTextAtomic(file, doc.toString());
+      } catch (error) {
+        await cleanup();
+        throw error;
+      }
+      try {
+        await commitCopies(staged);
+      } catch (error) {
+        if (before !== undefined) await writeTextAtomic(file, before);
+        else await rm(file, { force: true });
+        await cleanup();
+        throw error;
+      }
+      return { id, updated, files, labels };
+    } catch (error) {
+      await cleanup();
+      throw error;
+    }
+  };
+
   return {
     kind: config.kind,
     noun: config.noun,
@@ -412,6 +722,8 @@ export function defineLibraryKind<Entry extends LibraryEntryBase, UseName extend
     recordFile: config.recordFile,
     removeFile,
     remove,
+    importFrom,
+    useIn,
     targetKind: libraryTargetKind,
   };
 }
