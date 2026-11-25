@@ -13,6 +13,7 @@ import {
   notReleasedPublicly,
   planAutopilot,
   plainLyrics,
+  readYamlFile,
   releasedPublicly,
   writeJsonAtomic,
   writeTextAtomic,
@@ -67,6 +68,13 @@ async function writeStatus(projectRoot: string, change: (status: ReleaseStatus) 
  * the user's date in project.yaml first, so the calendar no longer moves.
  */
 export async function approveRelease(projectRoot: string, options: { root: string; now: Date; releaseDate?: string }): Promise<ReleaseStatus> {
+  // An internal project is never approved, also with a calendar from before it became internal: the refusal comes
+  // before anything is written (CMD-ApproveRelease, ST-042). The distribution is read from project.yaml alone, like
+  // the other readers of a project's distribution, so the check adds no other precondition to the approval.
+  const config = await readYamlFile(join(projectRoot, 'project.yaml'), ProjectConfigSchema);
+  if (!releasedPublicly(config)) {
+    throw new ValidationError(`${notReleasedPublicly(config.slug)}: it is never approved.`);
+  }
   const { loadCalendar } = await import('./release-calendar.js');
   const calendar = await loadCalendar(projectRoot);
   if (!calendar) throw new ValidationError('The project has no release calendar yet: run release first.');

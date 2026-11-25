@@ -120,6 +120,18 @@ export async function setDistribution(projectDir: string, distribution: string |
   await writeFile(path, stringify(config));
 }
 
+/**
+ * `release.release_date` (or, with `undefined`, no release day, so the calendar proposes one) in a fixture's
+ * project.yaml. Call it before `buildRelease`.
+ */
+export async function setReleaseDay(projectDir: string, date: string | undefined): Promise<void> {
+  const path = join(projectDir, 'project.yaml');
+  const config = parse(await readFile(path, 'utf8')) as { release?: Record<string, unknown> };
+  if (date === undefined) delete config.release?.release_date;
+  else config.release = { ...config.release, release_date: date };
+  await writeFile(path, stringify(config));
+}
+
 /** A project beside the fixture's, with an earlier calendar and the given distribution. */
 export async function siblingCalendar(
   projectDir: string,

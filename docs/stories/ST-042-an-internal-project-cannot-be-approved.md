@@ -12,7 +12,7 @@ risk: null
 events: [EVT-ReleaseDayFixed, EVT-ReleaseCalendarPlanned, EVT-ReleaseApproved, EVT-ApprovalRefused]
 depends_on: [ST-036]
 labels: [feature:internal-projects]
-status: ready
+status: done
 ---
 
 ## Story
