@@ -1,5 +1,58 @@
 # Changelog
 
+## [0.10.0](https://github.com/hemi1986/coreslopper/compare/v0.9.0...v0.10.0) (2026-11-25)
+
+Forty-two stories since v0.9.0: memes and the sound library, the set library, pose tracks, internal projects, and the
+production fixes around them.
+
+
+### Features
+
+**Memes and the sound library**
+
+* a meme project kind with its own stages ([#86](https://github.com/hemi1986/coreslopper/pull/86)); the board's wizard creates a meme ([#94](https://github.com/hemi1986/coreslopper/pull/94)), and the new `new-meme` skill grills the pitch into a script ([#98](https://github.com/hemi1986/coreslopper/pull/98))
+* a meme's script is validated against the library ([#95](https://github.com/hemi1986/coreslopper/pull/95)); its voice track takes library sounds ([#99](https://github.com/hemi1986/coreslopper/pull/99)); a shot lands on a sound's cue ([#105](https://github.com/hemi1986/coreslopper/pull/105)); the render carries German subtitles ([#106](https://github.com/hemi1986/coreslopper/pull/106)); it has a release folder ([#101](https://github.com/hemi1986/coreslopper/pull/101))
+* the sound library: add ([#82](https://github.com/hemi1986/coreslopper/pull/82)), edit the description ([#83](https://github.com/hemi1986/coreslopper/pull/83)), remove ([#104](https://github.com/hemi1986/coreslopper/pull/104)), list ([#85](https://github.com/hemi1986/coreslopper/pull/85)), check after hand edits ([#103](https://github.com/hemi1986/coreslopper/pull/103)), validate a hand-edited entry ([#84](https://github.com/hemi1986/coreslopper/pull/84))
+* a sound of unknown licence is a TODO in the release check ([#102](https://github.com/hemi1986/coreslopper/pull/102)); the board's Sounds view ([#124](https://github.com/hemi1986/coreslopper/pull/124)); docs for maintaining the library ([#126](https://github.com/hemi1986/coreslopper/pull/126))
+
+**The set library (ADR 0052)**
+
+* set entries and their validation ([#108](https://github.com/hemi1986/coreslopper/pull/108)); add a set by hand ([#109](https://github.com/hemi1986/coreslopper/pull/109)); add a reference or a plate ([#110](https://github.com/hemi1986/coreslopper/pull/110))
+* take a production's sets into the library ([#112](https://github.com/hemi1986/coreslopper/pull/112)); the sets of a finished set bible import themselves ([#113](https://github.com/hemi1986/coreslopper/pull/113))
+* use a library set in a music video or series canon ([#114](https://github.com/hemi1986/coreslopper/pull/114)); update it ([#115](https://github.com/hemi1986/coreslopper/pull/115)), remove a file ([#116](https://github.com/hemi1986/coreslopper/pull/116)), delete it ([#117](https://github.com/hemi1986/coreslopper/pull/117))
+* the board's Sets view ([#118](https://github.com/hemi1986/coreslopper/pull/118)); the wizard's "Sets from the library" step ([#119](https://github.com/hemi1986/coreslopper/pull/119)); the setup skills offer library sets ([#120](https://github.com/hemi1986/coreslopper/pull/120))
+
+**Pose tracks (ADR 0054)**
+
+* `pose-extract` writes pose tracks from reference clips ([#96](https://github.com/hemi1986/coreslopper/pull/96))
+
+**Internal projects**
+
+* an internal project gets no release package ([#90](https://github.com/hemi1986/coreslopper/pull/90)) and ends after QA ([#92](https://github.com/hemi1986/coreslopper/pull/92))
+* its calendar books no slots ([#121](https://github.com/hemi1986/coreslopper/pull/121)), the autopilot leaves it alone ([#122](https://github.com/hemi1986/coreslopper/pull/122)), and it cannot be approved ([#123](https://github.com/hemi1986/coreslopper/pull/123))
+
+**Production, board, and wizard**
+
+* ComfyUI projects lip-sync locally by default (ADR 0053) ([#89](https://github.com/hemi1986/coreslopper/pull/89)); ComfyUI restarts only when it is stuck ([#93](https://github.com/hemi1986/coreslopper/pull/93))
+* the episode track levels speech takes to one loudness ([#88](https://github.com/hemi1986/coreslopper/pull/88)); `clip-audio` takes an effect's sound from its clips, `frame --at`, and patch keeps the aspect ([#75](https://github.com/hemi1986/coreslopper/pull/75))
+* the board shows when it loads and when a button is working ([#80](https://github.com/hemi1986/coreslopper/pull/80)); the wizard's last step links to the new project or series ([#77](https://github.com/hemi1986/coreslopper/pull/77))
+* an episode's announcement images say "new episode", not "new song" ([#107](https://github.com/hemi1986/coreslopper/pull/107))
+
+
+### Bug Fixes
+
+* **bench:** check only the shipped example cases in the tracked-cases test ([33adfd7](https://github.com/hemi1986/coreslopper/commit/33adfd7cc6096cba5470e84c5517e6671c4e0b4c))
+* **generate:** take the Pika aspect from the master format, not the project kind ([#81](https://github.com/hemi1986/coreslopper/pull/81))
+* **transcribe:** decode audio with librosa instead of PyAV ([#87](https://github.com/hemi1986/coreslopper/pull/87))
+
+
+### Documentation
+
+* accept ADR 0052 (the set library) ([#79](https://github.com/hemi1986/coreslopper/pull/79)) and ADR 0054 (pose tracks from reference clips) ([#97](https://github.com/hemi1986/coreslopper/pull/97))
+* discover memes and the sound library ([#78](https://github.com/hemi1986/coreslopper/pull/78)); discover the set library and the board's loading feedback ([#79](https://github.com/hemi1986/coreslopper/pull/79)); the internal-project stories from the workspace's upstream features ([#91](https://github.com/hemi1986/coreslopper/pull/91))
+* describe the Kataster workflow and fix drifted texts (G-157, G-171, G-186) ([#74](https://github.com/hemi1986/coreslopper/pull/74))
+* research: can a meme use TikTok's trending audio? No publish path attaches one – the sound stays a manual step in the app, for a personal non-commercial account ([#125](https://github.com/hemi1986/coreslopper/pull/125))
+
 ## [0.9.0](https://github.com/hemi1986/coreslopper/compare/v0.8.0...v0.9.0) (2026-11-22)
 
 
