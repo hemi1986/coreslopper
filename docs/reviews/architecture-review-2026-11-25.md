@@ -1,6 +1,6 @@
 # Architecture review – 2026-11-25
 
-Status: in progress · 01 (`4bf6985`), 03 (`119f693`), 04 (`fbc42d0`) and 05 (`9950c69`) implemented, awaiting review · 02 design recorded (`583f22a`, ADR 0056 proposed), implementation next · Source: `/improve-codebase-architecture`, hot spots of the last 250 commits.
+Status: in progress · 01 (`4bf6985`), 03 (`119f693`), 04 (`fbc42d0`) and 05 (`9950c69`) implemented, awaiting review · 02 implementation started: cuts 0–2 landed (`07140b0`) – `workspace-dirs.ts`, the kind descriptor and read model, and the manual lifecycle; import/use, route factory and suites next; ADR 0056 proposed · Source: `/improve-codebase-architecture`, hot spots of the last 250 commits.
 Visual report: [architecture-review-2026-11-25.html](architecture-review-2026-11-25.html) (open in a browser; needs internet for Tailwind and Mermaid).
 Scope: release and publishing, the board, the libraries, generation, the workspace payload.
 
@@ -22,7 +22,7 @@ This file is the handoff between sessions. Keep it short and update the status t
 | # | Candidate | Strength | Status | Read set |
 |---|---|---|---|---|
 | 01 | Give the release one plan | Strong | done – `buildReleasePlan` in core, persisted as `manifest.plan`; folder, QA, board, autopilot and publish read it; ADR 0055 (proposed); commit 4bf6985 | `release.ts` (cli, core), `release-texts.ts`, `release-qa.ts`, `release-board-data.ts`, `publish.ts`, `release-autopilot.ts` |
-| 02 | Collapse the two library lifecycles | Strong | design – one `library-entry.ts` lifecycle with kind data and hooks, one seam module, one lifecycle suite and one route suite; ADR 0056 (proposed); §02 design state; no code yet; commit 583f22a | `library-entry.ts`, `character-library.ts`, `set-library.ts`, `board/characters.js`, `board/sets.js`, `release-board.ts` |
+| 02 | Collapse the two library lifecycles | Strong | in progress – cuts 0–2 landed: `workspace-dirs.ts`, `defineLibraryKind` with load/save/list/uses/targets and the manual add/update/file/remove verbs; the kind modules delegate; import/use, route factory and suites next; ADR 0056 (proposed); commit 07140b0 | `library-entry.ts`, `character-library.ts`, `set-library.ts`, `board/characters.js`, `board/sets.js`, `release-board.ts` |
 | 03 | Give the release records one owner | Strong | done – `release-records.ts` owns status, the autopilot and publish logs and the lock; the board and production view share `approvalHolds`; checklist keys are by line; `tests/release-records.test.ts`; commit 119f693 | `release-calendar.ts`, `release-autopilot.ts`, `autopilot-state.ts`, `publish.ts`, `board-production.ts`, `board/release.js` |
 | 04 | Lift release facts out of the board view | Strong | done – `release-facts.ts` owns `loadReleaseFacts`, `releasePlan` and `releaseProjectDirs`; the board and the autopilot build on them; one facts load per project per round; commit fbc42d0 | `release-autopilot.ts`, `release-board-data.ts`, `release-board.ts`, `publish.ts`, `board/app.js` |
 | 05 | Make the uncommitted series budget one rule | Strong | done – `uncommittedBudget` in core; `remainingBudget` and `assertAffordable` subtract the committed episode budgets, so canon batches and episode creation check the same amount before any provider; `tests/series-budget.test.ts`; commit 9950c69 | `series.ts`, `new-project.ts`, `generate.ts`, `core/cost.ts`, `core/state.ts`, `board-wizard.ts` |
@@ -128,6 +128,14 @@ deduplicating `characters.js` / `sets.js` is a later cut, not this candidate's t
 4. Route factory for both kinds.
 5. Fixture + lifecycle suite + route suite.
 6. ADR 0056 status and review row; optional view dedup as a separate candidate.
+
+**Implementation state (2026-11-25, session 2).** Cuts 0–2 are green on `07140b0`:
+`workspace-dirs.ts` owns `SLUG`, `projectDirs` and `seriesDirs` (`board-production` re-exports them, so its
+consumers stay unchanged); `defineLibraryKind` in `library-entry.ts` owns load/save/list/uses, target
+kind/target/targets and the manual add/update/add-file/remove-file/remove verbs with one staged-copy path;
+`character-library.ts` and `set-library.ts` hold their config and hooks and keep their exported names. The
+character and set suites stay green, `npm run typecheck` and `npm test` pass, and the sound library is untouched.
+Next session: cut 3 (import/use hooks), then the route factory, the fixture and the two shared suites.
 
 **ADR / context map.** ADR 0052 decides the domain (one `BC-Library`, sound apart) but not the code seam; the
 code-shape decision is hard to reverse, so ADR 0056 (proposed) records it. `docs/domain/context-map.md` needs no
