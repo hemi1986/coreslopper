@@ -1859,7 +1859,3 @@ flowchart LR
 | Bench run (`AGG-BenchRun`) | Model bench | as-is | bench/runs/<id>/run.json, the run's cases, targets, seeds and results keyed by <case>/<target>/<seed index>, loaded once and written whole and atomically after every result (packages/cli/src/bench.ts:127-136,523-539,698-700) |
 | Bench budget (`AGG-BenchBudget`) | Model bench | as-is | bench/state.json, the bench's spend, its total overwritten from bench/bench.yaml budget_usd on every load and saved atomically by the generation funnel's recordSpend (packages/cli/src/bench.ts:268-277,354-360; packages/cli/src/generate.ts:756-759) |
 | Library sound (`AGG-LibrarySound`) | Sound library | target | – |
-
-## Open Hotspots
-
-- **HS-259** – Can a meme use TikTok's trending audio – is there an API, what do TikTok's and the music labels' terms allow, and can such a sound leave TikTok at all? _(refs: BC-SoundLibrary)_

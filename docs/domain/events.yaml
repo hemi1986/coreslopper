@@ -4132,7 +4132,8 @@ hotspots:
   - id: HS-259
     question: "Can a meme use TikTok's trending audio – is there an API, what do TikTok's and the music labels' terms allow, and can such a sound leave TikTok at all?"
     refs: [BC-SoundLibrary]
-    status: open
+    status: resolved
+    resolution: "No. Trending audio stays out: no public API lists the general Sounds library (F1–F3), a trending sound may not be downloaded or mixed offline (personal in-app licence only, Terms forbid extraction, the poster must hold the licences – F10–F12), and the Content Posting API has no sound field on either path (F4–F6); the Business API's Commercial Music Library track attaches only to a direct post, not a draft (F7–F9). The inbox path's release steps already say 'Add sound and text', and a meme that wants a trending sound stays off the direct path (spike ST-019, docs/research/tiktok-trending-audio.md; the user confirms at merge, 2026-11-25)"
   - id: HS-260
     question: "A library sound the user deleted after a meme took it – does the meme stop?"
     refs: [AGG-TakeRegistry, EVT-LibrarySoundRemoved]
