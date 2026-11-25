@@ -1,5 +1,5 @@
 import { stat } from 'node:fs/promises';
-import { ConfigError } from '@coreslopper/core';
+import { ConfigError, PLATFORM_LIMITS } from '@coreslopper/core';
 import { delay, mimeForPath, type FetchLike } from '../http.js';
 import { fetchWithRetry, httpError, markUncertain, PublishError, readChunk, readJson, redactSecrets } from './http.js';
 import { RefreshingToken } from './oauth.js';
@@ -20,7 +20,7 @@ export const TIKTOK_LIMITS = {
   maxBytes: 4 * 1024 ** 3,
   maxSeconds: 600,
   minSeconds: 3,
-  captionChars: 2200,
+  captionChars: PLATFORM_LIMITS.tiktok.caption,
   minChunk: 5 * 1024 ** 2,
   chunk: 10 * 1024 ** 2,
   maxChunks: 1000,

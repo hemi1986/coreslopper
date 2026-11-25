@@ -4,8 +4,10 @@ import { join } from 'node:path';
 import {
   ReleaseManifestSchema,
   approvalHolds,
+  buildReleasePlan,
   chaptersFromSections,
   formatId,
+  withUrls,
   loadChannel,
   loadProject,
   loadReleaseSchedule,
@@ -23,24 +25,18 @@ import {
   type CalendarEvent,
   type ReleaseCalendar,
   type ReleaseManifest,
+  type ReleasePlan,
   type ReleaseStatus,
   type UploadData,
 } from '@coreslopper/core';
 import { loadCalendar, loadStatus } from './release-calendar.js';
 import { micrositeSong, type MicrositeSong } from './release-microsite.js';
 import {
-  announcementText,
   calendarEventLabel,
   distributorRows,
   feedVideo,
-  linkedinPostText,
   mediaFile,
-  memeCaption,
   releaseLabels,
-  tiktokDescription,
-  xTexts,
-  youtubeDescriptionText,
-  youtubeTarget,
   type ReleaseTextInput,
 } from './release-texts.js';
 import { loadUploadData, uploadPaths } from './upload-text.js';
@@ -434,50 +430,65 @@ export async function projectReleaseContext(projectRoot: string, root: string) {
     premiere: !meme && schedule.release.premiere,
     durationSeconds: timing?.audio.duration,
   };
-  return { project, music, channel, limits, identity, data, language, l, dir, manifest, files, calendar, status, schedule, input };
+  const handle = channel?.links.youtube?.handle;
+  const plan = withUrls(buildReleasePlan({
+    ...input,
+    tiktokPointer: l.tt.overlayDefault(handle && !/<ID>/.test(handle) ? handle : 'YouTube'),
+  }), { youtube: status.items.youtube?.url, spotify: status.items.song?.url });
+  return { project, music, channel, limits, identity, data, language, l, dir, manifest, files, calendar, status, schedule, input, plan };
 }
 
 /** Build the board view of one project. */
 export async function boardProject(projectRoot: string, root: string, options: { now?: Date } = {}): Promise<BoardProject> {
-  const { project, music, channel, limits, identity, data, language, l, manifest, files, calendar, status, schedule, input } = await projectReleaseContext(projectRoot, root);
+  const { project, music, channel, limits, identity, data, language, l, manifest, files, calendar, status, schedule, input, plan } = await projectReleaseContext(projectRoot, root);
   const de = language.toLowerCase().startsWith('de');
   const b = de ? BOARD.de : BOARD.en;
   const notes = de ? NOTES.de : NOTES.en;
   const at = (id: string) => calendar?.events.find((event) => event.id === id)?.at;
+  const planPost = (id: string) => plan.posts.find((post) => post.id === id);
+  const planText = (id: string, key: string) => planPost(id)?.texts[key];
+  const planValue = (id: string, key: string) => planText(id, key)?.value;
+  const display = (value: string | undefined) => value?.replaceAll('{youtube}', videoUrl).replaceAll('{spotify}', status.items.song?.url ?? '');
+  const limitOf = (id: string, key: string): Partial<BoardField> => {
+    const limit = planText(id, key)?.limit;
+    return limit ? { limit: limit.max, unit: limit.unit === 'bytes' ? 'bytes' : 'chars', ...(limit.counting === 'x' ? { counting: 'x' as const } : {}) } : {};
+  };
+  const hashtagNoteOf = (id: string, key: string): string | undefined => {
+    const hashtags = planText(id, key)?.hashtags;
+    return hashtags ? `${hashtags.count}/${hashtags.max} Hashtags` : undefined;
+  };
   const heading = (id: string, fallback: string) => {
     const event = calendar?.events.find((entry) => entry.id === id);
     return event ? calendarEventLabel(event, l, input.premiere, input.kind) : fallback;
   };
-  const videoUrl = youtubeTarget(l, status.items.youtube?.url);
+  const videoUrl = status.items.youtube?.url ?? `[${l.videoLink}]`;
   const profile = (platform: string) => channel?.links[platform]?.url ?? channel?.links[platform]?.handle;
-  const hashtagCount = (caption: string, tags: string[]) => tags.length + (caption.match(/#[\p{L}\p{N}_]+/gu)?.length ?? 0);
-  const main = data?.main;
   const meme = input.kind === 'meme';
   const thumbs = files.thumbnails.map((path, index) => ({ label: index === 0 ? b.upload : b.alt(index + 1), path, kind: 'image' as const }));
-  const announcement = meme ? undefined : announcementText(input);
+  const announcement = meme ? undefined : planValue('announce:youtube', 'text');
+  const description = planValue('youtube', 'description');
 
   // YouTube
   const youtube: BoardPost[] = [];
   if (announcement) {
-    youtube.push({ id: 'announce:youtube', heading: heading('announce:youtube', l.announce.heading), at: at('announce:youtube'), files: files.announcePost ? file(b.announcePost, files.announcePost) : file(b.cover, files.cover), fields: field(b.text, announcement), checklist: [], url: true });
+    youtube.push({ id: 'announce:youtube', heading: heading('announce:youtube', l.announce.heading), at: at('announce:youtube'), files: files.announcePost ? file(b.announcePost, files.announcePost) : file(b.cover, files.cover), fields: field(b.text, display(announcement)), checklist: [], url: true });
   }
-  const description = input.kind === 'meme' ? memeCaption(input) : youtubeDescriptionText(input, l);
   youtube.push({
     id: 'youtube',
     heading: heading('youtube', b.master),
     at: at('youtube'),
     files: [...file(b.master, files.master), ...(meme ? file(b.cover, files.cover) : []), ...thumbs, ...file(b.subtitles, files.subtitles)],
     fields: [
-      ...field(b.title, main?.title, { limit: limits.youtube.title, unit: 'chars' }),
-      ...field(b.description, description, { limit: limits.youtube.description_bytes, unit: 'bytes' }),
-      ...field(b.hashtags, main?.hashtags.join(', ')),
-      ...field(b.tags, main?.tags.join(', '), { limit: limits.youtube.tags, unit: 'chars' }),
-      ...field(b.pinned, meme ? undefined : main?.pinned_comment),
+      ...field(b.title, planValue('youtube', 'title'), limitOf('youtube', 'title')),
+      ...field(b.description, display(description), { ...limitOf('youtube', 'description'), unit: 'bytes' }),
+      ...field(b.hashtags, planValue('youtube', 'hashtags')),
+      ...field(b.tags, planValue('youtube', 'tags'), limitOf('youtube', 'tags')),
+      ...field(b.pinned, meme ? undefined : planValue('youtube', 'pinned')),
     ],
     checklist: meme ? [b.publish, b.synthetic, b.kids] : [input.premiere ? b.premiere : b.publish, b.synthetic, b.kids, b.category, b.endscreen],
     url: true,
   });
-  if (!meme && main?.community_post) youtube.push({ id: 'community', heading: heading('community', l.community), at: at('community'), files: file(b.upload, files.thumbnails[0]), fields: field(b.text, main.community_post), checklist: [], url: true });
+  if (!meme && planValue('youtube', 'community')) youtube.push({ id: 'community', heading: heading('community', l.community), at: at('community'), files: file(b.upload, files.thumbnails[0]), fields: field(b.text, planValue('youtube', 'community')), checklist: [], url: true });
   if (music) {
     youtube.push({
       id: 'links',
@@ -501,12 +512,12 @@ export async function boardProject(projectRoot: string, root: string, options: {
       heading: heading('announce:instagram', l.announce.heading),
       at: at('announce:instagram'),
       files: files.announceStory ? [...file(b.announceStory, files.announceStory), ...file(b.teaserFile, files.teaser)] : file(b.cover, files.cover),
-      fields: field(b.story, announcement),
+      fields: field(b.story, planValue('announce:instagram', 'story')),
       checklist: [],
       url: false,
     });
   }
-  const firstStory = meme ? undefined : data?.shorts.find((short) => short.instagram?.story)?.instagram?.story;
+  const firstStory = meme ? undefined : planValue('story', 'story');
   if (!meme) {
     instagramPosts.push({
       id: 'story',
@@ -518,8 +529,8 @@ export async function boardProject(projectRoot: string, root: string, options: {
       pointer: videoUrl,
     });
   }
-  if (!meme && data?.instagram_post) {
-    const caption = [data.instagram_post.caption.trim(), data.instagram_post.hashtags.join(' ')].filter(Boolean).join('\n\n');
+  const instagramCaption = planText('instagram-post', 'caption');
+  if (!meme && instagramCaption) {
     instagramPosts.push({
       id: 'instagram-post',
       heading: heading('instagram-post', l.ig.post),
@@ -529,22 +540,22 @@ export async function boardProject(projectRoot: string, root: string, options: {
         : files.feedImage
           ? file(b.feedImageFile, files.feedImage)
           : file(b.cover, files.cover),
-      fields: field(b.caption, caption, { limit: limits.instagram.caption, unit: 'chars', note: `${hashtagCount(data.instagram_post.caption, data.instagram_post.hashtags)}/${limits.instagram.hashtags} Hashtags` }),
+      fields: field(b.caption, display(instagramCaption.value), { ...limitOf('instagram-post', 'caption'), note: hashtagNoteOf('instagram-post', 'caption') }),
       checklist: [feedVideo(input) ? b.feedVideoCheck : files.feedImage ? b.feedImageCheck : b.feedImage, b.igAi, ...((input.durationSeconds ?? 0) > 180 ? [b.longReel] : [])],
       url: true,
     });
   }
-  if (!meme && announcement && data?.x) {
-    xPosts.push({ id: 'announce:x', heading: heading('announce:x', l.announce.heading), at: at('announce:x'), files: files.teaser ? file(b.teaserFile, files.teaser) : files.announcePost ? file(b.announcePost, files.announcePost) : file(b.cover, files.cover), fields: field(b.post, announcement, { limit: limits.x.post, unit: 'chars', counting: 'x' }), checklist: [], url: true });
+  if (!meme && announcement && planValue('announce:x', 'post')) {
+    xPosts.push({ id: 'announce:x', heading: heading('announce:x', l.announce.heading), at: at('announce:x'), files: files.teaser ? file(b.teaserFile, files.teaser) : files.announcePost ? file(b.announcePost, files.announcePost) : file(b.cover, files.cover), fields: field(b.post, display(planValue('announce:x', 'post')), limitOf('announce:x', 'post')), checklist: [], url: true });
   }
-  if (!meme && data?.x) {
-    const texts = xTexts(data.x, videoUrl);
+  const xPost = planText('x', 'post');
+  if (!meme && xPost) {
     xPosts.push({
       id: 'x',
       heading: heading('x', l.x.post),
       at: at('x'),
-      files: file(b.video, mediaFile(input, data.x.media ?? files.shorts[0]?.name)),
-      fields: [...field(b.post, texts.post, { limit: limits.x.post, unit: 'chars', counting: 'x' }), ...field(b.reply, texts.reply, { limit: limits.x.post, unit: 'chars', counting: 'x' })],
+      files: file(b.video, mediaFile(input, data?.x?.media ?? files.shorts[0]?.name)),
+      fields: [...field(b.post, display(xPost.value), limitOf('x', 'post')), ...field(b.reply, display(planValue('x', 'reply')), limitOf('x', 'reply'))],
       checklist: [b.xVideo, b.xReply],
       pointer: videoUrl,
       url: true,
@@ -555,54 +566,52 @@ export async function boardProject(projectRoot: string, root: string, options: {
     const id = (platform: string) => `short:${entry.name}:${platform}`;
     shortsPosts.push({
       id: id('youtube'),
-      heading: `${entry.name}${short?.moment ? ` — ${short.moment}` : ''}`,
+      heading: `${entry.name}${planPost(id('youtube'))?.moment ? ` — ${planPost(id('youtube'))!.moment}` : ''}`,
       at: at(id('youtube')),
       files: [...file(b.video, entry.video), ...file(b.thumb, entry.thumbnail)],
       fields: [
-        ...field(b.title, short?.title, { limit: limits.youtube.title, unit: 'chars' }),
-        ...field(b.description, short ? [short.description.trim(), short.hashtags.join(' ')].join('\n\n') : undefined),
-        ...field(b.hashtags, short?.hashtags.join(', ')),
+        ...field(b.title, planValue(id('youtube'), 'title'), limitOf(id('youtube'), 'title')),
+        ...field(b.description, planValue(id('youtube'), 'description')),
+        ...field(b.hashtags, planValue(id('youtube'), 'hashtags')),
       ],
       checklist: [b.related, b.customThumb, b.synthetic, b.kids, b.publish],
       pointer: b.youtubePointer,
       url: true,
     });
     if (short?.tiktok || !short) {
-      const pointer = l.tt.overlayDefault(channel?.links.youtube?.handle ?? 'YouTube');
+      const caption = planText(id('tiktok'), 'caption');
       tiktokPosts.push({
         id: id('tiktok'),
         heading: entry.name,
         at: at(id('tiktok')),
         files: [...file(b.video, entry.video), ...file(b.tiktokCover, entry.tiktokCover ?? entry.thumbnail)],
         fields: [
-          ...field(b.description, short?.tiktok ? tiktokDescription(short.tiktok, pointer) : undefined, { limit: limits.tiktok.caption, unit: 'chars' }),
-          ...field(b.pinned, short?.tiktok?.pinned_comment),
+          ...field(b.description, caption ? display(caption.value) : undefined, limitOf(id('tiktok'), 'caption')),
+          ...field(b.pinned, planValue(id('tiktok'), 'pinned')),
         ],
-        checklist: [b.ttCover, b.ttAi, b.publish, ...(short?.tiktok?.pinned_comment ? [b.ttPinned] : [])],
+        checklist: [b.ttCover, b.ttAi, b.publish, ...(planValue(id('tiktok'), 'pinned') ? [b.ttPinned] : [])],
         url: true,
       });
     }
     if (short?.instagram || !short) {
-      const ig = short?.instagram;
-      const caption = ig ? [ig.caption.trim(), ig.hashtags.join(' ')].filter(Boolean).join('\n\n') : undefined;
+      const caption = planText(id('instagram'), 'caption');
       instagramPosts.push({
         id: id('instagram'),
         heading: `${l.ig.reel}: ${entry.name}`,
         at: at(id('instagram')),
         files: [...file(b.video, entry.video), ...file(b.thumb, entry.thumbnail)],
-        fields: field(b.caption, caption, { limit: limits.instagram.caption, unit: 'chars', note: ig ? `${hashtagCount(ig.caption, ig.hashtags)}/${limits.instagram.hashtags} Hashtags` : undefined }),
-        checklist: [b.igCover(ig?.cover_frame), b.igAi, b.publish],
+        fields: field(b.caption, caption ? display(caption.value) : undefined, { ...limitOf(id('instagram'), 'caption'), note: hashtagNoteOf(id('instagram'), 'caption') }),
+        checklist: [b.igCover(planPost(id('instagram'))?.coverFrame), b.igAi, b.publish],
         url: true,
       });
     }
     if (short?.x) {
-      const texts = xTexts({ ...short.x, reply: undefined }, videoUrl);
       xPosts.push({
         id: id('x'),
         heading: `${l.x.short}: ${entry.name}`,
         at: at(id('x')),
         files: file(b.video, entry.video),
-        fields: [...field(b.post, texts.post, { limit: limits.x.post, unit: 'chars', counting: 'x' }), ...field(b.reply, texts.reply)],
+        fields: [...field(b.post, display(planValue(id('x'), 'post')), limitOf(id('x'), 'post')), ...field(b.reply, display(planValue(id('x'), 'reply')), limitOf(id('x'), 'reply'))],
         checklist: [b.xVideo, b.xReply],
         url: true,
       });
@@ -610,21 +619,23 @@ export async function boardProject(projectRoot: string, root: string, options: {
   }
   if (meme) {
     // One video, three posts: the same caption with its credits on TikTok and Instagram Reels.
+    const tiktokCaption = planText('tiktok', 'caption');
     tiktokPosts.push({
       id: 'tiktok',
       heading: heading('tiktok', l.meme.tiktok),
       at: at('tiktok'),
       files: [...file(b.video, files.master), ...file(b.cover, files.cover)],
-      fields: field(b.description, description, { limit: limits.tiktok.caption, unit: 'chars' }),
+      fields: field(b.description, tiktokCaption ? display(tiktokCaption.value) : undefined, limitOf('tiktok', 'caption')),
       checklist: [b.ttCover, b.ttAi, b.publish],
       url: true,
     });
+    const instagramCaption = planText('instagram', 'caption');
     instagramPosts.push({
       id: 'instagram',
       heading: heading('instagram', l.meme.instagram),
       at: at('instagram'),
       files: [...file(b.video, files.master), ...file(b.cover, files.cover)],
-      fields: field(b.caption, description, { limit: limits.instagram.caption, unit: 'chars', note: `${memeHashtags(data)}/${limits.instagram.hashtags} Hashtags` }),
+      fields: field(b.caption, instagramCaption ? display(instagramCaption.value) : undefined, { ...limitOf('instagram', 'caption'), note: hashtagNoteOf('instagram', 'caption') }),
       checklist: [b.igCover(undefined), b.igAi, b.publish],
       url: true,
     });
@@ -648,7 +659,7 @@ export async function boardProject(projectRoot: string, root: string, options: {
       heading: heading('pitch', b.pitch),
       at: at('pitch'),
       files: [],
-      fields: field(b.pitch, data?.spotify?.pitch, { limit: limits.spotify.pitch, unit: 'chars' }),
+      fields: field(b.pitch, planValue('pitch', 'pitch'), limitOf('pitch', 'pitch')),
       checklist: [b.pitchCheck],
       task: true,
     });
@@ -659,23 +670,26 @@ export async function boardProject(projectRoot: string, root: string, options: {
       heading: heading('artist-pick', b.artistPick),
       at: at('artist-pick'),
       files: [...file(b.master, files.master), ...file(b.cover, files.cover)],
-      fields: field(b.artistPick, data?.spotify?.artist_pick),
+      fields: field(b.artistPick, planValue('artist-pick', 'artistPick')),
       checklist: [b.videoBeta],
       task: true,
     });
   }
 
   // LinkedIn
-  const li = meme ? undefined : data?.linkedin;
+  const linkedinDecision = meme ? undefined : plan.settings.linkedin;
+  const linkedinPost = meme ? undefined : planPost('linkedin');
   const linkedin: BoardPost[] = [];
-  if (li?.decision === 'post') {
-    const text = linkedinPostText(li, videoUrl);
+  if (linkedinDecision?.decision === 'post' && linkedinPost) {
     linkedin.push({
       id: 'linkedin',
       heading: heading('linkedin', l.li.post),
       at: at('linkedin'),
-      files: file(b.video, mediaFile(input, li.media)),
-      fields: [...field(b.reason, li.reason), ...field(b.post, text, { limit: limits.linkedin.post, unit: 'chars', note: l.li.hook([...(li.post ?? '').split(/\n\s*\n/)[0]!].length, limits.linkedin.hook) })],
+      files: file(b.video, linkedinPost.media ?? mediaFile(input, 'main')),
+      fields: [
+        ...field(b.reason, planValue('linkedin', 'reason')),
+        ...field(b.post, display(planValue('linkedin', 'post')), { ...limitOf('linkedin', 'post'), note: l.li.hook(linkedinPost.hook?.count ?? 0, linkedinPost.hook?.max ?? limits.linkedin.hook) }),
+      ],
       checklist: [b.liVideo],
       pointer: videoUrl,
       url: true,
@@ -692,7 +706,7 @@ export async function boardProject(projectRoot: string, root: string, options: {
           heading: heading('microsite', l.cal.steps.page),
           at: at('microsite'),
           files: [...file(b.json, `microsite/${project.config.slug}.json`), ...file(b.cover, files.cover), ...file(b.upload, files.thumbnails[0])],
-          fields: [...field(b.teaser, data.microsite.teaser), ...field(b.pageText, data.microsite.text), ...field(b.quote, data.microsite.quote)],
+          fields: [...field(b.teaser, planValue('microsite', 'teaser')), ...field(b.pageText, planValue('microsite', 'pageText')), ...field(b.quote, planValue('microsite', 'quote'))],
           checklist: [b.pageCheck],
           url: true,
         },
@@ -717,7 +731,7 @@ export async function boardProject(projectRoot: string, root: string, options: {
           label: 'LinkedIn',
           profile: profile('linkedin'),
           notes: notes.linkedin,
-          skipped: !li ? b.noLinkedin : li.decision === 'skip' ? `${b.skipLinkedin}: ${li.reason}` : undefined,
+          skipped: !linkedinDecision ? b.noLinkedin : linkedinDecision.decision === 'skip' ? `${b.skipLinkedin}: ${linkedinDecision.reason}` : undefined,
           posts: linkedin,
         },
         { id: 'microsite', label: 'Microsite', notes: notes.microsite, posts: micrositePosts },

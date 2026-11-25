@@ -1,64 +1,27 @@
 import {
   TODO,
-  chapterTime,
-  memeCaption as captionOf,
-  memeHashtags,
   type CalendarEvent,
   type ChannelConfig,
-  type Chapter,
-  type ReleaseCalendar,
-  type PlatformLimits,
-  type ReleaseMetadata,
-  type UploadData,
-  type UploadShort,
+  type PlanText,
+  type ReleasePlan,
+  type ReleasePlanInput,
 } from '@coreslopper/core';
 
-// The copy-and-paste texts of the release folder. The skill writes the
-// creative texts into review/upload.yaml; this module lays them out per
-// platform with the facts (files, chapters, credits, links, limits) and marks
-// every gap with TODO. Labels follow the project's language.
+// The copy-and-paste texts of the release folder, laid out from the release
+// plan: the plan holds every exact platform text and its limit, this module only
+// adds the folder's headings, counters, checklists, and the language's labels.
 
-export interface ReleaseTextInput {
-  kind: 'music-video' | 'episode' | 'meme';
-  language: string;
-  slug: string;
-  artist?: string;
-  title: string;
-  data?: UploadData;
-  release?: ReleaseMetadata;
-  /** The release calendar; the plan lists its events. */
-  calendar?: ReleaseCalendar;
-  /** The main video goes out as a YouTube Premiere (config/release-schedule.yaml). */
-  premiere?: boolean;
-  channel?: ChannelConfig;
-  limits: PlatformLimits;
-  chapters: Chapter[];
-  /** Credit texts the platform texts must carry, from the library sounds the project took (HS-261, HS-265). */
-  credits?: string[];
-  /** Paths inside the release folder. */
-  files: {
-    master?: string;
-    /** Every format's video, by format id (`16x9`, `9x16`, `1x1`, ...). */
-    videos?: Record<string, string>;
-    subtitles?: string;
-    thumbnails: string[];
-    shorts: { name: string; video: string; thumbnail?: string; tiktokCover?: string }[];
-    audio?: string;
-    cover?: string;
-    canvas?: string;
-    lyricsTxt?: string;
-    lyricsLrc?: string;
-    /** The announcement a week before: the 9:16 story and the 16:9 post image with the release date, and the teaser. */
-    announceStory?: string;
-    announcePost?: string;
-    teaser?: string;
-    /** The release-day story image. */
-    story?: string;
-    /** The 4:5 feed image, when there is no feed-format render. */
-    feedImage?: string;
-  };
-  durationSeconds?: number;
-}
+/** The plan's input: what `buildReleasePlan` turns into the plan. */
+export type ReleaseTextInput = ReleasePlanInput;
+
+const postOf = (plan: ReleasePlan, id: string) => plan.posts.find((post) => post.id === id);
+const textOf = (plan: ReleasePlan, id: string, key: string): PlanText | undefined => postOf(plan, id)?.texts[key];
+const valueOf = (plan: ReleasePlan, id: string, key: string): string | undefined => textOf(plan, id, key)?.value;
+const postsOf = (plan: ReleasePlan, platform: ReleasePlan['posts'][number]['platform']) => plan.posts.filter((post) => post.platform === platform);
+const shortNameOf = (id: string) => /^short:(.+):(?:youtube|tiktok|instagram|x)$/.exec(id)?.[1];
+
+/** The text with its live-URL slots shown as the folder's placeholders. */
+const display = (value: string, l: Labels): string => value.replaceAll('{youtube}', `[${l.videoLink}]`).replaceAll('{spotify}', l.todo('the Spotify link'));
 
 interface Labels {
   todo: (what: string) => string;
@@ -510,17 +473,6 @@ const count = (text: string) => [...text].length;
 const block = (text: string) => ['```text', text.trimEnd(), '```'];
 const checkbox = (text: string) => `- [ ] ${text}`;
 
-/**
- * The channel handle (or URL) of a platform, with a TODO while it holds `<ID>`.
- * Undefined without config/channel.yaml or without that platform: texts then go without the link.
- */
-function channelLink(channel: ChannelConfig | undefined, platform: string, l: Labels): string | undefined {
-  const link = channel?.links[platform];
-  const value = link?.handle ?? link?.url;
-  if (!value) return undefined;
-  return /<ID>/.test(value) ? `${value} ${l.todo(`links.${platform} in config/channel.yaml`)}` : value;
-}
-
 /** Footer lines from config/channel.yaml: song credit (music videos only; an episode has no song), tool credit, links. */
 export function footerLines(
   input: Pick<ReleaseTextInput, 'channel' | 'artist' | 'title' | 'release'> & { kind?: ReleaseTextInput['kind'] },
@@ -547,112 +499,123 @@ export function footerLines(
   return lines;
 }
 
-/** The YouTube description: body, chapters, footer, hashtags. */
-export function youtubeDescriptionText(input: ReleaseTextInput, l: Labels): string {
-  const main = input.data?.main;
-  const parts = [main?.description.trim() ?? l.todo('main.description in review/upload.yaml')];
-  if (input.chapters.length) parts.push(input.chapters.map((chapter) => `${chapterTime(chapter.start)} ${chapter.title}`).join('\n'));
-  const footer = footerLines(input, l);
-  if (footer.length) parts.push(footer.join('\n'));
-  if (main?.hashtags.length) parts.push(main.hashtags.join(' '));
-  return parts.join('\n\n');
+/** The channel handle (or URL) of a platform, with a TODO while it holds `<ID>`. */
+function channelLinkOf(channel: ChannelConfig | undefined, platform: string, l: Labels): string | undefined {
+  const link = channel?.links[platform];
+  const value = link?.handle ?? link?.url;
+  if (!value) return undefined;
+  return /<ID>/.test(value) ? `${value} ${l.todo(`links.${platform} in config/channel.yaml`)}` : value;
 }
 
-function youtubeText(input: ReleaseTextInput, l: Labels): string {
-  const main = input.data?.main;
-  const synthetic = main?.synthetic_media ?? input.channel?.disclosure.youtube_synthetic ?? true;
-  const description = youtubeDescriptionText(input, l);
-  const tags = main?.tags.join(', ') ?? '';
+const counter = (text: PlanText | undefined, l: Labels, fallback = 0): string => {
+  const value = text?.value ?? '';
+  const max = text?.limit?.max ?? fallback;
+  return text?.limit?.unit === 'bytes' ? l.bytes(Buffer.byteLength(value), max) : l.chars(count(value), max);
+};
+
+const hashtagNote = (text: PlanText | undefined, l: Labels): string | undefined =>
+  text?.hashtags ? `${text.hashtags.count}/${text.hashtags.max} ${l.hashtags}` : undefined;
+
+/** The text a post's field carries, with the folder's TODO when it is absent. */
+const show = (plan: ReleasePlan, id: string, key: string, l: Labels, todo: string): string => {
+  const value = valueOf(plan, id, key);
+  return value === undefined ? l.todo(todo) : display(value, l);
+};
+
+/** The YouTube description of the plan: body, chapters, footer, hashtags. */
+export function youtubeDescriptionText(plan: ReleasePlan, l: Labels): string {
+  return display(valueOf(plan, 'youtube', 'description') ?? l.todo('main.description in review/upload.yaml'), l);
+}
+
+function youtubeText(plan: ReleasePlan, input: ReleaseTextInput, l: Labels): string {
+  const post = postOf(plan, 'youtube');
+  const title = post?.texts.title;
+  const description = post?.texts.description;
+  const tags = post?.texts.tags;
+  const hashtags = post?.texts.hashtags;
   const lines = [`# ${l.yt.heading}`, ''];
   lines.push(`**${l.file}:** \`${input.files.master ?? l.todo('master render')}\``);
   lines.push(`**${l.thumbnail}:** \`${input.files.thumbnails[0] ?? l.todo('thumbnail 1')}\``);
   if (input.files.thumbnails.length > 1) lines.push(`**${l.yt.testCompare}:** ${input.files.thumbnails.map((file) => `\`${file}\``).join(', ')}`);
-  lines.push('', `## ${l.title} (${l.chars(count(main?.title ?? ''), input.limits.youtube.title)})`, '', ...block(main?.title ?? l.todo('main.title')));
-  lines.push('', `## ${l.description} (${l.bytes(Buffer.byteLength(description), input.limits.youtube.description_bytes)})`, '', ...block(description));
+  lines.push('', `## ${l.title} (${counter(title, l, input.limits.youtube.title)})`, '', ...block(title?.value ?? l.todo('main.title')));
+  lines.push('', `## ${l.description} (${counter(description, l, input.limits.youtube.description_bytes)})`, '', ...block(description?.value ?? l.todo('main.description in review/upload.yaml')));
+  // A link still holding <ID> is not platform text: it stays a TODO beside the description.
+  const unresolved = footerLines(input, l).filter((line) => line.includes(TODO));
+  if (unresolved.length) lines.push('', `## ${TODO}`, '', ...block(unresolved.join('\n')));
   if (!input.chapters.length) lines.push('', `_${l.noChapters}_`);
-  if (main?.hashtags.length) lines.push('', `## ${l.hashtagsComma}`, '', ...block(main.hashtags.join(', ')));
-  lines.push('', `## ${l.tags} (${l.chars(tags.length, input.limits.youtube.tags)})`, '', ...block(tags || l.todo('main.tags')));
-  lines.push('', `## ${l.pinned}`, '', ...block(main?.pinned_comment ?? l.todo('main.pinned_comment in review/upload.yaml')));
-  lines.push('', `## ${l.community}`, '', ...block(main?.community_post ?? l.todo('main.community_post in review/upload.yaml')));
-  const announcement = announcementText(input);
-  if (announcement) lines.push('', `## ${l.announce.heading}`, '', announceImageLine(input, l), '', ...block(announcement));
-  if (main?.summary_en) lines.push('', `## ${l.english}`, '', ...block(`${main.summary_en.title}\n\n${main.summary_en.description}`));
+  if (hashtags?.value) lines.push('', `## ${l.hashtagsComma}`, '', ...block(hashtags.value));
+  lines.push('', `## ${l.tags} (${counter(tags, l, input.limits.youtube.tags)})`, '', ...block(tags?.value ?? l.todo('main.tags')));
+  lines.push('', `## ${l.pinned}`, '', ...block(show(plan, 'youtube', 'pinned', l, 'main.pinned_comment in review/upload.yaml')));
+  lines.push('', `## ${l.community}`, '', ...block(show(plan, 'youtube', 'community', l, 'main.community_post in review/upload.yaml')));
+  const announcement = valueOf(plan, 'announce:youtube', 'text');
+  if (announcement) lines.push('', `## ${l.announce.heading}`, '', announceImageLine(input, l), '', ...block(display(announcement, l)));
+  if (post?.english) lines.push('', `## ${l.english}`, '', ...block(`${post.english.title}\n\n${post.english.description}`));
   lines.push('', `## ${l.checklist}`, '');
-  lines.push(checkbox(l.yt.visibility), checkbox(l.yt.synthetic(synthetic)), checkbox(l.yt.kids(main?.made_for_kids ?? false)));
-  lines.push(checkbox(l.yt.category(main?.language ?? input.language)), checkbox(l.yt.endscreen));
+  lines.push(checkbox(l.yt.visibility), checkbox(l.yt.synthetic(post?.syntheticMedia ?? plan.settings.youtubeSynthetic)), checkbox(l.yt.kids(post?.madeForKids ?? false)));
+  lines.push(checkbox(l.yt.category(post?.language ?? input.language)), checkbox(l.yt.endscreen));
   if (input.files.subtitles) lines.push(checkbox(l.yt.subtitles(input.files.subtitles)));
   return `${lines.join('\n')}\n`;
 }
 
-function shortFor(input: ReleaseTextInput, name: string): UploadShort | undefined {
-  return input.data?.shorts.find((short) => short.name === name);
-}
-
-function shortsText(input: ReleaseTextInput, l: Labels): string {
+function shortsText(plan: ReleasePlan, input: ReleaseTextInput, l: Labels): string {
   const lines = [`# ${l.shorts.heading}`, ''];
-  for (const file of input.files.shorts) {
-    const short = shortFor(input, file.name);
-    const synthetic = short?.synthetic_media ?? input.channel?.disclosure.youtube_synthetic ?? true;
-    lines.push(`## ${file.name}${short?.moment ? ` — ${short.moment}` : ''}`, '');
-    lines.push(`**${l.file}:** \`${file.video}\``, `**${l.thumbnail}:** \`${file.thumbnail ?? l.todo('Short thumbnail')}\``, '');
-    lines.push(`### ${l.title} (${l.chars(count(short?.title ?? ''), input.limits.youtube.title)})`, '', ...block(short?.title ?? l.todo(`shorts.${file.name}.title`)), '');
-    const description = short ? [short.description.trim(), short.hashtags.join(' ')].join('\n\n') : l.todo(`shorts.${file.name} in review/upload.yaml`);
-    lines.push(`### ${l.description}`, '', ...block(description), '');
-    if (short?.hashtags.length) lines.push(`### ${l.hashtagsComma}`, '', ...block(short.hashtags.join(', ')), '');
-    lines.push(`### ${l.checklist}`, '', checkbox(l.shorts.relatedStep), checkbox(l.yt.synthetic(synthetic)), checkbox(l.yt.kids(short?.made_for_kids ?? false)), '');
+  for (const post of postsOf(plan, 'shorts')) {
+    const name = shortNameOf(post.id)!;
+    const file = input.files.shorts.find((short) => short.name === name);
+    lines.push(`## ${name}${post.moment ? ` — ${post.moment}` : ''}`, '');
+    lines.push(`**${l.file}:** \`${file?.video ?? l.todo('Short video')}\``, `**${l.thumbnail}:** \`${file?.thumbnail ?? l.todo('Short thumbnail')}\``, '');
+    lines.push(`### ${l.title} (${counter(post.texts.title, l, input.limits.youtube.title)})`, '', ...block(post.texts.title?.value ?? l.todo(`shorts.${name}.title`)), '');
+    lines.push(`### ${l.description}`, '', ...block(post.texts.description ? display(post.texts.description.value, l) : l.todo(`shorts.${name} in review/upload.yaml`)), '');
+    if (post.texts.hashtags?.value) lines.push(`### ${l.hashtagsComma}`, '', ...block(post.texts.hashtags.value), '');
+    lines.push(`### ${l.checklist}`, '', checkbox(l.shorts.relatedStep), checkbox(l.yt.synthetic(post.syntheticMedia ?? plan.settings.youtubeSynthetic)), checkbox(l.yt.kids(post.madeForKids ?? false)), '');
   }
-  if (input.files.shorts.length === 0) lines.push(l.todo('no Shorts in renders/shorts/'), '');
+  if (postsOf(plan, 'shorts').length === 0) lines.push(l.todo('no Shorts in renders/shorts/'), '');
   return `${lines.join('\n').trimEnd()}\n`;
 }
 
-function instagramText(input: ReleaseTextInput, l: Labels): string {
+function instagramText(plan: ReleasePlan, input: ReleaseTextInput, l: Labels): string {
   const lines = [`# ${l.ig.heading}`, ''];
-  const youtube = channelLink(input.channel, 'youtube', l);
-  const announcement = announcementText(input);
-  if (announcement) lines.push(`## ${l.announce.heading} (${l.ig.story})`, '', announceImageLine(input, l), '', ...block(announcement), '');
-  for (const file of input.files.shorts) {
-    const ig = shortFor(input, file.name)?.instagram;
-    lines.push(`## ${l.ig.reel}: ${file.name}`, '', `**${l.file}:** \`${file.video}\``, '');
-    const caption = ig ? [ig.caption.trim(), ig.hashtags.join(' ')].filter(Boolean).join('\n\n') : l.todo(`shorts.${file.name}.instagram in review/upload.yaml`);
-    const tags = ig ? ig.hashtags.length + (ig.caption.match(/#[\p{L}\p{N}_]+/gu)?.length ?? 0) : 0;
-    lines.push(`### ${l.ig.caption} (${l.chars(count(caption), input.limits.instagram.caption)}, ${tags}/${input.limits.instagram.hashtags} ${l.hashtags})`, '', ...block(caption), '');
-    lines.push(`### ${l.ig.story}`, '', ...block(ig?.story ?? l.todo(`shorts.${file.name}.instagram.story`)), '');
-    lines.push(`### ${l.checklist}`, '', checkbox(l.ig.cover(ig?.cover_frame)));
-    if (input.channel?.disclosure.instagram_ai_label ?? true) lines.push(checkbox(l.ig.aiLabel));
+  const youtube = channelLinkOf(input.channel, 'youtube', l);
+  const announcement = postOf(plan, 'announce:instagram')?.texts.story;
+  if (announcement) lines.push(`## ${l.announce.heading} (${l.ig.story})`, '', announceImageLine(input, l), '', ...block(display(announcement.value, l)), '');
+  for (const post of postsOf(plan, 'instagram')) {
+    const name = shortNameOf(post.id);
+    if (!name) continue;
+    const file = input.files.shorts.find((short) => short.name === name);
+    lines.push(`## ${l.ig.reel}: ${name}`, '', `**${l.file}:** \`${file?.video ?? l.todo('Short video')}\``, '');
+    const caption = post.texts.caption;
+    const note = hashtagNote(caption, l);
+    lines.push(`### ${l.ig.caption} (${counter(caption, l, input.limits.instagram.caption)}${note ? `, ${note}` : ''})`, '', ...block(caption ? display(caption.value, l) : l.todo(`shorts.${name}.instagram in review/upload.yaml`)), '');
+    lines.push(`### ${l.ig.story}`, '', ...block(post.texts.story ? display(post.texts.story.value, l) : l.todo(`shorts.${name}.instagram.story`)), '');
+    lines.push(`### ${l.checklist}`, '', checkbox(l.ig.cover(post.coverFrame)));
+    if (plan.settings.instagramAiLabel) lines.push(checkbox(l.ig.aiLabel));
     lines.push(checkbox(youtube ? `${l.ig.sticker} — ${youtube}` : l.ig.sticker), '');
   }
-  const post = input.data?.instagram_post;
-  if (post) {
+  const feed = postOf(plan, 'instagram-post')?.texts.caption;
+  if (feed) {
     const video = feedVideo(input);
-    lines.push(`## ${l.ig.post}`, '', `_${video ? l.ig.postVideo(video) : l.ig.postImage}_`, '', ...block([post.caption.trim(), post.hashtags.join(' ')].filter(Boolean).join('\n\n')), '');
+    lines.push(`## ${l.ig.post}`, '', `_${video ? l.ig.postVideo(video) : l.ig.postImage}_`, '', ...block(display(feed.value, l)), '');
   }
   return `${lines.join('\n').trimEnd()}\n`;
 }
 
-function tiktokText(input: ReleaseTextInput, l: Labels): string {
-  // Laid out like the TikTok Studio upload form: description, cover, settings.
+function tiktokText(plan: ReleasePlan, input: ReleaseTextInput, l: Labels): string {
   const lines = [`# ${l.tt.heading}`, ''];
-  const youtube = channelLink(input.channel, 'youtube', l);
-  for (const file of input.files.shorts) {
-    const tt = shortFor(input, file.name)?.tiktok;
-    lines.push(`## ${file.name}`, '', `**${l.file}:** \`${file.video}\``, '');
-    const description = tt
-      ? tiktokDescription(tt, l.tt.overlayDefault(youtube ?? 'YouTube'))
-      : l.todo(`shorts.${file.name}.tiktok in review/upload.yaml`);
-    lines.push(`### ${l.tt.description} (${l.chars(count(description), input.limits.tiktok.caption)})`, '', ...block(description), '');
-    const cover = file.tiktokCover ?? file.thumbnail;
+  for (const post of postsOf(plan, 'tiktok')) {
+    const name = shortNameOf(post.id);
+    if (!name) continue;
+    const file = input.files.shorts.find((short) => short.name === name);
+    lines.push(`## ${name}`, '', `**${l.file}:** \`${file?.video ?? l.todo('Short video')}\``, '');
+    const caption = post.texts.caption;
+    lines.push(`### ${l.tt.description} (${counter(caption, l, input.limits.tiktok.caption)})`, '', ...block(caption ? display(caption.value, l) : l.todo(`shorts.${name}.tiktok in review/upload.yaml`)), '');
+    const cover = file?.tiktokCover ?? file?.thumbnail;
     lines.push(`### ${l.tt.cover}`, '', cover ? l.tt.coverUpload(cover) : l.tt.coverFrame, '');
     lines.push(`### ${l.tt.settings}`, '', checkbox(l.tt.visibility));
-    if (input.channel?.disclosure.tiktok_ai_label ?? true) lines.push(checkbox(l.tt.aiLabel));
+    if (plan.settings.tiktokAiLabel) lines.push(checkbox(l.tt.aiLabel));
     lines.push(checkbox(l.tt.schedule), '');
-    if (tt?.pinned_comment) lines.push(`### ${l.tt.afterPost}`, '', checkbox(l.tt.pinned), '', ...block(tt.pinned_comment), '');
+    if (post.texts.pinned?.value) lines.push(`### ${l.tt.afterPost}`, '', checkbox(l.tt.pinned), '', ...block(post.texts.pinned.value), '');
   }
   return `${lines.join('\n').trimEnd()}\n`;
-}
-
-/** The TikTok description: caption, the pointer to the full video (TikTok Studio has no text overlay), hashtags. */
-export function tiktokDescription(tt: { caption: string; hashtags: string[]; overlay?: string }, pointer: string): string {
-  return [tt.caption.trim(), (tt.overlay ?? pointer).trim(), tt.hashtags.join(' ')].filter(Boolean).join('\n\n');
 }
 
 /** The distributor form, field by field in its order: label and the value to paste. */
@@ -684,11 +647,12 @@ export function distributorRows(input: ReleaseTextInput, l: Labels): [string, st
   ];
 }
 
-function spotifyText(input: ReleaseTextInput, l: Labels): string {
+function spotifyText(plan: ReleasePlan, input: ReleaseTextInput, l: Labels): string {
   const release = input.release;
   const distributor = release?.distributor === 'distrokid' ? 'DistroKid' : 'Distributor';
   const rows = distributorRows(input, l);
-  const pitch = input.data?.spotify?.pitch;
+  const pitch = postOf(plan, 'pitch')?.texts.pitch;
+  const artistPick = postOf(plan, 'artist-pick')?.texts.artistPick;
   const lines = [
     `# ${l.sp.heading}`,
     '',
@@ -707,11 +671,11 @@ function spotifyText(input: ReleaseTextInput, l: Labels): string {
     ...(input.files.master ? [checkbox(l.sp.video(input.files.master)), ''] : []),
     `### ${l.sp.artistPick}`,
     '',
-    ...block(input.data?.spotify?.artist_pick ?? l.todo('spotify.artist_pick in review/upload.yaml')),
+    ...block(artistPick?.value ?? l.todo('spotify.artist_pick in review/upload.yaml')),
     '',
-    `### ${l.sp.pitch} (${l.chars(count(pitch ?? ''), input.limits.spotify.pitch)})`,
+    `### ${l.sp.pitch} (${counter(pitch, l, input.limits.spotify.pitch)})`,
     '',
-    ...block(pitch ?? l.todo('spotify.pitch in review/upload.yaml')),
+    ...block(pitch?.value ?? l.todo('spotify.pitch in review/upload.yaml')),
     '',
     `_${l.sp.pitchNote}_`,
     '',
@@ -760,56 +724,10 @@ function planText(input: ReleaseTextInput, l: Labels): string {
   return `${lines.join('\n')}\n`;
 }
 
-/** The release announcement, the same text on every platform it goes to. */
 /** Which files the announcement uses: the composed images and teaser, or the cover before they exist. */
 function announceImageLine(input: ReleaseTextInput, l: Labels): string {
   const { announceStory, announcePost, teaser } = input.files;
   return announceStory || announcePost || teaser ? l.announce.files(announceStory, announcePost, teaser) : `_${l.announce.image}_`;
-}
-
-export function announcementText(input: ReleaseTextInput): string | undefined {
-  const a = input.data?.announcement;
-  return a ? [a.text.trim(), a.hashtags.join(' ')].filter(Boolean).join('\n\n') : undefined;
-}
-
-/** The X post with its hashtags, and the reply that carries the YouTube link. */
-export function xTexts(post: { post: string; hashtags: string[]; reply?: string }, youtubeUrl: string): { post: string; reply: string } {
-  return {
-    post: [post.post.trim(), post.hashtags.join(' ')].filter(Boolean).join('\n\n'),
-    reply: [post.reply?.trim() ?? '', youtubeUrl].filter(Boolean).join(' '),
-  };
-}
-
-/** The main video's URL once it is live; before that a bracketed slot the user fills in (the release board does it). */
-export function youtubeTarget(l: Labels, live?: string): string {
-  return live ?? `[${l.videoLink}]`;
-}
-
-function xText(input: ReleaseTextInput, l: Labels): string {
-  const lines = [`# ${l.x.heading}`, ''];
-  const youtube = youtubeTarget(l);
-  const announcement = announcementText(input);
-  if (announcement) lines.push(`## ${l.announce.heading}`, '', announceImageLine(input, l), '', ...block(announcement), '');
-  const x = input.data?.x;
-  if (x) {
-    const texts = xTexts(x, youtube);
-    const media = input.files.shorts.find((short) => short.name === (x.media ?? input.files.shorts[0]?.name));
-    lines.push(`## ${l.x.post} (${l.chars(count(texts.post), input.limits.x.post)})`, '');
-    if (media) lines.push(l.x.media(media.video), '');
-    lines.push(...block(texts.post), '', `### ${l.x.reply}`, '', ...block(texts.reply), '', `_${l.x.replyNote}_`, '');
-  } else lines.push(l.todo('x in review/upload.yaml'), '');
-  for (const file of input.files.shorts) {
-    const post = shortFor(input, file.name)?.x;
-    if (!post) continue;
-    const texts = xTexts({ ...post, reply: undefined }, youtube);
-    lines.push(`## ${l.x.short}: ${file.name}`, '', l.x.media(file.video), '', ...block(texts.post), '', `### ${l.x.reply}`, '', ...block(texts.reply), '');
-  }
-  return `${lines.join('\n').trimEnd()}\n`;
-}
-
-/** The LinkedIn post with its hashtags and the link at the end. */
-export function linkedinPostText(post: { post?: string; hashtags: string[] }, youtubeUrl: string): string {
-  return [post.post?.trim() ?? '', youtubeUrl, post.hashtags.join(' ')].filter(Boolean).join('\n\n');
 }
 
 /** The feed version of the main video: the 4:5 render, else the 1:1 render; undefined without either. */
@@ -823,23 +741,44 @@ export function mediaFile(input: Pick<ReleaseTextInput, 'files'>, media: string 
   return input.files.shorts.find((short) => short.name === media)?.video;
 }
 
-function linkedinText(input: ReleaseTextInput, l: Labels): string {
-  const lines = [`# ${l.li.heading}`, ''];
-  const li = input.data?.linkedin;
-  if (!li) return `${[...lines, l.todo('linkedin in review/upload.yaml (decision post or skip)')].join('\n')}\n`;
-  if (li.decision === 'skip') return `${[...lines, l.li.skipped(li.reason)].join('\n')}\n`;
-  const text = linkedinPostText(li, youtubeTarget(l));
-  const hook = (li.post ?? '').split(/\n\s*\n/)[0] ?? '';
-  const file = mediaFile(input, li.media);
-  lines.push(`**${l.li.reason}:** ${li.reason}`, '');
-  if (file) lines.push(l.li.media(file), '');
-  lines.push(`## ${l.li.post} (${l.chars(count(text), input.limits.linkedin.post)}; ${l.li.hook(count(hook), input.limits.linkedin.hook)})`, '', ...block(text), '', `_${l.li.noLinkNote}_`);
-  return `${lines.join('\n')}\n`;
+function xText(plan: ReleasePlan, input: ReleaseTextInput, l: Labels): string {
+  const lines = [`# ${l.x.heading}`, ''];
+  const announcement = valueOf(plan, 'announce:x', 'post');
+  if (announcement) lines.push(`## ${l.announce.heading}`, '', announceImageLine(input, l), '', ...block(display(announcement, l)), '');
+  const post = postOf(plan, 'x');
+  if (post?.texts.post) {
+    const media = mediaFile(input, input.data?.x?.media ?? input.files.shorts[0]?.name);
+    lines.push(`## ${l.x.post} (${counter(post.texts.post, l, input.limits.x.post)})`, '');
+    if (media) lines.push(l.x.media(media), '');
+    lines.push(...block(display(post.texts.post.value, l)), '', `### ${l.x.reply}`, '', ...block(display(post.texts.reply?.value ?? '', l)), '', `_${l.x.replyNote}_`, '');
+  } else lines.push(l.todo('x in review/upload.yaml'), '');
+  for (const short of postsOf(plan, 'x')) {
+    const name = shortNameOf(short.id);
+    if (!name) continue;
+    const file = input.files.shorts.find((entry) => entry.name === name);
+    lines.push(`## ${l.x.short}: ${name}`, '', file ? l.x.media(file.video) : '', '', ...block(display(short.texts.post?.value ?? '', l)), '', `### ${l.x.reply}`, '', ...block(display(short.texts.reply?.value ?? '', l)), '');
+  }
+  return `${lines.join('\n').trimEnd()}\n`;
 }
 
-/** The meme's one caption: its description, the credits of the library sounds it took, and the hashtags. */
-export function memeCaption(input: Pick<ReleaseTextInput, 'data' | 'credits'>): string {
-  return captionOf(input.data, input.credits);
+function linkedinText(plan: ReleasePlan, input: ReleaseTextInput, l: Labels): string {
+  const lines = [`# ${l.li.heading}`, ''];
+  const decision = plan.settings.linkedin;
+  if (!decision) return `${[...lines, l.todo('linkedin in review/upload.yaml (decision post or skip)')].join('\n')}\n`;
+  if (decision.decision === 'skip') return `${[...lines, l.li.skipped(decision.reason)].join('\n')}\n`;
+  const post = postOf(plan, 'linkedin');
+  const text = post?.texts.post;
+  const file = post?.media ?? mediaFile(input, 'main');
+  lines.push(`**${l.li.reason}:** ${post?.texts.reason?.value ?? decision.reason}`, '');
+  if (file) lines.push(l.li.media(file), '');
+  lines.push(
+    `## ${l.li.post} (${counter(text, l, input.limits.linkedin.post)}; ${l.li.hook(post?.hook?.count ?? 0, post?.hook?.max ?? input.limits.linkedin.hook)})`,
+    '',
+    ...block(text ? display(text.value, l) : l.todo('linkedin.post in review/upload.yaml')),
+    '',
+    `_${l.li.noLinkNote}_`,
+  );
+  return `${lines.join('\n')}\n`;
 }
 
 /** The meme video's file in the folder: its one 9:16 render, or the master when the format list names it. */
@@ -847,38 +786,38 @@ function memeFile(input: ReleaseTextInput, l: Labels): string {
   return input.files.master ?? input.files.videos?.['9x16'] ?? l.todo('renders/9x16.mp4');
 }
 
-function memeYoutubeText(input: ReleaseTextInput, l: Labels): string {
-  const main = input.data?.main;
-  const caption = memeCaption(input);
-  const synthetic = main?.synthetic_media ?? input.channel?.disclosure.youtube_synthetic ?? true;
+function memeYoutubeText(plan: ReleasePlan, input: ReleaseTextInput, l: Labels): string {
+  const post = postOf(plan, 'youtube');
+  const title = post?.texts.title;
+  const description = post?.texts.description;
+  const tags = post?.texts.tags;
   const lines = [`# ${l.meme.youtube}`, '', `**${l.file}:** \`${memeFile(input, l)}\``];
   if (input.files.cover) lines.push(l.meme.cover(input.files.cover));
-  lines.push('', `## ${l.title} (${l.chars(count(main?.title ?? ''), input.limits.youtube.title)})`, '', ...block(main?.title ?? l.todo('main.title')));
-  lines.push('', `## ${l.description} (${l.bytes(Buffer.byteLength(caption), input.limits.youtube.description_bytes)})`, '', ...block(caption || l.todo('main.description')));
-  const tags = main?.tags.join(', ') ?? '';
-  lines.push('', `## ${l.tags} (${l.chars(tags.length, input.limits.youtube.tags)})`, '', ...block(tags || l.todo('main.tags')));
-  lines.push('', `## ${l.checklist}`, '', checkbox(l.meme.visibility), checkbox(l.yt.synthetic(synthetic)), checkbox(l.yt.kids(main?.made_for_kids ?? false)));
+  lines.push('', `## ${l.title} (${counter(title, l, input.limits.youtube.title)})`, '', ...block(title?.value ?? l.todo('main.title')));
+  lines.push('', `## ${l.description} (${counter(description, l, input.limits.youtube.description_bytes)})`, '', ...block(description?.value ?? l.todo('main.description')));
+  lines.push('', `## ${l.tags} (${counter(tags, l, input.limits.youtube.tags)})`, '', ...block(tags?.value ?? l.todo('main.tags')));
+  lines.push('', `## ${l.checklist}`, '', checkbox(l.meme.visibility), checkbox(l.yt.synthetic(post?.syntheticMedia ?? plan.settings.youtubeSynthetic)), checkbox(l.yt.kids(post?.madeForKids ?? false)));
   return `${lines.join('\n')}\n`;
 }
 
-function memeTiktokText(input: ReleaseTextInput, l: Labels): string {
-  const caption = memeCaption(input);
+function memeTiktokText(plan: ReleasePlan, input: ReleaseTextInput, l: Labels): string {
+  const caption = postOf(plan, 'tiktok')?.texts.caption;
   const lines = [`# ${l.meme.tiktok}`, '', `**${l.file}:** \`${memeFile(input, l)}\``];
   if (input.files.cover) lines.push(l.tt.coverUpload(input.files.cover));
-  lines.push('', `### ${l.description} (${l.chars(count(caption), input.limits.tiktok.caption)})`, '', ...block(caption || l.todo('main.description')));
+  lines.push('', `### ${l.description} (${counter(caption, l, input.limits.tiktok.caption)})`, '', ...block(caption?.value ?? l.todo('main.description')));
   lines.push('', `### ${l.tt.settings}`, '', checkbox(l.tt.visibility));
-  if (input.channel?.disclosure.tiktok_ai_label ?? true) lines.push(checkbox(l.tt.aiLabel));
+  if (plan.settings.tiktokAiLabel) lines.push(checkbox(l.tt.aiLabel));
   return `${lines.join('\n')}\n`;
 }
 
-function memeInstagramText(input: ReleaseTextInput, l: Labels): string {
-  const caption = memeCaption(input);
-  const tags = memeHashtags(input.data);
+function memeInstagramText(plan: ReleasePlan, input: ReleaseTextInput, l: Labels): string {
+  const caption = postOf(plan, 'instagram')?.texts.caption;
   const lines = [`# ${l.meme.instagram}`, '', `**${l.file}:** \`${memeFile(input, l)}\``];
   if (input.files.cover) lines.push(l.meme.cover(input.files.cover));
-  lines.push('', `### ${l.ig.caption} (${l.chars(count(caption), input.limits.instagram.caption)}, ${tags}/${input.limits.instagram.hashtags} ${l.hashtags})`, '', ...block(caption || l.todo('main.description')));
+  const note = hashtagNote(caption, l);
+  lines.push('', `### ${l.ig.caption} (${counter(caption, l, input.limits.instagram.caption)}${note ? `, ${note}` : ''})`, '', ...block(caption?.value ?? l.todo('main.description')));
   lines.push('', `### ${l.checklist}`, '', checkbox(l.ig.cover(undefined)));
-  if (input.channel?.disclosure.instagram_ai_label ?? true) lines.push(checkbox(l.ig.aiLabel));
+  if (plan.settings.instagramAiLabel) lines.push(checkbox(l.ig.aiLabel));
   return `${lines.join('\n')}\n`;
 }
 
@@ -910,24 +849,24 @@ export function readmeText(input: ReleaseTextInput, todos: string[]): string {
 }
 
 /** Every text file of `texts/`, keyed by file name. Episodes have no streaming release; a meme has three posts. */
-export function releaseTexts(input: ReleaseTextInput): Record<string, string> {
+export function releaseTexts(plan: ReleasePlan, input: ReleaseTextInput): Record<string, string> {
   const l = releaseLabels(input.language);
   if (input.kind === 'meme') {
     return {
-      'youtube.md': memeYoutubeText(input, l),
-      'tiktok.md': memeTiktokText(input, l),
-      'instagram.md': memeInstagramText(input, l),
+      'youtube.md': memeYoutubeText(plan, input, l),
+      'tiktok.md': memeTiktokText(plan, input, l),
+      'instagram.md': memeInstagramText(plan, input, l),
       'release-plan.md': planText(input, l),
     };
   }
   return {
-    'youtube.md': youtubeText(input, l),
-    'shorts.md': shortsText(input, l),
-    'instagram.md': instagramText(input, l),
-    'tiktok.md': tiktokText(input, l),
-    ...(input.kind === 'music-video' ? { 'spotify.md': spotifyText(input, l) } : {}),
-    'x.md': xText(input, l),
-    ...(input.data?.linkedin?.decision === 'post' ? { 'linkedin.md': linkedinText(input, l) } : {}),
+    'youtube.md': youtubeText(plan, input, l),
+    'shorts.md': shortsText(plan, input, l),
+    'instagram.md': instagramText(plan, input, l),
+    'tiktok.md': tiktokText(plan, input, l),
+    ...(input.kind === 'music-video' ? { 'spotify.md': spotifyText(plan, input, l) } : {}),
+    'x.md': xText(plan, input, l),
+    ...(postOf(plan, 'linkedin') ? { 'linkedin.md': linkedinText(plan, input, l) } : {}),
     'release-plan.md': planText(input, l),
   };
 }

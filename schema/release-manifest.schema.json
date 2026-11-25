@@ -77,6 +77,377 @@
         ]
       }
     },
+    "plan": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "number",
+          "const": 1
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "music-video",
+            "episode",
+            "meme"
+          ]
+        },
+        "language": {
+          "type": "string",
+          "minLength": 1
+        },
+        "slug": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artist": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "durationSeconds": {
+          "type": "number"
+        },
+        "premiere": {
+          "default": false,
+          "type": "boolean"
+        },
+        "settings": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "youtubeSynthetic": {
+              "default": true,
+              "type": "boolean"
+            },
+            "instagramAiLabel": {
+              "default": true,
+              "type": "boolean"
+            },
+            "tiktokAiLabel": {
+              "default": true,
+              "type": "boolean"
+            },
+            "youtubeHandle": {
+              "type": "string",
+              "minLength": 1
+            },
+            "distributor": {
+              "type": "string",
+              "minLength": 1
+            },
+            "linkedin": {
+              "type": "object",
+              "properties": {
+                "decision": {
+                  "type": "string",
+                  "enum": [
+                    "post",
+                    "skip"
+                  ]
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "decision",
+                "reason"
+              ]
+            }
+          }
+        },
+        "posts": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "platform": {
+                "type": "string",
+                "enum": [
+                  "youtube",
+                  "shorts",
+                  "tiktok",
+                  "instagram",
+                  "spotify",
+                  "x",
+                  "linkedin",
+                  "microsite"
+                ]
+              },
+              "task": {
+                "default": false,
+                "type": "boolean"
+              },
+              "texts": {
+                "default": {},
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "type": "string"
+                    },
+                    "limit": {
+                      "type": "object",
+                      "properties": {
+                        "max": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "unit": {
+                          "default": "chars",
+                          "type": "string",
+                          "enum": [
+                            "chars",
+                            "bytes"
+                          ]
+                        },
+                        "counting": {
+                          "type": "string",
+                          "const": "x"
+                        },
+                        "extra": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "strip": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "label": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "field": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "verb": {
+                          "default": "has",
+                          "type": "string",
+                          "enum": [
+                            "has",
+                            "have"
+                          ]
+                        },
+                        "style": {
+                          "type": "string",
+                          "const": "linkedin-hook"
+                        }
+                      },
+                      "required": [
+                        "max",
+                        "label",
+                        "field"
+                      ]
+                    },
+                    "hashtags": {
+                      "type": "object",
+                      "properties": {
+                        "count": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "max": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "label": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "suffix": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "count",
+                        "max",
+                        "label"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "value"
+                  ]
+                }
+              },
+              "files": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "role": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "path": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "index": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "role",
+                    "path"
+                  ]
+                }
+              },
+              "source": {
+                "type": "string",
+                "minLength": 1
+              },
+              "media": {
+                "type": "string",
+                "minLength": 1
+              },
+              "placement": {
+                "type": "string",
+                "enum": [
+                  "reel",
+                  "feed",
+                  "story"
+                ]
+              },
+              "needsYoutube": {
+                "type": "boolean"
+              },
+              "url": {
+                "type": "boolean"
+              },
+              "pointer": {
+                "type": "string",
+                "const": "youtube"
+              },
+              "moment": {
+                "type": "string",
+                "minLength": 1
+              },
+              "coverFrame": {
+                "type": "number",
+                "minimum": 0
+              },
+              "syntheticMedia": {
+                "type": "boolean"
+              },
+              "madeForKids": {
+                "type": "boolean"
+              },
+              "language": {
+                "type": "string",
+                "minLength": 2
+              },
+              "english": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "title",
+                  "description"
+                ]
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              },
+              "hook": {
+                "type": "object",
+                "properties": {
+                  "count": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "max": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "count",
+                  "max"
+                ]
+              },
+              "errors": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "missing": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "id",
+              "platform"
+            ]
+          }
+        },
+        "problems": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "errors": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "missing": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "required": [
+        "version",
+        "kind",
+        "language",
+        "slug",
+        "title"
+      ]
+    },
     "todos": {
       "default": [],
       "type": "array",

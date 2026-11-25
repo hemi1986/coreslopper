@@ -17,11 +17,13 @@ import {
   unmarkedPlaceholders,
   type LoadedProject,
   type ReleaseManifest,
+  type ReleasePlan,
   withReleaseDefaults,
 } from '@coreslopper/core';
 import { shortProblems } from './release-files.js';
 import { canvasProblems, probeMedia, videoFacts, videoProblems, wavProblems, type Prober } from './release-media.js';
 import { projectFormats, releaseDir, usedLibrarySounds } from './release.js';
+import { releaseLabels } from './release-texts.js';
 import { jpegInfo, thumbnailProblems } from './thumbnail-files.js';
 import { loadUploadData, uploadPaths } from './upload-text.js';
 
@@ -33,10 +35,15 @@ export interface ReleaseCheck {
   evidence: string;
 }
 
-/** The texts every release folder has; `spotify.md` only for a music video, `linkedin.md` only when the song gets a LinkedIn post. */
-export function expectedTexts(kind: 'music-video' | 'episode' | 'meme'): string[] {
+/**
+ * The texts every release folder has, read from the plan: `spotify.md` only for
+ * a music video, `linkedin.md` only when the plan holds a LinkedIn post.
+ */
+export function expectedTexts(plan: Pick<ReleasePlan, 'kind' | 'posts'> | 'music-video' | 'episode' | 'meme'): string[] {
+  const kind = typeof plan === 'string' ? plan : plan.kind;
   if (kind === 'meme') return ['youtube.md', 'tiktok.md', 'instagram.md', 'release-plan.md'];
-  return ['youtube.md', 'shorts.md', 'instagram.md', 'tiktok.md', ...(kind === 'music-video' ? ['spotify.md'] : []), 'x.md', 'release-plan.md'];
+  const linkedin = typeof plan !== 'string' && plan.posts.some((post) => post.id === 'linkedin');
+  return ['youtube.md', 'shorts.md', 'instagram.md', 'tiktok.md', ...(kind === 'music-video' ? ['spotify.md'] : []), 'x.md', ...(linkedin ? ['linkedin.md'] : []), 'release-plan.md'];
 }
 
 const check = (name: string, result: CheckResult, evidence: string): ReleaseCheck => ({ name, result, evidence });
@@ -75,6 +82,7 @@ export async function releaseChecks(projectDir: string, probe: Prober = probeMed
     return [check('Release package', 'FAIL', `manifest.json is invalid: ${(error as Error).message}`)];
   }
   const checks: ReleaseCheck[] = [];
+  const plan = manifest.plan;
   const at = (path: string) => join(dir, path);
   const byKind = (kind: string) => manifest.files.filter((file) => file.kind === kind);
 
@@ -217,10 +225,11 @@ export async function releaseChecks(projectDir: string, probe: Prober = probeMed
   }
 
   // texts/: every file present, limits kept, placeholders marked.
-  const missingTexts = expectedTexts(kind).filter((name) => !existsSync(at(`texts/${name}`)));
+  const texts = expectedTexts(plan ?? kind);
+  const missingTexts = texts.filter((name) => !existsSync(at(`texts/${name}`)));
   const unmarked: string[] = [];
   let todoMarks = 0;
-  for (const name of expectedTexts(kind)) {
+  for (const name of texts) {
     if (!existsSync(at(`texts/${name}`))) continue;
     const text = await readFile(at(`texts/${name}`), 'utf8');
     unmarked.push(...unmarkedPlaceholders(text).map((line) => `${name}: ${line.trim()}`));
@@ -229,7 +238,14 @@ export async function releaseChecks(projectDir: string, probe: Prober = probeMed
   const textErrors: string[] = [];
   let textTodos = 0;
   if (existsSync(uploadPaths(project.paths.root).data)) {
-    const problems = platformTextProblems(await loadUploadData(project.paths.root), platformLimits(await loadChannel(root)), { kind, credits });
+    const data = await loadUploadData(project.paths.root);
+    const channel = await loadChannel(root);
+    const handle = channel?.links.youtube?.handle;
+    const problems = platformTextProblems(data, platformLimits(channel), {
+      kind,
+      credits,
+      tiktokPointer: releaseLabels(data.language).tt.overlayDefault(handle && !/<ID>/.test(handle) ? handle : 'YouTube'),
+    });
     textErrors.push(...problems.errors);
     textTodos = problems.missing.length;
   } else textTodos += 1;
@@ -242,7 +258,7 @@ export async function releaseChecks(projectDir: string, probe: Prober = probeMed
         ].join('; '))
       : textTodos || todoMarks
         ? check('Release texts', 'TODO', `${todoMarks} TODO line(s) in texts/; ${textTodos} text(s) still to write in review/upload.yaml`)
-        : check('Release texts', 'PASS', `${expectedTexts(kind).length} files, limits kept`),
+        : check('Release texts', 'PASS', `${texts.length} files, limits kept`),
   );
 
   if (music) {

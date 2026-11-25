@@ -43,7 +43,6 @@ import { acquireHolderLock } from './file-lock.js';
 import { loadStatus, runCalendar, statusPath, updateStatus, withReleaseLock } from './release-calendar.js';
 import { micrositeSong } from './release-microsite.js';
 import { probeVideo } from './short.js';
-import { announcementText, feedVideo, linkedinPostText, mediaFile, memeCaption, xTexts } from './release-texts.js';
 
 export { appendAutopilotEntry, autopilotLogPath, autopilotReadiness, loadAutopilotLog } from './autopilot-state.js';
 
@@ -340,7 +339,7 @@ export const COMMENT_EVENT = 'youtube:comment';
  */
 async function ensurePinnedComment(dir: string, context: Context, deps: AutopilotDeps, ready: Record<string, boolean>) {
   // A meme is posted as a Short: its one text is the caption, not a pinned comment under a main video.
-  const pinned = context.input.kind === 'meme' ? undefined : context.data?.main.pinned_comment;
+  const pinned = context.input.kind === 'meme' ? undefined : context.plan.posts.find((post) => post.id === 'youtube')?.texts.pinned?.value ?? context.data?.main.pinned_comment;
   const settings = context.schedule.autopilot;
   const item = context.status.items.youtube;
   if (!pinned || !item?.done || item.manual || !settings.platforms.includes('youtube') || !ready.youtube) return undefined;
@@ -396,11 +395,21 @@ type Outcome = Pick<AutopilotEntry, 'status'> & Partial<Pick<AutopilotEntry, 're
 
 async function act(dir: string, item: AutopilotEventPlan, context: Context, deps: AutopilotDeps): Promise<Outcome> {
   const action = item.action!;
-  const { data, files, status } = context;
-  if (!data) throw new ValidationError('review/upload.yaml is missing');
+  const { status } = context;
   const file = (rel: string | undefined) => (rel ? join(context.dir, rel) : undefined);
   const youtubeUrl = status.items.youtube?.url;
   const settings = context.schedule.autopilot;
+  const post = context.plan.posts.find((entry) => entry.id === item.id);
+  const text = (key: string): string => {
+    if (!post) throw new ValidationError(`no release plan post for ${item.id}`);
+    const value = post.texts[key]?.value;
+    if (value === undefined) throw new ValidationError(`${item.id} has no ${key} in the release plan`);
+    return value.replaceAll('{youtube}', youtubeUrl ?? '').replaceAll('{spotify}', status.items.song?.url ?? '');
+  };
+  const media = (): { path: string; kind: 'video' | 'image' } => {
+    if (!post?.media) throw new ValidationError(`${item.id} has no media in the release plan`);
+    return { path: file(post.media)!, kind: /\.(mp4|mov|webm)$/i.test(post.media) ? 'video' : 'image' };
+  };
 
   if (action.kind === 'youtube' || action.kind === 'tiktok') {
     const platform = action.kind;
@@ -472,61 +481,22 @@ async function act(dir: string, item: AutopilotEventPlan, context: Context, deps
   let request: SocialPostRequest;
   if (action.kind === 'instagram') {
     if (action.placement === 'reel') {
-      if (context.input.kind === 'meme' && action.item === 'main') {
-        // A meme's one video is its Reel: the same caption with the credits as the folder text.
-        if (!files.master) throw new ValidationError('no 9:16 video in the release folder');
-        request = { event: item.id, text: memeCaption(context.input), media: { path: file(files.master)!, kind: 'video' }, placement: 'reel' };
+      if (post?.coverFrame !== undefined) {
+        request = { event: item.id, text: text('caption'), media: media(), placement: 'reel', coverOffsetMs: Math.round(post.coverFrame * 1000) };
       } else {
-        const short = data.shorts.find((entry) => entry.name === action.item);
-        const video = files.shorts.find((entry) => entry.name === action.item)?.video;
-        if (!short?.instagram || !video) throw new ValidationError(`no Instagram text or video for ${action.item}`);
-        request = {
-          event: item.id,
-          text: [short.instagram.caption.trim(), short.instagram.hashtags.join(' ')].filter(Boolean).join('\n\n'),
-          media: { path: file(video)!, kind: 'video' },
-          placement: 'reel',
-          ...(short.instagram.cover_frame !== undefined ? { coverOffsetMs: Math.round(short.instagram.cover_frame * 1000) } : {}),
-        };
+        request = { event: item.id, text: text('caption'), media: media(), placement: 'reel' };
       }
     } else if (action.placement === 'feed') {
-      if (!data.instagram_post) throw new ValidationError('instagram_post is missing in review/upload.yaml');
-      const video = feedVideo(context.input);
-      const image = files.feedImage ?? files.cover;
-      if (!video && !image) throw new ValidationError('no feed video or image in the release folder');
-      request = {
-        event: item.id,
-        text: [data.instagram_post.caption.trim(), data.instagram_post.hashtags.join(' ')].filter(Boolean).join('\n\n'),
-        media: video ? { path: file(video)!, kind: 'video' } : { path: file(image)!, kind: 'image' },
-        placement: 'feed',
-      };
+      request = { event: item.id, text: text('caption'), media: media(), placement: 'feed' };
     } else {
-      const image = files.announceStory ?? files.cover;
-      if (!image) throw new ValidationError('no announcement story image in the release folder');
-      request = { event: item.id, text: '', media: { path: file(image)!, kind: 'image' }, placement: 'story' };
+      request = { event: item.id, text: '', media: media(), placement: 'story' };
     }
   } else if (action.kind === 'x') {
-    if (action.item === 'announcement') {
-      const text = announcementText(context.input);
-      if (!text) throw new ValidationError('announcement is missing in review/upload.yaml');
-      const media = files.teaser ? { path: file(files.teaser)!, kind: 'video' as const } : files.announcePost ?? files.cover ? { path: file(files.announcePost ?? files.cover)!, kind: 'image' as const } : undefined;
-      request = { event: item.id, text, ...(media ? { media } : {}) };
-    } else if (action.item === 'main') {
-      if (!data.x || !youtubeUrl) throw new ValidationError('x or the live main video is missing');
-      const texts = xTexts(data.x, youtubeUrl);
-      const video = mediaFile(context.input, data.x.media ?? files.shorts[0]?.name);
-      request = { event: item.id, text: texts.post, reply: texts.reply, ...(video ? { media: { path: file(video)!, kind: 'video' as const } } : {}) };
-    } else {
-      const short = data.shorts.find((entry) => entry.name === action.item);
-      const video = files.shorts.find((entry) => entry.name === action.item)?.video;
-      if (!short?.x || !video) throw new ValidationError(`no X text or video for ${action.item}`);
-      const texts = xTexts({ ...short.x, reply: undefined }, youtubeUrl ?? '');
-      request = { event: item.id, text: texts.post, ...(texts.reply ? { reply: texts.reply } : {}), media: { path: file(video)!, kind: 'video' } };
-    }
+    const reply = post?.texts.reply?.value;
+    if (reply === undefined) request = { event: item.id, text: text('post'), ...(post?.media ? { media: media() } : {}) };
+    else request = { event: item.id, text: text('post'), reply: text('reply'), ...(post?.media ? { media: media() } : {}) };
   } else {
-    const li = data.linkedin;
-    if (li?.decision !== 'post' || !youtubeUrl) throw new ValidationError('the LinkedIn post or the live main video is missing');
-    const video = mediaFile(context.input, li.media);
-    request = { event: item.id, text: linkedinPostText(li, youtubeUrl), ...(video ? { media: { path: file(video)!, kind: 'video' as const } } : {}) };
+    request = { event: item.id, text: text('post'), ...(post?.media ? { media: media() } : {}) };
   }
   const platform = action.kind as SocialPlatform;
   const result = await social(request, platform);

@@ -1382,12 +1382,127 @@ export const ReleaseFileSchema = z.object({
   source: z.string().min(1),
 });
 
-/** `renders/release/manifest.json`: every file `release` wrote, and the open TODOs. */
+/**
+ * One text of a release post as the platform receives it. `limit` is the check
+ * `release`, `qa`, the board and `publish` measure; `hashtags` is the platform's
+ * own hashtag count. Neither carries a TODO: a missing text is absent from
+ * `ReleasePlanPost.texts` and named in `ReleasePlan.problems`.
+ */
+export const PlanTextLimitSchema = z.object({
+  max: z.number().int().positive(),
+  unit: z.enum(['chars', 'bytes']).default('chars'),
+  /** X counts a link as 23 characters. */
+  counting: z.literal('x').optional(),
+  /** Characters added for a link the text will carry (the X reply's YouTube link). */
+  extra: z.number().int().nonnegative().optional(),
+  /** Link slots that do not count (the LinkedIn post's YouTube link). */
+  strip: z.array(z.string().min(1)).optional(),
+  /** The prefix of the error line, e.g. `youtube main` or `tiktok Z1-intro`. */
+  label: z.string().min(1),
+  /** The noun of the error line, e.g. `title` or `reply with the link`. */
+  field: z.string().min(1),
+  verb: z.enum(['has', 'have']).default('has'),
+  /** A sentence that replaces the standard limit line. */
+  style: z.literal('linkedin-hook').optional(),
+});
+
+export const PlanHashtagsSchema = z.object({
+  count: z.number().int().nonnegative(),
+  max: z.number().int().positive(),
+  label: z.string().min(1),
+  /** A parenthetical suffix, e.g. ` (Instagram)` for the announcement. */
+  suffix: z.string().optional(),
+});
+
+export const PlanTextSchema = z.object({
+  /** The exact text the platform receives: no TODO marker, no `<ID>` placeholder. */
+  value: z.string(),
+  limit: PlanTextLimitSchema.optional(),
+  hashtags: PlanHashtagsSchema.optional(),
+});
+
+/** One file of a post inside `renders/release/`, with the role the board labels it by. */
+export const PlanFileSchema = z.object({
+  role: z.string().min(1),
+  path: z.string().min(1),
+  /** The number of an alternate thumbnail (2, 3). */
+  index: z.number().int().positive().optional(),
+});
+
+/** A post, story, or task of one release, keyed by its calendar event id. */
+export const ReleasePlanPostSchema = z.object({
+  id: z.string().min(1),
+  platform: z.enum(['youtube', 'shorts', 'tiktok', 'instagram', 'spotify', 'x', 'linkedin', 'microsite']),
+  /** A task (distributor, pitch, canvas, links) rather than a post to publish. */
+  task: z.boolean().default(false),
+  texts: z.record(z.string(), PlanTextSchema).default({}),
+  files: z.array(PlanFileSchema).default([]),
+  /** The render or video the platform uploads, relative to the project. */
+  source: z.string().min(1).optional(),
+  /** The release-folder media the social API uploads. */
+  media: z.string().min(1).optional(),
+  placement: z.enum(['reel', 'feed', 'story']).optional(),
+  /** The text points at the live main video. */
+  needsYoutube: z.boolean().optional(),
+  /** Ask for the live URL once posted. */
+  url: z.boolean().optional(),
+  pointer: z.literal('youtube').optional(),
+  /** The moment of a Short, for its heading. */
+  moment: z.string().min(1).optional(),
+  /** Second of the Short shown as the Reel cover. */
+  coverFrame: z.number().nonnegative().optional(),
+  syntheticMedia: z.boolean().optional(),
+  madeForKids: z.boolean().optional(),
+  /** The video language on YouTube. */
+  language: z.string().min(2).optional(),
+  english: z.object({ title: z.string(), description: z.string() }).optional(),
+  /** Why LinkedIn is skipped, when it is. */
+  reason: z.string().min(1).optional(),
+  /** The first LinkedIn paragraph and what shows before "see more". */
+  hook: z.object({ count: z.number().int().nonnegative(), max: z.number().int().positive() }).optional(),
+  /** Worded problems of this post (identical captions, media not a Short). */
+  errors: z.array(z.string()).default([]),
+  /** Fields still to write in review/upload.yaml, e.g. `shorts.Z1-intro.tiktok`. */
+  missing: z.array(z.string()).default([]),
+});
+
+/**
+ * One release plan: every post's exact text, files, sources and limits, and
+ * what is still missing. `release` writes it into `manifest.json`; the folder
+ * texts, QA, the board, the autopilot and `publish` all read it.
+ */
+export const ReleasePlanSchema = z.object({
+  version: z.literal(1),
+  kind: z.enum(['music-video', 'episode', 'meme']),
+  language: z.string().min(1),
+  slug: z.string().min(1),
+  artist: z.string().optional(),
+  title: z.string(),
+  durationSeconds: z.number().optional(),
+  premiere: z.boolean().default(false),
+  /** The channel's disclosure switches and facts the folder and board show. */
+  settings: z
+    .object({
+      youtubeSynthetic: z.boolean().default(true),
+      instagramAiLabel: z.boolean().default(true),
+      tiktokAiLabel: z.boolean().default(true),
+      /** The channel's YouTube handle, for the TikTok pointer. */
+      youtubeHandle: z.string().min(1).optional(),
+      distributor: z.string().min(1).optional(),
+      linkedin: z.object({ decision: z.enum(['post', 'skip']), reason: z.string().min(1) }).optional(),
+    })
+    .prefault({}),
+  posts: z.array(ReleasePlanPostSchema).default([]),
+  problems: z.object({ errors: z.array(z.string()).default([]), missing: z.array(z.string()).default([]) }).prefault({}),
+});
+
+/** `renders/release/manifest.json`: every file `release` wrote, the plan, and the open TODOs. */
 export const ReleaseManifestSchema = z.object({
   version: z.literal(1),
   project: z.string().min(1),
   generated_at: z.string().min(1),
   files: z.array(ReleaseFileSchema).default([]),
+  plan: ReleasePlanSchema.optional(),
   todos: z.array(z.string()).default([]),
 });
 
@@ -1710,6 +1825,12 @@ export type PublishLog = z.infer<typeof PublishLogSchema>;
 export type AiShare = z.infer<typeof AiShareSchema>;
 export type ReleaseMetadata = z.infer<typeof ReleaseMetadataSchema>;
 export type ChannelConfig = z.infer<typeof ChannelConfigSchema>;
+export type PlanTextLimit = z.infer<typeof PlanTextLimitSchema>;
+export type PlanHashtags = z.infer<typeof PlanHashtagsSchema>;
+export type PlanText = z.infer<typeof PlanTextSchema>;
+export type PlanFile = z.infer<typeof PlanFileSchema>;
+export type ReleasePlanPost = z.infer<typeof ReleasePlanPostSchema>;
+export type ReleasePlan = z.infer<typeof ReleasePlanSchema>;
 export type ReleaseFile = z.infer<typeof ReleaseFileSchema>;
 export type ReleaseFileKind = z.infer<typeof ReleaseFileKindSchema>;
 export type ReleaseManifest = z.infer<typeof ReleaseManifestSchema>;

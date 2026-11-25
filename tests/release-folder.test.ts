@@ -19,6 +19,7 @@ import {
   UploadDataSchema,
   buildLrc,
   buildLyricsSrt,
+  buildReleasePlan,
   canvasWindow,
   chapterProblems,
   chaptersFromSections,
@@ -39,6 +40,8 @@ import { buildRelease, type ReleaseDeps } from '../packages/cli/src/release.ts';
 import { releaseChecks } from '../packages/cli/src/release-qa.ts';
 import { boardProject } from '../packages/cli/src/release-board-data.ts';
 import { boardHandler } from '../packages/cli/src/release-board.ts';
+import { publishProject } from '../packages/cli/src/publish.ts';
+import { MockPublisher, tiktokCaption } from '../packages/providers/src/index.ts';
 import { loadCalendar, loadStatus, runCalendar } from '../packages/cli/src/release-calendar.ts';
 import {
   canvasArgs,
@@ -234,7 +237,7 @@ describe('TODO detection and text limits', () => {
       ],
       files: { master: 'video/neon-16x9.mp4', thumbnails: ['thumbnails/thumb-1.jpg'], shorts: [{ name: 'Z1-intro', video: 'shorts/Z1-intro-9x16.mp4' }] },
     };
-    const texts = releaseTexts(input);
+    const texts = releaseTexts(buildReleasePlan({ ...input, tiktokPointer: 'Full video on YouTube' }), input);
     expect(Object.keys(texts)).toEqual(['youtube.md', 'shorts.md', 'instagram.md', 'tiktok.md', 'spotify.md', 'x.md', 'linkedin.md', 'release-plan.md']);
     expect(texts['youtube.md']).toContain('## Beschreibung');
     expect(texts['youtube.md']).toContain('0:00 Intro\n0:40 Refrain\n1:10 Bridge');
@@ -788,6 +791,27 @@ describe('release board', () => {
       const post = board.platforms.find((entry) => entry.id === platform)!.posts[0]!;
       expect(post.fields.map((field) => field.value).join(' ')).toContain(credit);
     }
+  });
+
+  it('one release plan: the TikTok Short caption is the same in folder, board, QA, and publisher', async () => {
+    const dir = await fixture();
+    const result = await buildRelease({ projectDir: dir, deps: fakeDeps() });
+    const tiktok = await readFile(join(result.dir, 'texts', 'tiktok.md'), 'utf8');
+    const caption = /### Beschreibung[^\n]*\n\n```text\n([\s\S]*?)\n```/.exec(tiktok)?.[1];
+    expect(caption).toBe('Teil 1 im Regen\n\nGanzes Video auf YouTube: @neonstatic\n\n#synthwave');
+
+    const board = await boardProject(dir, join(dir, '..', '..'));
+    const boardCaption = board.platforms
+      .find((platform) => platform.id === 'tiktok')!
+      .posts.find((post) => post.id === 'short:Z1-intro:tiktok')!
+      .fields.find((field) => field.label === 'Beschreibung')!.value;
+    expect(boardCaption).toBe(caption);
+
+    expect((await releaseChecks(dir, fixtureProbe())).find((check) => check.name === 'Release texts')?.result).toBe('PASS');
+
+    const publisher = new MockPublisher('tiktok');
+    await publishProject({ projectDir: dir, mock: true, only: 'Z1-intro', probe: () => ({ width: 1080, height: 1920, duration: 40 }), adapters: { tiktok: publisher }, log: () => undefined });
+    expect(tiktokCaption(publisher.calls[0]!.item)).toBe(caption);
   });
 
   it('plans the calendar during release and lays out every platform with files, texts, and limits', async () => {
