@@ -1,10 +1,10 @@
 # Architecture review – 2026-11-25
 
-Status: in progress · 01 (`4bf6985`), 03 (`119f693`), 04 (`fbc42d0`) and 05 (`9950c69`) implemented, awaiting review · 02 implementation started: cuts 0–2 landed (`07140b0`) – `workspace-dirs.ts`, the kind descriptor and read model, and the manual lifecycle; import/use, route factory and suites next; ADR 0056 proposed · Source: `/improve-codebase-architecture`, hot spots of the last 250 commits.
+Status: in progress · 01 (`4bf6985`), 03 (`119f693`), 04 (`fbc42d0`) and 05 (`9950c69`) implemented, awaiting review · 02 implementation started: cuts 0–3 landed (`e132af5`) – `workspace-dirs.ts`, the kind descriptor and read model, the manual lifecycle, and the shared import/use drivers with per-kind hooks; route factory and suites next; ADR 0056 proposed · Source: `/improve-codebase-architecture`, hot spots of the last 250 commits.
 Visual report: [architecture-review-2026-11-25.html](architecture-review-2026-11-25.html) (open in a browser; needs internet for Tailwind and Mermaid).
 Scope: release and publishing, the board, the libraries, generation, the workspace payload.
 
-Candidate 01 now has ADR 0055 (proposed) and code; candidate 02 has ADR 0056 (proposed) and the design state in §02, no code yet; candidate 03 has code and `tests/release-records.test.ts`; candidate 04 has `release-facts.ts` and `tests/release-facts.test.ts`; candidate 05 has the core budget rule and `tests/series-budget.test.ts`; the other four are proposals without a story.
+Candidate 01 now has ADR 0055 (proposed) and code; candidate 02 has ADR 0056 (proposed) and the shared lifecycle in code (cuts 0–3); candidate 03 has code and `tests/release-records.test.ts`; candidate 04 has `release-facts.ts` and `tests/release-facts.test.ts`; candidate 05 has the core budget rule and `tests/series-budget.test.ts`; the other four are proposals without a story.
 This file is the handoff between sessions. Keep it short and update the status table.
 
 ## Working rules (context discipline)
@@ -22,7 +22,7 @@ This file is the handoff between sessions. Keep it short and update the status t
 | # | Candidate | Strength | Status | Read set |
 |---|---|---|---|---|
 | 01 | Give the release one plan | Strong | done – `buildReleasePlan` in core, persisted as `manifest.plan`; folder, QA, board, autopilot and publish read it; ADR 0055 (proposed); commit 4bf6985 | `release.ts` (cli, core), `release-texts.ts`, `release-qa.ts`, `release-board-data.ts`, `publish.ts`, `release-autopilot.ts` |
-| 02 | Collapse the two library lifecycles | Strong | in progress – cuts 0–2 landed: `workspace-dirs.ts`, `defineLibraryKind` with load/save/list/uses/targets and the manual add/update/file/remove verbs; the kind modules delegate; import/use, route factory and suites next; ADR 0056 (proposed); commit 07140b0 | `library-entry.ts`, `character-library.ts`, `set-library.ts`, `board/characters.js`, `board/sets.js`, `release-board.ts` |
+| 02 | Collapse the two library lifecycles | Strong | in progress – cuts 0–3 landed: `workspace-dirs.ts`, `defineLibraryKind` with load/save/list/uses/targets and the manual add/update/file/remove verbs, and the shared import/use drivers with per-kind hooks; the kind modules delegate; route factory and suites next; ADR 0056 (proposed); commit e132af5 | `library-entry.ts`, `character-library.ts`, `set-library.ts`, `board/characters.js`, `board/sets.js`, `release-board.ts` |
 | 03 | Give the release records one owner | Strong | done – `release-records.ts` owns status, the autopilot and publish logs and the lock; the board and production view share `approvalHolds`; checklist keys are by line; `tests/release-records.test.ts`; commit 119f693 | `release-calendar.ts`, `release-autopilot.ts`, `autopilot-state.ts`, `publish.ts`, `board-production.ts`, `board/release.js` |
 | 04 | Lift release facts out of the board view | Strong | done – `release-facts.ts` owns `loadReleaseFacts`, `releasePlan` and `releaseProjectDirs`; the board and the autopilot build on them; one facts load per project per round; commit fbc42d0 | `release-autopilot.ts`, `release-board-data.ts`, `release-board.ts`, `publish.ts`, `board/app.js` |
 | 05 | Make the uncommitted series budget one rule | Strong | done – `uncommittedBudget` in core; `remainingBudget` and `assertAffordable` subtract the committed episode budgets, so canon batches and episode creation check the same amount before any provider; `tests/series-budget.test.ts`; commit 9950c69 | `series.ts`, `new-project.ts`, `generate.ts`, `core/cost.ts`, `core/state.ts`, `board-wizard.ts` |
@@ -135,7 +135,17 @@ consumers stay unchanged); `defineLibraryKind` in `library-entry.ts` owns load/s
 kind/target/targets and the manual add/update/add-file/remove-file/remove verbs with one staged-copy path;
 `character-library.ts` and `set-library.ts` hold their config and hooks and keep their exported names. The
 character and set suites stay green, `npm run typecheck` and `npm test` pass, and the sound library is untouched.
-Next session: cut 3 (import/use hooks), then the route factory, the fixture and the two shared suites.
+
+**Implementation state (2026-11-25, session 3).** Cut 3 is green on `e132af5`: `defineLibraryKind` owns
+`importFrom` and `useIn`. A kind supplies its import reader, its file check, its match rule, the fields of a new
+entry and the merge of an incoming item; for use it supplies the plan (which files, chosen states or every plate),
+the refusal of a foreign row, and the row/merge into the target bible. The lifecycle owns the loop, the copies,
+the history row, the result shape, the document validation, the write and the rollback. Characters keep
+copy-then-record imports and sets keep stage-then-commit imports; use copies are staged for both kinds, so a
+failed bible write now also cleans up a character copy. `character-library.ts` is 371 lines, `set-library.ts` 491,
+`library-entry.ts` 923, and each kind holds data and hooks only. Both library suites, `npm run typecheck` and the
+full `npm test` pass; the sound library is untouched.
+Next session: cut 4 (the `libraryRoutes(kind)` factory), then the fixture and the two shared suites.
 
 **ADR / context map.** ADR 0052 decides the domain (one `BC-Library`, sound apart) but not the code seam; the
 code-shape decision is hard to reverse, so ADR 0056 (proposed) records it. `docs/domain/context-map.md` needs no
