@@ -1,24 +1,19 @@
-import { randomUUID } from 'node:crypto';
-import { existsSync, lstatSync, statSync } from 'node:fs';
-import { mkdir, readFile, readdir, rename, rm, stat } from 'node:fs/promises';
-import { basename, extname, join, relative, resolve, sep } from 'node:path';
-import { isMap, isSeq, parse as parseYaml, parseDocument, stringify, type YAMLMap, type YAMLSeq } from 'yaml';
+import { existsSync, statSync } from 'node:fs';
+import { readFile, readdir, rm, stat } from 'node:fs/promises';
+import { basename, join, resolve, sep } from 'node:path';
+import { isMap, isSeq, parse as parseYaml, parseDocument, type YAMLMap, type YAMLSeq } from 'yaml';
 import { LibrarySetSchema, SetBibleSchema, ValidationError, isScriptId, readYamlFile, writeTextAtomic, type LibrarySet, type SetDefinition } from '@coreslopper/core';
-import { projectDirs, seriesDirs } from './board-production.js';
 import {
   LIBRARY_FILE_LIMITS,
-  checkEntryFileName,
   commitCopies,
   copyByContent,
+  defineLibraryKind,
   discardCopies,
   entryFileHashes,
   entryText,
   fileHash,
-  libraryEntryDir,
-  libraryEntryFile,
   librarySourceLabel,
   libraryTargetKind,
-  parseTags,
   slugOfName,
 } from './library-entry.js';
 
@@ -33,22 +28,74 @@ import {
 // never touches a finished video. The board's Sets view reads `listLibrarySets`
 // (RM-SetLibrary) and writes through the same commands.
 
-export const setEntryDir = (root: string, id: string) => libraryEntryDir(root, 'sets', id);
-const setEntryFile = (root: string, id: string) => libraryEntryFile(root, 'sets', id);
-const setLibraryRoot = (root: string) => join(root, 'library', 'sets');
-
-export async function loadLibrarySet(root: string, id: string): Promise<LibrarySet> {
-  const file = setEntryFile(root, id);
-  if (!existsSync(file)) throw new ValidationError(`no library set "${id}" (${file})`);
-  return readYamlFile(file, LibrarySetSchema);
-}
-
-async function saveLibrarySet(root: string, entry: LibrarySet): Promise<void> {
-  const header = '# A set of the workspace library; its files lie next to this file. See docs/adr/0052-set-library.md.\n';
-  await writeTextAtomic(setEntryFile(root, entry.id), header + stringify(LibrarySetSchema.parse(entry)));
-}
-
 // ------------------------------------------------------------- read model
+
+const kind = defineLibraryKind<LibrarySet, 'set', NewLibrarySet>({
+  kind: 'sets',
+  noun: 'set',
+  entryFile: 'set.yaml',
+  header: '# A set of the workspace library; its files lie next to this file. See docs/adr/0052-set-library.md.\n',
+  schema: LibrarySetSchema,
+  useFile: 'sets.yaml',
+  useName: 'set',
+  cover: (entry) => entry.plates.find((plate) => plate.file)?.file ?? entry.refs[0],
+  promptRequired: true,
+  fallbackId: 'set',
+  entryTakenMessage: (id) => `the library has a set "${id}" already`,
+  filesTakenMessage: (id) => `the library folder for "${id}" holds files a set.yaml would not name; move them or choose another name`,
+  idTaken,
+  fileMode: 'stage',
+  role: (role) => (role === 'ref' || role === 'plate' ? { extensions: LIBRARY_FILE_LIMITS.images, label: 'set image' } : undefined),
+  roleMessage: 'role must be ref or plate',
+  prepareFile: async (entry, options, source, dir) => {
+    const { role } = options;
+    if (role === 'ref' && (options.angle !== undefined || options.plate !== undefined)) {
+      throw new ValidationError('--angle and --plate belong to a plate; add --role plate');
+    }
+    const bytes = (await stat(source)).size;
+    if (bytes > LIBRARY_FILE_LIMITS.bytes) {
+      throw new ValidationError(`a set file is at most ${LIBRARY_FILE_LIMITS.bytes / (1024 * 1024)} MB; ${basename(source)} is ${(bytes / (1024 * 1024)).toFixed(1)} MB`);
+    }
+    if (role === 'plate') {
+      const angle = entryText(options.angle, 'camera angle', 200, true)!;
+      const plateId = options.plate === undefined ? slugOfName(angle, 'plate') : String(options.plate);
+      if (!isScriptId(plateId)) throw new ValidationError(`not a plate id: ${plateId}`);
+      const existing = entry.plates.find((plate) => plate.id === plateId);
+      if (existing) {
+        if (!existing.file || !existsSync(join(dir, existing.file))) throw new ValidationError(`the plate "${plateId}" of "${entry.id}" has no image on disk; remove the plate or restore its file`);
+        if ((await fileHash(join(dir, existing.file))) === (await fileHash(source))) return { noop: true };
+        throw new ValidationError(`the set "${entry.id}" has the plate "${plateId}" with another image; name another plate id with --plate`);
+      }
+      return { angle, plateId };
+    }
+    return {};
+  },
+  recordFile: (entry, name, options, _now, prepared) => {
+    if (options.role === 'ref') {
+      if (entry.refs.includes(name)) return [];
+      entry.refs.push(name);
+      return [name];
+    }
+    const { angle, plateId } = prepared as { angle?: string; plateId?: string };
+    entry.plates.push({ id: plateId!, angle: angle!, file: name });
+    return [`plate:${plateId}`];
+  },
+  unnameFile: (entry, file) => {
+    const named = entry.refs.includes(file) || entry.plates.some((plate) => plate.file === file);
+    entry.refs = entry.refs.filter((ref) => ref !== file);
+    entry.plates = entry.plates.filter((plate) => plate.file !== file);
+    return named;
+  },
+  refuseUnnamed: true,
+  removeMode: 'tolerant',
+});
+
+export const setEntryDir = kind.entryDir;
+const setEntryFile = kind.entryFile;
+const setLibraryRoot = kind.root;
+
+export const loadLibrarySet = kind.load;
+const saveLibrarySet = kind.save;
 
 /** Where a library set is used: a project or series canon whose sets.yaml names it in `library`. */
 export interface LibrarySetUse {
@@ -66,46 +113,13 @@ export interface LibrarySetEntry extends LibrarySet {
 
 /** Every project and series that uses a library set, by library id. */
 export async function setLibraryUses(root: string): Promise<Map<string, LibrarySetUse[]>> {
-  const uses = new Map<string, LibrarySetUse[]>();
-  const scan = async (dirs: string[], scope: LibrarySetUse['scope']) => {
-    for (const dir of dirs) {
-      const file = join(dir, 'sets.yaml');
-      if (!existsSync(file)) continue;
-      const raw = await readFile(file, 'utf8')
-        .then((content) => parseYaml(content) as { sets?: { id?: unknown; library?: unknown }[] } | null)
-        // An unreadable sets.yaml shows up in the production view; here it uses nothing.
-        .catch(() => null);
-      for (const set of raw?.sets ?? []) {
-        if (typeof set?.library !== 'string') continue;
-        const list = uses.get(set.library) ?? [];
-        list.push({ scope, slug: basename(dir), set: String(set.id) });
-        uses.set(set.library, list);
-      }
-    }
-  };
-  await scan(await projectDirs(root), 'project');
-  await scan(await seriesDirs(root), 'series');
-  return uses;
+  return kind.uses(root);
 }
 
 /** The library (RM-SetLibrary), sorted by name, with where each set is used. Entries that do not load are skipped with a warning in `errors`. */
 export async function listLibrarySets(root: string): Promise<{ sets: LibrarySetEntry[]; errors: { id: string; error: string }[] }> {
-  const dirs = await readdir(setLibraryRoot(root), { withFileTypes: true }).catch(() => []);
-  const uses = await setLibraryUses(root);
-  const sets: LibrarySetEntry[] = [];
-  const errors: { id: string; error: string }[] = [];
-  for (const dir of dirs) {
-    if (!dir.isDirectory() || !isScriptId(dir.name) || !existsSync(setEntryFile(root, dir.name))) continue;
-    try {
-      const entry = await loadLibrarySet(root, dir.name);
-      const cover = entry.plates.find((plate) => plate.file)?.file ?? entry.refs[0];
-      sets.push({ ...entry, ...(cover ? { cover } : {}), usedIn: uses.get(entry.id) ?? [] });
-    } catch (error) {
-      errors.push({ id: dir.name, error: (error as Error).message });
-    }
-  }
-  sets.sort((a, b) => a.name.localeCompare(b.name));
-  return { sets, errors };
+  const { entries, errors } = await kind.list(root);
+  return { sets: entries, errors };
 }
 
 /** The table of `set list`: one block per set (what it is, its files, where it is used), then the entries that did not load; a hint when nothing is there. */
@@ -161,24 +175,7 @@ export interface NewLibrarySet {
  * follow through `set add-file` (ST-025).
  */
 export async function addLibrarySet(root: string, input: NewLibrarySet, now = new Date()): Promise<LibrarySet> {
-  const name = entryText(input.name, 'name', 200, true)!;
-  const id = slugOfName(name, 'set');
-  const taken = await idTaken(root, id);
-  if (taken === 'entry') throw new ValidationError(`the library has a set "${id}" already`);
-  if (taken === 'files') throw new ValidationError(`the library folder for "${id}" holds files a set.yaml would not name; move them or choose another name`);
-  const entry = LibrarySetSchema.parse({
-    version: 1,
-    id,
-    name,
-    description: entryText(input.description, 'description', 4000, true),
-    prompt: entryText(input.prompt, 'prompt', 4000, true),
-    tags: input.tags === undefined ? [] : parseTags(input.tags),
-    origin: 'manual',
-    added: now.toISOString(),
-  });
-  await mkdir(setEntryDir(root, id), { recursive: true });
-  await saveLibrarySet(root, entry);
-  return entry;
+  return kind.add(root, input, now);
 }
 
 /**
@@ -188,14 +185,7 @@ export async function addLibrarySet(root: string, input: NewLibrarySet, now = ne
  * required, as in a set bible.
  */
 export async function updateLibrarySet(root: string, id: string, change: Partial<NewLibrarySet>): Promise<LibrarySet> {
-  if (change === null || typeof change !== 'object') throw new ValidationError('an update takes name, description, prompt or tags');
-  const entry = await loadLibrarySet(root, id);
-  if (change.name !== undefined) entry.name = entryText(change.name, 'name', 200, true)!;
-  if (change.description !== undefined) entry.description = entryText(change.description, 'description', 4000, true)!;
-  if (change.prompt !== undefined) entry.prompt = entryText(change.prompt, 'prompt', 4000, true)!;
-  if (change.tags !== undefined) entry.tags = parseTags(change.tags);
-  await saveLibrarySet(root, entry);
-  return entry;
+  return kind.update(root, id, change);
 }
 
 export type SetFileRole = 'ref' | 'plate';
@@ -225,68 +215,7 @@ export interface AddLibrarySetFileResult {
  * file the entry does not name.
  */
 export async function addLibrarySetFile(root: string, id: string, source: string, options: SetFileOptions, now = new Date()): Promise<AddLibrarySetFileResult> {
-  const entry = await loadLibrarySet(root, id);
-  const before = structuredClone(entry);
-  if (!existsSync(source)) throw new ValidationError(`missing file: ${source}`);
-  if (!(await stat(source)).isFile()) throw new ValidationError(`not a file: ${source}`);
-  const { role } = options;
-  if (role !== 'ref' && role !== 'plate') throw new ValidationError('role must be ref or plate');
-  const extension = extname(source).toLowerCase();
-  if (!(LIBRARY_FILE_LIMITS.images as readonly string[]).includes(extension)) {
-    throw new ValidationError(`a set image takes ${LIBRARY_FILE_LIMITS.images.join(' ')}; got ${extension || 'no extension'}`);
-  }
-  const bytes = (await stat(source)).size;
-  if (bytes > LIBRARY_FILE_LIMITS.bytes) {
-    throw new ValidationError(`a set file is at most ${LIBRARY_FILE_LIMITS.bytes / (1024 * 1024)} MB; ${basename(source)} is ${(bytes / (1024 * 1024)).toFixed(1)} MB`);
-  }
-  if (role === 'ref' && (options.angle !== undefined || options.plate !== undefined)) {
-    throw new ValidationError('--angle and --plate belong to a plate; add --role plate');
-  }
-  const dir = setEntryDir(root, id);
-  let angle: string | undefined;
-  let plateId: string | undefined;
-  if (role === 'plate') {
-    angle = entryText(options.angle, 'camera angle', 200, true)!;
-    plateId = options.plate === undefined ? slugOfName(angle, 'plate') : String(options.plate);
-    if (!isScriptId(plateId)) throw new ValidationError(`not a plate id: ${plateId}`);
-    const existing = entry.plates.find((plate) => plate.id === plateId);
-    if (existing) {
-      if (!existing.file || !existsSync(join(dir, existing.file))) throw new ValidationError(`the plate "${plateId}" of "${id}" has no image on disk; remove the plate or restore its file`);
-      if ((await fileHash(join(dir, existing.file))) === (await fileHash(source))) return { entry, added: [], changed: false };
-      throw new ValidationError(`the set "${id}" has the plate "${plateId}" with another image; name another plate id with --plate`);
-    }
-  }
-  const { names, added, staged } = await copyByContent([source], dir, 'sets', { stage: true });
-  const name = names.get(source)!;
-  const changes = [...added];
-  if (role === 'ref') {
-    if (!entry.refs.includes(name)) {
-      entry.refs.push(name);
-      if (!changes.includes(name)) changes.push(name);
-    }
-  } else {
-    entry.plates.push({ id: plateId!, angle: angle!, file: name });
-    changes.push(`plate:${plateId}`);
-  }
-  if (!changes.length) {
-    await discardCopies(staged);
-    return { entry, added: [], changed: false };
-  }
-  entry.history.push({ at: now.toISOString(), from: 'manual', added: changes });
-  try {
-    await saveLibrarySet(root, entry);
-  } catch (error) {
-    await discardCopies(staged);
-    throw error;
-  }
-  try {
-    await commitCopies(staged);
-  } catch (error) {
-    await saveLibrarySet(root, before);
-    await discardCopies(staged);
-    throw error;
-  }
-  return { entry, added: changes, changed: true };
+  return kind.addFile(root, id, source, { role: options.role, angle: options.angle, plate: options.plate }, now);
 }
 
 /**
@@ -302,29 +231,7 @@ export async function addLibrarySetFile(root: string, id: string, source: string
  * history records imports, as it does for a removed character.
  */
 export async function removeLibrarySetFile(root: string, id: string, name: unknown): Promise<LibrarySet> {
-  const entry = await loadLibrarySet(root, id);
-  const file = checkEntryFileName('sets', name);
-  if (!entry.refs.includes(file) && !entry.plates.some((plate) => plate.file === file)) {
-    throw new ValidationError(`the set "${id}" has no file "${file}"`);
-  }
-  const dir = setEntryDir(root, id);
-  const path = join(dir, file);
-  // The file goes out of sight first: a dot name is a staged copy, ignored by
-  // the entry's scan, so a failed write never leaves a plain file set.yaml
-  // does not name (the add path stages its copies the same way).
-  const staged = join(dir, `.removed-${randomUUID()}${extname(file)}`);
-  const moved = existsSync(path);
-  if (moved) await rename(path, staged);
-  entry.refs = entry.refs.filter((ref) => ref !== file);
-  entry.plates = entry.plates.filter((plate) => plate.file !== file);
-  try {
-    await saveLibrarySet(root, entry);
-  } catch (error) {
-    if (moved) await rename(staged, path).catch(() => undefined);
-    throw error;
-  }
-  if (moved) await rm(staged, { force: true });
-  return entry;
+  return kind.removeFile(root, id, name);
 }
 
 /** EVT-LibrarySetDeleted: the entry that left the library, when its set.yaml still loaded. */
@@ -347,37 +254,8 @@ export interface RemovedLibrarySet {
  * out of a commit.
  */
 export async function removeLibrarySet(root: string, id: string): Promise<RemovedLibrarySet> {
-  const folder = setEntryDir(root, id);
-  // The directory entry decides, so a dangling link or a stray file is not
-  // mistaken for a missing set (and a file is not silently deleted).
-  const present = lstatSync(folder, { throwIfNoEntry: false });
-  if (!present) throw new ValidationError(`no library set "${id}" (${folder})`);
-  if (!present.isDirectory() && !present.isSymbolicLink()) {
-    throw new ValidationError(`the library set "${id}" is not a folder (${folder}); move it away`);
-  }
-  let entry: LibrarySet | undefined;
-  try {
-    entry = await loadLibrarySet(root, id);
-  } catch (error) {
-    // A broken document is removed all the same; an I/O error is not swallowed.
-    if (!(error instanceof ValidationError)) throw error;
-  }
-  const trash = join(setLibraryRoot(root), `.removing-${randomUUID()}`);
-  try {
-    await rename(folder, trash);
-  } catch (error) {
-    // A concurrent delete between the check and the rename reads as unknown.
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw new ValidationError(`no library set "${id}" (${folder})`);
-    throw new ValidationError(`could not remove library set "${id}": ${(error as Error).message}`);
-  }
-  try {
-    await rm(trash, { recursive: true, force: true });
-  } catch (error) {
-    throw new ValidationError(
-      `library set "${id}" left the library, but its folder ${relative(root, trash)} could not be deleted: ${(error as Error).message}; delete it by hand`,
-    );
-  }
-  return { id, ...(entry ? { set: entry } : {}) };
+  const removed = await kind.remove(root, id);
+  return { id: removed.id, ...(removed.entry ? { set: removed.entry } : {}) };
 }
 
 // ----------------------------------------------------------------- import

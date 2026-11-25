@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
-import { copyFile, mkdir, readFile, readdir, rm } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { basename, extname, join, resolve, sep } from 'node:path';
-import { isMap, isSeq, parse as parseYaml, parseDocument, stringify, type YAMLMap, type YAMLSeq } from 'yaml';
+import { isMap, isSeq, parse as parseYaml, parseDocument, type YAMLMap, type YAMLSeq } from 'yaml';
 import {
   CharacterBibleSchema,
   LibraryCharacterSchema,
@@ -12,23 +12,19 @@ import {
   type Character,
   type LibraryCharacter,
 } from '@coreslopper/core';
-import { SLUG, projectDirs, seriesDirs } from './board-production.js';
 import {
   LIBRARY_FILE_LIMITS,
-  checkEntryFileName,
-  checkLibraryId,
   copyByContent,
+  defineLibraryKind,
   entryText,
   fileHash,
   freeName,
-  libraryEntryDir,
-  libraryEntryFile,
   librarySourceLabel,
   libraryTargetKind,
-  parseTags,
   safeName,
-  slugOfName,
 } from './library-entry.js';
+
+export { libraryTarget, libraryTargets, libraryTargetKind } from './library-entry.js';
 
 // The workspace's character library: `library/characters/<id>/character.yaml`
 // with the character's files next to it. Characters of finished
@@ -38,9 +34,67 @@ import {
 // each continuity state only when chosen. Nothing in a project points into
 // the library, so a later change there never touches a finished video.
 
-export const libraryRoot = (root: string) => join(root, 'library', 'characters');
-export const entryDir = (root: string, id: string) => libraryEntryDir(root, 'characters', id);
-const entryFile = (root: string, id: string) => libraryEntryFile(root, 'characters', id);
+const isImage = (file: string) => (LIBRARY_FILE_LIMITS.images as readonly string[]).includes(extname(file).toLowerCase());
+
+const kind = defineLibraryKind<LibraryCharacter, 'character', NewLibraryCharacter>({
+  kind: 'characters',
+  noun: 'character',
+  entryFile: 'character.yaml',
+  header: '# A character of the workspace library; its files lie next to this file. See docs/adr/0034-character-library.md.\n',
+  schema: LibraryCharacterSchema,
+  useFile: 'characters.yaml',
+  useName: 'character',
+  cover: (entry) => entry.sheet ?? entry.refs.find(isImage) ?? entry.states.find((state) => state.ref)?.ref,
+  acceptsId: true,
+  fallbackId: 'character',
+  entryTakenMessage: (id) => `the library has a character "${id}" already`,
+  newFields: (input) => {
+    const face = input.face ?? 'full';
+    if (!['full', 'silhouette', 'screen-only', 'voice-only'].includes(String(face))) throw new ValidationError('face must be full, silhouette, screen-only, or voice-only');
+    return { face: face as LibraryCharacter['face'] };
+  },
+  fileMode: 'copy',
+  role: (role) => ({ extensions: role === 'voice' ? LIBRARY_FILE_LIMITS.audio : LIBRARY_FILE_LIMITS.images, label: role }),
+  recordFile: (entry, name, options) => {
+    if (options.role === 'voice') {
+      entry.voice = { ref: name, transcript: entryText(options.transcript, 'transcript', 2000, true)! };
+    } else if (options.role === 'sheet') {
+      if (entry.sheet && !entry.refs.includes(entry.sheet)) entry.refs.unshift(entry.sheet);
+      entry.sheet = name;
+      entry.refs = entry.refs.filter((ref) => ref !== name);
+    } else if (!entry.refs.includes(name)) {
+      entry.refs.push(name);
+    }
+    return [name];
+  },
+  unnameFile: (entry, file) => {
+    let named = false;
+    if (entry.sheet === file) {
+      delete entry.sheet;
+      named = true;
+    }
+    if (entry.refs.includes(file)) {
+      entry.refs = entry.refs.filter((ref) => ref !== file);
+      named = true;
+    }
+    if (entry.voice?.ref === file) {
+      delete entry.voice;
+      named = true;
+    }
+    for (const state of entry.states) {
+      if (state.ref === file) {
+        delete state.ref;
+        named = true;
+      }
+    }
+    return named;
+  },
+  removeMode: 'strict',
+});
+
+export const libraryRoot = kind.root;
+export const entryDir = kind.entryDir;
+const entryFile = kind.entryFile;
 
 /** Where a library character is used: a project or series whose characters.yaml names it in `library`. */
 export interface LibraryUse {
@@ -56,61 +110,18 @@ export interface LibraryEntry extends LibraryCharacter {
   usedIn: LibraryUse[];
 }
 
-export async function loadLibraryCharacter(root: string, id: string): Promise<LibraryCharacter> {
-  const file = entryFile(root, id);
-  if (!existsSync(file)) throw new ValidationError(`no library character "${id}" (${file})`);
-  return readYamlFile(file, LibraryCharacterSchema);
-}
-
-async function saveLibraryCharacter(root: string, entry: LibraryCharacter): Promise<void> {
-  const header = '# A character of the workspace library; its files lie next to this file. See docs/adr/0034-character-library.md.\n';
-  await writeTextAtomic(entryFile(root, entry.id), header + stringify(LibraryCharacterSchema.parse(entry)));
-}
+export const loadLibraryCharacter = kind.load;
+const saveLibraryCharacter = kind.save;
 
 /** Every project and series that uses a library character, by library id. */
 export async function libraryUses(root: string): Promise<Map<string, LibraryUse[]>> {
-  const uses = new Map<string, LibraryUse[]>();
-  const scan = async (dirs: string[], scope: LibraryUse['scope']) => {
-    for (const dir of dirs) {
-      const file = join(dir, 'characters.yaml');
-      if (!existsSync(file)) continue;
-      const raw = await readFile(file, 'utf8')
-        .then((content) => parseYaml(content) as { characters?: { id?: unknown; library?: unknown }[] } | null)
-        // An unreadable characters.yaml shows up in the production view; here it uses nothing.
-        .catch(() => null);
-      for (const character of raw?.characters ?? []) {
-        if (typeof character?.library !== 'string') continue;
-        const list = uses.get(character.library) ?? [];
-        list.push({ scope, slug: basename(dir), character: String(character.id) });
-        uses.set(character.library, list);
-      }
-    }
-  };
-  await scan(await projectDirs(root), 'project');
-  await scan(await seriesDirs(root), 'series');
-  return uses;
+  return kind.uses(root);
 }
-
-const isImage = (file: string) => (LIBRARY_FILE_LIMITS.images as readonly string[]).includes(extname(file).toLowerCase());
 
 /** The library, sorted by name, with where each character is used. Entries that do not load are skipped with a warning in `errors`. */
 export async function listLibrary(root: string): Promise<{ characters: LibraryEntry[]; errors: { id: string; error: string }[] }> {
-  const dirs = await readdir(libraryRoot(root), { withFileTypes: true }).catch(() => []);
-  const uses = await libraryUses(root);
-  const characters: LibraryEntry[] = [];
-  const errors: { id: string; error: string }[] = [];
-  for (const dir of dirs) {
-    if (!dir.isDirectory() || !isScriptId(dir.name) || !existsSync(join(libraryRoot(root), dir.name, 'character.yaml'))) continue;
-    try {
-      const entry = await loadLibraryCharacter(root, dir.name);
-      const cover = entry.sheet ?? entry.refs.find(isImage) ?? entry.states.find((state) => state.ref)?.ref;
-      characters.push({ ...entry, ...(cover ? { cover } : {}), usedIn: uses.get(entry.id) ?? [] });
-    } catch (error) {
-      errors.push({ id: dir.name, error: (error as Error).message });
-    }
-  }
-  characters.sort((a, b) => a.name.localeCompare(b.name));
-  return { characters, errors };
+  const { entries, errors } = await kind.list(root);
+  return { characters: entries, errors };
 }
 
 // ------------------------------------------------------------------ files
@@ -249,26 +260,7 @@ export interface NewLibraryCharacter {
 
 /** A new library character without files yet; files follow through `addLibraryFile`. */
 export async function addLibraryCharacter(root: string, input: NewLibraryCharacter, now = new Date()): Promise<LibraryCharacter> {
-  const name = entryText(input.name, 'name', 200, true)!;
-  const id = input.id ? checkLibraryId(input.id, 'characters') : slugOfName(name, 'character');
-  if (existsSync(entryFile(root, id))) throw new ValidationError(`the library has a character "${id}" already`);
-  const face = input.face ?? 'full';
-  if (!['full', 'silhouette', 'screen-only', 'voice-only'].includes(String(face))) throw new ValidationError('face must be full, silhouette, screen-only, or voice-only');
-  const tags = input.tags === undefined ? [] : parseTags(input.tags);
-  const entry = LibraryCharacterSchema.parse({
-    version: 1,
-    id,
-    name,
-    description: entryText(input.description, 'description', 4000, true),
-    ...(entryText(input.prompt, 'prompt', 4000) ? { prompt: entryText(input.prompt, 'prompt', 4000) } : {}),
-    face,
-    tags,
-    origin: 'manual',
-    added: now.toISOString(),
-  });
-  await mkdir(entryDir(root, id), { recursive: true });
-  await saveLibraryCharacter(root, entry);
-  return entry;
+  return kind.add(root, input, now);
 }
 
 export type LibraryFileRole = 'ref' | 'sheet' | 'voice';
@@ -287,15 +279,7 @@ export async function recordLibraryFile(root: string, id: string, file: string, 
   const entry = await loadLibraryCharacter(root, id);
   const name = basename(file);
   if (resolve(entryDir(root, id), name) !== resolve(file)) throw new ValidationError(`${file} is not in the folder of ${id}`);
-  if (role === 'voice') {
-    entry.voice = { ref: name, transcript: entryText(transcript, 'transcript', 2000, true)! };
-  } else if (role === 'sheet') {
-    if (entry.sheet && !entry.refs.includes(entry.sheet)) entry.refs.unshift(entry.sheet);
-    entry.sheet = name;
-    entry.refs = entry.refs.filter((ref) => ref !== name);
-  } else if (!entry.refs.includes(name)) {
-    entry.refs.push(name);
-  }
+  kind.recordFile(entry, name, { role, transcript }, now, undefined);
   entry.history.push({ at: now.toISOString(), from: 'manual', added: [name] });
   await saveLibraryCharacter(root, entry);
   return entry;
@@ -303,51 +287,22 @@ export async function recordLibraryFile(root: string, id: string, file: string, 
 
 /** Copy a file from disk into an entry (the CLI's `character add-file`). */
 export async function addLibraryFile(root: string, id: string, source: string, role: LibraryFileRole, transcript?: string, now = new Date()): Promise<LibraryCharacter> {
-  if (!existsSync(source)) throw new ValidationError(`missing file: ${source}`);
-  const target = await libraryFileTarget(root, id, source, role);
-  await copyFile(source, target);
-  try {
-    return await recordLibraryFile(root, id, target, role, transcript, now);
-  } catch (error) {
-    await rm(target, { force: true });
-    throw error;
-  }
+  return (await kind.addFile(root, id, source, { role, transcript }, now)).entry;
 }
 
 /** Change the words of an entry: name, description, prompt, tags. */
 export async function updateLibraryCharacter(root: string, id: string, change: Partial<NewLibraryCharacter>): Promise<LibraryCharacter> {
-  const entry = await loadLibraryCharacter(root, id);
-  if (change.name !== undefined) entry.name = entryText(change.name, 'name', 200, true)!;
-  if (change.description !== undefined) entry.description = entryText(change.description, 'description', 4000, true)!;
-  if (change.prompt !== undefined) {
-    const prompt = entryText(change.prompt, 'prompt', 4000);
-    if (prompt) entry.prompt = prompt;
-    else delete entry.prompt;
-  }
-  if (change.tags !== undefined) {
-    entry.tags = parseTags(change.tags);
-  }
-  await saveLibraryCharacter(root, entry);
-  return entry;
+  return kind.update(root, id, change);
 }
 
 /** Take one file out of an entry (its reference, sheet, voice, or state image) and delete it. */
 export async function removeLibraryFile(root: string, id: string, name: unknown): Promise<LibraryCharacter> {
-  const entry = await loadLibraryCharacter(root, id);
-  const file = checkEntryFileName('characters', name);
-  if (entry.sheet === file) delete entry.sheet;
-  entry.refs = entry.refs.filter((ref) => ref !== file);
-  if (entry.voice?.ref === file) delete entry.voice;
-  for (const state of entry.states) if (state.ref === file) delete state.ref;
-  await saveLibraryCharacter(root, entry);
-  await rm(join(entryDir(root, id), file), { force: true });
-  return entry;
+  return kind.removeFile(root, id, name);
 }
 
 /** Delete an entry and its files. Projects keep their copies. */
 export async function removeLibraryCharacter(root: string, id: string): Promise<void> {
-  await loadLibraryCharacter(root, id);
-  await rm(entryDir(root, id), { recursive: true, force: true });
+  await kind.remove(root, id);
 }
 
 // -------------------------------------------------------------------- use
@@ -445,36 +400,4 @@ export async function useCharacter(root: string, targetDir: string, id: string, 
   return { character: id, updated, files: added.map((name) => `characters/${id}/${name}`), states: takenStates };
 }
 
-/** The project or series folder of a workspace for a slug, as `character` commands and the board take it. */
-export async function libraryTarget(root: string, scope: unknown, slug: unknown): Promise<string> {
-  if (scope !== 'project' && scope !== 'series') throw new ValidationError('scope must be project or series');
-  if (typeof slug !== 'string' || !SLUG.test(slug)) throw new ValidationError(`unknown ${scope} ${String(slug)}`);
-  const dirs = scope === 'series' ? await seriesDirs(root) : await projectDirs(root);
-  const dir = dirs.find((entry) => basename(entry) === slug);
-  if (!dir) throw new ValidationError(`unknown ${scope} ${slug}`);
-  return dir;
-}
 
-/** Where a library character can go: music videos (not episodes) and series canons, with their titles. */
-export async function libraryTargets(root: string): Promise<{ scope: 'project' | 'series'; slug: string; title: string }[]> {
-  const targets: { scope: 'project' | 'series'; slug: string; title: string }[] = [];
-  const head = async (file: string) =>
-    readFile(file, 'utf8')
-      .then((content) => (parseYaml(content) ?? {}) as { title?: unknown })
-      .catch(() => ({}) as { title?: unknown });
-  for (const dir of await projectDirs(root)) {
-    // A broken project.yaml is no target; the board lists what it can read.
-    const kind = await libraryTargetKind(dir).catch((error: unknown) => {
-      if (error instanceof ValidationError) return undefined;
-      throw error;
-    });
-    if (kind !== 'project') continue;
-    const config = await head(join(dir, 'project.yaml'));
-    targets.push({ scope: 'project', slug: basename(dir), title: typeof config.title === 'string' ? config.title : basename(dir) });
-  }
-  for (const dir of await seriesDirs(root)) {
-    const series = await head(join(dir, 'series.yaml'));
-    targets.push({ scope: 'series', slug: basename(dir), title: typeof series.title === 'string' ? series.title : basename(dir) });
-  }
-  return targets;
-}
