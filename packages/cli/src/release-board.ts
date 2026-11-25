@@ -1,5 +1,5 @@
-import { createReadStream, existsSync } from 'node:fs';
-import { mkdtemp, readFile, readdir, rm, stat } from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
+import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { tmpdir } from 'node:os';
 import { extname, join, resolve, sep } from 'node:path';
@@ -10,6 +10,7 @@ import { loadEvents, loadSnapshot } from './production-watch.js';
 import { editNote, reviewData, submitRound } from './board-review.js';
 import { SLUG, productionDetail, productionOverview, productionSeries, projectDirs, seriesDirs } from './board-production.js';
 import { loadCalendar } from './release-calendar.js';
+import { releaseProjectDirs } from './release-facts.js';
 import { updateStatus } from './release-records.js';
 import { LIBRARY_FILE_LIMITS, safeName } from './library-entry.js';
 import { releaseDir } from './release.js';
@@ -78,17 +79,6 @@ const PAGE_FILE = /^[a-z][a-z0-9-]*\.(js|css)$/;
 /** The workspace's docs the board shows: a top-level page, or an image under docs/assets/. */
 const DOC_FILE = /^([a-z][a-z0-9-]*(?:\.de)?\.md|assets\/(?:[a-z0-9_-]+\/)*[a-z0-9_-]+\.(?:webp|png|jpe?g|svg))$/;
 const pageDir = fileURLToPath(new URL('./board/', import.meta.url));
-
-/** Project directories of the workspace that have a release folder or a calendar. */
-export async function boardProjectDirs(root: string): Promise<string[]> {
-  const dir = join(root, 'projects');
-  const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
-  return entries
-    .filter((entry) => entry.isDirectory() && SLUG.test(entry.name) && existsSync(join(dir, entry.name, 'project.yaml')))
-    .map((entry) => join(dir, entry.name))
-    .filter((path) => existsSync(join(releaseDir(path), 'manifest.json')) || existsSync(join(path, 'review', 'calendar.yaml')))
-    .sort();
-}
 
 function send(res: ServerResponse, status: number, body: string | Buffer, type = 'application/json; charset=utf-8'): void {
   res.writeHead(status, { 'content-type': type, 'cache-control': 'no-store' });
@@ -477,12 +467,12 @@ export function boardHandler(options: BoardOptions = {}) {
   const projectDir = async (slug: string) => {
     if (!SLUG.test(slug)) throw new ValidationError(`unknown project ${slug}`);
     const dir = join(root, 'projects', slug);
-    if (!(await boardProjectDirs(root)).includes(dir)) throw new ValidationError(`unknown project ${slug}`);
+    if (!(await releaseProjectDirs(root)).includes(dir)) throw new ValidationError(`unknown project ${slug}`);
     return dir;
   };
   const allProjects = async (): Promise<(BoardProject | { slug: string; error: string })[]> => {
     const projects = [];
-    for (const dir of await boardProjectDirs(root)) {
+    for (const dir of await releaseProjectDirs(root)) {
       try {
         projects.push(await boardProject(dir, root, { now: now() }));
       } catch (error) {

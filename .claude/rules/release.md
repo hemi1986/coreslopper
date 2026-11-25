@@ -11,6 +11,7 @@ paths:
   - "packages/cli/src/release-qa.ts"
   - "packages/cli/src/release-calendar.ts"
   - "packages/cli/src/release-records.ts"
+  - "packages/cli/src/release-facts.ts"
   - "packages/cli/src/release-board.ts"
   - "packages/cli/src/release-board-data.ts"
   - "packages/cli/src/upload-text.ts"
@@ -59,6 +60,9 @@ Done Mark, Live URL, Release Approval, Announcement, Microsite, TODO. All are in
   - it composes the dated images (`release-images.ts`) and lays out `texts/` (`release-texts.ts`);
   - it writes `manifest.json` last.
 - The agent writes `review/upload.yaml` (`video-qa/release.md`, `release-backfill`); no code writes it.
+- `release-facts.ts` loads one project's release facts once: project and identity, upload data, manifest files,
+  calendar, status, schedule and the workspace root. The board view and the autopilot build on them; only the
+  records (status, log) are read again between autopilot steps.
 - The board's release view is `release-board.ts`, `release-board-data.ts` and `board/release.js`.
   - It writes `review/release-status.json` only through `updateStatus`/`writeStatus` under
     `review/.release.lock`.
@@ -88,8 +92,7 @@ Done Mark, Live URL, Release Approval, Announcement, Microsite, TODO. All are in
   `texts/linkedin.md` (G-154).
 - The microsite data has no schema (G-155). German labels and jurisdiction notes are hard-coded. Tests assume
   Berlin and German (G-156).
-- The release context and the folder layout exist twice. `buildRelease` finds the workspace from the working
-  directory (G-162).
+- The folder layout exists twice. `buildRelease` finds the workspace from the working directory (G-162).
 - There is no lock around the folder, the manifest or the calendar (G-161). Checklist ticks are keyed by position
   (G-163).
 - A new release day drops the times the user moved. That is intended (ADR 0045; ADR 0028 carries a dated note).
