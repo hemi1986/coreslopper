@@ -60,6 +60,8 @@ reinvent every time. The feature was grilled with the user on 2026-11-22; the mo
 - The script's checks are written for a series canon; for a meme they must name its own bibles, which do not exist
   yet when the script is written (HS-262). The subtitle language is decided (HS-263: a project setting, `de` by
   default for a meme, burned in by ST-014); the 30-second limit (HS-264) and the credit text (HS-265) still need
-  decisions. Trending platform audio stays out until HS-259 is answered.
+  decisions. Trending platform audio stays out: no public API lists the general sound library, a trending sound may
+  not be mixed into a file outside TikTok, and the Content Posting API cannot attach one – it is added in the TikTok
+  app (HS-259, `docs/research/tiktok-trending-audio.md`).
 - A library sound in a meme is someone else's material more often than not; the release board shows the TODO, the
   user decides.
