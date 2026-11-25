@@ -124,7 +124,7 @@ Releases are automated with [release-please](https://github.com/googleapis/relea
 2. Merging the release PR creates the `vX.Y.Z` tag and a GitHub release with the same notes.
 3. The same workflow then runs typecheck, tests, and a package smoke test, and publishes `coreslopper` to npm with provenance. After that, `npx coreslopper@latest` picks up the new version.
 
-Do not edit the version in `package.json` or `CHANGELOG.md` by hand. To force a specific version, add a `Release-As: 1.0.0` line to a commit body.
+Do not edit the version in `package.json` by hand. To force a specific version, add a `Release-As: 1.0.0` line to a commit body. The `CHANGELOG.md` section of an open release PR may be rewritten for hand-written notes; update the PR description in the same edit, because it becomes the GitHub release body.
 
 The `publish` job uses npm trusted publishing (OIDC): no npm token in the repository and no one-time password. A manual run (`workflow_dispatch`) publishes whatever version is in `package.json` on `main`, which helps when a publish failed after the release was created. Never put a token in `.env`, a workflow file, or a commit.
 
@@ -162,6 +162,7 @@ npm run pack:check
 ## Commits and pull requests
 
 - Use [Conventional Commits](https://www.conventionalcommits.org/): `feat:` (minor bump before 1.0), `fix:` (patch), `docs:`, `chore:`, `test:`, `ci:`, `refactor:`. Mark breaking changes with `feat!:` or a `BREAKING CHANGE:` footer. With squash merges, the PR title becomes the commit message, so it must follow the same format.
+- A story's work message ends with its ID and uses the story's area as its scope: `feat(meme): create a meme in the wizard (ST-008)`. The area is the story's `feature:` label, else its bounded context without `BC-`, kebab-cased (`BC-SoundLibrary` → `sound-library`). The implement skill lists the process messages.
 - Keep commits focused.
 - Describe the user-visible change and the test you ran.
 - Link an issue when one exists.

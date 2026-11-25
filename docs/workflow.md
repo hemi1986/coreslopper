@@ -103,9 +103,9 @@ is what to read when you are unsure where something belongs.
   a timeboxed question.
 - **Characterization before test-first.** In a domain story, an affected path with no test for the behaviour that
   is about to change gets a characterization test first: pin the current behaviour, run it green, commit it
-  separately (`ST-NNN: characterize <area>`), then start the story tests. If the current behaviour contradicts the
-  story, the story goes back to `review` – the test is not adapted to the story. The fast lane skips this except
-  for an explicit refactoring.
+  separately (`test(<area>): characterize <area> (ST-NNN)`), then start the story tests. If the current behaviour
+  contradicts the story, the story goes back to `review` – the test is not adapted to the story. The fast lane skips
+  this except for an explicit refactoring.
 - **The spec linter is the gate.** `node .claude/skills/user-stories/scripts/lint-story.ts <file>` (or
   `kataster lint-story`) checks frontmatter, required fields, aggregate/command/event references, Gherkin and the
   scenario limit – deterministically, without an LLM. Green → `ready-for-human-review`; the user approves `ready`.
@@ -176,9 +176,9 @@ Fast lane (`chore`/`task`, or `--fast`): prepare → implement → lint/typechec
 back to `review`, through the linter and the user again. Start the next story in a fresh session.
 
 In a brownfield domain story, `characterize.ts` names the affected paths with no test. Characterization tests pin
-the current behaviour and are committed separately (`ST-NNN: characterize <area>`) **before** the story's red →
-green loop. If the current behaviour contradicts the story, that is a finding: the story goes back to `review` and
-the code is not silently adjusted. The fast lane skips this except for an explicit refactoring.
+the current behaviour and are committed separately (`test(<area>): characterize <area> (ST-NNN)`) **before** the
+story's red → green loop. If the current behaviour contradicts the story, that is a finding: the story goes back to
+`review` and the code is not silently adjusted. The fast lane skips this except for an explicit refactoring.
 
 With a tracker: pull before `/review-stories`, `/groom-backlog` and `/implement`; push after changing or approving
 stories and after `done`. The tracker leads on conflict; `docs/stories/` is the mirror and `BACKLOG.md` stays

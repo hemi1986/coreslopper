@@ -32,6 +32,8 @@ The root package is published as `coreslopper`. `npm run build` writes the works
 ## Conventions
 
 - Repository artifacts are in English; use the terms in `docs/glossary.md`.
+- Commits and pull request titles are Conventional Commits; a story's work message ends with its ID, e.g.
+  `feat(meme): create a meme in the wizard (ST-008)` (`CONTRIBUTING.md`, `/implement`).
 - Decisions that are hard to reverse get an ADR in `docs/adr/` (`domain-modeling`).
 - Load `writing-for-agents` before writing a skill, an agent, a command, or an `AGENTS.md`/`CLAUDE.md`. Own skills use only `name`, `description`, and `license` in frontmatter; vendored skills keep theirs (`grill-me` keeps `disable-model-invocation: true` as a Claude Code hint).
 - Generated media, secrets, and copyrighted material are never committed.

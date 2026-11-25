@@ -34,6 +34,19 @@ how commands and read models are built, and the **seam catalog**.
 Project profile: `.claude/project.json` – default branch, code roots, commands, preview provider, pull-request tool.
 Read it instead of assuming `main`, `npm` or GitHub.
 
+## Commits and the pull request
+
+[Conventional Commits](../../../CONTRIBUTING.md); each message names its story.
+
+- Process messages: `chore(ST-NNN): start`, `test(<area>): characterize <area> (ST-NNN)`, `chore(ST-NNN): done`.
+- Work messages: `<type>(<area>): <scenario title> (ST-NNN)` per scenario, or `<type>(<area>): <story title> (ST-NNN)`
+  once in the fast lane. `feat` adds or changes behaviour, `fix` repairs it (story label `bug`), `docs` and `chore`
+  cover documentation and tooling.
+- `<area>` is the story's `feature:` label, else its `context` without `BC-`, kebab-cased (`BC-SoundLibrary` →
+  `sound-library`).
+- The pull request title is `<type>(<area>): <story title> (ST-NNN)`; release-please turns these messages into
+  `CHANGELOG.md`.
+
 ## 1. Prepare
 1. Working tree clean, on the default branch (`repo.defaultBranch`), up to date (`git pull`). Otherwise stop and tell
    the user.
@@ -46,7 +59,7 @@ Read it instead of assuming `main`, `npm` or GitHub.
    `status: unresolved`, stop: the consistency boundary is not settled, so the story goes back to `review` instead
    of being decided in code.
 4. `git switch -c st-NNN-<slug>` (slug from the file name), then
-   `node .claude/skills/implement/scripts/story-status.ts ST-NNN in-progress` and commit `ST-NNN: start`.
+   `node .claude/skills/implement/scripts/story-status.ts ST-NNN in-progress` and commit `chore(ST-NNN): start`.
 5. **Pick the lane** and say it in one line: fast lane for `chore`/`task`, domain lane otherwise. The fast lane is
    a shortcut for non-domain work, never a way to skip a risk review.
 
@@ -62,8 +75,9 @@ follow it.
    sidebar. You build the throwaway route or the `?variant=` gate yourself, following the project's routing
    convention; the `ux-designer` defines the question and variants and reviews the result. The prototype stays out of
    the production path and is captured on `prototype/<slug>`.
-3. **Capture.** Commit `docs/prototypes/<slug>/` (or the in-app prototype) on `prototype/<slug>`, return to the story
-   branch, and write the verdict into the story's `## Context`: `Prototype: prototype/<slug> – <question> – <verdict>`.
+3. **Capture.** Commit `docs/prototypes/<slug>/` (or the in-app prototype) on `prototype/<slug>` as
+   `docs(ST-NNN): prototype <slug>`, return to the story branch, and write the verdict into the story's `## Context`:
+   `Prototype: prototype/<slug> – <question> – <verdict>`.
    A recurring rule goes to `ux-designer` for `docs/product/ux-guidelines.md`.
 4. **Then decide.** If the prototype only settles layout and the scenarios still hold, continue with step 2. If it
    changes behaviour or a scenario, the story goes back to `review` (see *When the story is wrong*), the main session
@@ -107,7 +121,7 @@ For every affected path whose behaviour is about to change and has no test:
 1. Write a **characterization test** that pins the current behaviour (Feathers): assert what the code does today,
    not what the story wants it to do.
 2. Run it on the unchanged code and see it green. A red characterization test is not the story's red step.
-3. Commit it separately: `ST-NNN: characterize <area>`.
+3. Commit it separately: `test(<area>): characterize <area> (ST-NNN)`.
 4. Only then start the story's red → green loop (step 3).
 
 If the current behaviour contradicts the story, that is a **finding**, not a test to adjust: mark the story `[OPEN]`,
@@ -124,7 +138,7 @@ story carries the label `refactor`), write the characterization net first; a ref
 
 **Domain lane:**
 - Per row: write the test (title exactly `ST-NNN: <scenario title>`), run it and see it fail for the right reason,
-  write the minimal code to pass, run it green. Commit: `ST-NNN: <scenario title>`.
+  write the minimal code to pass, run it green. Commit: `<type>(<area>): <scenario title> (ST-NNN)`.
 - Domain IDs in the code: commands, events, read models and policies carry their ID from `events.yaml`
   (`CMD-ReportProblem`, `EVT-ProblemReported`, …). New code uses the words of `CONTEXT.md`; a new term goes into
   `CONTEXT.md` first (domain-model skill).
@@ -134,6 +148,7 @@ story carries the label `refactor`), write the characterization net first; a ref
 **Fast lane:**
 - Implement the task, keep the change as small as the checklist says, and add or update unit tests where the change
   can break behaviour. No test-title matching, no scenario traceability.
+- Commit the work as `<type>(<area>): <story title> (ST-NNN)`.
 - Tick each checklist item in the story file as it becomes true (`- [x] …`).
 - If the work turns into domain behaviour (a new/changed command, event or invariant), stop: the story is the wrong
   type. Send it back to `review` as a `domain` story instead of deciding it in code.
@@ -199,7 +214,7 @@ Say which lane you picked and why in one line.
 
 **Fast lane:** tick the last checklist item, then
 `node .claude/skills/implement/scripts/story-status.ts ST-NNN done` (it refuses while a checklist item is open).
-Commit `ST-NNN: done`, push, open the pull request.
+Commit `chore(ST-NNN): done`, push, open the pull request.
 
 **Domain lane:** the **acceptance tester's verdict is the acceptance**: the story is `done` in the pull request, so
 the user only merges.
@@ -210,14 +225,14 @@ the user only merges.
    is wrong* describes.
 2. `node .claude/skills/implement/scripts/story-status.ts ST-NNN done` – refuses unless every scenario has its test
    (domain) or every checklist item is ticked (chore/task/tech task/spike) and all dependencies are done. Commit
-   `ST-NNN: done`, push.
+   `chore(ST-NNN): done`, push.
    - GitHub: the status change closes the linked issue.
    - Jira: `story-status.ts` prints the transition it could not make (MCP is agent-only). Run
      `jira_get_transitions` + `jira_transition_issue` on the printed key, then push the story body once
      (`/backlog-sync push`).
 
 **Both lanes – the pull request:**
-3. Title `ST-NNN: <story title>`, body = the scenarios as a checklist (domain) or the task checklist (fast lane),
+3. Title `<type>(<area>): <story title> (ST-NNN)`, body = the scenarios as a checklist (domain) or the task checklist (fast lane),
    links to the story and the review files (if any), the acceptance verdict (domain), the preview URL, remaining
    minors/questions, and anything the user must approve (a conventions change). (No `gh` CLI, or it isn't
    authenticated: push and give the user the compare URL `git push` prints.)
