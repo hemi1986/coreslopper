@@ -137,6 +137,10 @@ Can coreslopper find TikTok's trending sounds and use one in a meme — (1) whic
 - **"No alterations or modifications"** (F10) clearly covers remixing/pitching; whether lowering a track under speech counts as altering "the fundamental character" is not defined.
 - **Gap:** no primary source states whether the inbox draft (F5) preserves or strips the uploaded file's audio track; only the absence of any audio field is documented.
 - **Gap:** no source addresses meme-length (<30 s) usage specifically; only the general "up to one minute" guidance.
+- **File note (2026-11-25, after retrieval):** F1's domain-model impact quotes ADR 0051 as it read on 2026-11-22
+  ("Trending platform audio stays out until HS-259 is answered"). ST-019 resolved HS-259 in the same change and the
+  ADR now records the answer; the quote is the pre-resolution wording, not the current text. F7's tier is split
+  because the official portal could not be fetched; the readable evidence is the mirror, so treat F7/F8 as Tier 3.
 
 ## Open questions for the grilling
 

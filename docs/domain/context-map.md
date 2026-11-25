@@ -101,7 +101,9 @@ Relationships:
 - Supplier to Scripted audio (above). It knows nothing of memes; where a sound is used is derived from the takes.
 - Supplier to Release: the release check reads the licence of every sound a meme used; unknown or needing credit
   is a TODO, never a failure (HS-261; the credit text has no field yet, HS-265).
-- Trending platform audio is outside it until HS-259 is answered.
+- Trending platform audio is outside it: no public API lists the general sound library, a trending sound may not be
+  mixed into a file outside TikTok, and the Content Posting API cannot attach one – it is added in the TikTok app
+  (HS-259, `docs/research/tiktok-trending-audio.md`).
 
 ### BC-Timing – Timing
 Purpose: turns the song and lyrics – or the episode track's timing – into the effective timing with the user's
