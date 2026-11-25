@@ -5,22 +5,17 @@ import { Command, Option } from 'commander';
 import {
   ValidationError,
   effectiveBatchCap,
-  estimateCost,
   formatUsd,
   loadModelsConfig,
   loadProject,
-  providerForRole,
-  recordSpend,
   remainingBudget,
   repoRoot,
-  resolveModelRole,
   saveState,
   setStageDone,
   setStageFailed,
   setStageRunning,
   setStageSkipped,
   resetStage,
-  type ModelPricing,
 } from '@coreslopper/core';
 import { validateProject } from './validate.js';
 import { validateChangedFile } from './validate-file.js';
@@ -34,7 +29,7 @@ import { writeUploadText } from './upload-text.js';
 import { runRelease } from './release.js';
 import { createProject } from './new-project.js';
 import { linkProjectMedia } from './media-dir.js';
-import { generateBatch } from './generate.js';
+import { generateBatch, quoteRole } from './generate.js';
 import { runQa } from './qa.js';
 import { reviewImage } from './review-image.js';
 import { patchImage } from './patch.js';
@@ -1069,18 +1064,6 @@ program
   );
 
 program
-  .command('spend <project> <usd>')
-  .description('Record a completed generation spend in state.json.')
-  .action((project: string, usd: string) =>
-    run(async () => {
-      const { loaded } = await loadAndSave(project);
-      recordSpend(loaded.state, Number(usd));
-      await saveState(loaded.paths.state, loaded.state);
-      console.log(`Recorded ${formatUsd(Number(usd))} spent.`);
-    }),
-  );
-
-program
   .command('estimate')
   .description('Estimate a generation batch cost against the project budget.')
   .requiredOption('--role <role>', 'Role from config/models.yaml')
@@ -1090,40 +1073,27 @@ program
   .action((options: { role: string; units: number; project?: string; provider?: string }) =>
     run(async () => {
       const models = await loadModelsConfig();
-      const role = models.roles[options.role];
-      if (!role) throw new ValidationError(`Unknown model role "${options.role}".`);
       const loaded = options.project ? await loadProject(projectDirFromArg(options.project)) : undefined;
       const provider = options.provider
         ? validateChoice(options.provider, ['fal', 'higgsfield', 'topview', 'comfyui', 'mock'] as const, 'provider')
-        : loaded
-          ? providerForRole(loaded.config, options.role)
-          : role.provider;
-      const override = (() => {
-        const value = loaded?.config.models[options.role];
-        return value && typeof value === 'object' && !Array.isArray(value)
-          ? (value as Record<string, unknown>)
-          : {};
-      })();
-      const resolved = resolveModelRole(role, provider, override, options.role);
-      const pricing =
-        provider === 'mock' || provider === 'comfyui'
-          ? ({ unit: 'request', usd: 0 } satisfies ModelPricing)
-          : resolved.pricing;
-      if (!pricing) {
-        throw new ValidationError(
-          `Role "${options.role}" has no pricing entry for provider "${provider}".`,
-        );
-      }
-      const cost = provider === 'mock' || provider === 'comfyui' ? 0 : estimateCost(options.units, pricing);
+        : undefined;
+      const quote = quoteRole(options.role, {
+        models,
+        ...(loaded ? { config: loaded.config } : {}),
+        ...(provider ? { provider } : {}),
+      });
+      const cost = quote.cost(options.units);
       console.log(
-        `${options.role} [${provider}/${resolved.model}]: ${options.units} ${pricing.unit}(s) × ${formatUsd(pricing.usd)} = ${formatUsd(cost)}`,
+        `${options.role} [${quote.provider}/${quote.resolved.model}]: ${options.units} ${quote.pricing.unit}(s) × ${formatUsd(quote.pricing.usd)} = ${formatUsd(cost)}`,
       );
       if (loaded) {
+        const remaining = remainingBudget(loaded.state);
         const cap = effectiveBatchCap(loaded.config, loaded.state);
         console.log(
-          `Project remaining: ${formatUsd(remainingBudget(loaded.state))} · batch cap: ${formatUsd(cap)}`,
+          `Project remaining: ${formatUsd(remaining)} · batch cap: ${formatUsd(cap)}`,
         );
         if (cost > cap) console.log('✖ Estimate exceeds the batch cap.');
+        if (cost > remaining) console.log('✖ Estimate exceeds the remaining project budget.');
       }
     }),
   );

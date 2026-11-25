@@ -294,6 +294,55 @@ function roleOverride(config: BatchConfig, role: string): Record<string, unknown
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
+/** A model role as a batch item would run it: the provider, the resolved entry, and the price of one unit. */
+export interface RoleQuote {
+  provider: ProviderKind;
+  role: string;
+  resolved: ReturnType<typeof resolveModelRole>;
+  pricing: ModelPricing;
+  /** The planned cost of `units`; local and mock generations cost nothing. */
+  cost(units: number): number;
+}
+
+export interface RoleQuoteOptions {
+  models: Awaited<ReturnType<typeof loadModelsConfig>>;
+  /** The project or series whose provider and `models.<role>` override apply. */
+  config?: BatchConfig;
+  /** A batch's provider override; without one the config or the role picks the provider. */
+  provider?: ProviderKind;
+  /** An explicit `models.<role>` override; default `config.models[role]`. */
+  override?: Record<string, unknown>;
+}
+
+/**
+ * The one price rule for a model role: role lookup, provider choice, the
+ * project's override, the role's price at that provider, and the zero price of
+ * local and mock generations. `runBatch` and `estimate` both quote through it.
+ */
+export function quoteRole(roleName: string, options: RoleQuoteOptions): RoleQuote {
+  const role = options.models.roles[roleName];
+  if (!role) throw new ValidationError(`Unknown model role "${roleName}". Add it to config/models.yaml.`);
+  const provider: ProviderKind =
+    options.provider ?? (options.config ? providerForRole(options.config, roleName) : (role.provider as ProviderKind));
+  const override = options.override ?? (options.config ? roleOverride(options.config, roleName) : {});
+  const resolved = resolveModelRole(role, provider, override, roleName);
+  const local = provider === 'comfyui' || provider === 'mock';
+  const pricing = local ? ({ unit: 'request', usd: 0 } satisfies ModelPricing) : resolved.pricing;
+  if (!pricing) {
+    throw new ConfigError(
+      `Role "${roleName}" has no pricing entry for provider "${provider}". ` +
+        'Add pricing to config/models.yaml or override models.<role>.pricing in project.yaml.',
+    );
+  }
+  return {
+    provider,
+    role: roleName,
+    resolved,
+    pricing,
+    cost: (units: number) => (local ? 0 : estimateCost(units, pricing)),
+  };
+}
+
 /** Moved to core with the episode rules; re-exported for existing callers. */
 export { checkSpokenText };
 
@@ -306,9 +355,6 @@ function resolveItem(
   characters: { id: string; name: string; description: string }[] = [],
   lipsyncOverride?: LipSyncProviderKind,
 ): ResolvedItem {
-  const role = models.roles[item.role];
-  if (!role) throw new ValidationError(`Unknown model role "${item.role}". Add it to config/models.yaml.`);
-  const override = roleOverride(config, item.role);
   const chosen =
     item.operation === 'lipSync'
       ? (lipsyncOverride ?? providerForRole(config, item.role))
@@ -331,7 +377,8 @@ function resolveItem(
         'Cut the line with `audio-segment` and drop audioStartSeconds.',
     );
   }
-  const resolved = resolveModelRole(role, provider, override, item.role);
+  const quote = quoteRole(item.role, { models, provider, override: roleOverride(config, item.role) });
+  const { resolved, pricing } = quote;
   const { workflow, ...merged } = { ...resolved.params, ...item.params };
   const { options: clip, rest } = takeClipOptions(merged);
   let params = rest;
@@ -382,15 +429,6 @@ function resolveItem(
   if (pika && item.durationSeconds === undefined && !(pikaLipSync && item.audio)) {
     throw new ValidationError(`${resolved.model} needs durationSeconds; it would fall back to the template's length.`);
   }
-  const pricing =
-    resolved.pricing ??
-    (provider === 'mock' || provider === 'comfyui' ? ({ unit: 'request', usd: 0 } satisfies ModelPricing) : undefined);
-  if (!pricing) {
-    throw new ConfigError(
-      `Role "${item.role}" has no pricing entry for provider "${provider}". ` +
-        'Add pricing to config/models.yaml or override models.<role>.pricing in project.yaml.',
-    );
-  }
 
   const audio = item.audio
     ? resolve(item.audio.startsWith('/') ? item.audio : join(projectRoot, item.audio))
@@ -438,7 +476,7 @@ function resolveItem(
       : pricing.unit === 'image'
         ? Number(params.num_images ?? params.batch_size ?? 1)
         : 1;
-  const cost = estimateCost(units, pricing);
+  const cost = quote.cost(units);
 
   const references = item.references.map((reference) =>
     resolve(reference.startsWith('/') ? reference : join(projectRoot, reference)),
@@ -695,8 +733,8 @@ export async function runBatch(
 ): Promise<BatchRunResult[]> {
   const log = options.log === false ? () => undefined : (...args: unknown[]) => console.log(...args);
   const models = await loadModelsConfig();
-  const resolved = batch.map((item) => {
-    const value = resolveItem(
+  const resolved = batch.map((item) =>
+    resolveItem(
       item,
       project.config,
       models,
@@ -704,9 +742,8 @@ export async function runBatch(
       options.provider,
       project.characters,
       options.lipsyncProvider,
-    );
-    return value.provider === 'mock' || value.provider === 'comfyui' ? { ...value, cost: 0 } : value;
-  });
+    ),
+  );
   const totalEstimate = resolved.reduce((sum, item) => sum + item.cost, 0);
   for (const item of batch) if (item.out) resolveOut(project.paths.root, item.out, project.paths.series);
 

@@ -4,7 +4,7 @@ import { mkdtemp, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { BudgetError } from '@coreslopper/core';
+import { BudgetError, loadModelsConfig } from '@coreslopper/core';
 import {
   GenerationRunner,
   MockProvider,
@@ -12,7 +12,7 @@ import {
   type Provider,
   type ProviderKind,
 } from '@coreslopper/providers';
-import { BatchSchema, runBatch, type BatchTarget } from '../packages/cli/src/generate.js';
+import { BatchSchema, quoteRole, runBatch, type BatchTarget } from '../packages/cli/src/generate.js';
 
 // Characterization tests from the adoption of the generation slice (2026-11-21).
 // They pin what runBatch and the generation runner do today; they do not assert what they should do.
@@ -84,6 +84,45 @@ describe('generation characterization', () => {
       log: false,
     });
     expect(mock[0]!.resolved.cost).toBe(0);
+  });
+
+  it('quotes a role through the same price rule as the batch, for paid, overridden, local, and mock runs', async () => {
+    const models = await loadModelsConfig();
+    const paid = target({ image: 'fal', video: 'mock' }, { totalUsd: 1 });
+    const [paidItem] = await runBatch(paid, keyframes(1), { dryRun: true, log: false });
+    const paidQuote = quoteRole('image.keyframe', { models, config: paid.config });
+    expect(paidQuote.provider).toBe('fal');
+    expect(paidQuote.cost(1)).toBe(paidItem!.resolved.cost);
+    expect(paidQuote.cost(3)).toBe(0.15);
+
+    const overridden = { ...paid.config, models: { 'image.keyframe': { pricing: { unit: 'image', usd: 0.2 } } } };
+    const [overriddenItem] = await runBatch({ ...paid, config: overridden }, keyframes(1), { dryRun: true, log: false });
+    const overrideQuote = quoteRole('image.keyframe', { models, config: overridden });
+    expect(overrideQuote.cost(1)).toBe(overriddenItem!.resolved.cost);
+    expect(overrideQuote.cost(1)).toBe(0.2);
+
+    for (const provider of ['comfyui', 'mock'] as const) {
+      const free = target({ image: provider, video: 'mock' }, { totalUsd: 0 });
+      const [item] = await runBatch(free, keyframes(1), { dryRun: true, log: false });
+      const quote = quoteRole('image.keyframe', { models, config: free.config });
+      expect(quote.pricing).toEqual({ unit: 'request', usd: 0 });
+      expect(quote.cost(5)).toBe(0);
+      expect(quote.cost(5)).toBe(item!.resolved.cost);
+    }
+  });
+
+  it('writes the ledger only through the generation path', () => {
+    const root = join(__dirname, '..');
+    const files = ['packages/cli/src', 'packages/core/src', 'packages/providers/src', 'packages/remotion/src'].flatMap((dir) =>
+      readdirSync(join(root, dir), { recursive: true, encoding: 'utf8' })
+        .filter((file) => /\.(ts|tsx)$/.test(file))
+        .map((file) => join(root, dir, file)),
+    );
+    const callers = files
+      .filter((file) => /recordSpend\(/.test(readFileSync(file, 'utf8')))
+      .map((file) => relative(root, file))
+      .sort();
+    expect(callers).toEqual(['packages/cli/src/generate.ts']);
   });
 
   it('bills a new paid generation at its planned cost and a reuse at nothing, with a manifest line for each', async () => {
