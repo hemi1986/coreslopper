@@ -1,6 +1,6 @@
 # Architecture review – 2026-11-25
 
-Status: in progress · 01 (`4bf6985`), 03 (`119f693`), 04 (`fbc42d0`) and 05 (`9950c69`) implemented, awaiting review · 02 design recorded (ADR 0056, proposed), implementation next · Source: `/improve-codebase-architecture`, hot spots of the last 250 commits.
+Status: in progress · 01 (`4bf6985`), 03 (`119f693`), 04 (`fbc42d0`) and 05 (`9950c69`) implemented, awaiting review · 02 design recorded (`583f22a`, ADR 0056 proposed), implementation next · Source: `/improve-codebase-architecture`, hot spots of the last 250 commits.
 Visual report: [architecture-review-2026-11-25.html](architecture-review-2026-11-25.html) (open in a browser; needs internet for Tailwind and Mermaid).
 Scope: release and publishing, the board, the libraries, generation, the workspace payload.
 
@@ -22,7 +22,7 @@ This file is the handoff between sessions. Keep it short and update the status t
 | # | Candidate | Strength | Status | Read set |
 |---|---|---|---|---|
 | 01 | Give the release one plan | Strong | done – `buildReleasePlan` in core, persisted as `manifest.plan`; folder, QA, board, autopilot and publish read it; ADR 0055 (proposed); commit 4bf6985 | `release.ts` (cli, core), `release-texts.ts`, `release-qa.ts`, `release-board-data.ts`, `publish.ts`, `release-autopilot.ts` |
-| 02 | Collapse the two library lifecycles | Strong | design – one `library-entry.ts` lifecycle with kind data and hooks, one seam module, one lifecycle suite and one route suite; ADR 0056 (proposed); §02 design state; no code yet | `library-entry.ts`, `character-library.ts`, `set-library.ts`, `board/characters.js`, `board/sets.js`, `release-board.ts` |
+| 02 | Collapse the two library lifecycles | Strong | design – one `library-entry.ts` lifecycle with kind data and hooks, one seam module, one lifecycle suite and one route suite; ADR 0056 (proposed); §02 design state; no code yet; commit 583f22a | `library-entry.ts`, `character-library.ts`, `set-library.ts`, `board/characters.js`, `board/sets.js`, `release-board.ts` |
 | 03 | Give the release records one owner | Strong | done – `release-records.ts` owns status, the autopilot and publish logs and the lock; the board and production view share `approvalHolds`; checklist keys are by line; `tests/release-records.test.ts`; commit 119f693 | `release-calendar.ts`, `release-autopilot.ts`, `autopilot-state.ts`, `publish.ts`, `board-production.ts`, `board/release.js` |
 | 04 | Lift release facts out of the board view | Strong | done – `release-facts.ts` owns `loadReleaseFacts`, `releasePlan` and `releaseProjectDirs`; the board and the autopilot build on them; one facts load per project per round; commit fbc42d0 | `release-autopilot.ts`, `release-board-data.ts`, `release-board.ts`, `publish.ts`, `board/app.js` |
 | 05 | Make the uncommitted series budget one rule | Strong | done – `uncommittedBudget` in core; `remainingBudget` and `assertAffordable` subtract the committed episode budgets, so canon batches and episode creation check the same amount before any provider; `tests/series-budget.test.ts`; commit 9950c69 | `series.ts`, `new-project.ts`, `generate.ts`, `core/cost.ts`, `core/state.ts`, `board-wizard.ts` |
