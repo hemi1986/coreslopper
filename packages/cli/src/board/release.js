@@ -38,7 +38,7 @@ let changed = function () {};
 /** Called after every write, so the navigation can refresh its counts. */
 export function onReleaseChange(fn) { changed = fn; }
 
-function count(value, field) {
+export function count(value, field) {
   if (field.unit === 'bytes') return new TextEncoder().encode(value).length;
   const text = field.counting === 'x' ? value.replace(/https?:\/\/\S+/g, 'xxxxxxxxxxxxxxxxxxxxxxx') : value;
   return Array.from(text).length;
@@ -221,7 +221,7 @@ function renderProject() {
   }
 }
 
-function tabOf(event) {
+export function tabOf(event) {
   if (event.platform === 'distributor') return 'spotify';
   return event.platform;
 }
