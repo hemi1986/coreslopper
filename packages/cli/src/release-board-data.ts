@@ -29,7 +29,8 @@ import {
   type ReleaseStatus,
   type UploadData,
 } from '@coreslopper/core';
-import { loadCalendar, loadStatus } from './release-calendar.js';
+import { loadCalendar } from './release-calendar.js';
+import { checklistKey, loadAutopilotLog, loadStatus } from './release-records.js';
 import { micrositeSong, type MicrositeSong } from './release-microsite.js';
 import {
   calendarEventLabel,
@@ -42,7 +43,7 @@ import {
 import { loadUploadData, uploadPaths } from './upload-text.js';
 import { releaseDir, songJson, usedSoundCredits } from './release.js';
 import { DERIVED_PATHS } from './release-images.js';
-import { autopilotReadiness, lastRun, loadAutopilotLog } from './autopilot-state.js';
+import { autopilotReadiness, lastRun } from './autopilot-state.js';
 
 // The release board's view of one project: per platform the posts to make,
 // each with its files (paths inside renders/release/), the texts to paste
@@ -66,6 +67,12 @@ export interface BoardField {
   note?: string;
 }
 
+export interface BoardChecklistItem {
+  /** The release-record key of the line: the post and the line's name, never its position (G-163). */
+  key: string;
+  label: string;
+}
+
 export interface BoardPost {
   id: string;
   heading: string;
@@ -73,7 +80,7 @@ export interface BoardPost {
   at?: string;
   files: BoardFile[];
   fields: BoardField[];
-  checklist: string[];
+  checklist: BoardChecklistItem[];
   /** Where the post sends people. */
   pointer?: string;
   /** Ask for the live URL once posted. */
@@ -389,6 +396,7 @@ const kindOf = (path: string): BoardFile['kind'] =>
   /\.(mp4|mov|webm)$/i.test(path) ? 'video' : /\.(jpe?g|png|webp)$/i.test(path) ? 'image' : /\.(wav|mp3|flac)$/i.test(path) ? 'audio' : /\.(txt|lrc|srt|md|json)$/i.test(path) ? 'text' : 'file';
 const file = (label: string, path: string | undefined): BoardFile[] => (path ? [{ label, path, kind: kindOf(path) }] : []);
 const field = (label: string, value: string | undefined, extra: Partial<BoardField> = {}): BoardField[] => (value?.trim() ? [{ label, value, ...extra }] : []);
+const checklist = (id: string, lines: string[]): BoardChecklistItem[] => lines.map((label) => ({ key: checklistKey(id, label), label }));
 
 /** Everything the release texts of a project are made from: the board and the autopilot read the same. */
 export async function projectReleaseContext(projectRoot: string, root: string) {
@@ -485,7 +493,7 @@ export async function boardProject(projectRoot: string, root: string, options: {
       ...field(b.tags, planValue('youtube', 'tags'), limitOf('youtube', 'tags')),
       ...field(b.pinned, meme ? undefined : planValue('youtube', 'pinned')),
     ],
-    checklist: meme ? [b.publish, b.synthetic, b.kids] : [input.premiere ? b.premiere : b.publish, b.synthetic, b.kids, b.category, b.endscreen],
+    checklist: checklist('youtube', meme ? [b.publish, b.synthetic, b.kids] : [input.premiere ? b.premiere : b.publish, b.synthetic, b.kids, b.category, b.endscreen]),
     url: true,
   });
   if (!meme && planValue('youtube', 'community')) youtube.push({ id: 'community', heading: heading('community', l.community), at: at('community'), files: file(b.upload, files.thumbnails[0]), fields: field(b.text, planValue('youtube', 'community')), checklist: [], url: true });
@@ -496,7 +504,7 @@ export async function boardProject(projectRoot: string, root: string, options: {
       at: at('links'),
       files: [],
       fields: field('Spotify', status.items.song?.url),
-      checklist: [b.linksStep],
+      checklist: checklist('links', [b.linksStep]),
       task: true,
     });
   }
@@ -525,7 +533,7 @@ export async function boardProject(projectRoot: string, root: string, options: {
       at: at('story'),
       files: [...(files.story ? file(b.storyImage, files.story) : file(b.thumb, files.shorts[0]?.thumbnail)), ...file(b.video, files.shorts[0]?.video)],
       fields: field(b.story, firstStory),
-      checklist: [b.sticker],
+      checklist: checklist('story', [b.sticker]),
       pointer: videoUrl,
     });
   }
@@ -541,7 +549,7 @@ export async function boardProject(projectRoot: string, root: string, options: {
           ? file(b.feedImageFile, files.feedImage)
           : file(b.cover, files.cover),
       fields: field(b.caption, display(instagramCaption.value), { ...limitOf('instagram-post', 'caption'), note: hashtagNoteOf('instagram-post', 'caption') }),
-      checklist: [feedVideo(input) ? b.feedVideoCheck : files.feedImage ? b.feedImageCheck : b.feedImage, b.igAi, ...((input.durationSeconds ?? 0) > 180 ? [b.longReel] : [])],
+      checklist: checklist('instagram-post', [feedVideo(input) ? b.feedVideoCheck : files.feedImage ? b.feedImageCheck : b.feedImage, b.igAi, ...((input.durationSeconds ?? 0) > 180 ? [b.longReel] : [])]),
       url: true,
     });
   }
@@ -556,7 +564,7 @@ export async function boardProject(projectRoot: string, root: string, options: {
       at: at('x'),
       files: file(b.video, mediaFile(input, data?.x?.media ?? files.shorts[0]?.name)),
       fields: [...field(b.post, display(xPost.value), limitOf('x', 'post')), ...field(b.reply, display(planValue('x', 'reply')), limitOf('x', 'reply'))],
-      checklist: [b.xVideo, b.xReply],
+      checklist: checklist('x', [b.xVideo, b.xReply]),
       pointer: videoUrl,
       url: true,
     });
@@ -574,7 +582,7 @@ export async function boardProject(projectRoot: string, root: string, options: {
         ...field(b.description, planValue(id('youtube'), 'description')),
         ...field(b.hashtags, planValue(id('youtube'), 'hashtags')),
       ],
-      checklist: [b.related, b.customThumb, b.synthetic, b.kids, b.publish],
+      checklist: checklist(id('youtube'), [b.related, b.customThumb, b.synthetic, b.kids, b.publish]),
       pointer: b.youtubePointer,
       url: true,
     });
@@ -589,7 +597,7 @@ export async function boardProject(projectRoot: string, root: string, options: {
           ...field(b.description, caption ? display(caption.value) : undefined, limitOf(id('tiktok'), 'caption')),
           ...field(b.pinned, planValue(id('tiktok'), 'pinned')),
         ],
-        checklist: [b.ttCover, b.ttAi, b.publish, ...(planValue(id('tiktok'), 'pinned') ? [b.ttPinned] : [])],
+        checklist: checklist(id('tiktok'), [b.ttCover, b.ttAi, b.publish, ...(planValue(id('tiktok'), 'pinned') ? [b.ttPinned] : [])]),
         url: true,
       });
     }
@@ -601,7 +609,7 @@ export async function boardProject(projectRoot: string, root: string, options: {
         at: at(id('instagram')),
         files: [...file(b.video, entry.video), ...file(b.thumb, entry.thumbnail)],
         fields: field(b.caption, caption ? display(caption.value) : undefined, { ...limitOf(id('instagram'), 'caption'), note: hashtagNoteOf(id('instagram'), 'caption') }),
-        checklist: [b.igCover(planPost(id('instagram'))?.coverFrame), b.igAi, b.publish],
+        checklist: checklist(id('instagram'), [b.igCover(planPost(id('instagram'))?.coverFrame), b.igAi, b.publish]),
         url: true,
       });
     }
@@ -612,7 +620,7 @@ export async function boardProject(projectRoot: string, root: string, options: {
         at: at(id('x')),
         files: file(b.video, entry.video),
         fields: [...field(b.post, display(planValue(id('x'), 'post')), limitOf(id('x'), 'post')), ...field(b.reply, display(planValue(id('x'), 'reply')), limitOf(id('x'), 'reply'))],
-        checklist: [b.xVideo, b.xReply],
+        checklist: checklist(id('x'), [b.xVideo, b.xReply]),
         url: true,
       });
     }
@@ -626,7 +634,7 @@ export async function boardProject(projectRoot: string, root: string, options: {
       at: at('tiktok'),
       files: [...file(b.video, files.master), ...file(b.cover, files.cover)],
       fields: field(b.description, tiktokCaption ? display(tiktokCaption.value) : undefined, limitOf('tiktok', 'caption')),
-      checklist: [b.ttCover, b.ttAi, b.publish],
+      checklist: checklist('tiktok', [b.ttCover, b.ttAi, b.publish]),
       url: true,
     });
     const instagramCaption = planText('instagram', 'caption');
@@ -636,7 +644,7 @@ export async function boardProject(projectRoot: string, root: string, options: {
       at: at('instagram'),
       files: [...file(b.video, files.master), ...file(b.cover, files.cover)],
       fields: field(b.caption, instagramCaption ? display(instagramCaption.value) : undefined, { ...limitOf('instagram', 'caption'), note: hashtagNoteOf('instagram', 'caption') }),
-      checklist: [b.igCover(undefined), b.igAi, b.publish],
+      checklist: checklist('instagram', [b.igCover(undefined), b.igAi, b.publish]),
       url: true,
     });
   }
@@ -651,7 +659,7 @@ export async function boardProject(projectRoot: string, root: string, options: {
       at: at('distributor'),
       files: [...file(b.audio, files.audio), ...file(b.cover, files.cover), ...file(b.lyrics, files.lyricsTxt), ...file(b.lrc, files.lyricsLrc)],
       fields: distributorRows(input, l).map(([label, value]) => ({ label, value: value.replace(/`/g, '') })),
-      checklist: [b.distributorCheck],
+      checklist: checklist('distributor', [b.distributorCheck]),
       task: true,
     });
     spotify.push({
@@ -660,18 +668,18 @@ export async function boardProject(projectRoot: string, root: string, options: {
       at: at('pitch'),
       files: [],
       fields: field(b.pitch, planValue('pitch', 'pitch'), limitOf('pitch', 'pitch')),
-      checklist: [b.pitchCheck],
+      checklist: checklist('pitch', [b.pitchCheck]),
       task: true,
     });
-    spotify.push({ id: 'canvas', heading: heading('canvas', b.canvas), at: at('canvas'), files: file(b.canvas, files.canvas), fields: [], checklist: [b.canvasCheck], task: true });
-    spotify.push({ id: 'song', heading: heading('song', l.cal.steps.song), at: at('song'), files: [], fields: [], checklist: [b.spotifyUrl], url: true });
+    spotify.push({ id: 'canvas', heading: heading('canvas', b.canvas), at: at('canvas'), files: file(b.canvas, files.canvas), fields: [], checklist: checklist('canvas', [b.canvasCheck]), task: true });
+    spotify.push({ id: 'song', heading: heading('song', l.cal.steps.song), at: at('song'), files: [], fields: [], checklist: checklist('song', [b.spotifyUrl]), url: true });
     spotify.push({
       id: 'artist-pick',
       heading: heading('artist-pick', b.artistPick),
       at: at('artist-pick'),
       files: [...file(b.master, files.master), ...file(b.cover, files.cover)],
       fields: field(b.artistPick, planValue('artist-pick', 'artistPick')),
-      checklist: [b.videoBeta],
+      checklist: checklist('artist-pick', [b.videoBeta]),
       task: true,
     });
   }
@@ -690,7 +698,7 @@ export async function boardProject(projectRoot: string, root: string, options: {
         ...field(b.reason, planValue('linkedin', 'reason')),
         ...field(b.post, display(planValue('linkedin', 'post')), { ...limitOf('linkedin', 'post'), note: l.li.hook(linkedinPost.hook?.count ?? 0, linkedinPost.hook?.max ?? limits.linkedin.hook) }),
       ],
-      checklist: [b.liVideo],
+      checklist: checklist('linkedin', [b.liVideo]),
       pointer: videoUrl,
       url: true,
     });
@@ -707,7 +715,7 @@ export async function boardProject(projectRoot: string, root: string, options: {
           at: at('microsite'),
           files: [...file(b.json, `microsite/${project.config.slug}.json`), ...file(b.cover, files.cover), ...file(b.upload, files.thumbnails[0])],
           fields: [...field(b.teaser, planValue('microsite', 'teaser')), ...field(b.pageText, planValue('microsite', 'pageText')), ...field(b.quote, planValue('microsite', 'quote'))],
-          checklist: [b.pageCheck],
+          checklist: checklist('microsite', [b.pageCheck]),
           url: true,
         },
       ]
@@ -808,7 +816,7 @@ export async function boardAutopilot(options: {
   const automatic = plans.filter((plan) => plan.action && plan.state !== 'manual').length;
   return {
     ...(options.status.approval ? { approval: options.status.approval } : {}),
-    approvalStale: Boolean(options.status.approval && options.calendar && options.status.approval.release_date !== options.calendar.release_date),
+    approvalStale: Boolean(options.status.approval && options.calendar && !approvalHolds(options.status, options.calendar)),
     blockers,
     ready,
     notes,

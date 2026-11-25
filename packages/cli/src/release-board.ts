@@ -9,7 +9,8 @@ import { boardProject, type BoardProject } from './release-board-data.js';
 import { loadEvents, loadSnapshot } from './production-watch.js';
 import { editNote, reviewData, submitRound } from './board-review.js';
 import { SLUG, productionDetail, productionOverview, productionSeries, projectDirs, seriesDirs } from './board-production.js';
-import { loadCalendar, updateStatus } from './release-calendar.js';
+import { loadCalendar } from './release-calendar.js';
+import { updateStatus } from './release-records.js';
 import { LIBRARY_FILE_LIMITS, safeName } from './library-entry.js';
 import { releaseDir } from './release.js';
 

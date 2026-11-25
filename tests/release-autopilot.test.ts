@@ -12,7 +12,8 @@ import { join } from 'node:path';
 import { parse, stringify } from 'yaml';
 import { MockPublisher, MockSocialAdapter, PublishError, markUncertain, tiktokCaption, type SocialPlatform } from '../packages/providers/src/index.ts';
 import { buildRelease } from '../packages/cli/src/release.ts';
-import { loadCalendar, loadStatus, updateStatus } from '../packages/cli/src/release-calendar.ts';
+import { loadCalendar } from '../packages/cli/src/release-calendar.ts';
+import { loadStatus, updateStatus } from '../packages/cli/src/release-records.ts';
 import { publishProject, youtubeDescription } from '../packages/cli/src/publish.ts';
 import {
   approveRelease,
@@ -25,7 +26,7 @@ import {
   type AutopilotDeps,
 } from '../packages/cli/src/release-autopilot.ts';
 import { boardProject } from '../packages/cli/src/release-board-data.ts';
-import { appendAutopilotEntry } from '../packages/cli/src/autopilot-state.ts';
+import { appendAutopilotEntry } from '../packages/cli/src/release-records.ts';
 import { boardHandler } from '../packages/cli/src/release-board.ts';
 import { timerPlan } from '../packages/cli/src/release-timer.ts';
 import { cleanupFixtures, fakeDeps, fixture, memeFixture, setDistribution, setReleaseDay, siblingCalendar } from './helpers/release-fixture.ts';

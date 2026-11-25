@@ -21,7 +21,6 @@ import {
   type PublishItem,
 } from '../packages/providers/src/index.ts';
 import {
-  appendPublishEntry,
   buildPublishPlan,
   platformProblems,
   publishProject,
@@ -30,6 +29,7 @@ import {
   youtubeTagChars,
   type VideoProbe,
 } from '../packages/cli/src/publish.ts';
+import { appendPublishEntry } from '../packages/cli/src/release-records.ts';
 import { memeFixture } from './helpers/release-fixture.ts';
 import { renderUploadText, writeUploadText } from '../packages/cli/src/upload-text.ts';
 import { parseUploadText, uploadTextProblems } from '../packages/cli/src/release-files.ts';
@@ -397,9 +397,8 @@ describe('an upload that may have gone out', () => {
 describe('writers at the same time', () => {
   it('keeps every entry when publish and the autopilot append to the publish log at once', async () => {
     const dir = await fixture();
-    const logPath = join(dir, 'review', 'publish.json');
     const entry = (item: string) => ({ platform: 'youtube' as const, item, file: 'renders/16x9.mp4', file_hash: 'a'.repeat(64), status: 'uploaded' as const, mock: false, warnings: [], at: '2026-11-16T12:00:00Z' });
-    await Promise.all(['main', 'N1-intro', 'N2-chorus', 'N3'].map((item) => appendPublishEntry(logPath, entry(item))));
+    await Promise.all(['main', 'N1-intro', 'N2-chorus', 'N3'].map((item) => appendPublishEntry(dir, entry(item))));
     expect((await readLog(dir)).entries.map((e) => e.item).sort()).toEqual(['N1-intro', 'N2-chorus', 'N3', 'main']);
   });
 

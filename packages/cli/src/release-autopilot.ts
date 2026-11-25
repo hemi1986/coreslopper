@@ -15,7 +15,6 @@ import {
   plainLyrics,
   readYamlFile,
   releasedPublicly,
-  writeJsonAtomic,
   writeTextAtomic,
   type AutopilotEntry,
   type AutopilotEventPlan,
@@ -34,33 +33,35 @@ import {
   type SocialPlatform,
   type SocialPostRequest,
 } from '@coreslopper/providers';
-import { appendAutopilotEntry, appendAutopilotEntryUnlocked, autopilotReadiness, lastRunPath, loadAutopilotLog } from './autopilot-state.js';
+import { autopilotReadiness, lastRunPath } from './autopilot-state.js';
 import { publishProject, type PublishOptions, type PublishSummary } from './publish.js';
 import { saveEnvValue } from './publish-auth.js';
 import { boardProjectDirs } from './release-board.js';
 import { projectReleaseContext } from './release-board-data.js';
 import { acquireHolderLock } from './file-lock.js';
-import { loadStatus, runCalendar, statusPath, updateStatus, withReleaseLock } from './release-calendar.js';
+import { runCalendar } from './release-calendar.js';
+import {
+  appendAutopilotEntry,
+  appendAutopilotEntryUnlocked,
+  clearApproval,
+  loadAutopilotLog,
+  loadStatus,
+  setApproval,
+  setEventManual as setEventManualRecord,
+  updateStatus,
+  withReleaseLock,
+} from './release-records.js';
 import { micrositeSong } from './release-microsite.js';
 import { probeVideo } from './short.js';
 
-export { appendAutopilotEntry, autopilotLogPath, autopilotReadiness, loadAutopilotLog } from './autopilot-state.js';
+export { appendAutopilotEntry, autopilotLogPath, loadAutopilotLog } from './release-records.js';
+export { autopilotReadiness } from './autopilot-state.js';
 
 // The release autopilot's runner (ADR 0029): for every release the user
 // approved on the board, post what is due by API, at its calendar time. Run
 // by a timer every few minutes (`release-timer install`); each run is short
 // and idempotent. Writes review/autopilot.json (its log) and
 // review/release-status.json (what is live, with URLs).
-
-async function writeStatus(projectRoot: string, change: (status: ReleaseStatus) => void): Promise<ReleaseStatus> {
-  return withReleaseLock(projectRoot, async () => {
-    const status = await loadStatus(projectRoot);
-    change(status);
-    await writeJsonAtomic(statusPath(projectRoot), status);
-    return status;
-  });
-}
-
 
 /**
  * The user's one click: approve the release. A proposed release day becomes
@@ -85,16 +86,12 @@ export async function approveRelease(projectRoot: string, options: { root: strin
     await setReleaseDate(projectRoot, date);
     await runCalendar({ projectDir: projectRoot, root: options.root, now: options.now, log: () => undefined });
   }
-  return writeStatus(projectRoot, (status) => {
-    status.approval = { at: options.now.toISOString(), release_date: date };
-  });
+  return setApproval(projectRoot, { at: options.now.toISOString(), release_date: date });
 }
 
 /** Withdraw the approval: the autopilot stops; what is posted stays posted. */
 export async function revokeApproval(projectRoot: string): Promise<ReleaseStatus> {
-  return writeStatus(projectRoot, (status) => {
-    delete status.approval;
-  });
+  return clearApproval(projectRoot);
 }
 
 /** Write `release.release_date` into project.yaml, keeping its comments and layout. */
@@ -109,12 +106,7 @@ export async function setReleaseDate(projectRoot: string, date: string): Promise
 
 /** The user takes a post over by hand (or gives it back to the autopilot). */
 export async function setEventManual(projectRoot: string, id: string, manual: boolean): Promise<ReleaseStatus> {
-  return writeStatus(projectRoot, (status) => {
-    const item = { ...(status.items[id] ?? { done: false }) };
-    if (manual) item.manual = true;
-    else delete item.manual;
-    status.items[id] = item;
-  });
+  return setEventManualRecord(projectRoot, id, manual);
 }
 
 /** Another attempt after a failure or a stuck run; `force` posts a missed post although its time has passed. */

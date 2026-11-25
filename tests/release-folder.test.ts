@@ -42,7 +42,8 @@ import { boardProject } from '../packages/cli/src/release-board-data.ts';
 import { boardHandler } from '../packages/cli/src/release-board.ts';
 import { publishProject } from '../packages/cli/src/publish.ts';
 import { MockPublisher, tiktokCaption } from '../packages/providers/src/index.ts';
-import { loadCalendar, loadStatus, runCalendar } from '../packages/cli/src/release-calendar.ts';
+import { loadCalendar, runCalendar } from '../packages/cli/src/release-calendar.ts';
+import { loadStatus } from '../packages/cli/src/release-records.ts';
 import {
   canvasArgs,
   canvasProblems,
@@ -784,8 +785,8 @@ describe('release board', () => {
     const main = board.platforms.find((platform) => platform.id === 'youtube')!.posts.find((post) => post.id === 'youtube')!;
     expect(main.files.map((entry) => entry.path)).toContain('cover/office-prank-1080x1920.jpg');
     expect(main.checklist).toHaveLength(3);
-    expect(main.checklist.join(' ')).toContain('Planen oder veröffentlichen zur Kalenderzeit');
-    expect(main.checklist.join(' ')).not.toMatch(/Kategorie|Abspann/);
+    expect(main.checklist.map((item) => item.label).join(' ')).toContain('Planen oder veröffentlichen zur Kalenderzeit');
+    expect(main.checklist.map((item) => item.label).join(' ')).not.toMatch(/Kategorie|Abspann/);
     expect(main.fields.map((field) => field.label)).not.toContain('Angepinnter Kommentar');
     for (const platform of ['tiktok', 'instagram']) {
       const post = board.platforms.find((entry) => entry.id === platform)!.posts[0]!;

@@ -169,11 +169,11 @@ function renderPost(entry) {
     input.onchange = function () { setStatus(entry.id, { url: input.value.trim() || null }).then(function () { reload(entry.id); }); };
     posted.insertBefore(input, posted.firstChild);
   }
-  const checklist = entry.checklist.length ? el('ul', { class: 'check' }, entry.checklist.map(function (item, index) {
-    const key = entry.id + '#' + index;
-    const box = el('input', { type: 'checkbox', checked: (view.data.status.items[key] || {}).done ? true : undefined });
-    box.onchange = function () { setStatus(key, { done: box.checked }); };
-    return el('li', {}, [el('label', {}, [box, ' ', item])]);
+  const checklist = entry.checklist.length ? el('ul', { class: 'check' }, entry.checklist.map(function (item) {
+    // The key is the line's record key from the server: a line appearing or going leaves the other ticks (G-163).
+    const box = el('input', { type: 'checkbox', checked: (view.data.status.items[item.key] || {}).done ? true : undefined });
+    box.onchange = function () { setStatus(item.key, { done: box.checked }); };
+    return el('li', {}, [el('label', {}, [box, ' ', item.label])]);
   })) : null;
   const pointer = entry.pointer ? el('div', { class: 'pointer' }, [t('points') + ': ', /^https?:/.test(entry.pointer) ? el('a', { href: entry.pointer, target: '_blank', text: entry.pointer }) : entry.pointer]) : null;
   return el('section', { class: 'card' + (status.done ? ' done' : ''), id: 'post-' + entry.id }, [

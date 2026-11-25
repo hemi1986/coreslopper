@@ -60,7 +60,8 @@ import {
   type Prober,
 } from './release-media.js';
 import { readmeText, releaseLabels, releaseTexts, calendarEventLabel, type ReleaseTextInput } from './release-texts.js';
-import { calendarInput, loadStatus, planCalendar } from './release-calendar.js';
+import { calendarInput, planCalendar } from './release-calendar.js';
+import { loadStatus } from './release-records.js';
 import { micrositeSong } from './release-microsite.js';
 import { listThumbnails } from './thumbnail-files.js';
 import { readRecipe, recipePath } from './thumbnail-recipe.js';

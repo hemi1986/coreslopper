@@ -1,12 +1,11 @@
 import { createHash } from 'node:crypto';
 import { createReadStream, existsSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
-import { dirname, extname, isAbsolute, join, relative, resolve } from 'node:path';
+import { extname, isAbsolute, join, relative, resolve } from 'node:path';
 import {
   ConfigError,
   PLATFORM_LIMITS,
   ProjectConfigSchema,
-  PublishLogSchema,
   TakesSchema,
   ValidationError,
   buildReleasePlan,
@@ -19,7 +18,6 @@ import {
   readYamlFile,
   repoRoot,
   soundLicenceTodos,
-  writeJsonAtomic,
   type PlatformLimits,
   type ProjectConfig,
   type PublishEntry,
@@ -46,10 +44,10 @@ import {
   type PublishAdapter,
   type PublishItem,
 } from '@coreslopper/providers';
-import { withReleaseLock } from './release-calendar.js';
+import { appendPublishEntry, readPublishLog } from './release-records.js';
 import { loadReleasePlan, usedLibrarySounds } from './release.js';
 import { releaseLabels } from './release-texts.js';
-import { loadUploadData, uploadPaths } from './upload-text.js';
+import { loadUploadData } from './upload-text.js';
 
 /** YouTube limits that `publish` checks before an upload; the text limits come from the one table. */
 export const YOUTUBE_LIMITS = {
@@ -130,11 +128,6 @@ export async function hashVideo(path: string): Promise<string> {
   const hash = createHash('sha256');
   for await (const chunk of createReadStream(path)) hash.update(chunk as Buffer);
   return hash.digest('hex');
-}
-
-export async function readPublishLog(path: string): Promise<PublishLog> {
-  if (!existsSync(path)) return { version: 1, entries: [] };
-  return readJsonFile(path, PublishLogSchema);
 }
 
 /** The calendar day of the YouTube quota, which resets at midnight Pacific Time. */
@@ -475,20 +468,6 @@ function printManualSteps(print: (line: string) => void, steps: string[]): void 
 }
 
 /**
- * Append one entry to the publish log (`<project>/review/publish.json`): read it fresh under the project's release
- * lock, then write it atomically. `publish` and the autopilot may run at once (HS-189).
- */
-export async function appendPublishEntry(logPath: string, entry: PublishEntry): Promise<PublishLog> {
-  return withReleaseLock(dirname(dirname(logPath)), async () => {
-    const log = await readPublishLog(logPath);
-    log.entries.push(entry);
-    const parsed = PublishLogSchema.parse(log);
-    await writeJsonAtomic(logPath, parsed);
-    return parsed;
-  });
-}
-
-/**
  * What the upload needs to post a meme's release text: whether the project is a
  * meme, and the library sounds its takes came from (HS-261, HS-265). Reads only
  * `project.yaml` and `takes.json`: publish needs the kind and the takes, not the
@@ -512,8 +491,7 @@ export async function publishProject(options: PublishOptions): Promise<PublishSu
   const print = options.log ?? ((line: string) => console.log(line));
   const now = options.now ?? (() => new Date());
   const data = await loadUploadData(projectDir);
-  const logPath = uploadPaths(projectDir).log;
-  let log = await readPublishLog(logPath);
+  let log = await readPublishLog(projectDir);
   const root = options.root ?? repoRoot();
   const { config, meme, sounds } = await uploadSounds(projectDir, root);
   const credits = sounds.map((sound) => sound.credit).filter((credit): credit is string => Boolean(credit));
@@ -573,7 +551,7 @@ export async function publishProject(options: PublishOptions): Promise<PublishSu
         ...(result.quotaUnits !== undefined ? { quota_units: result.quotaUnits } : {}),
         at: now().toISOString(),
       };
-      log = await appendPublishEntry(logPath, entry);
+      log = await appendPublishEntry(projectDir, entry);
       entries.push(entry);
       print(`✔ ${step.platform} ${step.item.name}: ${entry.status}${entry.url ? ` ${entry.url}` : ` (${entry.remote_id})`}`);
       for (const warning of result.warnings) print(`  ! ${warning}`);
@@ -583,7 +561,7 @@ export async function publishProject(options: PublishOptions): Promise<PublishSu
       const message = redactSecrets(error instanceof Error ? error.message : String(error), secrets());
       const uncertain = Boolean((error as { uncertain?: boolean }).uncertain);
       const entry: PublishEntry = { ...base, status: 'failed', warnings: [], error: message, ...(uncertain ? { uncertain } : {}), at: now().toISOString() };
-      log = await appendPublishEntry(logPath, entry);
+      log = await appendPublishEntry(projectDir, entry);
       entries.push(entry);
       printManualSteps(print, manualSteps);
       if (error instanceof ConfigError) throw new ConfigError(message);
