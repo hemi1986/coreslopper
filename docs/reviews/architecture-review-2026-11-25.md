@@ -1,10 +1,10 @@
 # Architecture review – 2026-11-25
 
-Status: in progress · 01 (`4bf6985`), 02 (`d3a53d1`), 03 (`119f693`), 04 (`fbc42d0`), 05 (`9950c69`) and 06 (`1fa9424`) implemented, awaiting review · 02 is closed: `defineLibraryKind` in `library-entry.ts` is the one lifecycle, `workspace-dirs.ts` carries the paths, the kind modules hold data and hooks, one `libraryRoutes` factory serves both URL families in `release-board.ts`, and `describeLibraryLifecycle` plus one route suite run for both kinds; ADR 0056 proposed · 06 is closed: `quoteRole` in `generate.ts` is the one price rule for `runBatch` and `estimate`, which now sees the remaining budget while keeping its output, and the `spend` command is gone so only `runBatch` writes spend · the browser views' deduplication stays a separate follow-up candidate · Source: `/improve-codebase-architecture`, hot spots of the last 250 commits.
+Status: in progress · 01 (`4bf6985`), 02 (`d3a53d1`), 03 (`119f693`), 04 (`fbc42d0`), 05 (`9950c69`), 06 (`1fa9424`) and 07 (`8e617df`) implemented, awaiting review · 02 is closed: `defineLibraryKind` in `library-entry.ts` is the one lifecycle, `workspace-dirs.ts` carries the paths, the kind modules hold data and hooks, one `libraryRoutes` factory serves both URL families in `release-board.ts`, and `describeLibraryLifecycle` plus one route suite run for both kinds; ADR 0056 proposed · 06 is closed: `quoteRole` in `generate.ts` is the one price rule for `runBatch` and `estimate`, which now sees the remaining budget while keeping its output, and the `spend` command is gone so only `runBatch` writes spend · 07 is closed: `classifyFailure`/`failureClass`/`markFailure` in `providers/src/publish/failure.ts` is the one fatal/retryable/uncertain rule, `HTTP_RETRY` is the one retry budget and `pollUntil` the one poll loop; the runner, `publish` and the pinned-comment step read the class, so no status code is re-judged · the browser views' deduplication stays a separate follow-up candidate · Source: `/improve-codebase-architecture`, hot spots of the last 250 commits.
 Visual report: [architecture-review-2026-11-25.html](architecture-review-2026-11-25.html) (open in a browser; needs internet for Tailwind and Mermaid).
 Scope: release and publishing, the board, the libraries, generation, the workspace payload.
 
-Candidate 01 now has ADR 0055 (proposed) and code; candidate 02 is done with ADR 0056 (proposed), the one lifecycle and the shared lifecycle/route suites (cuts 0–5); candidate 03 has code and `tests/release-records.test.ts`; candidate 04 has `release-facts.ts` and `tests/release-facts.test.ts`; candidate 05 has the core budget rule and `tests/series-budget.test.ts`; candidate 06 has `quoteRole` and the closed ledger in `tests/generation-characterization.test.ts`; the other three are proposals without a story.
+Candidate 01 now has ADR 0055 (proposed) and code; candidate 02 is done with ADR 0056 (proposed), the one lifecycle and the shared lifecycle/route suites (cuts 0–5); candidate 03 has code and `tests/release-records.test.ts`; candidate 04 has `release-facts.ts` and `tests/release-facts.test.ts`; candidate 05 has the core budget rule and `tests/series-budget.test.ts`; candidate 06 has `quoteRole` and the closed ledger in `tests/generation-characterization.test.ts`; candidate 07 has the failure seam in `providers/src/publish/failure.ts`, `tests/publish-failure.test.ts` and `tests/publish-poll.test.ts`; candidate 08 is a proposal without a story.
 This file is the handoff between sessions. Keep it short and update the status table.
 
 ## Working rules (context discipline)
@@ -27,7 +27,7 @@ This file is the handoff between sessions. Keep it short and update the status t
 | 04 | Lift release facts out of the board view | Strong | done – `release-facts.ts` owns `loadReleaseFacts`, `releasePlan` and `releaseProjectDirs`; the board and the autopilot build on them; one facts load per project per round; commit fbc42d0 | `release-autopilot.ts`, `release-board-data.ts`, `release-board.ts`, `publish.ts`, `board/app.js` |
 | 05 | Make the uncommitted series budget one rule | Strong | done – `uncommittedBudget` in core; `remainingBudget` and `assertAffordable` subtract the committed episode budgets, so canon batches and episode creation check the same amount before any provider; `tests/series-budget.test.ts`; commit 9950c69 | `series.ts`, `new-project.ts`, `generate.ts`, `core/cost.ts`, `core/state.ts`, `board-wizard.ts` |
 | 06 | Close the generation ledger's side doors | Strong | done – `quoteRole` in `generate.ts` is the one price rule for `runBatch` and `estimate`; `estimate` also checks the remaining budget, with its existing lines and exit unchanged; the `spend` command is gone, so only `runBatch` calls `recordSpend`; `tests/generation-characterization.test.ts` covers quote parity and the one write door; commit 1fa9424 | `index.ts` (`estimate`, `spend`), `generate.ts`, `core/state.ts`, `qa.ts` |
-| 07 | Put never twice behind one seam | Worth exploring | open | `providers/http.ts`, `providers/publish/http.ts`, the five publish adapters, `release-autopilot.ts` |
+| 07 | Put never twice behind one seam | Worth exploring | done – `classifyFailure`/`failureClass`/`markFailure` in `providers/src/publish/failure.ts` is the one fatal/retryable/uncertain rule; adapters say phase and last byte; `HTTP_RETRY` is the one retry budget and `pollUntil` the one poll loop; the runner, `publish` and the pinned-comment step read the class; `tests/publish-failure.test.ts`, `tests/publish-poll.test.ts`; commit 8e617df | `providers/http.ts`, `providers/publish/http.ts`, the five publish adapters, `release-autopilot.ts` |
 | 08 | Let each board view own its routes | Worth exploring | open | `release-board.ts`, `board/release.js`, `board/app.js`, the wizard and library routes |
 
 All paths are from the repository root. Tests are under `tests/`; the release fixture is
@@ -277,6 +277,17 @@ adapters say when the last byte left; the runner, `publish` and the pinned-comme
 adapter; `publishProject` with a fake adapter throwing each class.
 
 **Done when.** One "uncertain" rule; one retry budget; one poll loop; the runner never re-judges a status code.
+
+**Implementation state (2026-11-25).** `8e617df`: the classifier is `packages/providers/src/publish/failure.ts`
+(`classifyFailure`, `failureClass`, `markFailure`, `withFailureClass`; phases `prepare`/`upload`/`publication` and
+`lastByteSent`). `HTTP_RETRY` (4 attempts, 500 ms) plus `fetchResponseWithRetry` in `providers/src/http.ts` are the
+one retry stack; `publish/http.ts` wraps them with `PublishError` and redaction. `pollUntil` in `publish/http.ts`
+serves X, LinkedIn, Instagram and both TikTok loops; YouTube's resumable upload keeps its offset loop and shares the
+budget. The runner, `publish` and the pinned-comment step read `failureClass` and never re-judge a status code.
+`tests/publish-failure.test.ts` is the classifier table, `tests/publish-poll.test.ts` covers the loop, the five
+adapter suites assert the class, and `release-autopilot.test.ts` covers the uncertain pinned comment.
+`npm run typecheck`, `npm test` (991 passed, 2 skipped) and the gate are green. No new ADR: the change implements
+ADR 0046 and is reversible.
 
 **Alignment.** ADR 0046; no conflict.
 
