@@ -342,6 +342,31 @@ describe('release autopilot', () => {
     expect(comments).toEqual([{ method: 'postComment', videoId, text: 'Welcher Moment ist eurer?' }]);
   });
 
+  it('asks the user when the pinned comment may have gone out, and never retries it', async () => {
+    const t = await setup();
+    await approveRelease(t.dir, { root: t.root, now: new Date(t.at('distributor')) });
+    t.clock.now = new Date(t.at('youtube') - 23 * 3_600_000);
+    await t.run();
+    const videoId = (await loadAutopilotLog(t.dir)).entries.find((entry) => entry.event === 'youtube' && entry.remote_id)!.remote_id!;
+    t.youtube.statuses.set(videoId, { privacyStatus: 'public', uploadStatus: 'processed' });
+    await updateStatus(t.dir, 'youtube', { done: true, url: `https://youtu.be/${videoId}`, by: 'user' }, t.clock.now);
+    let calls = 0;
+    Object.defineProperty(t.youtube, 'postComment', {
+      value: () => {
+        calls += 1;
+        return Promise.reject(markUncertain(new PublishError('YouTube lost the comment answer')));
+      },
+    });
+    t.moveTo('youtube', 3);
+    await t.run();
+    t.moveTo('youtube', 15);
+    await t.run();
+    const comments = (await loadAutopilotLog(t.dir)).entries.filter((entry) => entry.event === 'youtube:comment' && entry.status === 'failed');
+    expect(calls).toBe(1);
+    expect(comments).toHaveLength(1);
+    expect(comments[0]).toMatchObject({ status: 'failed', uncertain: true });
+  });
+
   it('asks the user after a TikTok post that may have gone out, and never posts it again by itself', async () => {
     const t = await setup({ env: { TIKTOK_DIRECT_POST: '1' } });
     await approveRelease(t.dir, { root: t.root, now: new Date(t.at('distributor')) });

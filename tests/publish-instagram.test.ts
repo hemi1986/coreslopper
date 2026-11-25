@@ -11,6 +11,7 @@ import {
   resolveInstagramCredentials,
 } from '../packages/providers/src/publish/instagram.ts';
 import type { FetchLike } from '../packages/providers/src/http.ts';
+import { failureClass } from '../packages/providers/src/publish/failure.ts';
 
 const temporary: string[] = [];
 const noSleep = async () => undefined;
@@ -170,9 +171,11 @@ describe('InstagramPublisher', () => {
   it('fails when the container ends in ERROR and publishes nothing', async () => {
     const { video } = await files();
     const { fetchImpl, calls } = graph({ statuses: ['IN_PROGRESS', 'ERROR'] });
-    await expect(
-      publisher(fetchImpl).post({ event: 'short:Z1-intro:instagram', text: 'x', media: { path: video, kind: 'video' }, placement: 'reel' }),
-    ).rejects.toThrow(/could not process the media of short:Z1-intro:instagram: ERROR/);
+    const error = (await publisher(fetchImpl)
+      .post({ event: 'short:Z1-intro:instagram', text: 'x', media: { path: video, kind: 'video' }, placement: 'reel' })
+      .catch((caught: unknown) => caught as Error)) as Error;
+    expect(error.message).toMatch(/could not process the media of short:Z1-intro:instagram: ERROR/);
+    expect(failureClass(error)).toBe('retryable');
     expect(calls.some((call) => call.url.pathname.endsWith('/media_publish'))).toBe(false);
   });
 
@@ -230,6 +233,28 @@ describe('InstagramPublisher', () => {
     expect(result.warnings.join(' ')).toMatch(/answer was lost/);
     // media_publish is never retried.
     expect(calls.filter((call) => call.url.pathname.endsWith('/media_publish'))).toHaveLength(1);
+  });
+
+  it('marks media_publish as uncertain when the container status cannot be read', async () => {
+    const { video } = await files();
+    let containerChecks = 0;
+    const fetchImpl: FetchLike = async (input, init) => {
+      const path = new URL(input).pathname;
+      if (path.endsWith('/me')) return json({ user_id: '1784', username: 'neonband' });
+      if (path.endsWith('/content_publishing_limit')) return json({ data: [{ quota_usage: 0 }] });
+      if (path.endsWith('/1784/media') && init?.method === 'POST') return json({ id: 'c-1' });
+      if (path.endsWith('/media_publish')) return json({ error: { message: 'Service unavailable' } }, 503);
+      if (path.endsWith('/c-1')) {
+        containerChecks += 1;
+        return containerChecks === 1 ? json({ status_code: 'FINISHED' }) : json({ error: { message: 'down' } }, 500);
+      }
+      return json({ error: { message: `unexpected ${path}` } }, 404);
+    };
+    const error = await publisher(fetchImpl)
+      .post({ event: 'x', text: 'x', media: { path: video, kind: 'video' } })
+      .catch((caught: Error) => caught);
+    expect(failureClass(error)).toBe('uncertain');
+    expect((error as Error & { uncertain?: boolean }).uncertain).toBe(true);
   });
 
   it('masks the token in error messages', async () => {

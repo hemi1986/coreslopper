@@ -4,7 +4,6 @@ import { copyFile, mkdir, open, readFile, rm, stat } from 'node:fs/promises';
 import { dirname, isAbsolute, join, resolve, sep } from 'node:path';
 import { parseDocument } from 'yaml';
 import {
-  ConfigError,
   ProjectConfigSchema,
   ValidationError,
   approvalHolds,
@@ -26,8 +25,9 @@ import {
   InstagramPublisher,
   LinkedInPublisher,
   XPublisher,
-  markUncertain,
+  failureClass,
   redactSecrets,
+  withFailureClass,
   YouTubePublisher,
   type SocialAdapter,
   type SocialPlatform,
@@ -329,8 +329,8 @@ async function ensurePinnedComment(dir: string, facts: ReleaseFacts, deps: Autop
   const log = await loadAutopilotLog(dir);
   const id = mainVideoId(status, log);
   const entries = log.entries.filter((entry) => entry.event === COMMENT_EVENT);
-  const failures = entries.filter((entry) => entry.status === 'failed' && !entry.uncertain).length;
-  if (!id || entries.some((entry) => entry.status !== 'failed' || entry.uncertain) || failures >= settings.retries) return undefined;
+  const failures = entries.filter((entry) => entry.status === 'failed' && !entry.uncertain && !entry.fatal).length;
+  if (!id || entries.some((entry) => entry.status !== 'failed' || entry.uncertain || entry.fatal) || failures >= settings.retries) return undefined;
   if ((await deps.youtube().videoStatus(id)).privacyStatus !== 'public') return undefined;
   await appendAutopilotEntry(dir, { event: COMMENT_EVENT, status: 'running', at: deps.now().toISOString() });
   try {
@@ -340,17 +340,18 @@ async function ensurePinnedComment(dir: string, facts: ReleaseFacts, deps: Autop
     return { id: COMMENT_EVENT, status: 'posted' as const };
   } catch (error) {
     const message = redactSecrets((error as Error).message);
-    await appendAutopilotEntry(dir, { event: COMMENT_EVENT, status: 'failed', at: deps.now().toISOString(), error: message, ...(markedUncertain(error) ? { uncertain: true } : {}) });
+    const outcome = failureClass(error);
+    await appendAutopilotEntry(dir, {
+      event: COMMENT_EVENT,
+      status: 'failed',
+      at: deps.now().toISOString(),
+      error: message,
+      ...(outcome === 'uncertain' ? { uncertain: true } : {}),
+      ...(outcome === 'fatal' ? { fatal: true } : {}),
+    });
     deps.log(`${facts.input.slug} ${COMMENT_EVENT}: failed: ${message}`);
     return { id: COMMENT_EVENT, status: 'failed' as const, error: message };
   }
-}
-
-/** A YouTube comment POST is never retried by the adapter: a lost answer may have posted it. */
-function markedUncertain(error: unknown): boolean {
-  if ((error as { uncertain?: boolean }).uncertain) return true;
-  const status = (error as { status?: number }).status;
-  return status === undefined || status >= 500;
 }
 
 /** One claimed event: act, log the outcome. */
@@ -366,9 +367,15 @@ async function execute(dir: string, item: AutopilotEventPlan, facts: ReleaseFact
     return { id: item.id, status: outcome.status, url: outcome.url };
   } catch (error) {
     const message = redactSecrets((error as Error).message ?? String(error));
-    const uncertain = Boolean((error as { uncertain?: boolean }).uncertain);
-    const fatal = error instanceof ConfigError || error instanceof ValidationError;
-    await appendAutopilotEntry(dir, { event: item.id, status: 'failed', at: deps.now().toISOString(), error: message, ...(uncertain ? { uncertain } : {}), ...(fatal ? { fatal } : {}) });
+    const outcome = failureClass(error);
+    await appendAutopilotEntry(dir, {
+      event: item.id,
+      status: 'failed',
+      at: deps.now().toISOString(),
+      error: message,
+      ...(outcome === 'uncertain' ? { uncertain: true } : {}),
+      ...(outcome === 'fatal' ? { fatal: true } : {}),
+    });
     deps.log(`${slug} ${item.id}: failed: ${message}`);
     return { id: item.id, status: 'failed' as const, error: message };
   }
@@ -411,7 +418,7 @@ async function act(dir: string, item: AutopilotEventPlan, facts: ReleaseFacts, s
     if (!entry) throw new ValidationError(`publish planned no ${platform} upload for ${action.item}`);
     if (entry.status === 'failed') {
       const failure = new Error(entry.error ?? `the ${platform} upload failed`);
-      throw entry.uncertain ? markUncertain(failure) : failure;
+      throw entry.uncertain ? withFailureClass(failure, 'uncertain') : failure;
     }
     if (platform === 'tiktok') {
       const directMode = settings.tiktok_direct || deps.env.TIKTOK_DIRECT_POST === '1';

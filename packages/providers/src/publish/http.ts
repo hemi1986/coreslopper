@@ -1,4 +1,5 @@
-import { delay, isRetryableStatus, type FetchLike } from '../http.js';
+import { HTTP_RETRY, delay, fetchResponseWithRetry, isRetryableStatus, type FetchLike } from '../http.js';
+import { markFailure } from './failure.js';
 
 /** Replace every known secret and every token-shaped value in a message with `***`. */
 export function redactSecrets(message: string, secrets: (string | undefined)[] = []): string {
@@ -48,34 +49,22 @@ export async function fetchWithRetry(
   init: RequestInit,
   options: RetryOptions = {},
 ): Promise<Response> {
-  const attempts = options.attempts ?? 5;
-  const backoff = options.backoffMs ?? 1_000;
-  const sleep = options.sleep ?? delay;
-  let lastError: unknown;
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    try {
-      const response = await fetchImpl(url, {
-        ...init,
-        ...(options.timeoutMs ? { signal: AbortSignal.timeout(options.timeoutMs) } : {}),
-      });
-      if (!isRetryableStatus(response.status) || attempt === attempts - 1) return response;
-      lastError = new PublishError(`HTTP ${response.status}`, response.status);
-      await response.body?.cancel().catch(() => undefined);
-    } catch (error) {
-      lastError = error;
-      if (attempt === attempts - 1) break;
-    }
-    await sleep(backoff * 2 ** attempt);
+  try {
+    return await fetchResponseWithRetry(fetchImpl, url, init, {
+      attempts: options.attempts ?? HTTP_RETRY.attempts,
+      backoffMs: options.backoffMs ?? HTTP_RETRY.backoffMs,
+      sleep: options.sleep ?? delay,
+      timeoutMs: options.timeoutMs,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new PublishError(redactSecrets(`${new URL(url).host}: ${message}`, options.secrets));
   }
-  const message = lastError instanceof Error ? lastError.message : String(lastError);
-  throw new PublishError(redactSecrets(`${new URL(url).host}: ${message}`, options.secrets));
 }
 
 /** Mark an error of a call that may have gone through anyway; the release autopilot then asks the user instead of retrying. */
 export function markUncertain(error: unknown): unknown {
-  if (error instanceof PublishError) error.uncertain = true;
-  else if (error instanceof Error && !(error.name === 'ConfigError')) return Object.assign(new PublishError(error.message), { uncertain: true });
-  return error;
+  return markFailure(error, { phase: 'publication' });
 }
 
 /** Parse a JSON body; a non-JSON body becomes `{ raw }`. */
@@ -105,5 +94,47 @@ export async function readChunk(path: string, offset: number, length: number): P
     return bytesRead === length ? buffer : buffer.subarray(0, bytesRead);
   } finally {
     await handle.close();
+  }
+}
+
+export interface PollOptions<T> {
+  /** Wait between checks, in ms; a number or a function of the last value. */
+  intervalMs: number | ((value: T) => number);
+  /** Stop after this long, measured with `now`. */
+  timeoutMs?: number;
+  /** Stop after this many checks (including the first, or the `initial` value). */
+  attempts?: number;
+  now: () => number;
+  sleep: (ms: number) => Promise<void>;
+  /** True once the platform reached a terminal state. */
+  done: (value: T) => boolean;
+  /** Return an error for a terminal failure; it is thrown before `done` is read. */
+  failed?: (value: T) => Error | undefined;
+  /** A value already read, e.g. a finalize answer; the loop waits before its first check. */
+  initial?: T;
+  /** Called when the timeout or the attempt budget runs out; throw or return the last value. */
+  onTimeout: (last: T) => T;
+}
+
+/** One poll loop for every adapter: check a status until it is terminal, fails, or runs out of time. */
+export async function pollUntil<T>(check: () => Promise<T>, options: PollOptions<T>): Promise<T> {
+  const started = options.now();
+  let checks = 0;
+  let current: T;
+  if ('initial' in options) {
+    current = options.initial as T;
+  } else {
+    current = await check();
+    checks = 1;
+  }
+  while (true) {
+    const failure = options.failed?.(current);
+    if (failure) throw failure;
+    if (options.done(current)) return current;
+    if (options.timeoutMs !== undefined && options.now() - started >= options.timeoutMs) return options.onTimeout(current);
+    if (options.attempts !== undefined && checks >= options.attempts) return options.onTimeout(current);
+    await options.sleep(typeof options.intervalMs === 'function' ? options.intervalMs(current) : options.intervalMs);
+    current = await check();
+    checks += 1;
   }
 }

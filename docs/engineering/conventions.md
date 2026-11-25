@@ -137,10 +137,14 @@ state in memory), one core transition (`setStageRunning`, `setStageDone`, `setSt
   each due event is claimed by planning again under the release lock and appending `running` to
   `review/autopilot.json` in the same lock, and the platform call runs outside it. YouTube and TikTok always go
   through `publishProject`, never around it, so the publish log's hash check covers both paths.
-- Never twice: a post adapter sends the public post once (`attempts: 1`) and marks a failure that may have gone
-  out with `markUncertain` (`packages/providers/src/publish/http.ts`); the runner logs it as `uncertain` and the
-  plan makes it stuck. A `ConfigError` or `ValidationError` is fatal. Keep these classes when adding a platform;
-  the YouTube upload and TikTok do not mark yet (G-168).
+- Never twice: one rule classifies every publish failure as `fatal`, `retryable` or `uncertain`
+  (`classifyFailure`/`failureClass`/`markFailure` in `packages/providers/src/publish/failure.ts`). An adapter says
+  where it was (`prepare`, `upload`, `publication`) and whether the last byte left; a fatal class waits for the user
+  at once, a retryable one is tried again, and an uncertain one is logged as `uncertain` and makes the plan stuck.
+  A public post sends once (`attempts: 1`). The runner, `publish` and the pinned-comment step read the class and
+  never re-judge a status code. One retry budget (`HTTP_RETRY` in `packages/providers/src/http.ts`) and one
+  `pollUntil` loop (`packages/providers/src/publish/http.ts`) serve every adapter; YouTube's resumable upload keeps
+  its offset loop and shares only the backoff budget.
 - Secrets: tokens live in `.env` only; write them through `saveEnvValue`, mask every message with `redactSecrets`
   before it is logged or written. `review/publish.json` and `.env` take no lock today (G-169).
 - Workspace: `init` and `update` write `coreslopper.workspace.json` whole, as the last step before the install;

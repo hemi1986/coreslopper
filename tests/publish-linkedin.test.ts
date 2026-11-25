@@ -15,6 +15,7 @@ import {
   resolveLinkedInCredentials,
 } from '../packages/providers/src/publish/linkedin.ts';
 import type { FetchLike } from '../packages/providers/src/http.ts';
+import { failureClass } from '../packages/providers/src/publish/failure.ts';
 
 const temporary: string[] = [];
 const noSleep = async () => undefined;
@@ -280,6 +281,16 @@ describe('LinkedInPublisher', () => {
     expect(calls).toHaveLength(1);
     expect((error as Error).message).toMatch(/HTTP 500/);
     expect((error as Error).message).not.toContain('access-token-value');
+    expect(failureClass(error)).toBe('uncertain');
+  });
+
+  it('classifies a refused post as fatal, not uncertain', async () => {
+    const { fetchImpl, calls } = recorder(() => json({ message: 'bad commentary' }, 400));
+    const publisher = new LinkedInPublisher({ env: ENV, fetchImpl, now: () => NOW, sleep: noSleep });
+    const error = await publisher.post({ event: 'linkedin', text: 'x' }).catch((e: Error) => e);
+    expect(calls).toHaveLength(1);
+    expect(failureClass(error)).toBe('fatal');
+    expect((error as Error & { uncertain?: boolean }).uncertain).toBe(false);
   });
 
   it('refuses a post over 3000 characters before any call', async () => {

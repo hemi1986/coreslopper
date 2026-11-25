@@ -2,7 +2,8 @@ import { stat } from 'node:fs/promises';
 import { basename } from 'node:path';
 import { ConfigError } from '@coreslopper/core';
 import { delay, mimeForPath, type FetchLike } from '../http.js';
-import { fetchWithRetry, httpError, PublishError, readChunk, readJson, redactSecrets, markUncertain } from './http.js';
+import { fetchWithRetry, httpError, pollUntil, PublishError, readChunk, readJson, redactSecrets } from './http.js';
+import { markFailure } from './failure.js';
 import { RefreshingToken } from './oauth.js';
 import type { PublishLogger } from './types.js';
 import type { SaveSecret, SocialAdapter, SocialAdapterOptions, SocialPostRequest, SocialPostResult } from './social.js';
@@ -328,21 +329,34 @@ export class XPublisher implements SocialAdapter {
   }
 
   private async waitForProcessing(id: string, info: ProcessingInfo | undefined, name: string): Promise<void> {
-    const started = this.now().getTime();
-    let current = info;
-    while (current && (current.state === 'pending' || current.state === 'in_progress')) {
-      if (this.now().getTime() - started > this.processingTimeoutMs) {
-        throw new PublishError(`X was still processing ${name} after ${Math.round(this.processingTimeoutMs / 1000)} s; the next run tries again.`);
-      }
-      await this.sleep(Math.min(30, Math.max(1, current.checkAfterSecs ?? 2)) * 1000);
-      const status = await this.call(`${API}/media/upload?command=STATUS&media_id=${encodeURIComponent(id)}`, { method: 'GET' });
-      const body = await readJson(status);
-      if (!status.ok) throw httpError('X media upload status', status.status, body, this.secrets);
-      current = processingInfo(body);
-    }
-    if (current?.state === 'failed') {
-      throw new PublishError(`X could not process ${name}: ${current.error ?? 'processing failed'} (check length, size, and codec).`);
-    }
+    if (!info) return;
+    const timeoutMs = this.processingTimeoutMs;
+    await pollUntil(
+      async () => {
+        const status = await this.call(`${API}/media/upload?command=STATUS&media_id=${encodeURIComponent(id)}`, { method: 'GET' });
+        const body = await readJson(status);
+        if (!status.ok) throw httpError('X media upload status', status.status, body, this.secrets);
+        return processingInfo(body);
+      },
+      {
+        initial: info,
+        intervalMs: (current) => Math.min(30, Math.max(1, current?.checkAfterSecs ?? 2)) * 1000,
+        timeoutMs,
+        now: () => this.now().getTime(),
+        sleep: this.sleep,
+        failed: (current) =>
+          current?.state === 'failed'
+            ? markFailure(new PublishError(`X could not process ${name}: ${current.error ?? 'processing failed'} (check length, size, and codec).`), { phase: 'upload' })
+            : undefined,
+        done: (current) => !current || (current.state !== 'pending' && current.state !== 'in_progress'),
+        onTimeout: () => {
+          throw markFailure(
+            new PublishError(`X was still processing ${name} after ${Math.round(timeoutMs / 1000)} s; the next run tries again.`),
+            { phase: 'upload' },
+          );
+        },
+      },
+    );
   }
 
   /**
@@ -361,12 +375,12 @@ export class XPublisher implements SocialAdapter {
         ),
       ).catch((error: unknown) => {
         // A network error after sending: the post may exist.
-        throw markUncertain(error);
+        throw markFailure(error, { phase: 'publication' });
       });
       const json = await readJson(response);
       if (response.ok) {
         const id = stringAt(json, 'data', 'id');
-        if (!id) throw markUncertain(new PublishError('X accepted the post but returned no ID; check the profile before posting again.'));
+        if (!id) throw markFailure(new PublishError('X accepted the post but returned no ID; check the profile before posting again.'), { phase: 'publication' });
         return id;
       }
       if (response.status === 429) {
@@ -378,20 +392,25 @@ export class XPublisher implements SocialAdapter {
           continue;
         }
         const when = Number.isFinite(waitMs) ? ` until ${new Date(reset * 1000).toISOString()}` : '';
-        throw new PublishError(`X rate limit reached${when}; the next run tries again.`, 429, json);
+        throw markFailure(new PublishError(`X rate limit reached${when}; the next run tries again.`, 429, json), { phase: 'publication' });
       }
       if (response.status === 402 || /credit|payment/i.test(JSON.stringify(json))) {
         throw new ConfigError('X refused the post for billing: add credits to the app in the X developer console (pay-per-use).');
       }
       if (response.status === 403 && /duplicate/i.test(JSON.stringify(json))) {
-        throw markUncertain(new PublishError('X refused the post as a duplicate: it is probably live already; check the profile.', 403, json));
+        throw markFailure(new PublishError('X refused the post as a duplicate: it is probably live already; check the profile.', 403, json), {
+          phase: 'publication',
+          lastByteSent: true,
+        });
       }
       if (response.status >= 500) {
-        throw markUncertain(new PublishError(`X answered HTTP ${response.status}; the post may exist anyway. Check the profile before trying again.`, response.status, json));
+        throw markFailure(new PublishError(`X answered HTTP ${response.status}; the post may exist anyway. Check the profile before trying again.`, response.status, json), {
+          phase: 'publication',
+        });
       }
-      throw httpError('X create post', response.status, json, this.secrets);
+      throw markFailure(httpError('X create post', response.status, json, this.secrets), { phase: 'publication' });
     }
-    throw new PublishError('X rate limit reached; the next run tries again.', 429);
+    throw markFailure(new PublishError('X rate limit reached; the next run tries again.', 429), { phase: 'publication' });
   }
 }
 

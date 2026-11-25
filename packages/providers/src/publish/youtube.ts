@@ -1,7 +1,8 @@
 import { stat } from 'node:fs/promises';
 import { ConfigError } from '@coreslopper/core';
 import { delay, mimeForPath, type FetchLike } from '../http.js';
-import { fetchWithRetry, httpError, markUncertain, PublishError, readChunk, readJson, redactSecrets } from './http.js';
+import { fetchWithRetry, httpError, PublishError, readChunk, readJson, redactSecrets } from './http.js';
+import { markFailure } from './failure.js';
 import { RefreshingToken } from './oauth.js';
 import type { PublishAdapter, PublishLogger, PublishRequest, PublishResult } from './types.js';
 
@@ -233,7 +234,7 @@ export class YouTubePublisher implements PublishAdapter {
     const session = await this.startSession(metadata, size, mimeForPath(item.file));
     const video = await this.uploadChunks(session, item.file, size);
     const id = typeof video.id === 'string' ? video.id : undefined;
-    if (!id) throw markUncertain(new PublishError(`YouTube accepted the upload of ${item.name} but returned no video ID; check YouTube Studio.`));
+    if (!id) throw markFailure(new PublishError(`YouTube accepted the upload of ${item.name} but returned no video ID; check YouTube Studio.`), { phase: 'publication' });
 
     const warnings: string[] = [];
     let quotaUnits: number = YOUTUBE_QUOTA.insert;
@@ -300,11 +301,16 @@ export class YouTubePublisher implements PublishAdapter {
 
   /** Post a top-level comment under a video (commentThreads.insert, 50 units). The API cannot pin it. */
   async postComment(videoId: string, text: string): Promise<{ commentId: string }> {
-    const body = { snippet: { videoId, topLevelComment: { snippet: { textOriginal: text } } } };
-    const thread = await this.apiJson('POST', `${API_URL}/commentThreads?part=snippet`, body, 'YouTube commentThreads.insert');
-    const id = typeof thread.id === 'string' ? thread.id : undefined;
-    if (!id) throw new PublishError('YouTube accepted the comment but returned no ID.');
-    return { commentId: id };
+    try {
+      const body = { snippet: { videoId, topLevelComment: { snippet: { textOriginal: text } } } };
+      const thread = await this.apiJson('POST', `${API_URL}/commentThreads?part=snippet`, body, 'YouTube commentThreads.insert');
+      const id = typeof thread.id === 'string' ? thread.id : undefined;
+      if (!id) throw new PublishError('YouTube accepted the comment but returned no ID.');
+      return { commentId: id };
+    } catch (error) {
+      // A lost answer to the POST may have posted the comment.
+      throw markFailure(error, { phase: 'publication' });
+    }
   }
 
   private async getVideo(videoId: string, part: 'status' | 'snippet'): Promise<Record<string, unknown>> {
@@ -393,7 +399,7 @@ export class YouTubePublisher implements PublishAdapter {
     try {
       return await this.sendChunks(session, file, size, sent);
     } catch (error) {
-      throw sent.last ? markUncertain(error) : error;
+      throw markFailure(error, sent.last ? { phase: 'upload', lastByteSent: true } : { phase: 'upload' });
     }
   }
 

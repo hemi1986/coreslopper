@@ -9,6 +9,7 @@ import {
   YOUTUBE_QUOTA,
   YOUTUBE_SCOPES,
   YouTubePublisher,
+  failureClass,
   tiktokAuthUrl,
   tiktokScopes,
   youtubeAuthUrl,
@@ -147,7 +148,11 @@ describe('YouTube autopilot calls', () => {
       return undefined;
     });
     posts = 0;
-    await expect(new YouTubePublisher({ ...youtubeCredentials, fetchImpl: failing.fetchImpl, sleep: noSleep }).postComment('vid1', 'x')).rejects.toThrow(/HTTP 503/);
+    const error = (await new YouTubePublisher({ ...youtubeCredentials, fetchImpl: failing.fetchImpl, sleep: noSleep })
+      .postComment('vid1', 'x')
+      .catch((caught: unknown) => caught as Error)) as Error;
+    expect(error.message).toMatch(/HTTP 503/);
+    expect(failureClass(error)).toBe('uncertain');
     expect(posts).toBe(1);
   });
 
@@ -160,6 +165,7 @@ describe('YouTube autopilot calls', () => {
     ));
     expect(error).toBeInstanceOf(ConfigError);
     expect(error.message).toMatch(/publish-auth youtube" again to grant the new scope/);
+    expect(failureClass(error)).toBe('fatal');
   });
 });
 
@@ -261,6 +267,7 @@ describe('TikTok Direct Post', () => {
       .publish({ item: item(video) })
       .then((): Error & { uncertain?: boolean } => new Error('no error'), (caught: unknown) => caught as Error & { uncertain?: boolean });
     expect(error.uncertain).toBe(true);
+    expect(failureClass(error)).toBe('uncertain');
 
     // The last chunk's answer is lost: uncertain too.
     const chunkLost: FetchLike = async (url, init) => (url.startsWith('https://upload.tiktok') ? new Response('busy', { status: 503 }) : fake.fetchImpl(url, init));
@@ -268,6 +275,7 @@ describe('TikTok Direct Post', () => {
       .publish({ item: item(video) })
       .then((): Error & { uncertain?: boolean } => new Error('no error'), (caught: unknown) => caught as Error & { uncertain?: boolean });
     expect(chunkError.uncertain).toBe(true);
+    expect(failureClass(chunkError)).toBe('uncertain');
 
     // TikTok says FAILED: nothing is live, the autopilot may retry.
     const failed = await new TikTokPublisher({ ...credentials, fetchImpl: tiktokFake({ finalStatus: 'FAILED' }).fetchImpl, sleep: noSleep, mode: 'direct' })
@@ -275,6 +283,7 @@ describe('TikTok Direct Post', () => {
       .then((): Error & { uncertain?: boolean } => new Error('no error'), (caught: unknown) => caught as Error & { uncertain?: boolean });
     expect(failed.message).toMatch(/file_format_check_failed/);
     expect(failed.uncertain).toBeFalsy();
+    expect(failureClass(failed)).toBe('retryable');
   });
 
   it('keeps the inbox path as the default', async () => {

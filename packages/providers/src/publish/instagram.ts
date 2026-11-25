@@ -1,7 +1,8 @@
 import { extname } from 'node:path';
 import { ConfigError } from '@coreslopper/core';
 import { delay, IMAGE_EXTENSIONS, type FetchLike } from '../http.js';
-import { fetchWithRetry, httpError, PublishError, readJson, redactSecrets, markUncertain } from './http.js';
+import { fetchWithRetry, httpError, pollUntil, PublishError, readJson, redactSecrets } from './http.js';
+import { markFailure } from './failure.js';
 import type { PublishLogger } from './types.js';
 import type { SaveSecret, SocialAdapter, SocialAdapterOptions, SocialPostRequest, SocialPostResult } from './social.js';
 
@@ -237,16 +238,29 @@ export class InstagramPublisher implements SocialAdapter {
 
   /** Wait until the container is FINISHED; ERROR and EXPIRED fail. */
   private async waitForContainer(id: string, event: string): Promise<void> {
-    for (let attempt = 0; attempt < this.pollAttempts; attempt += 1) {
-      const body = await this.get(id, { fields: 'status_code,status' }, 'Instagram container status');
-      const code = String(body.status_code ?? '');
-      if (code === 'FINISHED' || code === 'PUBLISHED') return;
-      if (code === 'ERROR' || code === 'EXPIRED') {
-        throw new PublishError(`Instagram could not process the media of ${event}: ${code}${body.status ? ` (${String(body.status)})` : ''}.`);
-      }
-      await this.sleep(this.pollIntervalMs);
-    }
-    throw new PublishError(`Instagram was still processing the media of ${event} after ${Math.round((this.pollAttempts * this.pollIntervalMs) / 1000)} s; nothing was published.`);
+    await pollUntil(
+      async () => {
+        const body = await this.get(id, { fields: 'status_code,status' }, 'Instagram container status');
+        return { code: String(body.status_code ?? ''), status: body.status ? String(body.status) : undefined };
+      },
+      {
+        intervalMs: this.pollIntervalMs,
+        attempts: this.pollAttempts,
+        now: () => this.now().getTime(),
+        sleep: this.sleep,
+        failed: (current) =>
+          current.code === 'ERROR' || current.code === 'EXPIRED'
+            ? markFailure(new PublishError(`Instagram could not process the media of ${event}: ${current.code}${current.status ? ` (${current.status})` : ''}.`), { phase: 'upload' })
+            : undefined,
+        done: (current) => current.code === 'FINISHED' || current.code === 'PUBLISHED',
+        onTimeout: () => {
+          throw markFailure(
+            new PublishError(`Instagram was still processing the media of ${event} after ${Math.round((this.pollAttempts * this.pollIntervalMs) / 1000)} s; nothing was published.`),
+            { phase: 'upload' },
+          );
+        },
+      },
+    );
   }
 
   async post(request: SocialPostRequest): Promise<SocialPostResult> {
@@ -302,15 +316,18 @@ export class InstagramPublisher implements SocialAdapter {
       if (error instanceof ConfigError) throw error;
       const status = await this.get(containerId, { fields: 'status_code' }, 'Instagram container status').catch(() => undefined);
       // Without a readable container status nobody knows whether it went out.
-      if (status === undefined) throw markUncertain(error);
-      if (status.status_code !== 'PUBLISHED') throw error;
+      if (status === undefined) throw markFailure(error, { phase: 'publication' });
+      // The container says it did not publish: a retry is safe, and a 4xx stays fatal.
+      if (status.status_code !== 'PUBLISHED') throw markFailure(error, { phase: 'upload' });
       warnings.push('Instagram published the post but its answer was lost; the newest post of the account is reported.');
       const latest = await this.get(`${user}/media`, { fields: 'id,permalink', limit: '1' }, 'Instagram media list');
       const first = Array.isArray(latest.data) ? (latest.data[0] as { id?: string; permalink?: string } | undefined) : undefined;
-      if (!first?.id) throw markUncertain(new PublishError(`Instagram published ${request.event}, but the post could not be found; check the profile.`));
+      if (!first?.id) {
+        throw markFailure(new PublishError(`Instagram published ${request.event}, but the post could not be found; check the profile.`), { phase: 'publication' });
+      }
       return { remoteId: first.id, url: first.permalink, warnings, manualSteps };
     }
-    if (!mediaId) throw markUncertain(new PublishError(`Instagram published ${request.event} but returned no media ID; check the profile.`));
+    if (!mediaId) throw markFailure(new PublishError(`Instagram published ${request.event} but returned no media ID; check the profile.`), { phase: 'publication' });
 
     const details = await this.get(mediaId, { fields: 'permalink' }, 'Instagram media').catch((error: Error) => {
       warnings.push(redactSecrets(`Could not read the post's permalink: ${error.message}`, this.secrets));

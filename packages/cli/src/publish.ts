@@ -35,11 +35,12 @@ import {
   TikTokPublisher,
   YOUTUBE_QUOTA,
   YouTubePublisher,
-  markUncertain,
+  failureClass,
   redactSecrets,
   resolveTikTokCredentials,
   resolveYouTubeCredentials,
   tiktokCaption,
+  withFailureClass,
   youtubeDailyQuota,
   type PublishAdapter,
   type PublishItem,
@@ -559,7 +560,8 @@ export async function publishProject(options: PublishOptions): Promise<PublishSu
       for (const manual of [...result.manualSteps, ...(related ? [related] : [])]) manualSteps.push(`${step.platform} ${step.item.name}: ${manual}`);
     } catch (error) {
       const message = redactSecrets(error instanceof Error ? error.message : String(error), secrets());
-      const uncertain = Boolean((error as { uncertain?: boolean }).uncertain);
+      const outcome = failureClass(error);
+      const uncertain = outcome === 'uncertain';
       const entry: PublishEntry = { ...base, status: 'failed', warnings: [], error: message, ...(uncertain ? { uncertain } : {}), at: now().toISOString() };
       log = await appendPublishEntry(projectDir, entry);
       entries.push(entry);
@@ -570,7 +572,7 @@ export async function publishProject(options: PublishOptions): Promise<PublishSu
           (uncertain ? `; it may have gone out: check ${step.platform} before publishing it again with --force)` : ')'),
       );
       // The autopilot reads the mark and asks the user instead of retrying (never twice).
-      throw uncertain ? markUncertain(failure) : failure;
+      throw withFailureClass(failure, outcome);
     }
   }
   printManualSteps(print, manualSteps);

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ConfigError } from '../packages/core/src/index.ts';
 import type { FetchLike } from '../packages/providers/src/http.ts';
+import { failureClass } from '../packages/providers/src/publish/failure.ts';
 import {
   X_PRICES,
   XPublisher,
@@ -192,9 +193,11 @@ describe('XPublisher', () => {
 
   it('does not retry a post on 5xx, so it cannot post twice', async () => {
     const { fetchImpl, calls } = fakeX({ 'POST /2/oauth2/token': tokenRoute, 'POST /2/tweets': () => json({ title: 'Service Unavailable' }, 503) });
-    await expect(new XPublisher({ ...credentials, env: {}, fetchImpl, sleep: noSleep, saveSecret: () => undefined }).post({ event: 'x', text: 'Post' })).rejects.toThrow(
-      /may exist anyway/,
-    );
+    const error = (await new XPublisher({ ...credentials, env: {}, fetchImpl, sleep: noSleep, saveSecret: () => undefined })
+      .post({ event: 'x', text: 'Post' })
+      .catch((caught: unknown) => caught as Error)) as Error;
+    expect(error.message).toMatch(/may exist anyway/);
+    expect(failureClass(error)).toBe('uncertain');
     expect(calls.filter((call) => call.url.endsWith('/2/tweets'))).toHaveLength(1);
   });
 
@@ -233,6 +236,7 @@ describe('XPublisher', () => {
       .catch((caught: Error) => caught);
     expect((error as Error).message).not.toContain('access-0');
     expect((error as Error).message).not.toContain('refresh-token-1');
+    expect(failureClass(error)).toBe('fatal');
   });
 
   it('warns when a rotated refresh token is not stored', async () => {
