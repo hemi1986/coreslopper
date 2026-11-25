@@ -1,10 +1,10 @@
 # Architecture review – 2026-11-25
 
-Status: in progress · 01 implemented (uncommitted), awaiting review · Source: `/improve-codebase-architecture`, hot spots of the last 250 commits.
+Status: in progress · 01 (`4bf6985`) and 03 (`119f693`) implemented, awaiting review · Source: `/improve-codebase-architecture`, hot spots of the last 250 commits.
 Visual report: [architecture-review-2026-11-25.html](architecture-review-2026-11-25.html) (open in a browser; needs internet for Tailwind and Mermaid).
 Scope: release and publishing, the board, the libraries, generation, the workspace payload.
 
-Candidate 01 now has ADR 0055 (proposed) and code; the other seven are proposals without a story.
+Candidate 01 now has ADR 0055 (proposed) and code; candidate 03 has code and `tests/release-records.test.ts`; the other six are proposals without a story.
 This file is the handoff between sessions. Keep it short and update the status table.
 
 ## Working rules (context discipline)
@@ -23,7 +23,7 @@ This file is the handoff between sessions. Keep it short and update the status t
 |---|---|---|---|---|
 | 01 | Give the release one plan | Strong | done – `buildReleasePlan` in core, persisted as `manifest.plan`; folder, QA, board, autopilot and publish read it; ADR 0055 (proposed); commit 4bf6985 | `release.ts` (cli, core), `release-texts.ts`, `release-qa.ts`, `release-board-data.ts`, `publish.ts`, `release-autopilot.ts` |
 | 02 | Collapse the two library lifecycles | Strong | open | `library-entry.ts`, `character-library.ts`, `set-library.ts`, `board/characters.js`, `board/sets.js`, `release-board.ts` |
-| 03 | Give the release records one owner | Strong | open | `release-calendar.ts`, `release-autopilot.ts`, `autopilot-state.ts`, `publish.ts`, `board-production.ts`, `board/release.js` |
+| 03 | Give the release records one owner | Strong | done – `release-records.ts` owns status, the autopilot and publish logs and the lock; the board and production view share `approvalHolds`; checklist keys are by line; `tests/release-records.test.ts`; commit 119f693 | `release-calendar.ts`, `release-autopilot.ts`, `autopilot-state.ts`, `publish.ts`, `board-production.ts`, `board/release.js` |
 | 04 | Lift release facts out of the board view | Strong | open | `release-autopilot.ts`, `release-board-data.ts`, `release-board.ts`, `publish.ts`, `board/app.js` |
 | 05 | Make the uncommitted series budget one rule | Strong | open | `series.ts`, `new-project.ts`, `generate.ts`, `core/cost.ts`, `core/state.ts`, `board-wizard.ts` |
 | 06 | Close the generation ledger's side doors | Strong | open | `index.ts` (`estimate`, `spend`), `generate.ts`, `core/state.ts`, `qa.ts` |
