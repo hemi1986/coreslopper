@@ -12,6 +12,7 @@ import {
   nextStage,
   readYamlFile,
   repoRoot,
+  uncommittedBudget,
   type ProjectConfig,
   type Series,
 } from '@coreslopper/core';
@@ -59,18 +60,22 @@ async function episodeConfigs(seriesDir: string, slug: string) {
 
 export async function seriesBudget(seriesDir: string): Promise<SeriesBudget> {
   const { series, state } = await loadSeries(seriesDir);
-  const episodeBudgetsUsd = (await episodeConfigs(seriesDir, series.slug)).reduce(
-    (sum, { config }) => sum + config.budget_usd,
-    0,
-  );
+  const episodeBudgetsUsd = await committedEpisodeBudgets(seriesDir, series.slug);
   const canonSpentUsd = state.budget.spentUsd;
   return {
     totalUsd: series.budget_usd,
     canonSpentUsd,
     episodeBudgetsUsd,
     remainingUsd:
-      series.budget_usd === undefined ? undefined : Number((series.budget_usd - canonSpentUsd - episodeBudgetsUsd).toFixed(6)),
+      series.budget_usd === undefined
+        ? undefined
+        : uncommittedBudget(series.budget_usd, canonSpentUsd, episodeBudgetsUsd, state.budget.reservedUsd),
   };
+}
+
+/** The budget every created episode of a series has already claimed. */
+export async function committedEpisodeBudgets(seriesDir: string, slug: string): Promise<number> {
+  return (await episodeConfigs(seriesDir, slug)).reduce((sum, { config }) => sum + config.budget_usd, 0);
 }
 
 export interface SeriesStatus {

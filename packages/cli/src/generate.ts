@@ -32,6 +32,7 @@ import {
   saveState,
   withFl2vaAlignment,
   writeJsonAtomic,
+  type BudgetCommitment,
   type LoadedProject,
   type LoadedSeries,
   type LipSyncProviderKind,
@@ -59,6 +60,7 @@ import {
   type ClipOptions,
 } from './clip-options.js';
 import { muxOriginalAudio, probeDuration } from './media.js';
+import { committedEpisodeBudgets } from './series.js';
 
 export const BatchItemSchema = z
   .object({
@@ -250,6 +252,8 @@ export interface BatchTarget {
   paths: { root: string; assets: string; manifest: string; series?: string };
   /** Characters whose names Wan prompts replace with their descriptions. */
   characters?: { id: string; name: string; description: string }[];
+  /** Money the same budget has already promised elsewhere; a series' canon carries its episode budgets. */
+  commitment?: BudgetCommitment;
   saveState(): Promise<void>;
 }
 
@@ -264,8 +268,8 @@ export function projectTarget(project: LoadedProject): BatchTarget {
   };
 }
 
-/** A series canon as a batch target; canon generations need a series budget. */
-export function seriesTarget(loaded: LoadedSeries): BatchTarget {
+/** A series canon as a batch target; canon generations need a series budget and see the committed episode budgets. */
+export function seriesTarget(loaded: LoadedSeries, committedEpisodeBudgetsUsd: number): BatchTarget {
   const { series, state, paths } = loaded;
   if (series.budget_usd === undefined) {
     throw new ConfigError(`series.yaml of "${series.slug}" has no budget_usd; canon generations need a series budget.`);
@@ -280,6 +284,7 @@ export function seriesTarget(loaded: LoadedSeries): BatchTarget {
     config: { providers: series.providers, models: {}, formats: series.formats, batch_cap_usd: series.batch_cap_usd },
     state,
     paths,
+    commitment: { usd: committedEpisodeBudgetsUsd, scope: 'series', label: 'episode budgets' },
     saveState: () => writeJsonAtomic(paths.state, state),
   };
 }
@@ -706,12 +711,15 @@ export async function runBatch(
   for (const item of batch) if (item.out) resolveOut(project.paths.root, item.out, project.paths.series);
 
   log(`Batch: ${resolved.length} generation(s), worst-case estimate ${formatUsd(totalEstimate)}`);
+  const committedUsd = project.commitment?.usd ?? 0;
   log(
-    `Budget: ${formatUsd(remainingBudget(project.state))} remaining · batch cap ${formatUsd(
-      effectiveBatchCap(project.config, project.state),
-    )}`,
+    `Budget: ${formatUsd(remainingBudget(project.state, committedUsd))} uncommitted` +
+      (project.commitment
+        ? ` (${formatUsd(project.commitment.usd)} committed to ${project.commitment.label})`
+        : '') +
+      ` · batch cap ${formatUsd(effectiveBatchCap(project.config, project.state, committedUsd))}`,
   );
-  assertAffordable(project.config, project.state, totalEstimate, `${project.label} generation batch`);
+  assertAffordable(project.config, project.state, totalEstimate, `${project.label} generation batch`, project.commitment);
   if (options.dryRun) {
     for (const item of resolved) {
       log(
@@ -779,7 +787,7 @@ export async function runBatch(
 
   log(
     `Done. Actual spend ${formatUsd(actualSpend)} · cache hits ${cacheHits}/${resolved.length} · remaining ${formatUsd(
-      remainingBudget(project.state),
+      remainingBudget(project.state, committedUsd),
     )}`,
   );
   return results;
@@ -824,9 +832,13 @@ async function restoreClip(
 }
 
 export async function generateBatch(options: GenerateOptions): Promise<void> {
-  const project = options.seriesDir
-    ? seriesTarget(await loadSeries(options.seriesDir))
-    : projectTarget(await loadProject(options.projectDir));
+  let project: BatchTarget;
+  if (options.seriesDir) {
+    const loaded = await loadSeries(options.seriesDir);
+    project = seriesTarget(loaded, await committedEpisodeBudgets(options.seriesDir, loaded.series.slug));
+  } else {
+    project = projectTarget(await loadProject(options.projectDir));
+  }
   const batchRaw = await readFile(resolve(options.batchPath), 'utf8');
   let batchData: unknown;
   try {

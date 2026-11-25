@@ -16,7 +16,7 @@ import {
 } from '@coreslopper/core';
 import { createSeries } from '../packages/cli/src/new-series.ts';
 import { createProject } from '../packages/cli/src/new-project.ts';
-import { generateBatch, seriesTarget } from '../packages/cli/src/generate.ts';
+import { BatchSchema, generateBatch, runBatch, seriesTarget } from '../packages/cli/src/generate.ts';
 import { seriesBudget } from '../packages/cli/src/series.ts';
 import { validateChangedFile } from '../packages/cli/src/validate-file.ts';
 
@@ -73,7 +73,7 @@ describe('new-series', () => {
     await writeFile(path, stringify(series));
     await expect(validateChangedFile(path)).rejects.toThrow(/does not match series.yaml budget_usd/);
     const loaded = await loadSeries(seriesDir);
-    expect(() => seriesTarget(loaded)).toThrow(/budget \(40\) does not match series.yaml budget_usd \(60\)/);
+    expect(() => seriesTarget(loaded, 0)).toThrow(/budget \(40\) does not match series.yaml budget_usd \(60\)/);
   });
 });
 
@@ -105,13 +105,57 @@ describe('series budget', () => {
     await writeFile(path, stringify(series));
     await createProject({ root: dir, slug: 'open-01', budget: 500, kind: 'episode', series: 'open', episode: 1 });
     expect((await seriesBudget(seriesDir)).remainingUsd).toBeUndefined();
-    expect(() => seriesTarget({ series: SeriesSchema.parse(series), state: {} as never, paths: {} as never })).toThrow(
+    expect(() => seriesTarget({ series: SeriesSchema.parse(series), state: {} as never, paths: {} as never }, 0)).toThrow(
       /no budget_usd/,
     );
   });
 });
 
 describe('canon generations', () => {
+  it('check the uncommitted series budget before any provider exists', async () => {
+    const dir = await workspace();
+    const seriesDir = await createSeries({ root: dir, slug: 'commit', budget: 30 });
+    const statePath = join(seriesDir, 'state.json');
+    const state = await readJsonFile(statePath, SeriesStateSchema);
+    state.budget.spentUsd = 8;
+    await writeFile(statePath, JSON.stringify(state));
+    await createProject({ root: dir, slug: 'commit-01', budget: 12, kind: 'episode', series: 'commit', episode: 1 });
+
+    const seriesPath = join(seriesDir, 'series.yaml');
+    const series = parse(await readFile(seriesPath, 'utf8'));
+    series.providers.image = 'fal';
+    await writeFile(seriesPath, stringify(series));
+
+    expect((await seriesBudget(seriesDir)).remainingUsd).toBe(10);
+    await expect(
+      createProject({ root: dir, slug: 'commit-02', budget: 11, kind: 'episode', series: 'commit', episode: 2 }),
+    ).rejects.toThrow(/uncommitted series budget \$10\.00/);
+
+    const target = seriesTarget(await loadSeries(seriesDir), (await seriesBudget(seriesDir)).episodeBudgetsUsd);
+    let providerBuilt = false;
+    await expect(
+      runBatch(
+        target,
+        BatchSchema.parse([
+          {
+            operation: 'generateImage',
+            role: 'image.character_sheet',
+            prompt: 'canon test character sheet, front and side',
+            params: { num_images: 70 },
+          },
+        ]),
+        {
+          dryRun: true,
+          providerFactory: () => {
+            providerBuilt = true;
+            throw new Error('provider built before the budget check');
+          },
+        },
+      ),
+    ).rejects.toThrow(/uncommitted series budget \$10\.00 \(committed to episode budgets: \$12\.00\)/);
+    expect(providerBuilt).toBe(false);
+  });
+
   it('run through the series budget, cache, and manifest', async () => {
     const dir = await workspace();
     const seriesDir = await createSeries({ root: dir, slug: 'canon', budget: 20 });
