@@ -243,6 +243,7 @@ Use `grilling` before briefs, treatments, and storyboards.
 - `docs/mcp.md` — optional exploration MCP servers; provider adapters.
 - `docs/board.md` — the board: production view, the watchdog, and the board container.
 - `docs/board-guide.md` — the board tour for a user new to the board, with screenshots (German: `board-guide.de.md`).
+- `docs/sound-library.md` — the workspace sound library: the entry's fields, cues, `sound add|edit|remove|list|check`, hand edits, licences (German: `sound-library.de.md`).
 - `docs/publishing.md` — `publish` and the release autopilot: YouTube, TikTok, X, LinkedIn, and Instagram setup, limits, quota.
 - `docs/release-platforms.md` — what each platform takes (fields, limits, links), posting times, legal notes for Germany.
 - `docs/adr/0024-release-folder-manual-distribution.md` — the release folder and the manual distributor upload.
