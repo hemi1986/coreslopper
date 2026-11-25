@@ -2,11 +2,11 @@
 
 ## Status
 
-Proposed — 2026-11-25. From architecture candidate 02 in
+Accepted — 2026-11-25. From architecture candidate 02 in
 [the review](../reviews/architecture-review-2026-11-25.md). Extends [ADR 0034](0034-character-library.md) and
 [ADR 0052](0052-set-library.md); the sound library stays its own context ([ADR 0051](0051-memes-and-the-sound-library.md)).
-Implemented in cuts 0–5 on 2026-11-25 (commits `07140b0`, `e132af5`, `060dfbe`, `d3a53d1`); the status stays
-`proposed` until the user accepts it.
+Implemented in cuts 0–5 on 2026-11-25 (commits `07140b0`, `e132af5`, `060dfbe`, `d3a53d1`); the user accepted it on
+2026-11-25.
 
 ## Context
 

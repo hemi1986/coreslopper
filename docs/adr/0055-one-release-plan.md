@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed — 2026-11-25. From architecture candidate 01 in
+Accepted — 2026-11-25. From architecture candidate 01 in
 [the review](../reviews/architecture-review-2026-11-25.md). Aligns with [ADR 0019](0019-release-package.md) and
 [ADR 0024](0024-release-package-split.md); no accepted decision changes.
 

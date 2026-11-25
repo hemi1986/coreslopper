@@ -2,8 +2,8 @@
 
 ## Status
 
-Proposed — 2026-11-22. Amends [ADR 0030](0030-board-as-hub.md). The adoption of the board shell recovered it from the
-code and four questions about how the board is used. No user reviewed the code.
+Accepted — 2026-11-22; accepted by the user on 2026-11-25. Amends [ADR 0030](0030-board-as-hub.md). The adoption of
+the board shell recovered it from the code and four questions about how the board is used.
 
 ## Context
 
