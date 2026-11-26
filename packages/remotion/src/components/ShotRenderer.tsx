@@ -5,6 +5,7 @@ import { GlitchBackdrop, Grid, LyricCard, ParticleField, Scanlines, TitleCard } 
 import { ChatWindow } from './ChatWindow';
 import { MediaLayer } from './MediaLayer';
 import { NeonTorus } from './NeonTorus';
+import { ShotChimes } from './ShotChimes';
 import { TextOverlay } from './TextOverlay';
 import { Transition } from './Transition';
 import { useBeat, useEnergy } from '../hooks/useTiming';
@@ -156,6 +157,7 @@ export function ShotRenderer({ shot, timing, style, width, height, chat }: ShotR
             variant={variant}
           />
         ) : null}
+        <ShotChimes shot={shot} />
       </AbsoluteFill>
     </Transition>
   );

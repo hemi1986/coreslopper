@@ -561,8 +561,12 @@ The automated critic that checks coverage, sync, readability, determinism, and m
 _Avoid_: tester
 
 **Render**:
-The encoded video of one whole format of a project: `renders/<format>.mp4`, or `renders/<format>.en.mp4` with English subtitles burned in; a meme's subtitles are burned into its `renders/<format>.mp4`. Every format is rendered from the same composition at its own size and the master's frame rate; a derivative is rendered again, never cropped from the master. The song is the only sound.
+The encoded video of one whole format of a project: `renders/<format>.mp4`, or `renders/<format>.en.mp4` with English subtitles burned in; a meme's subtitles are burned into its `renders/<format>.mp4`. Every format is rendered from the same composition at its own size and the master's frame rate; a derivative is rendered again, never cropped from the master. The song is the only sound, apart from the shots' **Sound Cues**.
 _Avoid_: export, video file
+
+**Sound Cue**:
+A one-shot sound a shot plays on its own timeline, such as a chime on an incoming message or a slice of a typing take (`motion.props.chimes` of the shot: a project audio file, a time from the shot start, a gain, and optionally where in the file it starts and how long it plays). It never outlasts its shot. The render mixes it over the song or episode track and keeps the mix under the true-peak target.
+_Avoid_: chime (except as the storyboard key), sound effect, sfx
 
 **Master Format**:
 The format a project is made for, `formats.master` in `project.yaml`: usually 16:9 for a music video and 9:16 for a series. `render` without `--format` renders it, and every check, preview, and fix pass starts with it.
