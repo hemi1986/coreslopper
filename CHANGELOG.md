@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.1](https://github.com/hemi1986/coreslopper/compare/v0.10.0...v0.10.1) (2026-11-25)
+
+
+### Documentation
+
+* use conventional commits for story work ([d6407ce](https://github.com/hemi1986/coreslopper/commit/d6407ce8c2e679e82f2134adefe2b9d5592158c8))
+
 ## [0.10.0](https://github.com/hemi1986/coreslopper/compare/v0.9.0...v0.10.0) (2026-11-25)
 
 Forty-two stories since v0.9.0: memes and the sound library, the set library, pose tracks, internal projects, and the
