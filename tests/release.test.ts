@@ -91,6 +91,10 @@ describe('Short window', () => {
     const filter = shortFadeFilter(36);
     expect(filter).toContain("volume='min(1,t/0.15)*min(1,max(0,(36.000-t)/0.4))':eval=frame");
     expect(filter).not.toContain('afade');
+    // The re-encode ends in a true-peak limiter: -1 dBTP target, 1 dB AAC headroom.
+    const af = args[args.indexOf('-af') + 1] ?? '';
+    expect(af.startsWith(filter)).toBe(true);
+    expect(af).toContain('alimiter=limit=0.7943');
   });
 });
 
