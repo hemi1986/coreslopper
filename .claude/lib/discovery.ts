@@ -15,7 +15,16 @@
 import { existsSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { basename, join, relative, resolve, sep } from "node:path";
 import { parse as parseYaml, YAMLError } from "yaml";
-import { isManagedLabel, labelPrefix, loadBacklogConfig, loadResearchConfig } from "./config.ts";
+import {
+  invalidSentencePatterns,
+  isManagedLabel,
+  labelPrefix,
+  loadBacklogConfig,
+  loadProfile,
+  loadResearchConfig,
+  storySentenceForms,
+  type SentenceForm,
+} from "./config.ts";
 import * as research from "./research.ts";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -125,6 +134,20 @@ export const isDomain = (meta: Obj): boolean => DOMAIN_TYPES.has(String(meta.typ
 export const isFastLane = (meta: Obj): boolean => FAST_TYPES.has(String(meta.type));
 /** A story with a frontend part: the explicit `ui: true` flag, or the legacy `ui` label. */
 export const isUi = (meta: Obj): boolean => meta.ui === true || list(meta.labels).includes("ui");
+
+const FEATURE_LABEL_RE = /^feature:(.+)$/;
+/** The `feature:<slug>` labels' slugs. */
+export const featureLabels = (meta: Obj): string[] =>
+  list(meta.labels).map((l) => FEATURE_LABEL_RE.exec(String(l))?.[1]).filter((s): s is string => Boolean(s));
+/**
+ * The feature a story was derived from: the `feature` field, or – for stories written before the field existed –
+ * its single `feature:<slug>` label. null when it has neither.
+ */
+export function featureOf(meta: Obj): string | null {
+  if (typeof meta.feature === "string" && meta.feature) return meta.feature;
+  const labels = [...new Set(featureLabels(meta))];
+  return labels.length === 1 ? labels[0] : null;
+}
 
 /** Resolves symlinks where possible so paths from hooks and from ROOT compare equal. */
 export function realPath(p: string): string {
@@ -561,15 +584,15 @@ export function section(secs: Map<string, string>, name: string): string | null 
 
 export const SCENARIO_RE = /^\s*(?:Scenario Outline|Scenario Template|Scenario|Example)\s*:/m;
 
-function checkBody(r: Report, where: string, meta: Obj, body: string): void {
+function checkBody(r: Report, where: string, meta: Obj, body: string, forms: SentenceForm[]): void {
   const secs = sections(body);
   const type = String(meta.type);
   if (isDomain(meta)) {
     const s = section(secs, "story");
     if (s === null) {
       r.error(where, "section '## Story' is missing");
-    } else if (!/\bAs an?\b.+?\bI want\b.+?\b(so that|in order to)\b/is.test(s)) {
-      r.error(where, "story sentence must have the form 'As a <role>, I want <goal>, so that <benefit>'");
+    } else if (!forms.some(({ pattern }) => pattern.test(s))) {
+      r.error(where, `story sentence must have the form '${forms[0].form}'`);
     }
   }
   if (type === "spike" && section(secs, "question") === null) r.error(where, "spike needs a '## Question' section");
@@ -685,6 +708,11 @@ export function validateStories(report: Report, only: string | null = null, leni
   for (const s of parsed) if (storyId(s)) stories.set(storyId(s), s);
   const backlog = loadBacklogConfig();
   const researchCfg = loadResearchConfig();
+  const profile = loadProfile();
+  const sentenceForms = storySentenceForms(profile);
+  for (const source of invalidSentencePatterns(profile)) {
+    report.error(".claude/project.json", `stories.sentencePattern is not a valid regular expression: ${source}`);
+  }
 
   for (const s of parsed) {
     const r = isMine(s.path) ? report : new Report();
@@ -812,6 +840,17 @@ export function validateStories(report: Report, only: string | null = null, leni
       if (trigger) r.warn(where, `${trigger} requires at least one 'sources:' entry before ready-for-human-review`);
     }
 
+    // The feature reference: `feature: <slug>` is the field, the `feature:<slug>` label its tracker-visible twin.
+    // The metrics report splits a feature's spec cost across the stories that point to it.
+    const labelSlugs = [...new Set(featureLabels(m))];
+    if (labelSlugs.length > 1) r.error(where, `more than one feature label (${labelSlugs.map((x) => `feature:${x}`).join(", ")}) – a story belongs to one feature`);
+    if (typeof m.feature === "string" && labelSlugs.length && !labelSlugs.includes(m.feature)) {
+      r.error(where, `feature '${m.feature}' does not match the label 'feature:${labelSlugs[0]}'`);
+    }
+    if (m.feature === undefined && labelSlugs.length === 1) {
+      r.warn(where, `label 'feature:${labelSlugs[0]}' without the field – add 'feature: ${labelSlugs[0]}'`);
+    }
+
     if (m.size === "XL") r.warn(where, "size XL – split the story");
     // Every scenario is a red → green cycle in /implement; past four the story merges commands or restates UX
     // guideline patterns. Domain stories must obey it; legacy `story` files get a warning until migrated.
@@ -842,7 +881,7 @@ export function validateStories(report: Report, only: string | null = null, leni
       }
     }
 
-    checkBody(r, where, m, s.body);
+    checkBody(r, where, m, s.body, sentenceForms);
     // Completeness is checked while a story is being written; `ready` ones were approved under the older rules
     // and are challenged in `/groom-backlog` instead (user, 2026-10-01).
     if (status === "draft" || status === "review" || status === "ready-for-human-review") {
