@@ -1,5 +1,38 @@
 # Changelog
 
+## [0.11.0](https://github.com/hemi1986/coreslopper/compare/v0.10.1...v0.11.0) (2026-11-26)
+
+
+### Features
+
+* **release:** persist one release post plan in the manifest ([35b446b](https://github.com/hemi1986/coreslopper/commit/35b446bb504446f15fb878582888f45378697343))
+
+
+### Bug Fixes
+
+* **budget:** check canon batches against the uncommitted series budget ([a68115c](https://github.com/hemi1986/coreslopper/commit/a68115c4d1fae97ed9467e22426f16b4f5150bc1))
+
+
+### Documentation
+
+* **adr:** accept the architecture review's ADRs (candidate 08) ([07db100](https://github.com/hemi1986/coreslopper/commit/07db100d33f366962cf473c83f90f607107929e5))
+* **adr:** note candidate 06 closes the spend and estimate gaps ([79c6bbe](https://github.com/hemi1986/coreslopper/commit/79c6bbe315370459143ac0dd7b79c8eb8b8601ef))
+* **adr:** record the one library lifecycle (candidate 02) ([8190b55](https://github.com/hemi1986/coreslopper/commit/8190b557b67f4b69ca9b1ef033c9b4cb81b2a898))
+* **library:** record the one-library-lifecycle design (ADR 0056) ([25468a0](https://github.com/hemi1986/coreslopper/commit/25468a00302c0848bc8639a5a9401c3da88a97f7))
+* **review:** close candidate 02 (34096dd) ([ba9abcf](https://github.com/hemi1986/coreslopper/commit/ba9abcf0620ca51ad5a26a6bc803c841144e4330))
+* **review:** mark candidate 01 done (4bf6985) ([dfc664a](https://github.com/hemi1986/coreslopper/commit/dfc664a31c682e752e2d1536e08df212484eceab))
+* **review:** mark candidate 02 design recorded (583f22a) ([ea1a3bb](https://github.com/hemi1986/coreslopper/commit/ea1a3bbe30f87853ed4c896237fe300e91eab848))
+* **review:** mark candidate 03 done (119f693) ([dc17bba](https://github.com/hemi1986/coreslopper/commit/dc17bbab86ba2d4e1269187733e4f64936900604))
+* **review:** mark candidate 04 done (fbc42d0) ([92af7fb](https://github.com/hemi1986/coreslopper/commit/92af7fbaa989b08958282b895678df8603928754))
+* **review:** mark candidate 05 done (9950c69) ([db8b880](https://github.com/hemi1986/coreslopper/commit/db8b8806a163dbb6d25e1b2453bc7293e7b80d9e))
+* **review:** mark candidate 08 done (candidate 08) ([514d06a](https://github.com/hemi1986/coreslopper/commit/514d06a34cf50d5e6c591c4595d8352c0363df4e))
+* **review:** record candidate 02 cut 3 (e132af5) ([ba6baf9](https://github.com/hemi1986/coreslopper/commit/ba6baf9bd2bc29712b304741162e0126a68796b9))
+* **review:** record candidate 02 cut 4 (060dfbe) ([da49d1a](https://github.com/hemi1986/coreslopper/commit/da49d1a79bd0f4ae8f29c957935c14c916155e42))
+* **review:** record candidate 02 cut 5 (d3a53d1) ([3220eb7](https://github.com/hemi1986/coreslopper/commit/3220eb7aaf552011411c4a68ff3cd772d4632663))
+* **review:** record candidate 02 cuts 0-2 (07140b0) ([3cfb7b3](https://github.com/hemi1986/coreslopper/commit/3cfb7b3aad81136dc55c4efa3873b5c4424d4734))
+* **review:** record candidate 06 (1fa9424) ([2a1408c](https://github.com/hemi1986/coreslopper/commit/2a1408c99efb1c6b7098577c95b9cb9d0346fb77))
+* **review:** record candidate 07 (8e617df) ([26d9578](https://github.com/hemi1986/coreslopper/commit/26d9578d4d5a244ece93379d2b1f2970545f76a7))
+
 ## [0.10.1](https://github.com/hemi1986/coreslopper/compare/v0.10.0...v0.10.1) (2026-11-25)
 
 
