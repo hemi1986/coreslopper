@@ -1,3 +1,8 @@
+---
+status: superseded by ADR-0017
+date: 2026-11-10
+---
+
 # ComfyUI for stills, lip-sync, and audio
 
 ## Status

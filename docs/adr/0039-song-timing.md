@@ -1,3 +1,8 @@
+---
+status: proposed
+date: 2026-11-21
+---
+
 # Song timing: one effective timing, overrides that move times, a Python analysis behind a schema
 
 ## Status

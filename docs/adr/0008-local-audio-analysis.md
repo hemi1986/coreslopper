@@ -1,3 +1,8 @@
+---
+status: accepted
+date: 2026-11-08
+---
+
 # Local-first audio analysis: Demucs + WhisperX + librosa, lyrics text wins
 
 **Status:** Accepted

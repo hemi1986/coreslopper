@@ -1,3 +1,8 @@
+---
+status: accepted
+date: 2026-11-22
+---
+
 # The workspace set library
 
 ## Status

@@ -1,3 +1,8 @@
+---
+status: accepted
+date: 2026-11-15
+---
+
 # Add Topview as a third cloud provider
 
 ## Status

@@ -1,3 +1,8 @@
+---
+status: accepted
+date: 2026-11-08
+---
+
 # Storyboard timings use symbolic anchors resolved from timing.json
 
 **Status:** Accepted

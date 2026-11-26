@@ -1,3 +1,8 @@
+---
+status: accepted
+date: 2026-11-09
+---
+
 # Start every project from an existing song with an interactive setup
 
 ## Status

@@ -1,3 +1,8 @@
+---
+status: accepted
+date: 2026-11-21
+---
+
 # The board is the workspace's hub: production next to release
 
 ## Status

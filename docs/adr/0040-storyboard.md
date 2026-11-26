@@ -1,3 +1,8 @@
+---
+status: proposed
+date: 2026-11-21
+---
+
 # Storyboard: one model for both kinds, checked as a whole, written only by the agent
 
 ## Status

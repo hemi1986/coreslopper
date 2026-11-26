@@ -1,3 +1,8 @@
+---
+status: proposed
+date: 2026-11-22
+---
+
 # ComfyUI projects lip-sync locally by default
 
 ## Status

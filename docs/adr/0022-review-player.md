@@ -1,3 +1,8 @@
+---
+status: superseded by ADR-0050
+date: 2026-11-16
+---
+
 # A review player for frame-accurate notes on renders
 
 ## Status

@@ -1,3 +1,8 @@
+---
+status: accepted
+date: 2026-11-16
+---
+
 # One release folder, manual distributor upload, API distributors later
 
 ## Status

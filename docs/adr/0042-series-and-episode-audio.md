@@ -1,3 +1,8 @@
+---
+status: proposed
+date: 2026-11-22
+---
+
 # Series and episode audio: a committed series budget, a take registry, and a constructed episode track
 
 ## Status

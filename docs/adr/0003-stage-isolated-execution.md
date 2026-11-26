@@ -1,3 +1,8 @@
+---
+status: accepted
+date: 2026-11-08
+---
+
 # One fresh context per pipeline stage
 
 **Status:** Accepted

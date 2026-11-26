@@ -1,3 +1,8 @@
+---
+status: accepted
+date: 2026-11-21
+---
+
 # The release autopilot: one approval, then the calendar posts by API
 
 ## Status

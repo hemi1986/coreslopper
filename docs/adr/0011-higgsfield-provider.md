@@ -1,3 +1,8 @@
+---
+status: accepted
+date: 2026-11-08
+---
+
 # Add Higgsfield as a second generation provider
 
 ## Status

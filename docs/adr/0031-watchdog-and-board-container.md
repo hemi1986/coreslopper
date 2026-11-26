@@ -1,3 +1,8 @@
+---
+status: accepted
+date: 2026-11-21
+---
+
 # The watchdog round and the board container
 
 ## Status

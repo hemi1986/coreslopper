@@ -1,3 +1,8 @@
+---
+status: proposed
+date: 2026-11-21
+---
+
 # Generation: one path, a budget check per batch, a workspace cache, and planned spend
 
 ## Status

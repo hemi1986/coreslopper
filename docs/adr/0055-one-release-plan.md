@@ -1,3 +1,8 @@
+---
+status: accepted
+date: 2026-11-25
+---
+
 # One release post plan for every consumer
 
 ## Status

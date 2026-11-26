@@ -1,3 +1,8 @@
+---
+status: proposed
+date: 2026-11-22
+---
+
 # Memes: a third project kind, a pitch in the wizard, and the sound library
 
 ## Status

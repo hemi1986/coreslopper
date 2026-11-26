@@ -1,3 +1,8 @@
+---
+status: accepted
+date: 2026-11-12
+---
+
 # Three thumbnails per video in `qa-export`
 
 ## Status

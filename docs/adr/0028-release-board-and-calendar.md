@@ -1,3 +1,8 @@
+---
+status: accepted
+date: 2026-11-21
+---
+
 # Release board, release calendar, and the workspace release schedule
 
 ## Status
