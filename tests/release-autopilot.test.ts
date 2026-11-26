@@ -12,7 +12,8 @@ import { join } from 'node:path';
 import { parse, stringify } from 'yaml';
 import { MockPublisher, MockSocialAdapter, PublishError, markUncertain, tiktokCaption, type SocialPlatform } from '../packages/providers/src/index.ts';
 import { buildRelease } from '../packages/cli/src/release.ts';
-import { loadCalendar, loadStatus, updateStatus } from '../packages/cli/src/release-calendar.ts';
+import { loadCalendar } from '../packages/cli/src/release-calendar.ts';
+import { loadStatus, updateStatus } from '../packages/cli/src/release-records.ts';
 import { publishProject, youtubeDescription } from '../packages/cli/src/publish.ts';
 import {
   approveRelease,
@@ -24,8 +25,9 @@ import {
   setEventManual,
   type AutopilotDeps,
 } from '../packages/cli/src/release-autopilot.ts';
-import { boardProject } from '../packages/cli/src/release-board-data.ts';
-import { appendAutopilotEntry } from '../packages/cli/src/autopilot-state.ts';
+import { autopilotView } from '../packages/cli/src/release-board-data.ts';
+import { loadReleaseFacts } from '../packages/cli/src/release-facts.ts';
+import { appendAutopilotEntry } from '../packages/cli/src/release-records.ts';
 import { boardHandler } from '../packages/cli/src/release-board.ts';
 import { timerPlan } from '../packages/cli/src/release-timer.ts';
 import { cleanupFixtures, fakeDeps, fixture, memeFixture, setDistribution, setReleaseDay, siblingCalendar } from './helpers/release-fixture.ts';
@@ -102,7 +104,9 @@ async function setup(options: { env?: Record<string, string>; meme?: boolean | {
   const moveTo = (id: string, minutes = 1) => {
     clock.now = new Date(at(id) + minutes * 60_000);
   };
-  return { dir, root, calendar, at, clock, youtube, tiktok, social, failures, lines, publishCalls, run, moveTo };
+  /** The board's autopilot view from the facts, without building the whole board. */
+  const view = async (now = clock.now) => autopilotView(await loadReleaseFacts(dir, root), { now });
+  return { dir, root, calendar, at, clock, youtube, tiktok, social, failures, lines, publishCalls, run, moveTo, deps, view };
 }
 
 describe('release autopilot', () => {
@@ -116,12 +120,58 @@ describe('release autopilot', () => {
     expect(t.social.get('x')!.calls).toEqual([]);
   });
 
+  it('loads one project\'s release facts once per round when nothing is due', async () => {
+    const t = await setup();
+    await approveRelease(t.dir, { root: t.root, now: new Date(t.at('distributor')) });
+    t.clock.now = new Date(t.at('distributor') - 24 * 3_600_000);
+    let loads = 0;
+
+    const result = await runAutopilot({
+      root: t.root,
+      deps: {
+        ...t.deps,
+        loadFacts: async (dir, root) => {
+          loads += 1;
+          return loadReleaseFacts(dir, root);
+        },
+      },
+    });
+
+    expect(result.projects).toHaveLength(1);
+    expect(result.projects[0]!.acted).toEqual([]);
+    expect(loads).toBe(1);
+  });
+
+  it('passes the facts\' workspace root to publish instead of re-deriving it', async () => {
+    const t = await setup();
+    await approveRelease(t.dir, { root: t.root, now: new Date(t.at('distributor')) });
+    const facts = await loadReleaseFacts(t.dir, t.root);
+    const roots: (string | undefined)[] = [];
+    t.clock.now = new Date(t.at('youtube') - 23 * 3_600_000);
+
+    await runAutopilot({
+      root: t.root,
+      deps: {
+        ...t.deps,
+        loadFacts: async () => ({ ...facts, root: '/sentinel-workspace' }),
+        publish: (options) => {
+          roots.push(options.root);
+          return t.deps.publish!(options);
+        },
+      },
+    });
+
+    expect(roots.length).toBeGreaterThan(0);
+    expect(roots.every((root) => root === '/sentinel-workspace')).toBe(true);
+    expect(t.publishCalls.map((call) => call.only).sort()).toEqual(['Z1-intro', 'main']);
+  });
+
   it('tells the user after a withdrawal that a scheduled upload still goes public', async () => {
     const t = await setup();
     await approveRelease(t.dir, { root: t.root, now: new Date(t.at('distributor')) });
     await appendAutopilotEntry(t.dir, { event: 'youtube', status: 'scheduled', remote_id: 'abcdefghijk', publish_at: '2026-12-11T17:00:00.000Z', at: t.clock.now.toISOString() });
     await revokeApproval(t.dir);
-    const youtube = (await boardProject(t.dir, t.root, { now: t.clock.now })).autopilot.events['youtube']!;
+    const youtube = (await t.view()).events['youtube']!;
     expect(youtube).toMatchObject({ state: 'pending', needsUser: true });
     expect(youtube.manualSteps[0]).toMatch(/still makes it public at 2026-12-11T17:00:00.000Z.*studio\.youtube\.com\/video\/abcdefghijk/);
   });
@@ -166,15 +216,15 @@ describe('release autopilot', () => {
     t.clock.now = new Date(t.at('youtube') - 23 * 3_600_000);
     await t.run();
     expect(t.publishCalls).toContainEqual({ platform: 'youtube', only: 'main', schedule: undefined });
-    const board = await boardProject(t.dir, t.root, { now: t.clock.now });
-    expect(board.autopilot.events.youtube).toMatchObject({ state: 'pending', needsUser: true });
-    expect(board.autopilot.events.youtube!.manualSteps.join(' ')).toContain('Premiere');
+    const board = await t.view();
+    expect(board.events.youtube).toMatchObject({ state: 'pending', needsUser: true });
+    expect(board.events.youtube!.manualSteps.join(' ')).toContain('Premiere');
 
     // Release time: the X post waits for the public video; the first Short goes up.
     t.moveTo('youtube', 2);
     await t.run();
     expect(t.social.get('x')!.calls.map((call) => call.event)).toEqual(['announce:x']);
-    expect((await boardProject(t.dir, t.root, { now: t.clock.now })).autopilot.events.x).toMatchObject({ state: 'blocked', block: 'youtube' });
+    expect((await t.view()).events.x).toMatchObject({ state: 'blocked', block: 'youtube' });
 
     // The user starts the Premiere in Studio; the next round sees it public and posts what links to it.
     const log = await loadAutopilotLog(t.dir);
@@ -196,12 +246,12 @@ describe('release autopilot', () => {
     // TikTok lands as a draft: that one is yours.
     t.moveTo('short:Z1-intro:tiktok');
     await t.run();
-    expect((await boardProject(t.dir, t.root, { now: t.clock.now })).autopilot.events['short:Z1-intro:tiktok']).toMatchObject({ state: 'pending', needsUser: true });
+    expect((await t.view()).events['short:Z1-intro:tiktok']).toMatchObject({ state: 'pending', needsUser: true });
 
     // The day after: the links step waits for the Spotify link, then appends it.
     t.moveTo('links');
     await t.run();
-    expect((await boardProject(t.dir, t.root, { now: t.clock.now })).autopilot.events.links).toMatchObject({ state: 'blocked', block: 'spotify' });
+    expect((await t.view()).events.links).toMatchObject({ state: 'blocked', block: 'spotify' });
     await updateStatus(t.dir, 'song', { done: true, url: 'https://open.spotify.com/track/abc' }, t.clock.now);
     t.moveTo('links', 10);
     await t.run();
@@ -215,11 +265,11 @@ describe('release autopilot', () => {
     t.failures.set('announce:x', new PublishError('HTTP 500'));
     t.moveTo('announce:x');
     await t.run();
-    expect((await boardProject(t.dir, t.root, { now: t.clock.now })).autopilot.events['announce:x']).toMatchObject({ state: 'waiting', attempts: 1, error: 'HTTP 500' });
+    expect((await t.view()).events['announce:x']).toMatchObject({ state: 'waiting', attempts: 1, error: 'HTTP 500' });
     t.failures.set('announce:x', markUncertain(new PublishError('X answered HTTP 503; the post may exist anyway.')) as Error);
     t.moveTo('announce:x', 15);
     await t.run();
-    expect((await boardProject(t.dir, t.root, { now: t.clock.now })).autopilot.events['announce:x']).toMatchObject({ state: 'stuck', needsUser: true });
+    expect((await t.view()).events['announce:x']).toMatchObject({ state: 'stuck', needsUser: true });
     // The user checked X: not there. Try again.
     t.failures.delete('announce:x');
     await retryEvent(t.dir, 'announce:x', t.clock.now);
@@ -237,11 +287,11 @@ describe('release autopilot', () => {
     await approveRelease(t.dir, { root: t.root, now: new Date(t.at('distributor')) });
     t.moveTo('announce:x');
     await t.run();
-    expect((await boardProject(t.dir, t.root, { now: t.clock.now })).autopilot.events['announce:x']).toMatchObject({ state: 'blocked', block: 'credentials' });
+    expect((await t.view()).events['announce:x']).toMatchObject({ state: 'blocked', block: 'credentials' });
     // The computer was off for a day: the story is missed, and goes out only on "post now".
     t.moveTo('announce:instagram', 26 * 60);
     await t.run();
-    expect((await boardProject(t.dir, t.root, { now: t.clock.now })).autopilot.events['announce:instagram']).toMatchObject({ state: 'missed', needsUser: true });
+    expect((await t.view()).events['announce:instagram']).toMatchObject({ state: 'missed', needsUser: true });
     await retryEvent(t.dir, 'announce:instagram', t.clock.now, true);
     await t.run();
     expect(t.social.get('instagram')!.calls.map((call) => call.event)).toEqual(['announce:instagram']);
@@ -259,7 +309,7 @@ describe('release autopilot', () => {
     t.clock.now = new Date(Date.parse(moved.events.find((event) => event.id === 'announce:x')!.at) + 60_000);
     expect((await t.run()).projects[0]!.approved).toBe(false);
     expect(t.social.get('x')!.calls).toEqual([]);
-    expect((await boardProject(t.dir, t.root, { now: t.clock.now })).autopilot).toMatchObject({ approvalStale: true });
+    expect(await t.view()).toMatchObject({ approvalStale: true });
     expect(t.lines.join('\n')).toContain('approve it again');
   });
 
@@ -292,6 +342,31 @@ describe('release autopilot', () => {
     expect(comments).toEqual([{ method: 'postComment', videoId, text: 'Welcher Moment ist eurer?' }]);
   });
 
+  it('asks the user when the pinned comment may have gone out, and never retries it', async () => {
+    const t = await setup();
+    await approveRelease(t.dir, { root: t.root, now: new Date(t.at('distributor')) });
+    t.clock.now = new Date(t.at('youtube') - 23 * 3_600_000);
+    await t.run();
+    const videoId = (await loadAutopilotLog(t.dir)).entries.find((entry) => entry.event === 'youtube' && entry.remote_id)!.remote_id!;
+    t.youtube.statuses.set(videoId, { privacyStatus: 'public', uploadStatus: 'processed' });
+    await updateStatus(t.dir, 'youtube', { done: true, url: `https://youtu.be/${videoId}`, by: 'user' }, t.clock.now);
+    let calls = 0;
+    Object.defineProperty(t.youtube, 'postComment', {
+      value: () => {
+        calls += 1;
+        return Promise.reject(markUncertain(new PublishError('YouTube lost the comment answer')));
+      },
+    });
+    t.moveTo('youtube', 3);
+    await t.run();
+    t.moveTo('youtube', 15);
+    await t.run();
+    const comments = (await loadAutopilotLog(t.dir)).entries.filter((entry) => entry.event === 'youtube:comment' && entry.status === 'failed');
+    expect(calls).toBe(1);
+    expect(comments).toHaveLength(1);
+    expect(comments[0]).toMatchObject({ status: 'failed', uncertain: true });
+  });
+
   it('asks the user after a TikTok post that may have gone out, and never posts it again by itself', async () => {
     const t = await setup({ env: { TIKTOK_DIRECT_POST: '1' } });
     await approveRelease(t.dir, { root: t.root, now: new Date(t.at('distributor')) });
@@ -307,7 +382,7 @@ describe('release autopilot', () => {
     t.moveTo('short:Z1-intro:tiktok', 15);
     await t.run();
     expect(calls).toBe(1);
-    expect((await boardProject(t.dir, t.root, { now: t.clock.now })).autopilot.events['short:Z1-intro:tiktok']).toMatchObject({ state: 'stuck', needsUser: true });
+    expect((await t.view()).events['short:Z1-intro:tiktok']).toMatchObject({ state: 'stuck', needsUser: true });
   });
 
   it('records a direct TikTok post that is still processing as live, without an inbox step', async () => {
@@ -336,7 +411,7 @@ describe('release autopilot', () => {
     const t = await setup({ env: { X_CLIENT_SECRET: '' } });
     await approveRelease(t.dir, { root: t.root, now: new Date(t.at('distributor')) });
     t.moveTo('announce:x');
-    expect((await boardProject(t.dir, t.root, { now: t.clock.now })).autopilot.events['announce:x']).toMatchObject({ state: 'blocked', block: 'credentials' });
+    expect((await t.view()).events['announce:x']).toMatchObject({ state: 'blocked', block: 'credentials' });
   });
 
   it('writes nothing on a dry run and keeps a second run out while one holds the lock', async () => {

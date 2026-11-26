@@ -1,7 +1,8 @@
 import { stat } from 'node:fs/promises';
-import { ConfigError } from '@coreslopper/core';
+import { ConfigError, PLATFORM_LIMITS } from '@coreslopper/core';
 import { delay, mimeForPath, type FetchLike } from '../http.js';
-import { fetchWithRetry, httpError, markUncertain, PublishError, readChunk, readJson, redactSecrets } from './http.js';
+import { fetchWithRetry, httpError, pollUntil, PublishError, readChunk, readJson, redactSecrets } from './http.js';
+import { markFailure } from './failure.js';
 import { RefreshingToken } from './oauth.js';
 import type { PublishAdapter, PublishItem, PublishLogger, PublishRequest, PublishResult } from './types.js';
 
@@ -20,7 +21,7 @@ export const TIKTOK_LIMITS = {
   maxBytes: 4 * 1024 ** 3,
   maxSeconds: 600,
   minSeconds: 3,
-  captionChars: 2200,
+  captionChars: PLATFORM_LIMITS.tiktok.caption,
   minChunk: 5 * 1024 ** 2,
   chunk: 10 * 1024 ** 2,
   maxChunks: 1000,
@@ -328,9 +329,9 @@ export class TikTokPublisher implements PublishAdapter {
     try {
       posted = await this.waitForPost(publishId);
     } catch (error) {
-      throw markUncertain(error);
+      throw markFailure(error, { phase: 'publication' });
     }
-    if (posted.status === 'failed') throw new PublishError(`TikTok could not publish the post: ${posted.reason}.`);
+    if (posted.status === 'failed') throw markFailure(new PublishError(`TikTok could not publish the post: ${posted.reason}.`), { phase: 'upload' });
     const { status, postId } = posted;
     const profile = creator.username ? `https://www.tiktok.com/@${creator.username}` : undefined;
     const url = postId && creator.username ? `${profile}/video/${postId}` : profile;
@@ -371,7 +372,7 @@ export class TikTokPublisher implements PublishAdapter {
       try {
         await this.sendChunk(uploadUrl, file, chunk, { start, end, size, index, count });
       } catch (error) {
-        throw live && last ? markUncertain(error) : error;
+        throw markFailure(error, live && last ? { phase: 'upload', lastByteSent: true } : { phase: 'upload' });
       }
     }
     return publishId;
@@ -455,32 +456,52 @@ export class TikTokPublisher implements PublishAdapter {
   }
 
   private async waitForInbox(publishId: string): Promise<'draft' | 'processing'> {
-    const deadline = this.now() + this.pollTimeoutMs;
-    while (true) {
-      const data = await this.api('post/publish/status/fetch/', { publish_id: publishId });
-      const status = String(data.status ?? '');
-      if (status === 'SEND_TO_USER_INBOX' || status === 'PUBLISH_COMPLETE') return 'draft';
-      if (status === 'FAILED') throw new PublishError(`TikTok could not process the upload: ${String(data.fail_reason ?? 'unknown reason')}.`);
-      if (this.now() >= deadline) return 'processing';
-      await this.sleep(this.pollIntervalMs);
-    }
+    const last = await pollUntil(
+      async () => {
+        const data = await this.api('post/publish/status/fetch/', { publish_id: publishId });
+        return { status: String(data.status ?? ''), reason: String(data.fail_reason ?? 'unknown reason') };
+      },
+      {
+        intervalMs: this.pollIntervalMs,
+        timeoutMs: this.pollTimeoutMs,
+        now: this.now,
+        sleep: this.sleep,
+        failed: (current) =>
+          current.status === 'FAILED'
+            ? markFailure(new PublishError(`TikTok could not process the upload: ${current.reason}.`), { phase: 'upload' })
+            : undefined,
+        done: (current) => current.status === 'SEND_TO_USER_INBOX' || current.status === 'PUBLISH_COMPLETE',
+        onTimeout: (current) => current,
+      },
+    );
+    return last.status === 'SEND_TO_USER_INBOX' || last.status === 'PUBLISH_COMPLETE' ? 'draft' : 'processing';
   }
+
   /** Poll a Direct Post until it is live; returns the post ID once TikTok publishes one, or TikTok's reason it failed. */
   private async waitForPost(publishId: string): Promise<{ status: 'uploaded' | 'processing'; postId?: string } | { status: 'failed'; reason: string }> {
-    const deadline = this.now() + this.pollTimeoutMs;
-    while (true) {
-      const { data, raw } = await this.apiRaw('post/publish/status/fetch/', { publish_id: publishId });
-      const status = String(data.status ?? '');
-      if (status === 'PUBLISH_COMPLETE') {
-        // TikTok spells the field "publicaly_available_post_id" and sends int64 numbers that
-        // JSON.parse rounds, so the ID is read from the raw text; the correct spelling counts too.
-        const postId = /"publica?ly_available_post_id"\s*:\s*\[\s*"?(\d+)/.exec(raw)?.[1];
-        return { status: 'uploaded', ...(postId ? { postId } : {}) };
-      }
-      if (status === 'FAILED') return { status: 'failed', reason: String(data.fail_reason ?? 'unknown reason') };
-      if (this.now() >= deadline) return { status: 'processing' };
-      await this.sleep(this.pollIntervalMs);
-    }
+    const last = await pollUntil(
+      async () => {
+        const { data, raw } = await this.apiRaw('post/publish/status/fetch/', { publish_id: publishId });
+        return {
+          status: String(data.status ?? ''),
+          reason: String(data.fail_reason ?? 'unknown reason'),
+          // TikTok spells the field "publicaly_available_post_id" and sends int64 numbers that
+          // JSON.parse rounds, so the ID is read from the raw text; the correct spelling counts too.
+          postId: /"publica?ly_available_post_id"\s*:\s*\[\s*"?(\d+)/.exec(raw)?.[1],
+        };
+      },
+      {
+        intervalMs: this.pollIntervalMs,
+        timeoutMs: this.pollTimeoutMs,
+        now: this.now,
+        sleep: this.sleep,
+        done: (current) => current.status === 'PUBLISH_COMPLETE' || current.status === 'FAILED',
+        onTimeout: (current) => current,
+      },
+    );
+    if (last.status === 'PUBLISH_COMPLETE') return { status: 'uploaded', ...(last.postId ? { postId: last.postId } : {}) };
+    if (last.status === 'FAILED') return { status: 'failed', reason: last.reason };
+    return { status: 'processing' };
   }
 }
 

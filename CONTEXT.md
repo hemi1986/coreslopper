@@ -34,6 +34,10 @@ _Avoid_: dev workflow, dev config
 A workspace created from a local checkout of the upstream repository with `npm run dev:workspace`, outside the repository, to try the workflow the way a user gets it.
 _Avoid_: test workspace, playground
 
+**Release Post Plan**:
+The plan `buildReleasePlan` builds and `release` stores as `manifest.plan`: every post's exact platform text, release-folder files, source, and text limit, keyed by calendar event id. The folder texts, QA, the board, the autopilot, and `publish` read it. It is not the `release-plan.md` table, which is the calendar laid out.
+_Avoid_: calendar table (that is `release-plan.md`)
+
 <!--
 **Term**:
 What it is, in one or two sentences.

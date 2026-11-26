@@ -10,6 +10,7 @@ import {
   RefreshingToken,
   TikTokPublisher,
   YouTubePublisher,
+  failureClass,
   fetchWithRetry,
   redactSecrets,
   tiktokCaption,
@@ -21,7 +22,6 @@ import {
   type PublishItem,
 } from '../packages/providers/src/index.ts';
 import {
-  appendPublishEntry,
   buildPublishPlan,
   platformProblems,
   publishProject,
@@ -30,6 +30,7 @@ import {
   youtubeTagChars,
   type VideoProbe,
 } from '../packages/cli/src/publish.ts';
+import { appendPublishEntry } from '../packages/cli/src/release-records.ts';
 import { memeFixture } from './helpers/release-fixture.ts';
 import { renderUploadText, writeUploadText } from '../packages/cli/src/upload-text.ts';
 import { parseUploadText, uploadTextProblems } from '../packages/cli/src/release-files.ts';
@@ -326,15 +327,32 @@ describe('publish run and idempotency', () => {
     };
     const youtube = new MockPublisher('youtube');
     Object.defineProperty(youtube, 'mock', { value: false });
-    await expect(
-      publishProject({ projectDir: dir, only: 'N1-intro', probe, adapters: { youtube, tiktok }, log: quiet }),
-    ).rejects.toThrow(/tiktok N1-intro/);
+    const error = (await publishProject({ projectDir: dir, only: 'N1-intro', probe, adapters: { youtube, tiktok }, log: quiet }).catch((caught: unknown) => caught as Error)) as Error;
+    expect(error.message).toMatch(/tiktok N1-intro/);
+    expect(failureClass(error)).toBe('retryable');
     const log = await readLog(dir);
     expect(log.entries.map((entry) => `${entry.platform}:${entry.status}`)).toEqual(['youtube:uploaded', 'tiktok:failed']);
     expect(log.entries[1]!.error).not.toContain('secret123456');
     // A failed attempt is retried on the next run; the YouTube upload is not.
     const next = await publishProject({ projectDir: dir, dryRun: true, only: 'N1-intro', probe, adapters: forbidden, log: quiet });
     expect(next.plan.steps.map((step) => `${step.platform}:${step.action}`)).toEqual(['youtube:skip', 'tiktok:upload']);
+  });
+
+  it('keeps a fatal adapter failure out of the retry path', async () => {
+    const dir = await fixture();
+    const tiktok: PublishAdapter = {
+      platform: 'tiktok',
+      mock: false,
+      publish: () => Promise.reject(new ConfigError('TikTok credentials are not set')),
+    };
+    const youtube = new MockPublisher('youtube');
+    Object.defineProperty(youtube, 'mock', { value: false });
+    const error = (await publishProject({ projectDir: dir, only: 'N1-intro', probe, adapters: { youtube, tiktok }, log: quiet }).catch((caught: unknown) => caught as Error)) as Error;
+    expect(error).toBeInstanceOf(ConfigError);
+    expect(failureClass(error)).toBe('fatal');
+    const entry = (await readLog(dir)).entries[1]!;
+    expect(entry).toMatchObject({ platform: 'tiktok', status: 'failed' });
+    expect(entry.uncertain).toBeFalsy();
   });
 });
 
@@ -397,9 +415,8 @@ describe('an upload that may have gone out', () => {
 describe('writers at the same time', () => {
   it('keeps every entry when publish and the autopilot append to the publish log at once', async () => {
     const dir = await fixture();
-    const logPath = join(dir, 'review', 'publish.json');
     const entry = (item: string) => ({ platform: 'youtube' as const, item, file: 'renders/16x9.mp4', file_hash: 'a'.repeat(64), status: 'uploaded' as const, mock: false, warnings: [], at: '2026-11-16T12:00:00Z' });
-    await Promise.all(['main', 'N1-intro', 'N2-chorus', 'N3'].map((item) => appendPublishEntry(logPath, entry(item))));
+    await Promise.all(['main', 'N1-intro', 'N2-chorus', 'N3'].map((item) => appendPublishEntry(dir, entry(item))));
     expect((await readLog(dir)).entries.map((e) => e.item).sort()).toEqual(['N1-intro', 'N2-chorus', 'N3', 'main']);
   });
 
@@ -582,6 +599,7 @@ describe('YouTube adapter', () => {
       .publish({ item: item(video) })
       .then((): Error & { uncertain?: boolean } => new Error('no error'), (caught: unknown) => caught as Error & { uncertain?: boolean });
     expect(after.uncertain).toBe(true);
+    expect(failureClass(after)).toBe('uncertain');
 
     // The session never opened: nothing was uploaded.
     const refused: FetchLike = async (url) => token(url) ?? json({ error: { message: 'bad request' } }, 400);
@@ -590,6 +608,7 @@ describe('YouTube adapter', () => {
       .then((): Error & { uncertain?: boolean } => new Error('no error'), (caught: unknown) => caught as Error & { uncertain?: boolean });
     expect(before.message).toContain('HTTP 400');
     expect(before.uncertain).toBeFalsy();
+    expect(failureClass(before)).toBe('fatal');
   });
 
   it('validates an OAuth client without a user', async () => {

@@ -6,11 +6,13 @@ paths:
   - "packages/cli/src/publish-setup.ts"
   - "packages/cli/src/social-auth.ts"
   - "packages/cli/src/release-autopilot.ts"
+  - "packages/cli/src/release-records.ts"
   - "packages/cli/src/autopilot-state.ts"
   - "packages/cli/src/release-timer.ts"
   - "packages/providers/src/publish/**"
   - "tests/publish*.test.ts"
   - "tests/release-autopilot*.test.ts"
+  - "tests/release-records.test.ts"
 ---
 
 # Publishing (BC-Publish)
@@ -43,7 +45,8 @@ All are in `docs/glossary.md`. A publish upload never goes public; a post does.
 - `publishProject` (`packages/cli/src/publish.ts`) uploads YouTube and TikTok and writes `review/publish.json`, for
   the `publish` command and for the autopilot.
 - `runAutopilot` (`packages/cli/src/release-autopilot.ts`) is one round under `.cache/release-run.lock`:
-  - it reads pending YouTube uploads, then claims each due event under `review/.release.lock`;
+  - it loads one project's release facts once (`release-facts.ts`), reads pending YouTube uploads, then claims each
+    due event under `review/.release.lock`;
   - it acts through `AutopilotDeps` and appends to `review/autopilot.json` (`autopilot-state.ts`);
   - it posts the pinned comment.
 - The release status's writers (done marks, take-overs) are the release slice's. The autopilot calls them.

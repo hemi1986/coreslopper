@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { readFile, readdir, stat } from 'node:fs/promises';
 import { join, sep } from 'node:path';
 import {
+  approvalHolds,
   isScriptedKind,
   loadProject,
   productionPhase,
@@ -18,14 +19,16 @@ import {
   type StageView,
 } from '@coreslopper/core';
 import { reviewCounts } from './board-review.js';
-import { loadStatus } from './release-calendar.js';
+import { loadCalendar } from './release-calendar.js';
+import { loadStatus } from './release-records.js';
 import { collectSeriesStatus, type SeriesStatus } from './series.js';
+import { SLUG, projectDirs, seriesDirs } from './workspace-dirs.js';
 
 // The board's production view: every project and series of the workspace,
 // read from the files the pipeline writes (state.json, renders/, the
 // generation queue, the art director's verdicts). Read-only.
 
-export const SLUG = /^[a-z0-9][a-z0-9-]*$/;
+export { SLUG, projectDirs, seriesDirs };
 
 export interface ProductionRender {
   /** Relative to the project. */
@@ -120,26 +123,6 @@ export interface ProductionSeries {
   canonGaps: string[];
   episodes: { episode: number; title: string; slug?: string; next?: string; status?: string }[];
   next: NextAction;
-}
-
-/** Project folders of a workspace: every `projects/<slug>/` with a project.yaml. */
-export async function projectDirs(root: string): Promise<string[]> {
-  const dir = join(root, 'projects');
-  const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
-  return entries
-    .filter((entry) => entry.isDirectory() && SLUG.test(entry.name) && existsSync(join(dir, entry.name, 'project.yaml')))
-    .map((entry) => join(dir, entry.name))
-    .sort();
-}
-
-/** Series folders of a workspace: every `projects/<slug>/` with a series.yaml. */
-export async function seriesDirs(root: string): Promise<string[]> {
-  const dir = join(root, 'projects');
-  const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
-  return entries
-    .filter((entry) => entry.isDirectory() && SLUG.test(entry.name) && existsSync(join(dir, entry.name, 'series.yaml')))
-    .map((entry) => join(dir, entry.name))
-    .sort();
 }
 
 async function readJsonLoose<T>(path: string): Promise<T | undefined> {
@@ -278,7 +261,8 @@ async function collect(projectDir: string, detail: boolean): Promise<ProductionD
   const internal = !releasedPublicly(config);
   const hasRelease = !internal && existsSync(join(paths.renders, 'release', 'manifest.json'));
   const status = await loadStatus(projectDir).catch(() => undefined);
-  const approved = Boolean(status?.approval);
+  const calendar = await loadCalendar(projectDir).catch(() => undefined);
+  const approved = Boolean(status && calendar && approvalHolds(status, calendar));
   const song = isScriptedKind(config.kind) ? undefined : await readJsonLoose<{ artist?: unknown }>(paths.song);
   const queueItems = (await loadQueue(paths.assets)) ?? [];
   const hasQueue = existsSync(join(paths.assets, 'queue.json'));

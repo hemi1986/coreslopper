@@ -1,24 +1,29 @@
 import { createHash } from 'node:crypto';
 import { createReadStream, existsSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
-import { dirname, extname, isAbsolute, join, relative, resolve } from 'node:path';
+import { extname, isAbsolute, join, relative, resolve } from 'node:path';
 import {
   ConfigError,
+  PLATFORM_LIMITS,
   ProjectConfigSchema,
-  PublishLogSchema,
   TakesSchema,
   ValidationError,
+  buildReleasePlan,
+  loadChannel,
   memeCaption,
   memeDescription,
+  platformLimits,
   projectPaths,
   readJsonFile,
   readYamlFile,
   repoRoot,
   soundLicenceTodos,
-  writeJsonAtomic,
+  type PlatformLimits,
+  type ProjectConfig,
   type PublishEntry,
   type PublishLog,
   type PublishPlatform,
+  type ReleasePlan,
   type UploadData,
   type UploadMain,
   type UploadShort,
@@ -30,25 +35,27 @@ import {
   TikTokPublisher,
   YOUTUBE_QUOTA,
   YouTubePublisher,
-  markUncertain,
+  failureClass,
   redactSecrets,
   resolveTikTokCredentials,
   resolveYouTubeCredentials,
   tiktokCaption,
+  withFailureClass,
   youtubeDailyQuota,
   type PublishAdapter,
   type PublishItem,
 } from '@coreslopper/providers';
-import { withReleaseLock } from './release-calendar.js';
-import { usedLibrarySounds } from './release.js';
-import { loadUploadData, uploadPaths } from './upload-text.js';
+import { appendPublishEntry, readPublishLog } from './release-records.js';
+import { loadReleasePlan, usedLibrarySounds } from './release.js';
+import { releaseLabels } from './release-texts.js';
+import { loadUploadData } from './upload-text.js';
 
-/** YouTube limits that `publish` checks before an upload. */
+/** YouTube limits that `publish` checks before an upload; the text limits come from the one table. */
 export const YOUTUBE_LIMITS = {
-  titleChars: 100,
-  descriptionBytes: 5000,
-  tagChars: 500,
-  hashtags: 15,
+  titleChars: PLATFORM_LIMITS.youtube.title,
+  descriptionBytes: PLATFORM_LIMITS.youtube.description_bytes,
+  tagChars: PLATFORM_LIMITS.youtube.tags,
+  hashtags: PLATFORM_LIMITS.youtube.hashtags,
   thumbnailBytes: 2 * 1024 * 1024,
   shortSeconds: 180,
   /** Longest upload of a channel that has not verified its phone number. */
@@ -124,11 +131,6 @@ export async function hashVideo(path: string): Promise<string> {
   return hash.digest('hex');
 }
 
-export async function readPublishLog(path: string): Promise<PublishLog> {
-  if (!existsSync(path)) return { version: 1, entries: [] };
-  return readJsonFile(path, PublishLogSchema);
-}
-
 /** The calendar day of the YouTube quota, which resets at midnight Pacific Time. */
 export function quotaDay(date: Date): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(date);
@@ -163,23 +165,45 @@ function toItem(projectDir: string, data: UploadData, entry: UploadMain | Upload
   };
 }
 
+/**
+ * The exact platform texts of one item from the release plan: the YouTube
+ * description already carries chapters, footer, and hashtags, and the TikTok
+ * caption already carries its pointer and hashtags.
+ */
+function applyPlan(item: PublishItem, plan: ReleasePlan | undefined, ids: { youtube: string; tiktok: string }): void {
+  const youtube = plan?.posts.find((post) => post.id === ids.youtube);
+  const tiktok = plan?.posts.find((post) => post.id === ids.tiktok);
+  if (youtube?.texts.title) item.title = youtube.texts.title.value;
+  if (youtube?.texts.description) {
+    item.description = youtube.texts.description.value;
+    // The plan's description already holds the hashtags; appending them again would double them.
+    item.hashtags = [];
+  }
+  if (tiktok?.texts.caption) item.caption = tiktok.texts.caption.value;
+}
+
 /** The items `--only` selects, each with the platforms it is meant for. */
 export function selectItems(
   projectDir: string,
   data: UploadData,
   only?: string,
-  /** How a meme's main item posts: its release caption, credits included (HS-261, HS-265, HS-172). */
-  main: { meme?: boolean; credits?: string[] } = {},
+  /** The release plan's texts, and how a meme posts when no plan exists yet (HS-261, HS-265, HS-172). */
+  main: { meme?: boolean; credits?: string[]; plan?: ReleasePlan } = {},
 ): { item: PublishItem; platforms: PublishPlatform[] }[] {
   const item = toItem(projectDir, data, data.main, 'main');
+  if (main.plan) applyPlan(item, main.plan, { youtube: 'youtube', tiktok: 'tiktok' });
   // A meme posts the one caption the release folder holds, with or without a credit; the platforms never see a different text.
-  if (main.meme) {
+  else if (main.meme) {
     item.description = memeDescription(data, main.credits);
     item.caption = memeCaption(data, main.credits);
   }
   const all = [
     { item, platforms: data.main.platforms },
-    ...data.shorts.map((short) => ({ item: toItem(projectDir, data, short, 'short'), platforms: short.platforms })),
+    ...data.shorts.map((short) => {
+      const shortItem = toItem(projectDir, data, short, 'short');
+      if (main.plan) applyPlan(shortItem, main.plan, { youtube: `short:${short.name}:youtube`, tiktok: `short:${short.name}:tiktok` });
+      return { item: shortItem, platforms: short.platforms };
+    }),
   ];
   if (!only) return all;
   if (only === 'main') return all.slice(0, 1);
@@ -197,19 +221,20 @@ export function platformProblems(
   item: PublishItem,
   probe: VideoProbe | undefined,
   sizes: { video: number; thumbnail?: number },
+  limits: PlatformLimits = platformLimits(),
 ): { errors: string[]; warnings: string[] } {
   const errors: string[] = [];
   const warnings: string[] = [];
   const label = `${platform} ${item.name}`;
   if (platform === 'youtube') {
-    if ([...item.title].length > YOUTUBE_LIMITS.titleChars) errors.push(`${label}: title has ${[...item.title].length} characters, limit ${YOUTUBE_LIMITS.titleChars}`);
+    if ([...item.title].length > limits.youtube.title) errors.push(`${label}: title has ${[...item.title].length} characters, limit ${limits.youtube.title}`);
     const description = youtubeDescription(item);
     const bytes = Buffer.byteLength(description, 'utf8');
-    if (bytes > YOUTUBE_LIMITS.descriptionBytes) errors.push(`${label}: description with hashtags has ${bytes} bytes, limit ${YOUTUBE_LIMITS.descriptionBytes}`);
+    if (bytes > limits.youtube.description_bytes) errors.push(`${label}: description with hashtags has ${bytes} bytes, limit ${limits.youtube.description_bytes}`);
     if (/[<>]/.test(item.title) || /[<>]/.test(description)) errors.push(`${label}: title and description may not contain < or >`);
     const tagChars = youtubeTagChars(item.tags);
-    if (tagChars > YOUTUBE_LIMITS.tagChars) errors.push(`${label}: tags take ${tagChars} characters, limit ${YOUTUBE_LIMITS.tagChars}`);
-    if (item.hashtags.length > YOUTUBE_LIMITS.hashtags) warnings.push(`${label}: ${item.hashtags.length} hashtags; YouTube ignores all of them above ${YOUTUBE_LIMITS.hashtags}`);
+    if (tagChars > limits.youtube.tags) errors.push(`${label}: tags take ${tagChars} characters, limit ${limits.youtube.tags}`);
+    if (item.hashtags.length > limits.youtube.hashtags) warnings.push(`${label}: ${item.hashtags.length} hashtags; YouTube ignores all of them above ${limits.youtube.hashtags}`);
     if (sizes.thumbnail !== undefined) {
       if (sizes.thumbnail > YOUTUBE_LIMITS.thumbnailBytes) errors.push(`${label}: thumbnail is ${(sizes.thumbnail / 1e6).toFixed(1)} MB, limit 2 MB`);
       if (!['.jpg', '.jpeg', '.png'].includes(extname(item.thumbnail ?? '').toLowerCase())) errors.push(`${label}: thumbnail must be JPEG or PNG`);
@@ -230,7 +255,7 @@ export function platformProblems(
       if (Math.abs(probe.width / probe.height - 9 / 16) > 0.01) warnings.push(`${label}: ${probe.width}x${probe.height}; TikTok shows 9:16 full screen`);
     }
     const caption = tiktokCaption(item);
-    if ([...caption].length > TIKTOK_LIMITS.captionChars) errors.push(`${label}: caption has ${[...caption].length} characters, limit ${TIKTOK_LIMITS.captionChars}`);
+    if ([...caption].length > limits.tiktok.caption) errors.push(`${label}: caption has ${[...caption].length} characters, limit ${limits.tiktok.caption}`);
   }
   return { errors, warnings };
 }
@@ -296,6 +321,10 @@ export async function buildPublishPlan(
     /** A meme posts its release caption on the main item (see `selectItems`). */
     meme?: boolean;
     credits?: string[];
+    /** The release plan whose texts every upload uses. */
+    plan?: ReleasePlan;
+    /** The channel's text limits. */
+    limits?: PlatformLimits;
     /** Open TODOs of the release checks, reported as warnings: a TODO never blocks an upload (HS-172). */
     todos?: string[];
   } = {},
@@ -303,6 +332,7 @@ export async function buildPublishPlan(
   const root = resolve(projectDir);
   const now = options.now?.() ?? new Date();
   const mock = Boolean(options.mock);
+  const limits = options.limits ?? platformLimits();
   const wanted: PublishPlatform[] = !options.platform || options.platform === 'all' ? ['youtube', 'tiktok'] : [options.platform];
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -311,7 +341,7 @@ export async function buildPublishPlan(
   const probes = new Map<string, VideoProbe | undefined>();
   let unprobed = 0;
 
-  for (const { item, platforms } of selectItems(root, data, options.only, { meme: options.meme, credits: options.credits })) {
+  for (const { item, platforms } of selectItems(root, data, options.only, { meme: options.meme, credits: options.credits, plan: options.plan })) {
     const targets = platforms.filter((platform) => wanted.includes(platform));
     if (targets.length === 0) continue;
     const file = item.file.startsWith(`${root}/`) ? relative(root, item.file) : item.file;
@@ -335,7 +365,7 @@ export async function buildPublishPlan(
       ...(item.thumbnail && existsSync(item.thumbnail) ? { thumbnail: (await stat(item.thumbnail)).size } : {}),
     };
     for (const platform of targets) {
-      const problems = platformProblems(platform, item, probe, sizes);
+      const problems = platformProblems(platform, item, probe, sizes, limits);
       errors.push(...problems.errors);
       warnings.push(...problems.warnings);
       const hash = hashes.get(item.file)!;
@@ -439,31 +469,17 @@ function printManualSteps(print: (line: string) => void, steps: string[]): void 
 }
 
 /**
- * Append one entry to the publish log (`<project>/review/publish.json`): read it fresh under the project's release
- * lock, then write it atomically. `publish` and the autopilot may run at once (HS-189).
- */
-export async function appendPublishEntry(logPath: string, entry: PublishEntry): Promise<PublishLog> {
-  return withReleaseLock(dirname(dirname(logPath)), async () => {
-    const log = await readPublishLog(logPath);
-    log.entries.push(entry);
-    const parsed = PublishLogSchema.parse(log);
-    await writeJsonAtomic(logPath, parsed);
-    return parsed;
-  });
-}
-
-/**
  * What the upload needs to post a meme's release text: whether the project is a
  * meme, and the library sounds its takes came from (HS-261, HS-265). Reads only
  * `project.yaml` and `takes.json`: publish needs the kind and the takes, not the
  * whole loaded project.
  */
-async function uploadSounds(projectDir: string, root: string): Promise<{ meme: boolean; sounds: UsedSound[] }> {
+async function uploadSounds(projectDir: string, root: string): Promise<{ config: ProjectConfig; meme: boolean; sounds: UsedSound[] }> {
   const config = await readYamlFile(projectPaths(projectDir).config, ProjectConfigSchema);
-  if (config.kind !== 'meme') return { meme: false, sounds: [] };
+  if (config.kind !== 'meme') return { config, meme: false, sounds: [] };
   const paths = projectPaths(projectDir, config);
   const takes = paths.takes && existsSync(paths.takes) ? await readJsonFile(paths.takes, TakesSchema) : undefined;
-  return { meme: true, sounds: await usedLibrarySounds({ takes, paths }, root) };
+  return { config, meme: true, sounds: await usedLibrarySounds({ takes, paths }, root) };
 }
 
 /**
@@ -476,11 +492,35 @@ export async function publishProject(options: PublishOptions): Promise<PublishSu
   const print = options.log ?? ((line: string) => console.log(line));
   const now = options.now ?? (() => new Date());
   const data = await loadUploadData(projectDir);
-  const logPath = uploadPaths(projectDir).log;
-  let log = await readPublishLog(logPath);
-  const { meme, sounds } = await uploadSounds(projectDir, options.root ?? repoRoot());
+  let log = await readPublishLog(projectDir);
+  const root = options.root ?? repoRoot();
+  const { config, meme, sounds } = await uploadSounds(projectDir, root);
   const credits = sounds.map((sound) => sound.credit).filter((credit): credit is string => Boolean(credit));
-  const plan = await buildPublishPlan(projectDir, data, log, { ...options, meme, credits, todos: soundLicenceTodos(sounds) });
+  const channel = await loadChannel(root);
+  const limits = platformLimits(channel);
+  const handle = channel?.links.youtube?.handle;
+  // The plan `release` wrote; without a release folder, the texts of review/upload.yaml alone.
+  const storedPlan = await loadReleasePlan(projectDir);
+  const releasePlan =
+    storedPlan ??
+    buildReleasePlan({
+      kind: config.kind,
+      language: data.language,
+      slug: config.slug,
+      title: config.title,
+      data,
+      release: config.release,
+      channel,
+      limits,
+      chapters: data.main.chapters ?? [],
+      credits,
+      files: { thumbnails: [], shorts: data.shorts.map((short) => ({ name: short.name, video: short.file })) },
+      tiktokPointer: releaseLabels(data.language).tt.overlayDefault(handle && !/<ID>/.test(handle) ? handle : 'YouTube'),
+    });
+  const plan = await buildPublishPlan(projectDir, data, log, { ...options, meme, credits, plan: releasePlan, limits, todos: soundLicenceTodos(sounds) });
+  if (!storedPlan) {
+    plan.warnings.unshift('no release plan yet (renders/release/manifest.json): uploading the texts of review/upload.yaml alone; run release for the chapters, footer, and the exact captions');
+  }
   for (const line of formatPlan(plan, data.main.title, Boolean(options.dryRun))) print(line);
 
   if (plan.errors.length) {
@@ -512,7 +552,7 @@ export async function publishProject(options: PublishOptions): Promise<PublishSu
         ...(result.quotaUnits !== undefined ? { quota_units: result.quotaUnits } : {}),
         at: now().toISOString(),
       };
-      log = await appendPublishEntry(logPath, entry);
+      log = await appendPublishEntry(projectDir, entry);
       entries.push(entry);
       print(`✔ ${step.platform} ${step.item.name}: ${entry.status}${entry.url ? ` ${entry.url}` : ` (${entry.remote_id})`}`);
       for (const warning of result.warnings) print(`  ! ${warning}`);
@@ -520,9 +560,10 @@ export async function publishProject(options: PublishOptions): Promise<PublishSu
       for (const manual of [...result.manualSteps, ...(related ? [related] : [])]) manualSteps.push(`${step.platform} ${step.item.name}: ${manual}`);
     } catch (error) {
       const message = redactSecrets(error instanceof Error ? error.message : String(error), secrets());
-      const uncertain = Boolean((error as { uncertain?: boolean }).uncertain);
+      const outcome = failureClass(error);
+      const uncertain = outcome === 'uncertain';
       const entry: PublishEntry = { ...base, status: 'failed', warnings: [], error: message, ...(uncertain ? { uncertain } : {}), at: now().toISOString() };
-      log = await appendPublishEntry(logPath, entry);
+      log = await appendPublishEntry(projectDir, entry);
       entries.push(entry);
       printManualSteps(print, manualSteps);
       if (error instanceof ConfigError) throw new ConfigError(message);
@@ -531,7 +572,7 @@ export async function publishProject(options: PublishOptions): Promise<PublishSu
           (uncertain ? `; it may have gone out: check ${step.platform} before publishing it again with --force)` : ')'),
       );
       // The autopilot reads the mark and asks the user instead of retrying (never twice).
-      throw uncertain ? markUncertain(failure) : failure;
+      throw withFailureClass(failure, outcome);
     }
   }
   printManualSteps(print, manualSteps);

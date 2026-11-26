@@ -4,7 +4,6 @@ import { copyFile, mkdir, open, readFile, rm, stat } from 'node:fs/promises';
 import { dirname, isAbsolute, join, resolve, sep } from 'node:path';
 import { parseDocument } from 'yaml';
 import {
-  ConfigError,
   ProjectConfigSchema,
   ValidationError,
   approvalHolds,
@@ -15,7 +14,6 @@ import {
   plainLyrics,
   readYamlFile,
   releasedPublicly,
-  writeJsonAtomic,
   writeTextAtomic,
   type AutopilotEntry,
   type AutopilotEventPlan,
@@ -27,41 +25,42 @@ import {
   InstagramPublisher,
   LinkedInPublisher,
   XPublisher,
-  markUncertain,
+  failureClass,
   redactSecrets,
+  withFailureClass,
   YouTubePublisher,
   type SocialAdapter,
   type SocialPlatform,
   type SocialPostRequest,
 } from '@coreslopper/providers';
-import { appendAutopilotEntry, appendAutopilotEntryUnlocked, autopilotReadiness, lastRunPath, loadAutopilotLog } from './autopilot-state.js';
+import { autopilotReadiness, lastRunPath } from './autopilot-state.js';
 import { publishProject, type PublishOptions, type PublishSummary } from './publish.js';
 import { saveEnvValue } from './publish-auth.js';
-import { boardProjectDirs } from './release-board.js';
-import { projectReleaseContext } from './release-board-data.js';
+import { loadReleaseFacts, releasePlan, releaseProjectDirs, type ReleaseFacts } from './release-facts.js';
 import { acquireHolderLock } from './file-lock.js';
-import { loadStatus, runCalendar, statusPath, updateStatus, withReleaseLock } from './release-calendar.js';
+import { runCalendar } from './release-calendar.js';
+import {
+  appendAutopilotEntry,
+  appendAutopilotEntryUnlocked,
+  clearApproval,
+  loadAutopilotLog,
+  loadStatus,
+  setApproval,
+  setEventManual as setEventManualRecord,
+  updateStatus,
+  withReleaseLock,
+} from './release-records.js';
 import { micrositeSong } from './release-microsite.js';
 import { probeVideo } from './short.js';
-import { announcementText, feedVideo, linkedinPostText, mediaFile, memeCaption, xTexts } from './release-texts.js';
 
-export { appendAutopilotEntry, autopilotLogPath, autopilotReadiness, loadAutopilotLog } from './autopilot-state.js';
+export { appendAutopilotEntry, autopilotLogPath, loadAutopilotLog } from './release-records.js';
+export { autopilotReadiness } from './autopilot-state.js';
 
 // The release autopilot's runner (ADR 0029): for every release the user
 // approved on the board, post what is due by API, at its calendar time. Run
 // by a timer every few minutes (`release-timer install`); each run is short
 // and idempotent. Writes review/autopilot.json (its log) and
 // review/release-status.json (what is live, with URLs).
-
-async function writeStatus(projectRoot: string, change: (status: ReleaseStatus) => void): Promise<ReleaseStatus> {
-  return withReleaseLock(projectRoot, async () => {
-    const status = await loadStatus(projectRoot);
-    change(status);
-    await writeJsonAtomic(statusPath(projectRoot), status);
-    return status;
-  });
-}
-
 
 /**
  * The user's one click: approve the release. A proposed release day becomes
@@ -86,16 +85,12 @@ export async function approveRelease(projectRoot: string, options: { root: strin
     await setReleaseDate(projectRoot, date);
     await runCalendar({ projectDir: projectRoot, root: options.root, now: options.now, log: () => undefined });
   }
-  return writeStatus(projectRoot, (status) => {
-    status.approval = { at: options.now.toISOString(), release_date: date };
-  });
+  return setApproval(projectRoot, { at: options.now.toISOString(), release_date: date });
 }
 
 /** Withdraw the approval: the autopilot stops; what is posted stays posted. */
 export async function revokeApproval(projectRoot: string): Promise<ReleaseStatus> {
-  return writeStatus(projectRoot, (status) => {
-    delete status.approval;
-  });
+  return clearApproval(projectRoot);
 }
 
 /** Write `release.release_date` into project.yaml, keeping its comments and layout. */
@@ -110,12 +105,7 @@ export async function setReleaseDate(projectRoot: string, date: string): Promise
 
 /** The user takes a post over by hand (or gives it back to the autopilot). */
 export async function setEventManual(projectRoot: string, id: string, manual: boolean): Promise<ReleaseStatus> {
-  return writeStatus(projectRoot, (status) => {
-    const item = { ...(status.items[id] ?? { done: false }) };
-    if (manual) item.manual = true;
-    else delete item.manual;
-    status.items[id] = item;
-  });
+  return setEventManualRecord(projectRoot, id, manual);
 }
 
 /** Another attempt after a failure or a stuck run; `force` posts a missed post although its time has passed. */
@@ -134,6 +124,8 @@ export interface AutopilotDeps {
   env: NodeJS.ProcessEnv;
   now: () => Date;
   log: (line: string) => void;
+  /** One project's release facts; a round reads them once per project. Tests count calls through this seam. */
+  loadFacts: (projectDir: string, root: string) => Promise<ReleaseFacts>;
 }
 
 function defaultDeps(): AutopilotDeps {
@@ -163,6 +155,7 @@ function defaultDeps(): AutopilotDeps {
     env: process.env,
     now: () => new Date(),
     log: (line) => console.log(line),
+    loadFacts: loadReleaseFacts,
   };
 }
 
@@ -213,7 +206,7 @@ export async function runAutopilot(options: AutopilotOptions): Promise<Autopilot
   }
   try {
     const result: AutopilotRunResult = { projects: [] };
-    for (const dir of await boardProjectDirs(options.root)) {
+    for (const dir of await releaseProjectDirs(options.root)) {
       const slug = dir.split(sep).at(-1)!;
       if (options.project && options.project !== slug) continue;
       try {
@@ -235,36 +228,36 @@ export async function runAutopilot(options: AutopilotOptions): Promise<Autopilot
 
 async function runProject(dir: string, slug: string, options: AutopilotOptions, deps: AutopilotDeps): Promise<AutopilotRunResult['projects'][number]> {
   const acted: AutopilotRunResult['projects'][number]['acted'] = [];
-  let context = await projectReleaseContext(dir, options.root);
+  const facts = await deps.loadFacts(dir, options.root);
   // A project that is no longer released publicly is left alone, also with an approval from before (ST-041).
-  if (!releasedPublicly(context.project.config)) {
+  if (!releasedPublicly(facts.project.config)) {
     deps.log(`${notReleasedPublicly(slug)}; nothing to post`);
-    return { slug, approved: Boolean(context.calendar && approvalHolds(context.status, context.calendar)), acted, attention: [] };
+    return { slug, approved: Boolean(facts.calendar && approvalHolds(facts.status, facts.calendar)), acted, attention: [] };
   }
-  const settings = context.schedule.autopilot;
+  const settings = facts.schedule.autopilot;
   const { ready } = autopilotReadiness(settings, deps.env, deps.now());
+  // One facts load for the round: only the records (status and log) are read again between steps.
   const plan = async () => {
-    context = await projectReleaseContext(dir, options.root);
-    if (!context.calendar) return [];
+    if (!facts.calendar) return [];
     return planAutopilot({
-      calendar: context.calendar,
-      status: context.status,
+      calendar: facts.calendar,
+      status: await loadStatus(dir),
       log: await loadAutopilotLog(dir),
       settings,
       now: deps.now(),
       ready,
-      premiere: context.input.premiere,
+      premiere: facts.input.premiere,
     });
   };
-  if (!context.calendar || !approvalHolds(context.status, context.calendar)) {
-    if (context.status.approval && context.calendar) deps.log(`${slug}: approved for ${context.status.approval.release_date}, but the release is now on ${context.calendar.release_date}: approve it again on the board`);
+  if (!facts.calendar || !approvalHolds(facts.status, facts.calendar)) {
+    if (facts.status.approval && facts.calendar) deps.log(`${slug}: approved for ${facts.status.approval.release_date}, but the release is now on ${facts.calendar.release_date}: approve it again on the board`);
     return { slug, approved: false, acted, attention: [] };
   }
 
   // First the uploads that wait to go public: the posts that link to them follow in the same run.
   for (const item of (await plan()).filter((entry) => entry.state === 'pending' && entry.action?.kind === 'youtube')) {
     if (options.dryRun) continue;
-    const outcome = await pollYouTube(dir, item, context, deps).catch((error: Error) => {
+    const outcome = await pollYouTube(dir, item, facts, deps).catch((error: Error) => {
       deps.log(`${slug} ${item.id}: could not read the video's status (${redactSecrets(error.message)})`);
       return undefined;
     });
@@ -277,29 +270,19 @@ async function runProject(dir: string, slug: string, options: AutopilotOptions, 
       acted.push({ id: item.id, status: 'running' });
       continue;
     }
-    // Claim it under the project's lock: plan it again from the files as they are now (an earlier action
+    // Claim it under the project's lock: plan it again from the records as they are now (an earlier action
     // in this run, or a click on the board, may have changed things) and log it as running in the same breath.
     const claimed = await withReleaseLock(dir, async () => {
-      const fresh = planAutopilot({
-        calendar: context.calendar!,
-        status: await loadStatus(dir),
-        log: await loadAutopilotLog(dir),
-        settings,
-        now: deps.now(),
-        ready,
-        premiere: context.input.premiere,
-      }).find((entry) => entry.id === item.id);
+      const fresh = (await plan()).find((entry) => entry.id === item.id);
       if (fresh?.state !== 'due') return undefined;
       await appendAutopilotEntryUnlocked(dir, { event: item.id, status: 'running', at: deps.now().toISOString() });
       return fresh;
     });
     if (!claimed) continue;
-    context = await projectReleaseContext(dir, options.root);
-    acted.push(await execute(dir, claimed, context, deps));
+    acted.push(await execute(dir, claimed, facts, await loadStatus(dir), deps));
   }
   if (!options.dryRun) {
-    context = await projectReleaseContext(dir, options.root);
-    const comment = await ensurePinnedComment(dir, context, deps, ready).catch((error: Error) => {
+    const comment = await ensurePinnedComment(dir, facts, deps, ready).catch((error: Error) => {
       deps.log(`${slug} ${COMMENT_EVENT}: could not check the main video (${redactSecrets(error.message)})`);
       return undefined;
     });
@@ -310,10 +293,8 @@ async function runProject(dir: string, slug: string, options: AutopilotOptions, 
   return { slug, approved: true, acted, attention };
 }
 
-type Context = Awaited<ReturnType<typeof projectReleaseContext>>;
-
 /** A YouTube upload that went public (switched in Studio, or its scheduled time came): the event is live. */
-async function pollYouTube(dir: string, item: AutopilotEventPlan, context: Context, deps: AutopilotDeps) {
+async function pollYouTube(dir: string, item: AutopilotEventPlan, facts: ReleaseFacts, deps: AutopilotDeps) {
   const id = item.last?.remote_id;
   if (!id) return undefined;
   const video = await deps.youtube().videoStatus(id);
@@ -321,7 +302,7 @@ async function pollYouTube(dir: string, item: AutopilotEventPlan, context: Conte
   const url = item.last?.url ?? (item.action?.kind === 'youtube' && item.action.item !== 'main' ? `https://youtube.com/shorts/${id}` : `https://youtu.be/${id}`);
   await appendAutopilotEntry(dir, { event: item.id, status: 'posted', at: deps.now().toISOString(), remote_id: id, url });
   await markLive(dir, item.id, url, deps.now());
-  deps.log(`${context.input.slug} ${item.id}: live at ${url}`);
+  deps.log(`${facts.input.slug} ${item.id}: live at ${url}`);
   return { id: item.id, status: 'posted' as const, url };
 }
 
@@ -338,45 +319,47 @@ export const COMMENT_EVENT = 'youtube:comment';
  * attempt is logged as running first, and any entry stops further attempts but
  * a plain failure, which is retried up to `retries` times.
  */
-async function ensurePinnedComment(dir: string, context: Context, deps: AutopilotDeps, ready: Record<string, boolean>) {
+async function ensurePinnedComment(dir: string, facts: ReleaseFacts, deps: AutopilotDeps, ready: Record<string, boolean>) {
   // A meme is posted as a Short: its one text is the caption, not a pinned comment under a main video.
-  const pinned = context.input.kind === 'meme' ? undefined : context.data?.main.pinned_comment;
-  const settings = context.schedule.autopilot;
-  const item = context.status.items.youtube;
+  const status = await loadStatus(dir);
+  const pinned = facts.input.kind === 'meme' ? undefined : releasePlan(facts, status).posts.find((post) => post.id === 'youtube')?.texts.pinned?.value ?? facts.data?.main.pinned_comment;
+  const settings = facts.schedule.autopilot;
+  const item = status.items.youtube;
   if (!pinned || !item?.done || item.manual || !settings.platforms.includes('youtube') || !ready.youtube) return undefined;
   const log = await loadAutopilotLog(dir);
-  const id = mainVideoId(context.status, log);
+  const id = mainVideoId(status, log);
   const entries = log.entries.filter((entry) => entry.event === COMMENT_EVENT);
-  const failures = entries.filter((entry) => entry.status === 'failed' && !entry.uncertain).length;
-  if (!id || entries.some((entry) => entry.status !== 'failed' || entry.uncertain) || failures >= settings.retries) return undefined;
+  const failures = entries.filter((entry) => entry.status === 'failed' && !entry.uncertain && !entry.fatal).length;
+  if (!id || entries.some((entry) => entry.status !== 'failed' || entry.uncertain || entry.fatal) || failures >= settings.retries) return undefined;
   if ((await deps.youtube().videoStatus(id)).privacyStatus !== 'public') return undefined;
   await appendAutopilotEntry(dir, { event: COMMENT_EVENT, status: 'running', at: deps.now().toISOString() });
   try {
     const { commentId } = await deps.youtube().postComment(id, pinned);
     await appendAutopilotEntry(dir, { event: COMMENT_EVENT, status: 'posted', at: deps.now().toISOString(), remote_id: commentId, manual_steps: ['Pin the comment under the video in YouTube Studio.'] });
-    deps.log(`${context.input.slug} ${COMMENT_EVENT}: posted; pin it in YouTube Studio`);
+    deps.log(`${facts.input.slug} ${COMMENT_EVENT}: posted; pin it in YouTube Studio`);
     return { id: COMMENT_EVENT, status: 'posted' as const };
   } catch (error) {
     const message = redactSecrets((error as Error).message);
-    await appendAutopilotEntry(dir, { event: COMMENT_EVENT, status: 'failed', at: deps.now().toISOString(), error: message, ...(markedUncertain(error) ? { uncertain: true } : {}) });
-    deps.log(`${context.input.slug} ${COMMENT_EVENT}: failed: ${message}`);
+    const outcome = failureClass(error);
+    await appendAutopilotEntry(dir, {
+      event: COMMENT_EVENT,
+      status: 'failed',
+      at: deps.now().toISOString(),
+      error: message,
+      ...(outcome === 'uncertain' ? { uncertain: true } : {}),
+      ...(outcome === 'fatal' ? { fatal: true } : {}),
+    });
+    deps.log(`${facts.input.slug} ${COMMENT_EVENT}: failed: ${message}`);
     return { id: COMMENT_EVENT, status: 'failed' as const, error: message };
   }
 }
 
-/** A YouTube comment POST is never retried by the adapter: a lost answer may have posted it. */
-function markedUncertain(error: unknown): boolean {
-  if ((error as { uncertain?: boolean }).uncertain) return true;
-  const status = (error as { status?: number }).status;
-  return status === undefined || status >= 500;
-}
-
 /** One claimed event: act, log the outcome. */
-async function execute(dir: string, item: AutopilotEventPlan, context: Context, deps: AutopilotDeps) {
-  const slug = context.input.slug;
+async function execute(dir: string, item: AutopilotEventPlan, facts: ReleaseFacts, status: ReleaseStatus, deps: AutopilotDeps) {
+  const slug = facts.input.slug;
   deps.log(`${slug} ${item.id}: ${item.action!.kind}...`);
   try {
-    const outcome = await act(dir, item, context, deps);
+    const outcome = await act(dir, item, facts, status, deps);
     await appendAutopilotEntry(dir, { event: item.id, at: deps.now().toISOString(), ...outcome });
     if (outcome.status === 'posted') await markLive(dir, item.id, outcome.url, deps.now());
     deps.log(`${slug} ${item.id}: ${outcome.status}${outcome.url ? ` ${outcome.url}` : ''}`);
@@ -384,9 +367,15 @@ async function execute(dir: string, item: AutopilotEventPlan, context: Context, 
     return { id: item.id, status: outcome.status, url: outcome.url };
   } catch (error) {
     const message = redactSecrets((error as Error).message ?? String(error));
-    const uncertain = Boolean((error as { uncertain?: boolean }).uncertain);
-    const fatal = error instanceof ConfigError || error instanceof ValidationError;
-    await appendAutopilotEntry(dir, { event: item.id, status: 'failed', at: deps.now().toISOString(), error: message, ...(uncertain ? { uncertain } : {}), ...(fatal ? { fatal } : {}) });
+    const outcome = failureClass(error);
+    await appendAutopilotEntry(dir, {
+      event: item.id,
+      status: 'failed',
+      at: deps.now().toISOString(),
+      error: message,
+      ...(outcome === 'uncertain' ? { uncertain: true } : {}),
+      ...(outcome === 'fatal' ? { fatal: true } : {}),
+    });
     deps.log(`${slug} ${item.id}: failed: ${message}`);
     return { id: item.id, status: 'failed' as const, error: message };
   }
@@ -394,13 +383,22 @@ async function execute(dir: string, item: AutopilotEventPlan, context: Context, 
 
 type Outcome = Pick<AutopilotEntry, 'status'> & Partial<Pick<AutopilotEntry, 'remote_id' | 'url' | 'publish_at' | 'warnings' | 'manual_steps' | 'cost_usd'>>;
 
-async function act(dir: string, item: AutopilotEventPlan, context: Context, deps: AutopilotDeps): Promise<Outcome> {
+async function act(dir: string, item: AutopilotEventPlan, facts: ReleaseFacts, status: ReleaseStatus, deps: AutopilotDeps): Promise<Outcome> {
   const action = item.action!;
-  const { data, files, status } = context;
-  if (!data) throw new ValidationError('review/upload.yaml is missing');
-  const file = (rel: string | undefined) => (rel ? join(context.dir, rel) : undefined);
+  const file = (rel: string | undefined) => (rel ? join(facts.dir, rel) : undefined);
   const youtubeUrl = status.items.youtube?.url;
-  const settings = context.schedule.autopilot;
+  const settings = facts.schedule.autopilot;
+  const post = releasePlan(facts, status).posts.find((entry) => entry.id === item.id);
+  const text = (key: string): string => {
+    if (!post) throw new ValidationError(`no release plan post for ${item.id}`);
+    const value = post.texts[key]?.value;
+    if (value === undefined) throw new ValidationError(`${item.id} has no ${key} in the release plan`);
+    return value.replaceAll('{youtube}', youtubeUrl ?? '').replaceAll('{spotify}', status.items.song?.url ?? '');
+  };
+  const media = (): { path: string; kind: 'video' | 'image' } => {
+    if (!post?.media) throw new ValidationError(`${item.id} has no media in the release plan`);
+    return { path: file(post.media)!, kind: /\.(mp4|mov|webm)$/i.test(post.media) ? 'video' : 'image' };
+  };
 
   if (action.kind === 'youtube' || action.kind === 'tiktok') {
     const platform = action.kind;
@@ -408,7 +406,7 @@ async function act(dir: string, item: AutopilotEventPlan, context: Context, deps
     const schedule = platform === 'youtube' && settings.youtube_audited && Date.parse(item.event.at) - deps.now().getTime() > 20 * 60_000 ? item.event.at : undefined;
     const summary = await deps.publish({
       projectDir: dir,
-      root: workspaceRootOf(context),
+      root: facts.root,
       platform,
       only: action.item,
       ...(schedule ? { schedule } : {}),
@@ -420,7 +418,7 @@ async function act(dir: string, item: AutopilotEventPlan, context: Context, deps
     if (!entry) throw new ValidationError(`publish planned no ${platform} upload for ${action.item}`);
     if (entry.status === 'failed') {
       const failure = new Error(entry.error ?? `the ${platform} upload failed`);
-      throw entry.uncertain ? markUncertain(failure) : failure;
+      throw entry.uncertain ? withFailureClass(failure, 'uncertain') : failure;
     }
     if (platform === 'tiktok') {
       const directMode = settings.tiktok_direct || deps.env.TIKTOK_DIRECT_POST === '1';
@@ -437,7 +435,7 @@ async function act(dir: string, item: AutopilotEventPlan, context: Context, deps
     }
     const studio = entry.remote_id ? `https://studio.youtube.com/video/${entry.remote_id}/edit` : 'YouTube Studio';
     const steps: string[] = [];
-    if (action.item === 'main' && context.input.kind !== 'meme' && context.schedule.release.premiere) steps.push(`Schedule it as a Premiere at ${item.event.at} in ${studio} (the API cannot).`);
+    if (action.item === 'main' && facts.input.kind !== 'meme' && facts.schedule.release.premiere) steps.push(`Schedule it as a Premiere at ${item.event.at} in ${studio} (the API cannot).`);
     else if (entry.status !== 'scheduled') steps.push(`Switch it to public at ${item.event.at} in ${studio} (an unaudited API project uploads private only).`);
     if (action.item !== 'main') steps.push(`Set the related video to the main video in ${studio}.`);
     return { status: entry.status === 'scheduled' ? 'scheduled' : 'uploaded', remote_id: entry.remote_id, url: entry.url, publish_at: entry.publish_at, warnings: entry.warnings, manual_steps: steps };
@@ -453,16 +451,16 @@ async function act(dir: string, item: AutopilotEventPlan, context: Context, deps
 
   if (action.kind === 'microsite') {
     const site = settings.microsite!;
-    const target = isAbsolute(site.dir) ? site.dir : resolve(workspaceRootOf(context), site.dir);
-    const slug = context.input.slug;
-    const lyrics = context.music && existsSync(context.project.paths.lyrics) ? plainLyrics(await readFile(context.project.paths.lyrics, 'utf8')) : undefined;
-    const song = micrositeSong(context.input, { status, calendar: context.calendar, lyrics });
+    const target = isAbsolute(site.dir) ? site.dir : resolve(facts.root, site.dir);
+    const slug = facts.input.slug;
+    const lyrics = facts.music && existsSync(facts.project.paths.lyrics) ? plainLyrics(await readFile(facts.project.paths.lyrics, 'utf8')) : undefined;
+    const song = micrositeSong(facts.input, { status, calendar: facts.calendar, lyrics });
     await mkdir(target, { recursive: true });
     await writeTextAtomic(join(target, `${slug}.json`), `${JSON.stringify(song, null, 2)}\n`);
     for (const rel of [song.images.cover, song.images.thumbnail, ...song.images.shorts].filter((path): path is string => Boolean(path))) {
       const destination = join(target, slug, rel);
       await mkdir(dirname(destination), { recursive: true });
-      await copyFile(join(context.dir, rel), destination);
+      await copyFile(join(facts.dir, rel), destination);
     }
     if (site.command) await deps.runCommand(site.command, target);
     return { status: 'posted', manual_steps: [] };
@@ -472,88 +470,44 @@ async function act(dir: string, item: AutopilotEventPlan, context: Context, deps
   let request: SocialPostRequest;
   if (action.kind === 'instagram') {
     if (action.placement === 'reel') {
-      if (context.input.kind === 'meme' && action.item === 'main') {
-        // A meme's one video is its Reel: the same caption with the credits as the folder text.
-        if (!files.master) throw new ValidationError('no 9:16 video in the release folder');
-        request = { event: item.id, text: memeCaption(context.input), media: { path: file(files.master)!, kind: 'video' }, placement: 'reel' };
+      if (post?.coverFrame !== undefined) {
+        request = { event: item.id, text: text('caption'), media: media(), placement: 'reel', coverOffsetMs: Math.round(post.coverFrame * 1000) };
       } else {
-        const short = data.shorts.find((entry) => entry.name === action.item);
-        const video = files.shorts.find((entry) => entry.name === action.item)?.video;
-        if (!short?.instagram || !video) throw new ValidationError(`no Instagram text or video for ${action.item}`);
-        request = {
-          event: item.id,
-          text: [short.instagram.caption.trim(), short.instagram.hashtags.join(' ')].filter(Boolean).join('\n\n'),
-          media: { path: file(video)!, kind: 'video' },
-          placement: 'reel',
-          ...(short.instagram.cover_frame !== undefined ? { coverOffsetMs: Math.round(short.instagram.cover_frame * 1000) } : {}),
-        };
+        request = { event: item.id, text: text('caption'), media: media(), placement: 'reel' };
       }
     } else if (action.placement === 'feed') {
-      if (!data.instagram_post) throw new ValidationError('instagram_post is missing in review/upload.yaml');
-      const video = feedVideo(context.input);
-      const image = files.feedImage ?? files.cover;
-      if (!video && !image) throw new ValidationError('no feed video or image in the release folder');
-      request = {
-        event: item.id,
-        text: [data.instagram_post.caption.trim(), data.instagram_post.hashtags.join(' ')].filter(Boolean).join('\n\n'),
-        media: video ? { path: file(video)!, kind: 'video' } : { path: file(image)!, kind: 'image' },
-        placement: 'feed',
-      };
+      request = { event: item.id, text: text('caption'), media: media(), placement: 'feed' };
     } else {
-      const image = files.announceStory ?? files.cover;
-      if (!image) throw new ValidationError('no announcement story image in the release folder');
-      request = { event: item.id, text: '', media: { path: file(image)!, kind: 'image' }, placement: 'story' };
+      request = { event: item.id, text: '', media: media(), placement: 'story' };
     }
   } else if (action.kind === 'x') {
-    if (action.item === 'announcement') {
-      const text = announcementText(context.input);
-      if (!text) throw new ValidationError('announcement is missing in review/upload.yaml');
-      const media = files.teaser ? { path: file(files.teaser)!, kind: 'video' as const } : files.announcePost ?? files.cover ? { path: file(files.announcePost ?? files.cover)!, kind: 'image' as const } : undefined;
-      request = { event: item.id, text, ...(media ? { media } : {}) };
-    } else if (action.item === 'main') {
-      if (!data.x || !youtubeUrl) throw new ValidationError('x or the live main video is missing');
-      const texts = xTexts(data.x, youtubeUrl);
-      const video = mediaFile(context.input, data.x.media ?? files.shorts[0]?.name);
-      request = { event: item.id, text: texts.post, reply: texts.reply, ...(video ? { media: { path: file(video)!, kind: 'video' as const } } : {}) };
-    } else {
-      const short = data.shorts.find((entry) => entry.name === action.item);
-      const video = files.shorts.find((entry) => entry.name === action.item)?.video;
-      if (!short?.x || !video) throw new ValidationError(`no X text or video for ${action.item}`);
-      const texts = xTexts({ ...short.x, reply: undefined }, youtubeUrl ?? '');
-      request = { event: item.id, text: texts.post, ...(texts.reply ? { reply: texts.reply } : {}), media: { path: file(video)!, kind: 'video' } };
-    }
+    const reply = post?.texts.reply?.value;
+    if (reply === undefined) request = { event: item.id, text: text('post'), ...(post?.media ? { media: media() } : {}) };
+    else request = { event: item.id, text: text('post'), reply: text('reply'), ...(post?.media ? { media: media() } : {}) };
   } else {
-    const li = data.linkedin;
-    if (li?.decision !== 'post' || !youtubeUrl) throw new ValidationError('the LinkedIn post or the live main video is missing');
-    const video = mediaFile(context.input, li.media);
-    request = { event: item.id, text: linkedinPostText(li, youtubeUrl), ...(video ? { media: { path: file(video)!, kind: 'video' as const } } : {}) };
+    request = { event: item.id, text: text('post'), ...(post?.media ? { media: media() } : {}) };
   }
   const platform = action.kind as SocialPlatform;
   const result = await social(request, platform);
   return { status: 'posted', remote_id: result.remoteId, url: result.url, warnings: result.warnings, manual_steps: result.manualSteps, ...(result.costUsd !== undefined ? { cost_usd: result.costUsd } : {}) };
 }
 
-/** The workspace root of a project: two levels above it (`<root>/projects/<slug>`). */
-function workspaceRootOf(context: Context): string {
-  return resolve(context.project.paths.root, '..', '..');
-}
-
 /** Print the plan of every release with a calendar, approved or not: what is due, waiting, and what needs the user. */
 export async function autopilotOverview(root: string, options: { now?: Date; env?: NodeJS.ProcessEnv; log?: (line: string) => void } = {}): Promise<void> {
   const log = options.log ?? ((line: string) => console.log(line));
   const now = options.now ?? new Date();
-  for (const dir of await boardProjectDirs(root)) {
-    const context = await projectReleaseContext(dir, root);
-    if (!context.calendar) continue;
+  for (const dir of await releaseProjectDirs(root)) {
+    const facts = await loadReleaseFacts(dir, root);
+    if (!facts.calendar) continue;
     // A project that is no longer released publicly has no plan, even with an earlier calendar on disk (ST-041).
-    if (!releasedPublicly(context.project.config)) {
-      log(`${notReleasedPublicly(context.input.slug)}; nothing to plan`);
+    if (!releasedPublicly(facts.project.config)) {
+      log(`${notReleasedPublicly(facts.input.slug)}; nothing to plan`);
       continue;
     }
-    const settings = context.schedule.autopilot;
+    const settings = facts.schedule.autopilot;
     const { ready, notes } = autopilotReadiness(settings, options.env, now);
-    const plans = planAutopilot({ calendar: context.calendar, status: context.status, log: await loadAutopilotLog(dir), settings, now, ready, premiere: context.input.premiere });
-    log(`${context.input.slug}: ${context.status.approval ? `approved ${context.status.approval.at.slice(0, 10)}` : 'not approved'} (release ${context.calendar.release_date})`);
+    const plans = planAutopilot({ calendar: facts.calendar, status: facts.status, log: await loadAutopilotLog(dir), settings, now, ready, premiere: facts.input.premiere });
+    log(`${facts.input.slug}: ${facts.status.approval ? `approved ${facts.status.approval.at.slice(0, 10)}` : 'not approved'} (release ${facts.calendar.release_date})`);
     for (const plan of plans) {
       const when = plan.event.at.slice(0, 16).replace('T', ' ');
       log(`  ${when}  ${plan.id.padEnd(28)} ${plan.state}${plan.block ? ` (${plan.block})` : ''}${plan.needsUser ? '  ← you' : ''}`);

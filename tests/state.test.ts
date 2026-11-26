@@ -12,6 +12,7 @@ import {
   remainingBudget,
   setStageDone,
   setStageRunning,
+  uncommittedBudget,
 } from '@coreslopper/core';
 
 const config = ProjectConfigSchema.parse({
@@ -67,6 +68,23 @@ describe('state machine', () => {
     expect(remainingBudget(state)).toBe(40);
     expect(effectiveBatchCap(config, state)).toBeCloseTo(12);
     expect(() => recordSpend(state, 45)).toThrow(BudgetError);
+  });
+
+  it('takes committed budgets off the remaining amount', () => {
+    const state = createInitialState(config, '0.1.0');
+    recordSpend(state, 10);
+    state.budget.reservedUsd = 5;
+    const table = [
+      { committedUsd: 0, remainingUsd: 35, capUsd: 10.5 },
+      { committedUsd: 15, remainingUsd: 20, capUsd: 6 },
+      { committedUsd: 35, remainingUsd: 0, capUsd: 0 },
+      { committedUsd: 60, remainingUsd: 0, capUsd: 0 },
+    ];
+    for (const row of table) {
+      expect(remainingBudget(state, row.committedUsd)).toBe(row.remainingUsd);
+      expect(effectiveBatchCap(config, state, row.committedUsd)).toBeCloseTo(row.capUsd);
+    }
+    expect(uncommittedBudget(50, 10, 15, 5)).toBe(20);
   });
 
   it('reports done only when every stage is done or skipped', () => {

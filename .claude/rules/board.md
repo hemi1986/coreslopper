@@ -46,8 +46,8 @@ release view only. "Page", "screen" and "sidebar" are not terms; "tab" is only t
     `docs/assets/` images).
   - `/media` checks only that the path stays inside the release folder.
 - Two sets of projects. `projectDirs`/`seriesDirs` (every project and series) serve production, review, files and
-  the wizard. `boardProjectDirs` (a release folder or a calendar) serves the release routes and `/media`, and the
-  autopilot reads it too.
+  the wizard. `releaseProjectDirs` (a release folder or a calendar, in `release-facts.ts`) serves the release routes
+  and `/media`, and the autopilot reads it too.
 - The page (`packages/cli/src/board/`) is static ES modules with no build step:
   - `app.js` holds the hash routes, the navigation and the user's refresh (no poll, ADR 0049);
   - `markdown.js` renders the markdown subset of the docs and the project documents as DOM nodes, never as HTML;

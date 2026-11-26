@@ -1,17 +1,24 @@
-import { createReadStream, existsSync } from 'node:fs';
-import { mkdtemp, readFile, readdir, rm, stat } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { tmpdir } from 'node:os';
-import { extname, join, resolve, sep } from 'node:path';
+import { extname, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ValidationError, calendarIcs, loadChannel, loadProject, releasedPublicly, repoRoot, LIBRARY_SOUND_FILE, type ReleaseCalendar } from '@coreslopper/core';
-import { boardProject, type BoardProject } from './release-board-data.js';
+import { ValidationError, loadChannel, repoRoot, LIBRARY_SOUND_FILE } from '@coreslopper/core';
+import { MIME, body, json, send, serveMedia } from './board-http.js';
+import { releaseRoutes } from './release-board-routes.js';
 import { loadEvents, loadSnapshot } from './production-watch.js';
 import { editNote, reviewData, submitRound } from './board-review.js';
 import { SLUG, productionDetail, productionOverview, productionSeries, projectDirs, seriesDirs } from './board-production.js';
-import { loadCalendar, updateStatus } from './release-calendar.js';
-import { LIBRARY_FILE_LIMITS, safeName } from './library-entry.js';
-import { releaseDir } from './release.js';
+import {
+  LIBRARY_FILE_LIMITS,
+  libraryTarget,
+  libraryTargets,
+  safeName,
+  type LibraryImportOptions,
+  type LibraryImportOutcome,
+  type LibraryUseOptions,
+  type LibraryUseOutcome,
+} from './library-entry.js';
 
 // The board: a local web page over the workspace. Its production view shows
 // every project and series as the pipeline leaves them (stages, budget,
@@ -38,36 +45,6 @@ export interface BoardOptions {
   refresh?: (projectDir: string) => Promise<void>;
 }
 
-/** The quick refresh after a live URL arrives: texts and microsite data, no renders, no new stills; an internal project has none. */
-async function quickRelease(projectDir: string, root: string): Promise<void> {
-  if (!releasedPublicly((await loadProject(projectDir)).config)) return;
-  const { buildRelease } = await import('./release.js');
-  await buildRelease({ projectDir, root, render: false, stills: false, deps: { log: () => undefined } });
-}
-
-const MIME: Record<string, string> = {
-  '.mp4': 'video/mp4',
-  '.mov': 'video/quicktime',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.png': 'image/png',
-  '.webp': 'image/webp',
-  '.wav': 'audio/wav',
-  '.mp3': 'audio/mpeg',
-  '.json': 'application/json; charset=utf-8',
-  '.txt': 'text/plain; charset=utf-8',
-  '.lrc': 'text/plain; charset=utf-8',
-  '.srt': 'text/plain; charset=utf-8',
-  '.md': 'text/plain; charset=utf-8',
-  '.ics': 'text/calendar; charset=utf-8',
-  '.svg': 'image/svg+xml',
-  '.yaml': 'text/plain; charset=utf-8',
-  '.yml': 'text/plain; charset=utf-8',
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-};
-
 /** What the board serves from a project, relative to the project: its media folders and its documents. */
 const PROJECT_FILES = /^(renders|review|assets|characters|sets|props)\/|^(brief\.md|treatment\.md|storyboard\.md|timing\.report\.md|lyrics\.txt|script\.yaml)$/;
 /** What the board serves from a series canon. */
@@ -77,35 +54,6 @@ const PAGE_FILE = /^[a-z][a-z0-9-]*\.(js|css)$/;
 /** The workspace's docs the board shows: a top-level page, or an image under docs/assets/. */
 const DOC_FILE = /^([a-z][a-z0-9-]*(?:\.de)?\.md|assets\/(?:[a-z0-9_-]+\/)*[a-z0-9_-]+\.(?:webp|png|jpe?g|svg))$/;
 const pageDir = fileURLToPath(new URL('./board/', import.meta.url));
-
-/** Project directories of the workspace that have a release folder or a calendar. */
-export async function boardProjectDirs(root: string): Promise<string[]> {
-  const dir = join(root, 'projects');
-  const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
-  return entries
-    .filter((entry) => entry.isDirectory() && SLUG.test(entry.name) && existsSync(join(dir, entry.name, 'project.yaml')))
-    .map((entry) => join(dir, entry.name))
-    .filter((path) => existsSync(join(releaseDir(path), 'manifest.json')) || existsSync(join(path, 'review', 'calendar.yaml')))
-    .sort();
-}
-
-function send(res: ServerResponse, status: number, body: string | Buffer, type = 'application/json; charset=utf-8'): void {
-  res.writeHead(status, { 'content-type': type, 'cache-control': 'no-store' });
-  res.end(body);
-}
-
-const json = (res: ServerResponse, value: unknown, status = 200) => send(res, status, JSON.stringify(value));
-
-async function body(req: IncomingMessage): Promise<unknown> {
-  const chunks: Buffer[] = [];
-  let size = 0;
-  for await (const chunk of req) {
-    size += (chunk as Buffer).length;
-    if (size > 64 * 1024) throw new ValidationError('request body too large');
-    chunks.push(chunk as Buffer);
-  }
-  return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
-}
 
 const LOOPBACK_HOST = /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/i;
 
@@ -133,46 +81,127 @@ export function trustedWrite(req: Pick<IncomingMessage, 'headers'>, upload = fal
   return undefined;
 }
 
-/** Serve a file of a release folder, with byte ranges so videos seek. */
-async function serveMedia(req: IncomingMessage, res: ServerResponse, base: string, rel: string): Promise<void> {
-  // Served files are data, never a page that runs: an SVG or HTML file opened from here gets no scripts.
-  res.setHeader('x-content-type-options', 'nosniff');
-  res.setHeader('content-security-policy', "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'; sandbox");
-  const target = resolve(base, rel);
-  if (!target.startsWith(resolve(base) + sep)) return send(res, 403, 'forbidden', 'text/plain');
-  const info = await stat(target).catch(() => undefined);
-  if (!info?.isFile()) return send(res, 404, 'not found', 'text/plain');
-  const type = MIME[extname(target).toLowerCase()] ?? 'application/octet-stream';
-  const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range ?? '');
-  if (range) {
-    const start = range[1] ? Number(range[1]) : Math.max(0, info.size - Number(range[2]));
-    const end = range[1] && range[2] ? Math.min(Number(range[2]), info.size - 1) : info.size - 1;
-    if (start > end || start >= info.size) {
-      res.writeHead(416, { 'content-range': `bytes */${info.size}` });
-      return void res.end();
-    }
-    res.writeHead(206, { 'content-type': type, 'accept-ranges': 'bytes', 'content-range': `bytes ${start}-${end}/${info.size}`, 'content-length': end - start + 1 });
-    return void createReadStream(target, { start, end }).pipe(res);
-  }
-  res.writeHead(200, { 'content-type': type, 'accept-ranges': 'bytes', 'content-length': info.size });
-  createReadStream(target).pipe(res);
+/** What the board's library routes need from a kind's lifecycle descriptor. */
+interface LibraryRouteKind {
+  /** `characters` / `sets`: the listing key and the `library/<kind>/` folder. */
+  kind: 'characters' | 'sets';
+  /** The entry file a file route never serves. */
+  entryName: string;
+  /** The roles an upload may name. */
+  roles: readonly string[];
+  /** The row key of a use: `character` / `set`; also the import body's field. */
+  useName: string;
+  entryDir: (root: string, id: string) => string;
+  load: (root: string, id: string) => Promise<unknown>;
+  list: (root: string) => Promise<{ entries: readonly unknown[]; errors: { id: string; error: string }[] }>;
+  add: (root: string, input: never, now?: Date) => Promise<{ id: string }>;
+  update: (root: string, id: string, change: never) => Promise<unknown>;
+  removeFile: (root: string, id: string, name: unknown) => Promise<unknown>;
+  remove: (root: string, id: string) => Promise<unknown>;
+  importFrom: (root: string, sourceDir: string, options: LibraryImportOptions) => Promise<LibraryImportOutcome[]>;
+  useIn: (root: string, targetDir: string, id: string, options: LibraryUseOptions) => Promise<LibraryUseOutcome>;
 }
+
+/**
+ * One library's routes: the URL family, the words its refusals and results
+ * use, and the two hooks where the kinds genuinely differ. The flow, the
+ * status codes, the write guard and the response shapes are the same for both.
+ */
+interface LibraryRouteSpec {
+  /** The kind module; its lifecycle descriptor drives the routes. */
+  module: () => Promise<{ libraryKind: LibraryRouteKind }>;
+  /** `/api/library` or `/api/sets`. */
+  api: string;
+  /** `/library-files/` or `/set-files/`. */
+  files: string;
+  /** `/api/upload/library/` or `/api/upload/sets/`. */
+  upload: string;
+  /** The refusal for a role the kind does not take. */
+  roleMessage: string;
+  /** Whether `use` takes and checks `states` (characters). */
+  states?: boolean;
+  /** Load the entry before the role check (sets); nothing for characters. */
+  beforeUpload?: (library: LibraryRouteKind, root: string, id: string) => Promise<void>;
+  /** The result words of an import (`character` vs `set`, skipped sets). */
+  importResult: (outcome: LibraryImportOutcome) => object;
+  /** The result words of a use (`character`/`states` vs `set`/`plates`). */
+  useResult: (outcome: LibraryUseOutcome) => object;
+  /** Store an uploaded file: directly into the entry, or through a temp folder and `addFile`. */
+  uploadFile: (root: string, id: string, req: IncomingMessage, query: URLSearchParams, role: string, now: Date) => Promise<void>;
+}
+
+/** Escape a URL prefix for a route's pattern. */
+const routePattern = (prefix: string) => prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const CHARACTER_LIBRARY_ROUTES: LibraryRouteSpec = {
+  module: () => import('./character-library.js'),
+  api: '/api/library',
+  files: '/library-files/',
+  upload: '/api/upload/library/',
+  roleMessage: 'role must be ref, sheet, or voice',
+  states: true,
+  importResult: (outcome) => ({
+    character: outcome.sourceId,
+    id: outcome.id!,
+    created: outcome.created,
+    added: outcome.added,
+    missing: outcome.missing,
+  }),
+  useResult: (outcome) => ({ character: outcome.id, updated: outcome.updated, files: outcome.files, states: outcome.labels }),
+  uploadFile: async (root, id, req, query, role, now) => {
+    const character = await import('./character-library.js');
+    const file = await character.libraryFileTarget(root, id, query.get('name') ?? '', role as 'ref' | 'sheet' | 'voice');
+    const { receiveUpload } = await import('./board-wizard.js');
+    await receiveUpload(req, file, LIBRARY_FILE_LIMITS.bytes);
+    try {
+      await character.recordLibraryFile(root, id, file, role as 'ref' | 'sheet' | 'voice', query.get('transcript') ?? undefined, now);
+    } catch (error) {
+      await rm(file, { force: true });
+      throw error;
+    }
+  },
+};
+
+const SET_LIBRARY_ROUTES: LibraryRouteSpec = {
+  module: () => import('./set-library.js'),
+  api: '/api/sets',
+  files: '/set-files/',
+  upload: '/api/upload/sets/',
+  roleMessage: 'role must be ref or plate',
+  // A set's upload loads the entry first, exactly as `set add-file` does.
+  beforeUpload: async (library, root, id) => {
+    await library.load(root, id);
+  },
+  importResult: (outcome) => ({
+    set: outcome.sourceId,
+    ...(outcome.id ? { id: outcome.id } : {}),
+    created: outcome.created,
+    ...(outcome.skipped ? { skipped: true } : {}),
+    added: outcome.added,
+    missing: outcome.missing,
+  }),
+  useResult: (outcome) => ({ set: outcome.id, updated: outcome.updated, files: outcome.files, plates: outcome.labels }),
+  // The image lands in a temporary folder first; `addLibrarySetFile` copies it into the entry by content,
+  // applies the plate rules and names it in set.yaml, so the board adds a file exactly as the command does.
+  uploadFile: async (root, id, req, query, role, now) => {
+    const sets = await import('./set-library.js');
+    const folder = await mkdtemp(join(tmpdir(), 'coreslopper-set-upload-'));
+    try {
+      const file = join(folder, safeName(query.get('name') ?? ''));
+      const { receiveUpload } = await import('./board-wizard.js');
+      await receiveUpload(req, file, LIBRARY_FILE_LIMITS.bytes);
+      await sets.addLibrarySetFile(root, id, file, { role: role as 'ref' | 'plate', angle: query.get('angle') ?? undefined, plate: query.get('plate') ?? undefined }, now);
+    } finally {
+      await rm(folder, { recursive: true, force: true });
+    }
+  },
+};
 
 /** The request handler, separate from the server so tests call it directly. */
 export function boardHandler(options: BoardOptions = {}) {
   const root = options.root ?? repoRoot();
   const now = options.now ?? (() => new Date());
-  const refresh = options.refresh ?? ((projectDir: string) => quickRelease(projectDir, root));
-  // One refresh per project at a time; a change during a refresh queues one more.
-  const refreshing = new Map<string, Promise<void>>();
-  const scheduleRefresh = (dir: string) => {
-    const previous = refreshing.get(dir) ?? Promise.resolve();
-    const next = previous
-      .then(() => refresh(dir))
-      .catch((error: Error) => console.error(`release-board: refreshing ${dir} failed: ${error.message}`));
-    refreshing.set(dir, next);
-    return next;
-  };
+  const release = releaseRoutes({ root, now, ...(options.refresh ? { refresh: options.refresh } : {}) });
   const workspaceDir = async (list: (root: string) => Promise<string[]>, slug: string, what: string) => {
     const dir = SLUG.test(slug) ? (await list(root)).find((entry) => entry.split(sep).at(-1) === slug) : undefined;
     if (!dir) throw new ValidationError(`unknown ${what} ${slug}`);
@@ -180,6 +209,87 @@ export function boardHandler(options: BoardOptions = {}) {
   };
   const scopeDir = (scope: string, slug: string) =>
     scope === 'series' ? workspaceDir(seriesDirs, slug, 'series') : workspaceDir(projectDirs, slug, 'project');
+  /** One library's routes, driven by its lifecycle descriptor; true when it answered the request. */
+  const libraryRoutes = (spec: LibraryRouteSpec) => {
+    const filePattern = new RegExp(`^${routePattern(spec.files)}([^/]+)/([^/]+)$`);
+    const entryPattern = new RegExp(`^${routePattern(spec.api)}/([^/]+)$`);
+    const uploadPattern = new RegExp(`^${routePattern(spec.upload)}([^/]+)$`);
+    const handle = async (req: IncomingMessage, res: ServerResponse, path: string, query: URLSearchParams): Promise<boolean> => {
+      const { libraryKind: library } = await spec.module();
+      const answer = (value: unknown) => {
+        json(res, value);
+        return true;
+      };
+      const listing = async () => {
+        const { entries, errors } = await library.list(root);
+        return { [library.kind]: entries, errors, targets: await libraryTargets(root) };
+      };
+      const fileMatch = filePattern.exec(path);
+      if (req.method === 'GET' && fileMatch) {
+        const [, id, name] = fileMatch as unknown as [string, string, string];
+        if (name.startsWith('.') || name === library.entryName) {
+          send(res, 403, 'forbidden', 'text/plain');
+          return true;
+        }
+        await serveMedia(req, res, library.entryDir(root, id), name);
+        return true;
+      }
+      if (req.method === 'GET' && path === spec.api) return answer(await listing());
+      if (req.method === 'POST' && path === `${spec.api}/new`) {
+        const entry = await library.add(root, (await body(req)) as never, now());
+        return answer({ id: entry.id });
+      }
+      if (req.method === 'POST' && path === `${spec.api}/import`) {
+        const change = (await body(req)) as Record<string, unknown>;
+        const dir = await libraryTarget(root, change.scope, change.slug);
+        const source = change[library.useName];
+        const outcomes = await library.importFrom(root, dir, {
+          sourceId: typeof source === 'string' && source ? source : undefined,
+          into: typeof change.into === 'string' && change.into ? change.into : undefined,
+          now: now(),
+        });
+        return answer({ results: outcomes.map(spec.importResult), ...(await listing()) });
+      }
+      if (req.method === 'POST' && path === `${spec.api}/use`) {
+        const change = (await body(req)) as Record<string, unknown>;
+        const dir = await libraryTarget(root, change.scope, change.slug);
+        if (
+          spec.states &&
+          change.states !== undefined &&
+          change.states !== 'all' &&
+          !(Array.isArray(change.states) && change.states.every((state) => typeof state === 'string'))
+        ) {
+          throw new ValidationError('states must be a list of state ids or "all"');
+        }
+        const result = await library.useIn(root, dir, String(change.id ?? ''), spec.states ? { states: change.states as string[] | 'all' | undefined } : {});
+        return answer({ result: spec.useResult(result), ...(await listing()) });
+      }
+      const entryMatch = entryPattern.exec(path);
+      if (req.method === 'POST' && entryMatch) {
+        const id = entryMatch[1]!;
+        const change = (await body(req)) as Record<string, unknown>;
+        if (change.action === 'update') await library.update(root, id, change as never);
+        else if (change.action === 'remove-file') await library.removeFile(root, id, change.name);
+        else if (change.action === 'delete') await library.remove(root, id);
+        else throw new ValidationError('action must be update, remove-file, or delete');
+        return answer(await listing());
+      }
+      const uploadMatch = uploadPattern.exec(path);
+      if (req.method === 'POST' && uploadMatch) {
+        const id = uploadMatch[1]!;
+        await spec.beforeUpload?.(library, root, id);
+        const role = query.get('role') ?? 'ref';
+        if (!library.roles.includes(role)) throw new ValidationError(spec.roleMessage);
+        await spec.uploadFile(root, id, req, query, role, now());
+        return answer(await listing());
+      }
+      return false;
+    };
+    return {
+      matches: (path: string) => path.startsWith(spec.api) || path.startsWith(spec.files) || path.startsWith(spec.upload),
+      handle,
+    };
+  };
   /** The wizard for new projects, series, and episodes; true when it answered the request. */
   const wizardRoute = async (req: IncomingMessage, res: ServerResponse, path: string, query: URLSearchParams): Promise<boolean> => {
     const wizard = await import('./board-wizard.js');
@@ -260,151 +370,6 @@ export function boardHandler(options: BoardOptions = {}) {
     }
     return false;
   };
-  /** The character library: list, import, new entries, uploads, use in a project or canon; true when it answered. */
-  const libraryRoute = async (req: IncomingMessage, res: ServerResponse, path: string, query: URLSearchParams): Promise<boolean> => {
-    const library = await import('./character-library.js');
-    const answer = (value: unknown) => {
-      json(res, value);
-      return true;
-    };
-    const listing = async () => ({ ...(await library.listLibrary(root)), targets: await library.libraryTargets(root) });
-    const fileMatch = /^\/library-files\/([^/]+)\/([^/]+)$/.exec(path);
-    if (req.method === 'GET' && fileMatch) {
-      const [, id, name] = fileMatch as unknown as [string, string, string];
-      if (name.startsWith('.') || name === 'character.yaml') {
-        send(res, 403, 'forbidden', 'text/plain');
-        return true;
-      }
-      await serveMedia(req, res, library.entryDir(root, id), name);
-      return true;
-    }
-    if (req.method === 'GET' && path === '/api/library') return answer(await listing());
-    if (req.method === 'POST' && path === '/api/library/new') {
-      const entry = await library.addLibraryCharacter(root, (await body(req)) as never, now());
-      return answer({ id: entry.id });
-    }
-    if (req.method === 'POST' && path === '/api/library/import') {
-      const change = (await body(req)) as { scope?: unknown; slug?: unknown; character?: unknown; into?: unknown };
-      const dir = await library.libraryTarget(root, change.scope, change.slug);
-      const results = await library.importCharacters(root, dir, {
-        character: typeof change.character === 'string' && change.character ? change.character : undefined,
-        into: typeof change.into === 'string' && change.into ? change.into : undefined,
-        now: now(),
-      });
-      return answer({ results, ...(await listing()) });
-    }
-    if (req.method === 'POST' && path === '/api/library/use') {
-      const change = (await body(req)) as { scope?: unknown; slug?: unknown; id?: unknown; states?: unknown };
-      const dir = await library.libraryTarget(root, change.scope, change.slug);
-      if (change.states !== undefined && change.states !== 'all' && !(Array.isArray(change.states) && change.states.every((state) => typeof state === 'string'))) {
-        throw new ValidationError('states must be a list of state ids or "all"');
-      }
-      const result = await library.useCharacter(root, dir, String(change.id ?? ''), { states: change.states as string[] | 'all' | undefined });
-      return answer({ result, ...(await listing()) });
-    }
-    const entryMatch = /^\/api\/library\/([^/]+)$/.exec(path);
-    if (req.method === 'POST' && entryMatch) {
-      const id = entryMatch[1]!;
-      const change = (await body(req)) as Record<string, unknown>;
-      if (change.action === 'update') await library.updateLibraryCharacter(root, id, change);
-      else if (change.action === 'remove-file') await library.removeLibraryFile(root, id, change.name);
-      else if (change.action === 'delete') await library.removeLibraryCharacter(root, id);
-      else throw new ValidationError('action must be update, remove-file, or delete');
-      return answer(await listing());
-    }
-    const uploadMatch = /^\/api\/upload\/library\/([^/]+)$/.exec(path);
-    if (req.method === 'POST' && uploadMatch) {
-      const id = uploadMatch[1]!;
-      const role = query.get('role') ?? 'ref';
-      if (role !== 'ref' && role !== 'sheet' && role !== 'voice') throw new ValidationError('role must be ref, sheet, or voice');
-      const file = await library.libraryFileTarget(root, id, query.get('name') ?? '', role);
-      const { receiveUpload } = await import('./board-wizard.js');
-      await receiveUpload(req, file, LIBRARY_FILE_LIMITS.bytes);
-      try {
-        await library.recordLibraryFile(root, id, file, role, query.get('transcript') ?? undefined, now());
-      } catch (error) {
-        await rm(file, { force: true });
-        throw error;
-      }
-      return answer(await listing());
-    }
-    return false;
-  };
-  /**
-   * The set library: list, import, new entries, uploads, edit, remove a file,
-   * use in a project or canon, delete; true when it answered the request.
-   */
-  const setsRoute = async (req: IncomingMessage, res: ServerResponse, path: string, query: URLSearchParams): Promise<boolean> => {
-    const sets = await import('./set-library.js');
-    const library = await import('./character-library.js');
-    const answer = (value: unknown) => {
-      json(res, value);
-      return true;
-    };
-    const listing = async () => ({ ...(await sets.listLibrarySets(root)), targets: await library.libraryTargets(root) });
-    // A set's files are served from their own path, apart from a character's; its entry file is never served.
-    const fileMatch = /^\/set-files\/([^/]+)\/([^/]+)$/.exec(path);
-    if (req.method === 'GET' && fileMatch) {
-      const [, id, name] = fileMatch as unknown as [string, string, string];
-      if (name.startsWith('.') || name === 'set.yaml') {
-        send(res, 403, 'forbidden', 'text/plain');
-        return true;
-      }
-      await serveMedia(req, res, sets.setEntryDir(root, id), name);
-      return true;
-    }
-    if (req.method === 'GET' && path === '/api/sets') return answer(await listing());
-    if (req.method === 'POST' && path === '/api/sets/new') {
-      const entry = await sets.addLibrarySet(root, (await body(req)) as never, now());
-      return answer({ id: entry.id });
-    }
-    if (req.method === 'POST' && path === '/api/sets/import') {
-      const change = (await body(req)) as { scope?: unknown; slug?: unknown; set?: unknown; into?: unknown };
-      const dir = await library.libraryTarget(root, change.scope, change.slug);
-      const results = await sets.importSets(root, dir, {
-        set: typeof change.set === 'string' && change.set ? change.set : undefined,
-        into: typeof change.into === 'string' && change.into ? change.into : undefined,
-        now: now(),
-      });
-      return answer({ results, ...(await listing()) });
-    }
-    if (req.method === 'POST' && path === '/api/sets/use') {
-      const change = (await body(req)) as { scope?: unknown; slug?: unknown; id?: unknown };
-      const dir = await library.libraryTarget(root, change.scope, change.slug);
-      const result = await sets.useSet(root, dir, String(change.id ?? ''));
-      return answer({ result, ...(await listing()) });
-    }
-    const entryMatch = /^\/api\/sets\/([^/]+)$/.exec(path);
-    if (req.method === 'POST' && entryMatch) {
-      const id = entryMatch[1]!;
-      const change = (await body(req)) as Record<string, unknown>;
-      if (change.action === 'update') await sets.updateLibrarySet(root, id, change);
-      else if (change.action === 'remove-file') await sets.removeLibrarySetFile(root, id, change.name);
-      else if (change.action === 'delete') await sets.removeLibrarySet(root, id);
-      else throw new ValidationError('action must be update, remove-file, or delete');
-      return answer(await listing());
-    }
-    const uploadMatch = /^\/api\/upload\/sets\/([^/]+)$/.exec(path);
-    if (req.method === 'POST' && uploadMatch) {
-      const id = uploadMatch[1]!;
-      await sets.loadLibrarySet(root, id);
-      const role = query.get('role') ?? 'ref';
-      if (role !== 'ref' && role !== 'plate') throw new ValidationError('role must be ref or plate');
-      // The image lands in a temporary folder first; `addLibrarySetFile` copies it into the entry by content,
-      // applies the plate rules and names it in set.yaml, so the board adds a file exactly as the command does.
-      const folder = await mkdtemp(join(tmpdir(), 'coreslopper-set-upload-'));
-      try {
-        const file = join(folder, safeName(query.get('name') ?? ''));
-        const { receiveUpload } = await import('./board-wizard.js');
-        await receiveUpload(req, file, LIBRARY_FILE_LIMITS.bytes);
-        await sets.addLibrarySetFile(root, id, file, { role, angle: query.get('angle') ?? undefined, plate: query.get('plate') ?? undefined }, now());
-      } finally {
-        await rm(folder, { recursive: true, force: true });
-      }
-      return answer(await listing());
-    }
-    return false;
-  };
   /**
    * The sound library: list, upload through `sound add`, edit and remove, and
    * the one WAV of an entry; true when it answered the request.
@@ -473,23 +438,8 @@ export function boardHandler(options: BoardOptions = {}) {
     }
     return false;
   };
-  const projectDir = async (slug: string) => {
-    if (!SLUG.test(slug)) throw new ValidationError(`unknown project ${slug}`);
-    const dir = join(root, 'projects', slug);
-    if (!(await boardProjectDirs(root)).includes(dir)) throw new ValidationError(`unknown project ${slug}`);
-    return dir;
-  };
-  const allProjects = async (): Promise<(BoardProject | { slug: string; error: string })[]> => {
-    const projects = [];
-    for (const dir of await boardProjectDirs(root)) {
-      try {
-        projects.push(await boardProject(dir, root, { now: now() }));
-      } catch (error) {
-        projects.push({ slug: dir.split(sep).at(-1)!, error: (error as Error).message });
-      }
-    }
-    return projects;
-  };
+  /** Both bible libraries, in dispatch order; one factory, two kind descriptors. */
+  const libraryKindRoutes = [libraryRoutes(CHARACTER_LIBRARY_ROUTES), libraryRoutes(SET_LIBRARY_ROUTES)];
 
   return async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     try {
@@ -551,13 +501,9 @@ export function boardHandler(options: BoardOptions = {}) {
           return json(res, await submitRound(dir, change.video, now()));
         }
       }
-      if (path.startsWith('/api/library') || path.startsWith('/library-files/') || path.startsWith('/api/upload/library/')) {
-        const handled = await libraryRoute(req, res, path, url.searchParams);
-        if (handled) return;
-      }
-      if (path.startsWith('/api/sets') || path.startsWith('/set-files/') || path.startsWith('/api/upload/sets/')) {
-        const handled = await setsRoute(req, res, path, url.searchParams);
-        if (handled) return;
+      for (const route of libraryKindRoutes) {
+        if (!route.matches(path)) continue;
+        if (await route.handle(req, res, path, url.searchParams)) return;
       }
       if (path.startsWith('/api/sounds') || path.startsWith('/sound-files/') || path.startsWith('/api/upload/sounds')) {
         const handled = await soundsRoute(req, res, path, url.searchParams);
@@ -565,6 +511,10 @@ export function boardHandler(options: BoardOptions = {}) {
       }
       if (path.startsWith('/api/new') || path.startsWith('/api/upload/')) {
         const handled = await wizardRoute(req, res, path, url.searchParams);
+        if (handled) return;
+      }
+      if (release.matches(path)) {
+        const handled = await release.handle(req, res, path, url.searchParams);
         if (handled) return;
       }
       const fileMatch = /^\/(files|series-files)\/([^/]+)\/(.+)$/.exec(path);
@@ -581,94 +531,6 @@ export function boardHandler(options: BoardOptions = {}) {
         const channel = await loadChannel(root).catch(() => undefined);
         return json(res, { name: channel?.name, motto: channel?.motto });
       }
-      if (req.method === 'GET' && path === '/api/projects') {
-        const projects = await allProjects();
-        return json(
-          res,
-          projects.map((project) => {
-            if ('error' in project) return project;
-            const ids = project.calendar.map((event) => event.id);
-            return {
-              slug: project.slug,
-              title: project.title,
-              artist: project.artist,
-              releaseDate: project.releaseDate,
-              proposed: project.proposed,
-              hasRelease: project.hasRelease,
-              total: ids.length,
-              done: ids.filter((id) => project.status.items[id]?.done).length,
-            };
-          }),
-        );
-      }
-      const projectMatch = /^\/api\/projects\/([^/]+)$/.exec(path);
-      if (req.method === 'GET' && projectMatch) return json(res, await boardProject(await projectDir(projectMatch[1]!), root, { now: now() }));
-      const statusMatch = /^\/api\/projects\/([^/]+)\/status$/.exec(path);
-      if (req.method === 'POST' && statusMatch) {
-        const dir = await projectDir(statusMatch[1]!);
-        const change = (await body(req)) as { id?: unknown; done?: unknown; url?: unknown };
-        if (typeof change.id !== 'string' || !change.id || change.id.length > 200) throw new ValidationError('status needs an id');
-        if (change.done !== undefined && typeof change.done !== 'boolean') throw new ValidationError('done must be true or false');
-        if (change.url !== undefined && change.url !== null && (typeof change.url !== 'string' || (change.url && !/^https?:\/\//.test(change.url)))) {
-          throw new ValidationError('url must start with http:// or https://');
-        }
-        const status = await updateStatus(dir, change.id, { done: change.done as boolean | undefined, url: change.url as string | null | undefined, by: 'user' }, now());
-        // A live URL changes the X and LinkedIn texts and the microsite data: lay them out again in the background.
-        if (change.url !== undefined) void scheduleRefresh(dir);
-        return json(res, status);
-      }
-      const approveMatch = /^\/api\/projects\/([^/]+)\/(approve|revoke)$/.exec(path);
-      if (req.method === 'POST' && approveMatch) {
-        const dir = await projectDir(approveMatch[1]!);
-        const { approveRelease, revokeApproval } = await import('./release-autopilot.js');
-        if (approveMatch[2] === 'revoke') return json(res, await revokeApproval(dir));
-        const change = (await body(req)) as { release_date?: unknown };
-        if (change.release_date !== undefined && (typeof change.release_date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(change.release_date))) {
-          throw new ValidationError('release_date must be YYYY-MM-DD');
-        }
-        const status = await approveRelease(dir, { root, now: now(), releaseDate: change.release_date as string | undefined });
-        void scheduleRefresh(dir);
-        return json(res, status);
-      }
-      const autopilotMatch = /^\/api\/projects\/([^/]+)\/autopilot$/.exec(path);
-      if (req.method === 'POST' && autopilotMatch) {
-        const dir = await projectDir(autopilotMatch[1]!);
-        const change = (await body(req)) as { id?: unknown; action?: unknown };
-        if (typeof change.id !== 'string' || !change.id || change.id.length > 200) throw new ValidationError('autopilot needs an id');
-        const action = change.action;
-        if (action !== 'manual' && action !== 'auto' && action !== 'retry' && action !== 'force') throw new ValidationError('action must be manual, auto, retry, or force');
-        const { retryEvent, setEventManual } = await import('./release-autopilot.js');
-        if (action === 'manual' || action === 'auto') await setEventManual(dir, change.id, action === 'manual');
-        else await retryEvent(dir, change.id, now(), action === 'force');
-        return json(res, await boardProject(dir, root, { now: now() }));
-      }
-      if (req.method === 'GET' && path === '/api/calendar') {
-        const projects = (await allProjects()).filter((project): project is BoardProject => !('error' in project));
-        return json(
-          res,
-          projects
-            .flatMap((project) =>
-              project.calendar.map((event) => ({ ...event, project: project.slug, title: project.title, done: Boolean(project.status.items[event.id]?.done) })),
-            )
-            .sort((a, b) => Date.parse(a.at) - Date.parse(b.at)),
-        );
-      }
-      if (req.method === 'GET' && path === '/calendar.ics') {
-        const projects = (await allProjects()).filter((project): project is BoardProject => !('error' in project));
-        const calendars: { calendar: ReleaseCalendar; labels: Map<string, string> }[] = [];
-        for (const project of projects) {
-          const calendar = await loadCalendar(join(root, 'projects', project.slug));
-          if (calendar) calendars.push({ calendar, labels: new Map(project.calendar.map((event) => [event.id, event.label])) });
-        }
-        const ics = calendarIcs(
-          calendars.map((entry) => entry.calendar),
-          (calendar, event) => `${calendar.title}: ${calendars.find((entry) => entry.calendar === calendar)?.labels.get(event.id) ?? event.step}`,
-        );
-        res.setHeader('content-disposition', 'attachment; filename="release-calendar.ics"');
-        return send(res, 200, ics, MIME['.ics']);
-      }
-      const mediaMatch = /^\/media\/([^/]+)\/(.+)$/.exec(path);
-      if (req.method === 'GET' && mediaMatch) return serveMedia(req, res, releaseDir(await projectDir(mediaMatch[1]!)), mediaMatch[2]!);
       return send(res, 404, 'not found', 'text/plain');
     } catch (error) {
       const status = error instanceof ValidationError ? 400 : 500;

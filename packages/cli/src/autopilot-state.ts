@@ -1,16 +1,7 @@
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { withReleaseLock } from './release-calendar.js';
-import {
-  AutopilotLogSchema,
-  readJsonFile,
-  writeJsonAtomic,
-  type AutopilotEntry,
-  type AutopilotLog,
-  type AutopilotPlatform,
-  type AutopilotSettings,
-} from '@coreslopper/core';
+import type { AutopilotPlatform, AutopilotSettings } from '@coreslopper/core';
 import {
   instagramTokenDaysLeft,
   linkedinTokenDaysLeft,
@@ -21,8 +12,8 @@ import {
   resolveYouTubeCredentials,
 } from '@coreslopper/providers';
 
-// The release autopilot's state on disk, shared by the runner and the board:
-// the log of each project, the credentials it can use, and when it last ran.
+// The release autopilot's state on disk that is not a release record: the
+// credentials it can use and when it last ran. The log lives in release-records.
 
 /** When `release-run` last finished a round: the board warns when the timer seems to be off. */
 export const lastRunPath = (root: string) => join(root, '.cache', 'release-run.last');
@@ -39,29 +30,6 @@ export async function lastRun(root: string): Promise<{ at: string; every?: numbe
     // An older plain timestamp.
   }
   return text ? { at: text } : undefined;
-}
-
-export const autopilotLogPath = (projectRoot: string) => join(projectRoot, 'review', 'autopilot.json');
-
-export async function loadAutopilotLog(projectRoot: string): Promise<AutopilotLog> {
-  const path = autopilotLogPath(projectRoot);
-  return existsSync(path) ? readJsonFile(path, AutopilotLogSchema) : { version: 1, entries: [] };
-}
-
-/** Append one entry to the log (read fresh, then write atomically). */
-export type NewAutopilotEntry = Omit<AutopilotEntry, 'warnings' | 'manual_steps' | 'mock'> & Partial<AutopilotEntry>;
-
-export async function appendAutopilotEntry(projectRoot: string, entry: NewAutopilotEntry): Promise<AutopilotLog> {
-  return withReleaseLock(projectRoot, () => appendAutopilotEntryUnlocked(projectRoot, entry));
-}
-
-/** Append inside a section that already holds the project's release lock. */
-export async function appendAutopilotEntryUnlocked(projectRoot: string, entry: NewAutopilotEntry): Promise<AutopilotLog> {
-  const log = await loadAutopilotLog(projectRoot);
-  log.entries.push({ warnings: [], manual_steps: [], mock: false, ...entry });
-  const parsed = AutopilotLogSchema.parse(log);
-  await writeJsonAtomic(autopilotLogPath(projectRoot), parsed);
-  return parsed;
 }
 
 /** Which platforms have their credentials, and notes on tokens that expire soon. */
@@ -89,4 +57,3 @@ export function autopilotReadiness(settings: AutopilotSettings, env: NodeJS.Proc
   };
   return { ready, notes };
 }
-

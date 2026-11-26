@@ -61,43 +61,71 @@ export function isRetryableStatus(status: number): boolean {
 
 export class NonRetryableHttpError extends Error {}
 
+/** The one retry budget: four attempts, 500 ms base, doubling per attempt. */
+export const HTTP_RETRY = { attempts: 4, backoffMs: 500 } as const;
+
+export interface FetchRetryOptions {
+  attempts?: number;
+  /** Base backoff in ms; doubles per attempt. */
+  backoffMs?: number;
+  sleep?: (ms: number) => Promise<void>;
+  timeoutMs?: number;
+}
+
+/**
+ * fetch with retries: network errors and 408/409/429/5xx are retried with exponential backoff; other statuses
+ * are returned to the caller. The last network error is rethrown.
+ */
+export async function fetchResponseWithRetry(
+  fetchImpl: FetchLike,
+  url: string,
+  init: RequestInit,
+  options: FetchRetryOptions = {},
+): Promise<Response> {
+  const attempts = options.attempts ?? HTTP_RETRY.attempts;
+  const backoff = options.backoffMs ?? HTTP_RETRY.backoffMs;
+  const sleep = options.sleep ?? delay;
+  let lastError: unknown;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const response = await fetchImpl(url, {
+        ...init,
+        ...(options.timeoutMs ? { signal: AbortSignal.timeout(options.timeoutMs) } : {}),
+      });
+      if (!isRetryableStatus(response.status) || attempt === attempts - 1) return response;
+      lastError = new Error(`HTTP ${response.status}`);
+      await response.body?.cancel().catch(() => undefined);
+    } catch (error) {
+      lastError = error;
+      if (attempt === attempts - 1) break;
+    }
+    await sleep(backoff * 2 ** attempt);
+  }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
+}
+
 export async function fetchJsonWithRetry(
   label: string,
   url: string,
   init: RequestInit,
   timeoutMs: number,
   fetchImpl: FetchLike = fetch,
-  attempts = 4,
+  attempts: number = HTTP_RETRY.attempts,
 ): Promise<Record<string, unknown>> {
-  let lastError: unknown;
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    try {
-      const response = await fetchImpl(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
-      const text = await response.text();
-      let body: unknown;
-      try {
-        body = text ? JSON.parse(text) : {};
-      } catch {
-        body = { raw: text };
-      }
-      if (!response.ok) {
-        const message = `${label} ${response.status}: ${typeof body === 'string' ? body : JSON.stringify(body)}`;
-        if (!isRetryableStatus(response.status)) throw new NonRetryableHttpError(message);
-        if (attempt < attempts - 1) {
-          await delay(500 * 2 ** attempt);
-          continue;
-        }
-        throw new Error(message);
-      }
-      return body as Record<string, unknown>;
-    } catch (error) {
-      if (error instanceof NonRetryableHttpError) throw error;
-      lastError = error;
-      if (attempt >= attempts - 1) break;
-      await delay(500 * 2 ** attempt);
-    }
+  const response = await fetchResponseWithRetry(fetchImpl, url, init, { attempts, timeoutMs });
+  const text = await response.text();
+  let body: unknown;
+  try {
+    body = text ? JSON.parse(text) : {};
+  } catch {
+    body = { raw: text };
   }
-  throw lastError instanceof Error ? lastError : new Error(String(lastError));
+  if (!response.ok) {
+    const message = `${label} ${response.status}: ${typeof body === 'string' ? body : JSON.stringify(body)}`;
+    if (!isRetryableStatus(response.status)) throw new NonRetryableHttpError(message);
+    throw new Error(message);
+  }
+  return body as Record<string, unknown>;
 }
 
 export function collectUrls(value: unknown, keyHint = ''): string[] {

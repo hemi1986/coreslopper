@@ -1,0 +1,957 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Architecture review for coreslopper</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({
+        startOnLoad: true,
+        theme: "neutral",
+        securityLevel: "loose",
+        flowchart: { htmlLabels: true, curve: "basis" },
+      });
+    </script>
+    <style>
+      html { scroll-behavior: smooth; }
+      body { text-rendering: optimizeLegibility; }
+      .seam-line { stroke-dasharray: 5 4; }
+      .deepbox { background: linear-gradient(135deg, #0f172a, #1e293b); }
+      .mermaid { display: flex; justify-content: center; }
+      .mermaid svg { max-width: 100%; height: auto; }
+      .hatch {
+        background-image: repeating-linear-gradient(
+          -45deg,
+          rgba(220, 38, 38, 0.25) 0,
+          rgba(220, 38, 38, 0.25) 6px,
+          rgba(254, 242, 242, 0.9) 6px,
+          rgba(254, 242, 242, 0.9) 12px
+        );
+      }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900 antialiased">
+    <main class="mx-auto max-w-6xl space-y-14 px-6 py-12">
+      <header class="border-b border-slate-200 pb-8">
+        <div class="flex flex-wrap items-end justify-between gap-6">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">Architecture review</p>
+            <h1 class="mt-2 font-serif text-5xl tracking-tight text-slate-900">coreslopper</h1>
+            <p class="mt-3 max-w-2xl text-sm text-slate-500">
+              Release and publishing &middot; the board &middot; the libraries &middot; generation &middot; the workspace payload.
+              Eight candidates from the hot spots of the last 250 commits.
+            </p>
+          </div>
+          <p class="shrink-0 font-mono text-xs text-slate-400">25 November 2026</p>
+        </div>
+
+        <div class="mt-7 flex flex-wrap items-center gap-x-7 gap-y-3 text-[11px] uppercase tracking-wider text-slate-500">
+          <span class="flex items-center gap-2">
+            <span class="inline-block h-4 w-7 rounded-sm border border-slate-400 bg-white"></span>
+            module
+          </span>
+          <span class="flex items-center gap-2">
+            <svg width="34" height="8" viewBox="0 0 34 8" aria-hidden="true">
+              <line x1="1" y1="4" x2="33" y2="4" stroke="#64748b" stroke-width="1.5" class="seam-line" />
+            </svg>
+            seam
+          </span>
+          <span class="flex items-center gap-2">
+            <svg width="34" height="10" viewBox="0 0 34 10" aria-hidden="true">
+              <line x1="1" y1="5" x2="27" y2="5" stroke="#dc2626" stroke-width="1.5" />
+              <path d="M27 1.5 L33 5 L27 8.5 Z" fill="#dc2626" />
+            </svg>
+            leakage
+          </span>
+          <span class="flex items-center gap-2">
+            <span class="deepbox inline-block h-4 w-7 rounded-sm"></span>
+            deep module
+          </span>
+        </div>
+      </header>
+
+      <section class="space-y-12">
+        <!-- 01 -->
+        <article id="release-plan" class="scroll-mt-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div class="border-b border-slate-100 px-7 pb-5 pt-7">
+            <div class="flex flex-wrap items-center gap-2 text-xs">
+              <span class="rounded-full bg-emerald-600 px-3 py-1 text-[11px] font-semibold text-white">Strong</span>
+              <span class="rounded-full border border-slate-300 px-3 py-1 font-mono text-[11px] text-slate-600">in-process</span>
+              <span class="ml-auto font-mono text-[11px] text-slate-400">01</span>
+            </div>
+            <h2 class="mt-3 font-serif text-3xl tracking-tight">Give the release one plan</h2>
+          </div>
+
+          <div class="space-y-7 px-7 py-7">
+            <div class="grid gap-4 md:grid-cols-[7rem_1fr]">
+              <p class="text-[11px] uppercase tracking-wider text-slate-500">Files</p>
+              <ul class="grid gap-1 font-mono text-[11px] leading-5 text-slate-600 sm:grid-cols-2">
+                <li>packages/cli/src/release.ts</li>
+                <li>packages/core/src/release.ts</li>
+                <li>packages/cli/src/release-texts.ts</li>
+                <li>packages/cli/src/release-qa.ts</li>
+                <li>packages/cli/src/release-board-data.ts</li>
+                <li>packages/cli/src/publish.ts</li>
+                <li>packages/cli/src/release-autopilot.ts</li>
+              </ul>
+            </div>
+
+            <div class="grid gap-5 md:grid-cols-2">
+              <figure class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                <figcaption class="mb-3 flex items-center justify-between text-[10px] uppercase tracking-wider">
+                  <span class="text-slate-500">Before</span>
+                  <span class="text-red-600">five answers</span>
+                </figcaption>
+                <pre class="mermaid">
+flowchart TB
+  U["upload.yaml"] --> F["folder writer"]
+  U --> Q["release QA"]
+  U --> B["board view"]
+  U --> A["autopilot"]
+  U --> P["publish"]
+  C["channel.yaml"] --> F
+  C --> Q
+  C --> B
+  C --> A
+  C --> P
+  F -. caption A .-> D["what one post contains"]
+  Q -. caption A .-> D
+  B -. caption A .-> D
+  A -. limits B .-> D
+  P -. caption C .-> D
+  classDef leak fill:#fef2f2,stroke:#dc2626,color:#7f1d1d,stroke-width:2px;
+  class D leak;
+  linkStyle 10,11,12,13,14 stroke:#dc2626,stroke-width:2px;
+                </pre>
+              </figure>
+
+              <figure class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                <figcaption class="mb-3 flex items-center justify-between text-[10px] uppercase tracking-wider">
+                  <span class="text-slate-500">After</span>
+                  <span class="text-emerald-700">one definition</span>
+                </figcaption>
+                <pre class="mermaid">
+flowchart TB
+  U["upload.yaml"] --> R["Release plan"]
+  C["channel.yaml"] --> R
+  M["manifest"] --> R
+  R --> F["folder writer"]
+  R --> Q["release QA"]
+  R --> B["board view"]
+  R --> A["autopilot"]
+  R --> P["publish"]
+  classDef deep fill:#0f172a,stroke:#0f172a,color:#f8fafc,stroke-width:3px;
+  class R deep;
+                </pre>
+              </figure>
+            </div>
+
+            <div class="grid gap-5 md:grid-cols-2">
+              <div class="rounded-xl border border-red-100 bg-red-50/70 p-5">
+                <p class="text-[10px] uppercase tracking-wider text-red-700">Problem</p>
+                <p class="mt-2 text-sm leading-6">
+                  No module states what one post of one release contains; five consumers rebuild files, text and limits from
+                  raw upload data and have already drifted &mdash; the TikTok Short is checked with one caption and sent with
+                  another.
+                </p>
+              </div>
+              <div class="rounded-xl border border-emerald-100 bg-emerald-50/60 p-5">
+                <p class="text-[10px] uppercase tracking-wider text-emerald-800">Solution</p>
+                <p class="mt-2 text-sm leading-6">
+                  One release plan turns the project, the upload data and the channel into each post&rsquo;s files, exact text
+                  and limits in effect; the folder writer, checks, board, autopilot and uploader read it, and the manifest and
+                  board fields become projections.
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <p class="text-[10px] uppercase tracking-wider text-slate-500">Wins</p>
+              <ul class="mt-2 grid gap-x-8 gap-y-1 text-sm sm:grid-cols-2">
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>One text: shown, checked, sent</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>Limits resolved once</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>Leverage: one plan, five consumers</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>Caption drift fails a test</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>Locality: post rules in one module</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>Manifest and board become projections</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+        <!-- 02 -->
+        <article id="library-lifecycle" class="scroll-mt-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div class="border-b border-slate-100 px-7 pb-5 pt-7">
+            <div class="flex flex-wrap items-center gap-2 text-xs">
+              <span class="rounded-full bg-emerald-600 px-3 py-1 text-[11px] font-semibold text-white">Strong</span>
+              <span class="rounded-full border border-slate-300 px-3 py-1 font-mono text-[11px] text-slate-600">in-process</span>
+              <span class="ml-auto font-mono text-[11px] text-slate-400">02</span>
+            </div>
+            <h2 class="mt-3 font-serif text-3xl tracking-tight">Collapse the two library lifecycles</h2>
+          </div>
+
+          <div class="space-y-7 px-7 py-7">
+            <div class="grid gap-4 md:grid-cols-[7rem_1fr]">
+              <p class="text-[11px] uppercase tracking-wider text-slate-500">Files</p>
+              <ul class="grid gap-1 font-mono text-[11px] leading-5 text-slate-600 sm:grid-cols-2">
+                <li>packages/cli/src/library-entry.ts</li>
+                <li>packages/cli/src/character-library.ts</li>
+                <li>packages/cli/src/set-library.ts</li>
+                <li>packages/cli/src/board/characters.js</li>
+                <li>packages/cli/src/board/sets.js</li>
+                <li>packages/cli/src/release-board.ts</li>
+                <li>tests/set-library.test.ts &middot; character-library.test.ts</li>
+              </ul>
+            </div>
+
+            <div class="grid gap-5 md:grid-cols-2">
+              <figure class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                <figcaption class="mb-3 flex items-center justify-between text-[10px] uppercase tracking-wider">
+                  <span class="text-slate-500">Before</span>
+                  <span class="text-red-600">two twins</span>
+                </figcaption>
+                <div class="grid grid-cols-2 gap-3">
+                  <div class="overflow-hidden rounded-lg border border-slate-300 bg-white">
+                    <div class="border-b border-slate-200 px-2 py-1 text-[10px] uppercase tracking-wider text-slate-500">Characters</div>
+                    <ol class="space-y-1 p-2 font-mono text-[10px] text-slate-600">
+                      <li>list</li><li>add</li><li>add-file</li><li>import</li><li>use</li><li>remove</li>
+                    </ol>
+                  </div>
+                  <div class="overflow-hidden rounded-lg border border-slate-300 bg-white">
+                    <div class="border-b border-slate-200 px-2 py-1 text-[10px] uppercase tracking-wider text-slate-500">Sets</div>
+                    <ol class="space-y-1 p-2 font-mono text-[10px] text-slate-600">
+                      <li>list</li><li>add</li><li>add-file</li><li>import</li><li>use</li><li>remove</li>
+                    </ol>
+                  </div>
+                </div>
+                <div class="mt-3 rounded-md border border-dashed border-slate-400 px-2 py-1 text-center font-mono text-[10px] text-slate-500">
+                  shared mechanics &middot; 21 exports
+                </div>
+                <p class="mt-2 text-center text-[10px] text-red-700">146 identical board lines &middot; three route blocks &middot; three suites</p>
+              </figure>
+
+              <figure class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                <figcaption class="mb-3 flex items-center justify-between text-[10px] uppercase tracking-wider">
+                  <span class="text-slate-500">After</span>
+                  <span class="text-emerald-700">one lifecycle</span>
+                </figcaption>
+                <div class="deepbox rounded-xl p-4 text-slate-100">
+                  <div class="flex items-center justify-between">
+                    <p class="text-[10px] uppercase tracking-wider text-slate-300">Entry lifecycle</p>
+                    <div class="flex gap-1">
+                      <span class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[9px]">character</span>
+                      <span class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[9px]">set</span>
+                    </div>
+                  </div>
+                  <ol class="mt-3 grid gap-1 font-mono text-[10px] text-slate-300">
+                    <li class="rounded bg-white/5 px-2 py-1">list &middot; add &middot; add-file</li>
+                    <li class="rounded bg-white/5 px-2 py-1">import &middot; match &middot; dedupe by content</li>
+                    <li class="rounded bg-white/5 px-2 py-1">use &middot; copy into the target</li>
+                    <li class="rounded bg-white/5 px-2 py-1">remove &middot; history &middot; origin</li>
+                  </ol>
+                  <p class="mt-3 text-[9px] uppercase tracking-wider text-slate-400">entry file &middot; file roles &middot; target key live inside</p>
+                </div>
+                <div class="mt-3 rounded-md border border-slate-300 bg-white px-2 py-1 text-center font-mono text-[10px] text-slate-500">
+                  sound library &mdash; its own context
+                </div>
+              </figure>
+            </div>
+
+            <div class="grid gap-5 md:grid-cols-2">
+              <div class="rounded-xl border border-red-100 bg-red-50/70 p-5">
+                <p class="text-[10px] uppercase tracking-wider text-red-700">Problem</p>
+                <p class="mt-2 text-sm leading-6">
+                  Characters and sets are one Library context in ADR 0052 but two full lifecycles in code: six parallel
+                  functions, two board views, three route blocks and three test suites pin the copies.
+                </p>
+              </div>
+              <div class="rounded-xl border border-emerald-100 bg-emerald-50/60 p-5">
+                <p class="text-[10px] uppercase tracking-wider text-emerald-800">Solution</p>
+                <p class="mt-2 text-sm leading-6">
+                  Grow the entry seam into the one lifecycle for characters and sets, with the entry file, file roles, target
+                  key and words as data inside it; the sound library stays its own context.
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <p class="text-[10px] uppercase tracking-wider text-slate-500">Wins</p>
+              <ul class="mt-2 grid gap-x-8 gap-y-1 text-sm sm:grid-cols-2">
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>One lifecycle, two kinds</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>Delete one of two full twins</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>Library views stop importing each other</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>Leverage: a new kind is data</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>Tests stop cloning</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>Locality: entry rules in one module</li>
+              </ul>
+              <p class="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-600">
+                <span class="font-semibold text-slate-700">Already decided.</span>
+                ADR 0052 calls characters and sets one Library context; this closes the gap between the decision and the code.
+              </p>
+            </div>
+          </div>
+        </article>
+
+        <!-- 03 -->
+        <article id="release-records" class="scroll-mt-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div class="border-b border-slate-100 px-7 pb-5 pt-7">
+            <div class="flex flex-wrap items-center gap-2 text-xs">
+              <span class="rounded-full bg-emerald-600 px-3 py-1 text-[11px] font-semibold text-white">Strong</span>
+              <span class="rounded-full border border-slate-300 px-3 py-1 font-mono text-[11px] text-slate-600">in-process</span>
+              <span class="ml-auto font-mono text-[11px] text-slate-400">03</span>
+            </div>
+            <h2 class="mt-3 font-serif text-3xl tracking-tight">Give the release records one owner</h2>
+          </div>
+
+          <div class="space-y-7 px-7 py-7">
+            <div class="grid gap-4 md:grid-cols-[7rem_1fr]">
+              <p class="text-[11px] uppercase tracking-wider text-slate-500">Files</p>
+              <ul class="grid gap-1 font-mono text-[11px] leading-5 text-slate-600 sm:grid-cols-2">
+                <li>packages/cli/src/release-calendar.ts</li>
+                <li>packages/cli/src/release-autopilot.ts</li>
+                <li>packages/cli/src/autopilot-state.ts</li>
+                <li>packages/cli/src/publish.ts</li>
+                <li>packages/cli/src/board-production.ts</li>
+                <li>packages/cli/src/board/release.js</li>
+                <li>packages/core/src/autopilot.ts</li>
+              </ul>
+            </div>
+
+            <div class="grid gap-5 md:grid-cols-2">
+              <figure class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                <figcaption class="mb-3 flex items-center justify-between text-[10px] uppercase tracking-wider">
+                  <span class="text-slate-500">Before</span>
+                  <span class="text-red-600">two rules, four writers</span>
+                </figcaption>
+                <pre class="mermaid">
+flowchart LR
+  BP["board production"] --> ST[("release status")]
+  RC["release calendar"] --> ST
+  AP["release autopilot"] --> ST
+  AP --> AL[("autopilot log")]
+  PB["publish"] --> PL[("publish log")]
+  BR["board page"] --> ST
+  BP -. any approval .-> X{{Two rules}}
+  AP -. date check .-> X
+  classDef leak fill:#fef2f2,stroke:#dc2626,color:#7f1d1d,stroke-width:2px;
+  class X leak;
+  linkStyle 6,7 stroke:#dc2626,stroke-width:2px;
+                </pre>
+              </figure>
+
+              <figure class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                <figcaption class="mb-3 flex items-center justify-between text-[10px] uppercase tracking-wider">
+                  <span class="text-slate-500">After</span>
+                  <span class="text-emerald-700">one owner</span>
+                </figcaption>
+                <div class="flex h-full flex-col justify-start pt-4">
+                  <div class="grid grid-cols-5 gap-1 text-center font-mono text-[9px] text-slate-600">
+                    <span class="rounded border border-slate-300 bg-white px-1 py-1">board</span>
+                    <span class="rounded border border-slate-300 bg-white px-1 py-1">calendar</span>
+                    <span class="rounded border border-slate-300 bg-white px-1 py-1">autopilot</span>
+                    <span class="rounded border border-slate-300 bg-white px-1 py-1">publish</span>
+                    <span class="rounded border border-slate-300 bg-white px-1 py-1">page</span>
+                  </div>
+                  <div class="mx-auto my-2 h-4 w-px bg-slate-400"></div>
+                  <div class="deepbox rounded-xl p-4 text-slate-100">
+                    <p class="text-[10px] uppercase tracking-wider text-slate-300">Release records</p>
+                    <div class="mt-2 space-y-1 font-mono text-[10px] text-slate-300">
+                      <p class="rounded bg-white/5 px-2 py-1">status &middot; approval &middot; take-over &middot; done rows</p>
+                      <p class="rounded bg-white/5 px-2 py-1">autopilot log &middot; publish log</p>
+                      <p class="rounded bg-white/5 px-2 py-1">review/.release.lock</p>
+                    </div>
+                  </div>
+                  <p class="mt-3 text-center text-[10px] text-slate-500">calendar planning stays a pure core rule and becomes a client</p>
+                </div>
+              </figure>
+            </div>
+
+            <div class="grid gap-5 md:grid-cols-2">
+              <div class="rounded-xl border border-red-100 bg-red-50/70 p-5">
+                <p class="text-[10px] uppercase tracking-wider text-red-700">Problem</p>
+                <p class="mt-2 text-sm leading-6">
+                  The release status, autopilot log, publish log and lock are written through four modules with two approval
+                  rules, so a stale approval can read as released and checklist ticks move when a row appears.
+                </p>
+              </div>
+              <div class="rounded-xl border border-emerald-100 bg-emerald-50/60 p-5">
+                <p class="text-[10px] uppercase tracking-wider text-emerald-800">Solution</p>
+                <p class="mt-2 text-sm leading-6">
+                  One release-records module owns the status, the logs and the lock; approval, take-over, done rows and
+                  checklist keys are entries it names, and calendar planning becomes a client.
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <p class="text-[10px] uppercase tracking-wider text-slate-500">Wins</p>
+              <ul class="mt-2 grid gap-x-8 gap-y-1 text-sm sm:grid-cols-2">
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>One approval rule</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>One lock, one write path</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>Checklist keys stop moving</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>Stale approvals read as stale</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>Leverage: four callers, one owner</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>Locality: record shape in one module</li>
+              </ul>
+              <p class="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-600">
+                <span class="font-semibold text-slate-700">Already decided.</span>
+                ADR 0046 (proposed) decided four records, each with its lock; the code still has two approval rules and one
+                unvalidated write.
+              </p>
+            </div>
+          </div>
+        </article>
+
+        <!-- 04 -->
+        <article id="release-facts" class="scroll-mt-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div class="border-b border-slate-100 px-7 pb-5 pt-7">
+            <div class="flex flex-wrap items-center gap-2 text-xs">
+              <span class="rounded-full bg-emerald-600 px-3 py-1 text-[11px] font-semibold text-white">Strong</span>
+              <span class="rounded-full border border-slate-300 px-3 py-1 font-mono text-[11px] text-slate-600">in-process</span>
+              <span class="ml-auto font-mono text-[11px] text-slate-400">04</span>
+            </div>
+            <h2 class="mt-3 font-serif text-3xl tracking-tight">Lift release facts out of the board view</h2>
+          </div>
+
+          <div class="space-y-7 px-7 py-7">
+            <div class="grid gap-4 md:grid-cols-[7rem_1fr]">
+              <p class="text-[11px] uppercase tracking-wider text-slate-500">Files</p>
+              <ul class="grid gap-1 font-mono text-[11px] leading-5 text-slate-600 sm:grid-cols-2">
+                <li>packages/cli/src/release-autopilot.ts</li>
+                <li>packages/cli/src/release-board-data.ts</li>
+                <li>packages/cli/src/release-board.ts</li>
+                <li>packages/cli/src/publish.ts</li>
+                <li>packages/cli/src/board/app.js</li>
+                <li>packages/cli/src/board-production.ts</li>
+              </ul>
+            </div>
+
+            <div class="grid gap-5 md:grid-cols-2">
+              <figure class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                <figcaption class="mb-3 flex items-center justify-between text-[10px] uppercase tracking-wider">
+                  <span class="text-slate-500">Before</span>
+                  <span class="text-red-600">cycle, five loads</span>
+                </figcaption>
+                <pre class="mermaid">
+flowchart LR
+  AP["release autopilot"] --> BP["boardProject"]
+  BP --> BD["release board data"]
+  RB["board shell"] --> BD
+  AP -. imports .-> RB
+  RB -. approve, revoke .-> AP
+  AP -. loads 5x .-> PJ["project files"]
+  BP --> PJ
+  classDef leak fill:#fef2f2,stroke:#dc2626,color:#7f1d1d,stroke-width:2px;
+  class AP,RB leak;
+  linkStyle 3,4 stroke:#dc2626,stroke-width:2px;
+                </pre>
+              </figure>
+
+              <figure class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                <figcaption class="mb-3 flex items-center justify-between text-[10px] uppercase tracking-wider">
+                  <span class="text-slate-500">After</span>
+                  <span class="text-emerald-700">one read</span>
+                </figcaption>
+                <pre class="mermaid">
+flowchart LR
+  AP["release autopilot"] --> RF["Release facts"]
+  BV["board view"] --> RF
+  PB["publish"] --> RF
+  RF --> PJ["project"]
+  RF --> CH["channel"]
+  RF --> MF["manifest"]
+  RF --> CA["calendar"]
+  RF --> ST["status"]
+  classDef deep fill:#0f172a,stroke:#0f172a,color:#f8fafc,stroke-width:3px;
+  class RF deep;
+                </pre>
+              </figure>
+            </div>
+
+            <div class="grid gap-5 md:grid-cols-2">
+              <div class="rounded-xl border border-red-100 bg-red-50/70 p-5">
+                <p class="text-[10px] uppercase tracking-wider text-red-700">Problem</p>
+                <p class="mt-2 text-sm leading-6">
+                  The posting runner builds the board&rsquo;s whole view to learn a few facts, imports the board&rsquo;s shell
+                  module, and reloads an approved project five times per round even when nothing is due.
+                </p>
+              </div>
+              <div class="rounded-xl border border-emerald-100 bg-emerald-50/60 p-5">
+                <p class="text-[10px] uppercase tracking-wider text-emerald-800">Solution</p>
+                <p class="mt-2 text-sm leading-6">
+                  One release-facts module owns project, identity, upload data, manifest files, calendar, status, settings and
+                  workspace root; the board view and the runner both build on it, and project discovery leaves the board shell.
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <p class="text-[10px] uppercase tracking-wider text-slate-500">Wins</p>
+              <ul class="mt-2 grid gap-x-8 gap-y-1 text-sm sm:grid-cols-2">
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>Break the runner &harr; board cycle</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>Five loads per project become one</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>Runner tests stop using the board view</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>Root stops being derived as <span class="font-mono">../..</span></li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>One <span class="font-mono">song.json</span> reader</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>Leverage: two consumers, one read</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+        <!-- 05 -->
+        <article id="series-budget" class="scroll-mt-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div class="border-b border-slate-100 px-7 pb-5 pt-7">
+            <div class="flex flex-wrap items-center gap-2 text-xs">
+              <span class="rounded-full bg-emerald-600 px-3 py-1 text-[11px] font-semibold text-white">Strong</span>
+              <span class="rounded-full border border-slate-300 px-3 py-1 font-mono text-[11px] text-slate-600">in-process</span>
+              <span class="ml-auto font-mono text-[11px] text-slate-400">05</span>
+            </div>
+            <h2 class="mt-3 font-serif text-3xl tracking-tight">Make the uncommitted series budget one rule</h2>
+          </div>
+
+          <div class="space-y-7 px-7 py-7">
+            <div class="grid gap-4 md:grid-cols-[7rem_1fr]">
+              <p class="text-[11px] uppercase tracking-wider text-slate-500">Files</p>
+              <ul class="grid gap-1 font-mono text-[11px] leading-5 text-slate-600 sm:grid-cols-2">
+                <li>packages/cli/src/series.ts</li>
+                <li>packages/cli/src/new-project.ts</li>
+                <li>packages/cli/src/generate.ts</li>
+                <li>packages/core/src/cost.ts</li>
+                <li>packages/core/src/state.ts</li>
+                <li>packages/cli/src/board-wizard.ts</li>
+                <li>tests/series-budget.test.ts</li>
+              </ul>
+            </div>
+
+            <div class="grid gap-5 md:grid-cols-2">
+              <figure class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                <figcaption class="mb-3 flex items-center justify-between text-[10px] uppercase tracking-wider">
+                  <span class="text-slate-500">Before</span>
+                  <span class="text-red-600">two remainings</span>
+                </figcaption>
+                <div class="space-y-6 py-2">
+                  <div>
+                    <div class="flex items-baseline justify-between text-[10px]">
+                      <span class="font-mono text-slate-600">seriesBudget</span>
+                      <span class="text-emerald-700">remaining $50</span>
+                    </div>
+                    <div class="mt-1 flex h-7 overflow-hidden rounded-md border border-slate-300 text-[9px] font-semibold">
+                      <div class="flex items-center bg-slate-700 px-2 text-white" style="width: 20%">spent 20</div>
+                      <div class="flex items-center bg-amber-200 px-2 text-amber-900" style="width: 30%">episodes 30</div>
+                      <div class="flex items-center bg-emerald-100 px-2 text-emerald-900" style="width: 50%">free 50</div>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="flex items-baseline justify-between text-[10px]">
+                      <span class="font-mono text-slate-600">remainingBudget(series.state)</span>
+                      <span class="text-red-700">reads as $80</span>
+                    </div>
+                    <div class="mt-1 flex h-7 overflow-hidden rounded-md border border-slate-300 text-[9px] font-semibold">
+                      <div class="flex items-center bg-slate-700 px-2 text-white" style="width: 20%">spent 20</div>
+                      <div class="flex" style="width: 80%">
+                        <div class="hatch flex items-center border-r border-red-300 px-2 text-red-900" style="width: 37.5%">committed 30</div>
+                        <div class="flex items-center bg-emerald-100 px-2 text-emerald-900" style="width: 62.5%">free 50</div>
+                      </div>
+                    </div>
+                    <p class="mt-2 text-[10px] text-red-700">a canon batch sees 80 and may spend into the committed 30</p>
+                  </div>
+                </div>
+                <p class="text-[9px] uppercase tracking-wider text-slate-400">example amounts</p>
+              </figure>
+
+              <figure class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                <figcaption class="mb-3 flex items-center justify-between text-[10px] uppercase tracking-wider">
+                  <span class="text-slate-500">After</span>
+                  <span class="text-emerald-700">one amount</span>
+                </figcaption>
+                <div class="flex h-full flex-col justify-center">
+                  <div class="grid grid-cols-2 gap-2 text-center font-mono text-[10px] text-slate-600">
+                    <span class="rounded border border-slate-300 bg-white px-2 py-1">new episode</span>
+                    <span class="rounded border border-slate-300 bg-white px-2 py-1">canon batch</span>
+                  </div>
+                  <div class="mx-auto my-2 h-4 w-px bg-slate-400"></div>
+                  <div class="deepbox rounded-xl p-4 text-slate-100">
+                    <p class="text-[10px] uppercase tracking-wider text-slate-300">Uncommitted series budget</p>
+                    <div class="mt-3 flex h-8 overflow-hidden rounded-md border border-slate-600 text-[9px] font-semibold">
+                      <div class="flex items-center bg-slate-500 px-2 text-white" style="width: 20%">spent 20</div>
+                      <div class="flex items-center bg-amber-300/80 px-2 text-amber-950" style="width: 30%">episodes 30</div>
+                      <div class="flex items-center bg-emerald-300 px-2 text-emerald-950" style="width: 50%">free 50</div>
+                    </div>
+                    <p class="mt-3 text-[10px] text-slate-300">one pure rule in core &middot; both entry points check $50</p>
+                  </div>
+                </div>
+              </figure>
+            </div>
+
+            <div class="grid gap-5 md:grid-cols-2">
+              <div class="rounded-xl border border-red-100 bg-red-50/70 p-5">
+                <p class="text-[10px] uppercase tracking-wider text-red-700">Problem</p>
+                <p class="mt-2 text-sm leading-6">
+                  Uncommitted Series Budget is series total minus canon spend minus episode budgets in the wizard and board,
+                  but a canon batch checks only the series state&rsquo;s remaining budget, which ignores committed episodes.
+                </p>
+              </div>
+              <div class="rounded-xl border border-emerald-100 bg-emerald-50/60 p-5">
+                <p class="text-[10px] uppercase tracking-wider text-emerald-800">Solution</p>
+                <p class="mt-2 text-sm leading-6">
+                  Move the uncommitted-series-budget rule into the core budget rule and have episode creation and every canon
+                  batch read the same amount.
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <p class="text-[10px] uppercase tracking-wider text-slate-500">Wins</p>
+              <ul class="mt-2 grid gap-x-8 gap-y-1 text-sm sm:grid-cols-2">
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>One meaning of remaining</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>Canon cannot spend committed money</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>Pure rule, inline table test</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>Wizard and batch agree</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>Leverage: one check, both entry points</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>Locality: the rule sits in core</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+        <!-- 06 -->
+        <article id="generation-ledger" class="scroll-mt-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div class="border-b border-slate-100 px-7 pb-5 pt-7">
+            <div class="flex flex-wrap items-center gap-2 text-xs">
+              <span class="rounded-full bg-emerald-600 px-3 py-1 text-[11px] font-semibold text-white">Strong</span>
+              <span class="rounded-full border border-slate-300 px-3 py-1 font-mono text-[11px] text-slate-600">in-process</span>
+              <span class="ml-auto font-mono text-[11px] text-slate-400">06</span>
+            </div>
+            <h2 class="mt-3 font-serif text-3xl tracking-tight">Close the generation ledger&rsquo;s side doors</h2>
+          </div>
+
+          <div class="space-y-7 px-7 py-7">
+            <div class="grid gap-4 md:grid-cols-[7rem_1fr]">
+              <p class="text-[11px] uppercase tracking-wider text-slate-500">Files</p>
+              <ul class="grid gap-1 font-mono text-[11px] leading-5 text-slate-600 sm:grid-cols-2">
+                <li>packages/cli/src/index.ts</li>
+                <li>packages/cli/src/generate.ts</li>
+                <li>packages/core/src/state.ts</li>
+                <li>packages/cli/src/qa.ts</li>
+                <li>tests/generation-characterization.test.ts</li>
+                <li>tests/qa-manifest.test.ts</li>
+              </ul>
+            </div>
+
+            <div class="grid gap-5 md:grid-cols-2">
+              <figure class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                <figcaption class="mb-3 flex items-center justify-between text-[10px] uppercase tracking-wider">
+                  <span class="text-slate-500">Before</span>
+                  <span class="text-red-600">two side doors</span>
+                </figcaption>
+                <pre class="mermaid">
+flowchart LR
+  E["estimate"] --> MR["models.yaml"]
+  E -. own price math .-> PR["price"]
+  S["spend"] --> SB[("state budget")]
+  G["runBatch"] --> L[("manifest + spend")]
+  G --> PR
+  S -. no manifest line .-> L
+  classDef leak fill:#fef2f2,stroke:#dc2626,color:#7f1d1d,stroke-width:2px;
+  class E,S leak;
+  linkStyle 1,5 stroke:#dc2626,stroke-width:2px;
+                </pre>
+              </figure>
+
+              <figure class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                <figcaption class="mb-3 flex items-center justify-between text-[10px] uppercase tracking-wider">
+                  <span class="text-slate-500">After</span>
+                  <span class="text-emerald-700">one ledger</span>
+                </figcaption>
+                <pre class="mermaid">
+flowchart TB
+  E["estimate"] --> Q["generation quote"]
+  S["spend"] --> G["runBatch / ledger"]
+  Q --> G
+  G --> PR["one price rule"]
+  G --> L[("manifest + spend")]
+  classDef deep fill:#0f172a,stroke:#0f172a,color:#f8fafc,stroke-width:3px;
+  class G deep;
+                </pre>
+              </figure>
+            </div>
+
+            <div class="grid gap-5 md:grid-cols-2">
+              <div class="rounded-xl border border-red-100 bg-red-50/70 p-5">
+                <p class="text-[10px] uppercase tracking-wider text-red-700">Problem</p>
+                <p class="mt-2 text-sm leading-6">
+                  <span class="font-mono text-xs">runBatch</span> carries the invariant that manifest cost equals recorded
+                  spend, but <span class="font-mono text-xs">estimate</span> re-derives the price and
+                  <span class="font-mono text-xs">spend</span> raises spend without a manifest line, so the invariant holds
+                  only if callers avoid two commands.
+                </p>
+              </div>
+              <div class="rounded-xl border border-emerald-100 bg-emerald-50/60 p-5">
+                <p class="text-[10px] uppercase tracking-wider text-emerald-800">Solution</p>
+                <p class="mt-2 text-sm leading-6">
+                  Quote through the generation module&rsquo;s existing price resolution, and make manual spend a manifest-backed
+                  ledger write through it or remove the command.
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <p class="text-[10px] uppercase tracking-wider text-slate-500">Wins</p>
+              <ul class="mt-2 grid gap-x-8 gap-y-1 text-sm sm:grid-cols-2">
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>One price rule</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>Ledger invariant always true</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>Two side doors closed</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>Estimate sees the remaining budget</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>Leverage: every quote from one path</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>Locality: the ledger has one owner</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+        <!-- 07 -->
+        <article id="never-twice" class="scroll-mt-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div class="border-b border-slate-100 px-7 pb-5 pt-7">
+            <div class="flex flex-wrap items-center gap-2 text-xs">
+              <span class="rounded-full bg-amber-400 px-3 py-1 text-[11px] font-semibold text-amber-950">Worth exploring</span>
+              <span class="rounded-full border border-slate-300 px-3 py-1 font-mono text-[11px] text-slate-600">ports &amp; adapters</span>
+              <span class="ml-auto font-mono text-[11px] text-slate-400">07</span>
+            </div>
+            <h2 class="mt-3 font-serif text-3xl tracking-tight">Put never twice behind one seam</h2>
+          </div>
+
+          <div class="space-y-7 px-7 py-7">
+            <div class="grid gap-4 md:grid-cols-[7rem_1fr]">
+              <p class="text-[11px] uppercase tracking-wider text-slate-500">Files</p>
+              <ul class="grid gap-1 font-mono text-[11px] leading-5 text-slate-600 sm:grid-cols-2">
+                <li>packages/providers/src/http.ts</li>
+                <li>packages/providers/src/publish/http.ts</li>
+                <li>packages/providers/src/publish/tiktok.ts</li>
+                <li>packages/providers/src/publish/youtube.ts</li>
+                <li>packages/providers/src/publish/x.ts</li>
+                <li>packages/providers/src/publish/linkedin.ts</li>
+                <li>packages/providers/src/publish/instagram.ts</li>
+                <li>packages/cli/src/release-autopilot.ts</li>
+              </ul>
+            </div>
+
+            <div class="grid gap-5 md:grid-cols-2">
+              <figure class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                <figcaption class="mb-3 flex items-center justify-between text-[10px] uppercase tracking-wider">
+                  <span class="text-slate-500">Before</span>
+                  <span class="text-red-600">three uncertainty rules</span>
+                </figcaption>
+                <div class="space-y-3 py-1">
+                  <div class="grid grid-cols-3 gap-2">
+                    <div class="rounded-lg border border-slate-300 bg-white p-2">
+                      <p class="text-[9px] uppercase tracking-wider text-slate-500">Upload adapters</p>
+                      <p class="mt-1 font-mono text-[10px] text-slate-700">TikTok</p>
+                      <p class="text-[9px] text-slate-500">two poll loops</p>
+                      <p class="mt-2 font-mono text-[10px] text-slate-700">YouTube</p>
+                      <p class="text-[9px] text-slate-500">own backoff</p>
+                    </div>
+                    <div class="rounded-lg border border-slate-300 bg-white p-2">
+                      <p class="text-[9px] uppercase tracking-wider text-slate-500">Post adapters</p>
+                      <p class="mt-1 font-mono text-[10px] text-slate-700">X &middot; LinkedIn</p>
+                      <p class="text-[9px] text-slate-500">Instagram</p>
+                      <p class="mt-2 text-[9px] text-slate-500">a poll loop each</p>
+                    </div>
+                    <div class="rounded-lg border border-slate-300 bg-white p-2">
+                      <p class="text-[9px] uppercase tracking-wider text-slate-500">Runners</p>
+                      <p class="mt-1 font-mono text-[10px] text-slate-700">autopilot</p>
+                      <p class="text-[9px] text-slate-500">status-code rule</p>
+                      <p class="mt-2 font-mono text-[10px] text-slate-700">publish</p>
+                      <p class="text-[9px] text-slate-500">error property</p>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-3 text-[9px] uppercase tracking-wider text-red-700">
+                    <span class="h-px flex-1 bg-red-300"></span>
+                    three answers to: may have gone out?
+                    <span class="h-px flex-1 bg-red-300"></span>
+                  </div>
+                </div>
+              </figure>
+
+              <figure class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                <figcaption class="mb-3 flex items-center justify-between text-[10px] uppercase tracking-wider">
+                  <span class="text-slate-500">After</span>
+                  <span class="text-emerald-700">one classification</span>
+                </figcaption>
+                <pre class="mermaid">
+flowchart TB
+  AD["adapters: say when the last byte left"] --> CL["failure class + poll until terminal"]
+  CL --> RU["runner, publish, pinned comment"]
+  CL --> RT["fatal, retryable, uncertain"]
+  classDef deep fill:#0f172a,stroke:#0f172a,color:#f8fafc,stroke-width:3px;
+  class CL deep;
+                </pre>
+              </figure>
+            </div>
+
+            <div class="grid gap-5 md:grid-cols-2">
+              <div class="rounded-xl border border-red-100 bg-red-50/70 p-5">
+                <p class="text-[10px] uppercase tracking-wider text-red-700">Problem</p>
+                <p class="mt-2 text-sm leading-6">
+                  The rule that a public post is never sent twice is decided at each call site: two retry stacks, three
+                  definitions of &ldquo;may have gone out&rdquo;, and a poll loop per adapter &mdash; twice in TikTok.
+                </p>
+              </div>
+              <div class="rounded-xl border border-emerald-100 bg-emerald-50/60 p-5">
+                <p class="text-[10px] uppercase tracking-wider text-emerald-800">Solution</p>
+                <p class="mt-2 text-sm leading-6">
+                  One failure-classification seam &mdash; fatal, retryable, uncertain &mdash; and one poll-until-terminal
+                  helper; adapters say when the last byte left, and the runner, publish and the pinned-comment step share
+                  the class.
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <p class="text-[10px] uppercase tracking-wider text-slate-500">Wins</p>
+              <ul class="mt-2 grid gap-x-8 gap-y-1 text-sm sm:grid-cols-2">
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>One &ldquo;uncertain&rdquo; rule</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>One retry budget</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>One poll loop</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>Never twice, tested once</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>Adapters declare; the runner decides</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>Leverage: every platform call crosses it</li>
+              </ul>
+              <p class="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-600">
+                <span class="font-semibold text-slate-700">Already decided.</span>
+                ADR 0046 decided never twice on every platform; the code still classifies uncertainty three ways.
+              </p>
+            </div>
+          </div>
+        </article>
+
+        <!-- 08 -->
+        <article id="board-routes" class="scroll-mt-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div class="border-b border-slate-100 px-7 pb-5 pt-7">
+            <div class="flex flex-wrap items-center gap-2 text-xs">
+              <span class="rounded-full bg-amber-400 px-3 py-1 text-[11px] font-semibold text-amber-950">Worth exploring</span>
+              <span class="rounded-full border border-slate-300 px-3 py-1 font-mono text-[11px] text-slate-600">in-process</span>
+              <span class="ml-auto font-mono text-[11px] text-slate-400">08</span>
+            </div>
+            <h2 class="mt-3 font-serif text-3xl tracking-tight">Let each board view own its routes</h2>
+          </div>
+
+          <div class="space-y-7 px-7 py-7">
+            <div class="grid gap-4 md:grid-cols-[7rem_1fr]">
+              <p class="text-[11px] uppercase tracking-wider text-slate-500">Files</p>
+              <ul class="grid gap-1 font-mono text-[11px] leading-5 text-slate-600 sm:grid-cols-2">
+                <li>packages/cli/src/release-board.ts</li>
+                <li>packages/cli/src/board/release.js</li>
+                <li>packages/cli/src/board/app.js</li>
+                <li>packages/cli/src/board/wizard.js</li>
+                <li>packages/cli/src/board/characters.js</li>
+                <li>packages/cli/src/board/sets.js</li>
+              </ul>
+            </div>
+
+            <div class="grid gap-5 md:grid-cols-2">
+              <figure class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                <figcaption class="mb-3 flex items-center justify-between text-[10px] uppercase tracking-wider">
+                  <span class="text-slate-500">Before</span>
+                  <span class="text-red-600">shell interprets records</span>
+                </figcaption>
+                <div class="space-y-1 py-1">
+                  <div class="rounded-r-md border-l-4 border-slate-800 bg-slate-800 p-2 text-white">
+                    <p class="text-[9px] uppercase tracking-wider text-slate-300">board shell</p>
+                    <p class="font-mono text-[10px]">guard &middot; static &middot; media &middot; dispatch</p>
+                    <div class="mt-1 rounded border border-red-400/60 bg-red-500/20 p-1 font-mono text-[9px] text-red-100">
+                      release routes &middot; autopilot routes &middot; review routes &middot; production routes
+                      <span class="block text-red-200">~180 inline lines</span>
+                    </div>
+                  </div>
+                  <div class="rounded-r-md border-l-4 border-slate-300 bg-white p-2 font-mono text-[10px] text-slate-600">wizard route</div>
+                  <div class="rounded-r-md border-l-4 border-slate-300 bg-white p-2 font-mono text-[10px] text-slate-600">library routes (characters, sets, sounds)</div>
+                </div>
+                <p class="mt-2 text-[10px] text-red-700">the release view&rsquo;s own module has no routes</p>
+              </figure>
+
+              <figure class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                <figcaption class="mb-3 flex items-center justify-between text-[10px] uppercase tracking-wider">
+                  <span class="text-slate-500">After</span>
+                  <span class="text-emerald-700">a host without state</span>
+                </figcaption>
+                <div class="space-y-1 py-1">
+                  <div class="rounded-r-md border-l-4 border-emerald-600 bg-white p-2">
+                    <p class="text-[9px] uppercase tracking-wider text-emerald-700">board shell</p>
+                    <p class="font-mono text-[10px] text-slate-600">guard &middot; static &middot; media &middot; dispatch</p>
+                  </div>
+                  <div class="grid grid-cols-3 gap-1">
+                    <div class="rounded border border-slate-300 bg-slate-100 p-2 text-center font-mono text-[9px] text-slate-600">production</div>
+                    <div class="rounded border border-slate-300 bg-slate-100 p-2 text-center font-mono text-[9px] text-slate-600">review</div>
+                    <div class="rounded border border-emerald-300 bg-emerald-50 p-2 text-center font-mono text-[9px] text-emerald-900">release</div>
+                    <div class="rounded border border-slate-300 bg-slate-100 p-2 text-center font-mono text-[9px] text-slate-600">autopilot</div>
+                    <div class="rounded border border-slate-300 bg-slate-100 p-2 text-center font-mono text-[9px] text-slate-600">wizard</div>
+                    <div class="rounded border border-slate-300 bg-slate-100 p-2 text-center font-mono text-[9px] text-slate-600">libraries</div>
+                  </div>
+                  <p class="pt-1 text-center text-[9px] uppercase tracking-wider text-slate-400">every route lives with the view that owns it</p>
+                </div>
+              </figure>
+            </div>
+
+            <div class="grid gap-5 md:grid-cols-2">
+              <div class="rounded-xl border border-red-100 bg-red-50/70 p-5">
+                <p class="text-[10px] uppercase tracking-wider text-red-700">Problem</p>
+                <p class="mt-2 text-sm leading-6">
+                  The board shell validates and interprets release records itself, re-lists the workspace on every status
+                  click, and serves view documents, while the release view&rsquo;s module has no routes.
+                </p>
+              </div>
+              <div class="rounded-xl border border-emerald-100 bg-emerald-50/60 p-5">
+                <p class="text-[10px] uppercase tracking-wider text-emerald-800">Solution</p>
+                <p class="mt-2 text-sm leading-6">
+                  A release-view route function beside the wizard and library ones owns the view&rsquo;s records and bodies;
+                  the shell keeps only the write guard, the static page, whitelisted media and dispatch.
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <p class="text-[10px] uppercase tracking-wider text-slate-500">Wins</p>
+              <ul class="mt-2 grid gap-x-8 gap-y-1 text-sm sm:grid-cols-2">
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>Shell shrinks to a host</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>Release rules leave the shell</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>One route seam per view</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>No workspace scan per click</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>Page helpers become testable</li>
+                <li class="flex gap-2"><span class="text-emerald-600">&rarr;</span>Locality: a view changes in its module</li>
+              </ul>
+              <p class="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-600">
+                <span class="font-semibold text-slate-700">Already decided.</span>
+                ADR 0049 decided a view&rsquo;s routes live in that view&rsquo;s module; production, review, release and
+                autopilot are still inline.
+              </p>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section id="top-recommendation" class="scroll-mt-8">
+        <div class="deepbox overflow-hidden rounded-2xl p-8 text-slate-100 md:p-10">
+          <p class="text-[10px] uppercase tracking-[0.24em] text-emerald-300">Top recommendation</p>
+          <h2 class="mt-3 font-serif text-3xl tracking-tight">01 &middot; Give the release one plan</h2>
+          <p class="mt-4 max-w-3xl text-sm leading-7 text-slate-300">
+            It is the missing deep module under the release hot spot: one definition of each post&rsquo;s files, text and
+            limits means what the board shows, QA checks and the uploader sends can no longer disagree &mdash; and the
+            records and facts deepenings land more cleanly once that definition exists.
+          </p>
+          <a href="#release-plan" class="mt-7 inline-flex items-center gap-2 rounded-full bg-emerald-400 px-4 py-2 text-xs font-semibold text-emerald-950 transition hover:bg-emerald-300">
+            Back to candidate 01
+            <span aria-hidden="true">&uarr;</span>
+          </a>
+        </div>
+      </section>
+
+      <footer class="border-t border-slate-200 pb-8 pt-5 text-[11px] text-slate-400">
+        Rendered 25 November 2026 from the hot spots of the last 250 commits. Persisted with the handoff in
+        <span class="font-mono">docs/reviews/architecture-review-2026-11-25.md</span>.
+      </footer>
+    </main>
+  </body>
+</html>

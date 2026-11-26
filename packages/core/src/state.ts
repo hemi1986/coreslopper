@@ -364,8 +364,22 @@ export function resetStage(state: State, stageId: string): State {
   return state;
 }
 
-export function remainingBudget(state: Pick<State, 'budget'>): number {
-  return Math.max(0, state.budget.totalUsd - state.budget.spentUsd - state.budget.reservedUsd);
+/** The unspent, unreserved and uncommitted part of one budget. */
+export function uncommittedBudget(
+  totalUsd: number,
+  spentUsd: number,
+  committedUsd: number,
+  reservedUsd = 0,
+): number {
+  return Math.max(0, Number((totalUsd - spentUsd - reservedUsd - committedUsd).toFixed(6)));
+}
+
+/**
+ * The budget still free to spend: total minus spend, reservations, and money
+ * already committed elsewhere in the same budget (a series' episode budgets).
+ */
+export function remainingBudget(state: Pick<State, 'budget'>, committedUsd = 0): number {
+  return uncommittedBudget(state.budget.totalUsd, state.budget.spentUsd, committedUsd, state.budget.reservedUsd);
 }
 
 export function recordSpend<T extends Pick<State, 'budget' | 'updatedAt'>>(state: T, usd: number): T {

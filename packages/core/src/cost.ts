@@ -10,8 +10,21 @@ export function estimateCost(units: number, pricing: ModelPricing): number {
   return Number((units * pricing.usd).toFixed(6));
 }
 
-export function effectiveBatchCap(config: Pick<ProjectConfig, 'batch_cap_usd'>, state: Pick<State, 'budget'>): number {
-  const remaining = remainingBudget(state);
+/** Money another part of the same budget has already claimed, e.g. a series' episode budgets. */
+export interface BudgetCommitment {
+  usd: number;
+  /** The budget the commitment belongs to, e.g. "series". */
+  scope: string;
+  /** How the commitment reads in a message, e.g. "episode budgets". */
+  label: string;
+}
+
+export function effectiveBatchCap(
+  config: Pick<ProjectConfig, 'batch_cap_usd'>,
+  state: Pick<State, 'budget'>,
+  committedUsd = 0,
+): number {
+  const remaining = remainingBudget(state, committedUsd);
   const ratioCap = remaining * 0.3;
   const configured = config.batch_cap_usd ?? ratioCap;
   return Math.min(configured, remaining);
@@ -22,14 +35,17 @@ export function assertAffordable(
   state: Pick<State, 'budget'>,
   estimatedUsd: number,
   label = 'batch',
+  commitment?: BudgetCommitment,
 ): void {
-  const remaining = remainingBudget(state);
+  const remaining = remainingBudget(state, commitment?.usd ?? 0);
   if (estimatedUsd > remaining + 1e-9) {
+    const committed = commitment ? ` (committed to ${commitment.label}: $${commitment.usd.toFixed(2)})` : '';
+    const what = commitment ? `uncommitted ${commitment.scope} budget` : 'remaining project budget';
     throw new BudgetError(
-      `${label} estimate $${estimatedUsd.toFixed(2)} exceeds the remaining project budget $${remaining.toFixed(2)}.`,
+      `${label} estimate $${estimatedUsd.toFixed(2)} exceeds the ${what} $${remaining.toFixed(2)}${committed}.`,
     );
   }
-  const cap = effectiveBatchCap(config, state);
+  const cap = effectiveBatchCap(config, state, commitment?.usd ?? 0);
   if (estimatedUsd > cap + 1e-9) {
     throw new BudgetError(
       `${label} estimate $${estimatedUsd.toFixed(2)} exceeds the batch cap $${cap.toFixed(2)}. Raise batch_cap_usd or reduce the batch.`,

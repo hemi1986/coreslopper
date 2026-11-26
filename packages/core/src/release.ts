@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { srtTime } from './episode.js';
 import { readYamlFile } from './project.js';
+import { buildReleasePlan } from './release-plan.js';
 import {
   ChannelConfigSchema,
   PLATFORM_LIMITS,
@@ -281,26 +282,6 @@ export function unmarkedPlaceholders(text: string): string[] {
   return text.split('\n').filter((line) => PLACEHOLDER.test(line) && !line.includes(TODO));
 }
 
-const chars = (text: string) => [...text].length;
-
-/**
- * The text a meme's platform post carries before its hashtags: its description
- * and the credits the library sounds it took need (HS-261, HS-265).
- */
-export function memeDescription(data: Pick<UploadData, 'main'> | undefined, credits: string[] = []): string {
-  return [data?.main.description.trim() ?? '', ...credits].filter(Boolean).join('\n\n');
-}
-
-/**
- * The caption of a meme's one video: its description, the credits the library
- * sounds it took need, and its hashtags. `release` writes this string and the
- * checks measure it, so the two cannot drift (HS-172, ADR 0045).
- */
-export function memeCaption(data: Pick<UploadData, 'main'> | undefined, credits: string[] = []): string {
-  const main = data?.main;
-  return [memeDescription(data, credits), main?.hashtags.join(' ') ?? ''].filter(Boolean).join('\n\n');
-}
-
 /** Whether a licence is unknown: unset, blank, or a value that starts with "unknown" (e.g. "unknown – ask Jane"). */
 export function licenceUnknown(licence: string | undefined): boolean {
   const text = licence?.trim().toLowerCase() ?? '';
@@ -344,105 +325,30 @@ export function soundLicenceTodos(sounds: UsedSound[]): string[] {
   return todos;
 }
 
-/** The hashtags a meme's platform post carries: the list plus any the description already holds (credits are not counted). */
-export function memeHashtags(data: Pick<UploadData, 'main'> | undefined): number {
-  const main = data?.main;
-  return (main?.hashtags.length ?? 0) + (main?.description.match(/#[\p{L}\p{N}_]+/gu)?.length ?? 0);
-}
-
 /**
  * Limit and completeness problems of the platform texts in the upload data:
  * `errors` break a limit, `missing` are texts the skill still has to write.
  * A meme has one video and no main-video extras: its one description is the
- * Shorts, TikTok, and Reels caption.
+ * Shorts, TikTok, and Reels caption. This is the plan's own check, over a plan
+ * built from the upload data alone.
  */
 export function platformTextProblems(
   data: UploadData,
   limits: PlatformLimits,
-  options: { music?: boolean; kind?: 'music-video' | 'episode' | 'meme'; credits?: string[] } = { music: true },
+  options: { music?: boolean; kind?: 'music-video' | 'episode' | 'meme'; credits?: string[]; tiktokPointer?: string } = { music: true },
 ): { errors: string[]; missing: string[] } {
-  const errors: string[] = [];
-  const missing: string[] = [];
-  const main = data.main;
   const kind = options.kind ?? (options.music === false ? 'episode' : 'music-video');
-  if (kind === 'meme') {
-    const caption = memeCaption(data, options.credits);
-    if (chars(main.title) > limits.youtube.title) errors.push(`youtube short: title has ${chars(main.title)} characters, limit ${limits.youtube.title}`);
-    if (Buffer.byteLength(caption) > limits.youtube.description_bytes) errors.push(`youtube short: description has ${Buffer.byteLength(caption)} bytes, limit ${limits.youtube.description_bytes}`);
-    const tags = main.tags.join(', ');
-    if (chars(tags) > limits.youtube.tags) errors.push(`youtube short: tags have ${chars(tags)} characters, limit ${limits.youtube.tags}`);
-    if (chars(caption) > limits.tiktok.caption) errors.push(`tiktok: caption has ${chars(caption)} characters, limit ${limits.tiktok.caption}`);
-    const hashtags = memeHashtags(data);
-    if (hashtags > limits.tiktok.hashtags) errors.push(`tiktok: ${hashtags} hashtags, limit ${limits.tiktok.hashtags}`);
-    if (chars(caption) > limits.instagram.caption) errors.push(`instagram: caption has ${chars(caption)} characters, limit ${limits.instagram.caption}`);
-    if (hashtags > limits.instagram.hashtags) errors.push(`instagram: ${hashtags} hashtags, limit ${limits.instagram.hashtags}`);
-    return { errors, missing };
-  }
-  if (chars(main.title) > limits.youtube.title) errors.push(`youtube main: title has ${chars(main.title)} characters, limit ${limits.youtube.title}`);
-  if (!main.pinned_comment) missing.push('main.pinned_comment');
-  if (!main.community_post) missing.push('main.community_post');
-  for (const short of data.shorts) {
-    if (chars(short.title) > limits.youtube.title) errors.push(`youtube ${short.name}: title has ${chars(short.title)} characters, limit ${limits.youtube.title}`);
-    if (!short.instagram) missing.push(`shorts.${short.name}.instagram`);
-    else {
-      const caption = [short.instagram.caption, short.instagram.hashtags.join(' ')].filter(Boolean).join('\n\n');
-      if (chars(caption) > limits.instagram.caption) errors.push(`instagram ${short.name}: caption has ${chars(caption)} characters, limit ${limits.instagram.caption}`);
-      const tags = short.instagram.hashtags.length + (short.instagram.caption.match(/#[\p{L}\p{N}_]+/gu)?.length ?? 0);
-      if (tags > limits.instagram.hashtags) errors.push(`instagram ${short.name}: ${tags} hashtags, limit ${limits.instagram.hashtags}`);
-      if (!short.instagram.story) missing.push(`shorts.${short.name}.instagram.story`);
-    }
-    if (!short.tiktok) missing.push(`shorts.${short.name}.tiktok`);
-    else {
-      // The description holds the caption, the pointer to the full video, and the hashtags.
-      const caption = [short.tiktok.caption, short.tiktok.overlay ?? '', short.tiktok.hashtags.join(' ')].filter(Boolean).join('\n\n');
-      if (chars(caption) > limits.tiktok.caption) errors.push(`tiktok ${short.name}: caption has ${chars(caption)} characters, limit ${limits.tiktok.caption}`);
-      if (short.tiktok.hashtags.length > limits.tiktok.hashtags) errors.push(`tiktok ${short.name}: ${short.tiktok.hashtags.length} hashtags, limit ${limits.tiktok.hashtags}`);
-    }
-    if (short.instagram && short.tiktok && short.instagram.caption.trim() === short.tiktok.caption.trim()) {
-      errors.push(`${short.name}: the Instagram and TikTok captions are identical; write one per platform`);
-    }
-  }
-  if (!data.instagram_post) missing.push('instagram_post');
-  if (data.instagram_post) {
-    const caption = [data.instagram_post.caption, data.instagram_post.hashtags.join(' ')].join('\n\n');
-    if (chars(caption) > limits.instagram.caption) errors.push(`instagram post: caption has ${chars(caption)} characters, limit ${limits.instagram.caption}`);
-    if (data.instagram_post.hashtags.length > limits.instagram.hashtags) errors.push(`instagram post: ${data.instagram_post.hashtags.length} hashtags, limit ${limits.instagram.hashtags}`);
-  }
-  // X: links count as 23 characters each; the YouTube link sits in the reply, not in the post.
-  const xLength = (text: string) => chars(text.replace(/https?:\/\/\S+/g, 'x'.repeat(23)));
-  const xPost = (post: string, hashtags: string[]) => [post.trim(), hashtags.join(' ')].filter(Boolean).join('\n\n');
-  if (!data.x) missing.push('x');
-  else {
-    const post = xPost(data.x.post, data.x.hashtags);
-    if (xLength(post) > limits.x.post) errors.push(`x: post has ${xLength(post)} characters, limit ${limits.x.post}`);
-    if (data.x.hashtags.length > limits.x.hashtags) errors.push(`x: ${data.x.hashtags.length} hashtags, limit ${limits.x.hashtags}`);
-    if (data.x.reply && xLength(data.x.reply) + 24 > limits.x.post) errors.push(`x: reply with the link has ${xLength(data.x.reply) + 24} characters, limit ${limits.x.post}`);
-    if (data.x.media && !data.shorts.some((short) => short.name === data.x?.media)) errors.push(`x: media ${data.x.media} is not a Short in upload.yaml`);
-  }
-  for (const short of data.shorts) {
-    if (!short.x) continue;
-    const post = xPost(short.x.post, short.x.hashtags);
-    if (xLength(post) > limits.x.post) errors.push(`x ${short.name}: post has ${xLength(post)} characters, limit ${limits.x.post}`);
-    if (short.x.hashtags.length > limits.x.hashtags) errors.push(`x ${short.name}: ${short.x.hashtags.length} hashtags, limit ${limits.x.hashtags}`);
-  }
-  if (!data.linkedin) missing.push('linkedin (decision post or skip, with the reason)');
-  else if (data.linkedin.decision === 'post' && data.linkedin.post) {
-    const post = [data.linkedin.post.trim(), data.linkedin.hashtags.join(' ')].filter(Boolean).join('\n\n');
-    if (chars(post) > limits.linkedin.post) errors.push(`linkedin: post has ${chars(post)} characters, limit ${limits.linkedin.post}`);
-    if (data.linkedin.hashtags.length > limits.linkedin.hashtags) errors.push(`linkedin: ${data.linkedin.hashtags.length} hashtags, limit ${limits.linkedin.hashtags}`);
-    const hook = data.linkedin.post.split(/\n\s*\n/)[0] ?? '';
-    if (chars(hook) > limits.linkedin.hook) errors.push(`linkedin: the first paragraph has ${chars(hook)} characters; only ${limits.linkedin.hook} show before "see more"`);
-    if (data.linkedin.media !== 'main' && !data.shorts.some((short) => short.name === data.linkedin?.media)) errors.push(`linkedin: media ${data.linkedin.media} is not main or a Short`);
-  }
-  if (!data.microsite) missing.push('microsite');
-  if (!data.announcement) missing.push('announcement');
-  else if (data.announcement.hashtags.length > limits.instagram.hashtags) {
-    errors.push(`announcement: ${data.announcement.hashtags.length} hashtags, limit ${limits.instagram.hashtags} (Instagram)`);
-  }
-  if (kind === 'music-video') {
-    if (!data.spotify?.pitch) missing.push('spotify.pitch');
-    else if (chars(data.spotify.pitch) > limits.spotify.pitch) errors.push(`spotify: pitch has ${chars(data.spotify.pitch)} characters, limit ${limits.spotify.pitch}`);
-    if (!data.spotify?.artist_pick) missing.push('spotify.artist_pick');
-  }
-  return { errors, missing };
+  const plan = buildReleasePlan({
+    kind,
+    language: data.language,
+    slug: 'release',
+    title: '',
+    data,
+    limits,
+    chapters: [],
+    credits: options.credits,
+    tiktokPointer: options.tiktokPointer,
+    files: { thumbnails: [], shorts: [] },
+  });
+  return plan.problems;
 }

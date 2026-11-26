@@ -9,6 +9,7 @@ import {
   buildLyricsSrt,
   buildSrt,
   canvasWindow,
+  buildReleasePlan,
   chapterProblems,
   chaptersFromSections,
   channelTodos,
@@ -21,7 +22,6 @@ import {
   libraryTakeSoundId,
   notReleasedPublicly,
   platformLimits,
-  platformTextProblems,
   plainLyrics,
   readJsonFile,
   releaseIdentity,
@@ -41,6 +41,7 @@ import {
   type ReleaseFileKind,
   type ReleaseManifest,
   type ReleaseCalendar,
+  type ReleasePlan,
   type UploadData,
   type UsedSound,
 } from '@coreslopper/core';
@@ -58,8 +59,9 @@ import {
   type FfmpegRunner,
   type Prober,
 } from './release-media.js';
-import { readmeText, releaseLabels, releaseTexts, youtubeDescriptionText, calendarEventLabel, type ReleaseTextInput } from './release-texts.js';
-import { calendarInput, loadStatus, planCalendar } from './release-calendar.js';
+import { readmeText, releaseLabels, releaseTexts, calendarEventLabel, type ReleaseTextInput } from './release-texts.js';
+import { calendarInput, planCalendar } from './release-calendar.js';
+import { loadStatus } from './release-records.js';
 import { micrositeSong } from './release-microsite.js';
 import { listThumbnails } from './thumbnail-files.js';
 import { readRecipe, recipePath } from './thumbnail-recipe.js';
@@ -73,6 +75,15 @@ import { loadLibrarySound } from './sound-library.js';
 /** The release folder of a project; on CORESLOPPER_MEDIA_DIR when `renders/` is linked there. */
 export function releaseDir(projectDir: string): string {
   return join(resolve(projectDir), 'renders', 'release');
+}
+
+/** The plan `release` wrote into `manifest.json`, or undefined before the first release. */
+export async function loadReleasePlan(projectDir: string): Promise<ReleasePlan | undefined> {
+  const path = join(releaseDir(projectDir), 'manifest.json');
+  if (!existsSync(path)) return undefined;
+  return readJsonFile(path, ReleaseManifestSchema)
+    .then((manifest) => manifest.plan)
+    .catch(() => undefined);
 }
 
 /** The cover source the skill composes with `thumbnail --format 1x1`. */
@@ -485,6 +496,15 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
   if (!meme) {
     await deriveReleaseMedia({ project, dir, writer, files, data, calendar: input.calendar, language, title: identity.title, deps, todos, stills: options.stills !== false });
   }
+  const youtubeHandle = channel?.links.youtube?.handle;
+  const plan = buildReleasePlan({
+    ...input,
+    tiktokPointer: releaseLabels(language).tt.overlayDefault(youtubeHandle && !/<ID>/.test(youtubeHandle) ? youtubeHandle : 'YouTube'),
+  });
+  if (data) {
+    errors.push(...plan.problems.errors);
+    todos.push(...plan.problems.missing.map((field) => `${field} is missing in review/upload.yaml`));
+  }
   const labels = releaseLabels(language);
   const ics = calendarIcs([input.calendar], (calendar, event) => `${calendar.title}: ${calendarEventLabel(event, labels, input.premiere, kind)}`);
   await writer.text('calendar.ics', ics, 'calendar', { events: input.calendar.events.length, release_date: input.calendar.release_date });
@@ -493,17 +513,8 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
     const song = micrositeSong(input, { status: await loadStatus(project.paths.root), calendar: input.calendar, lyrics: music ? lyrics : undefined });
     await writer.text(`microsite/${slug}.json`, `${JSON.stringify(song, null, 2)}\n`, 'microsite', {});
   }
-  if (data) {
-    const problems = platformTextProblems(data, limits, { kind, credits });
-    errors.push(...problems.errors);
-    todos.push(...problems.missing.map((field) => `${field} is missing in review/upload.yaml`));
-  }
-  const texts = releaseTexts(input);
+  const texts = releaseTexts(plan, input);
   for (const [name, content] of Object.entries(texts)) await writer.text(`texts/${name}`, content, 'text', { limits });
-  if (kind !== 'meme') {
-    const youtubeBytes = Buffer.byteLength(youtubeDescriptionText(input, releaseLabels(language)));
-    if (youtubeBytes > limits.youtube.description_bytes) errors.push(`youtube main: description with chapters and footer has ${youtubeBytes} bytes, limit ${limits.youtube.description_bytes}`);
-  }
 
   await writer.text('README.md', readmeText(input, [...new Set(todos)]), 'readme');
 
@@ -517,6 +528,7 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
     project: slug,
     generated_at: deps.now().toISOString(),
     files: writer.files,
+    plan,
     todos: [...new Set(todos)],
   };
   await writeJsonAtomic(manifestPath, ReleaseManifestSchema.parse(manifest));

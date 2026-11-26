@@ -1,7 +1,8 @@
 import { stat } from 'node:fs/promises';
 import { ConfigError } from '@coreslopper/core';
 import { delay, mimeForPath, type FetchLike } from '../http.js';
-import { fetchWithRetry, httpError, PublishError, readChunk, readJson, redactSecrets, markUncertain } from './http.js';
+import { fetchWithRetry, httpError, pollUntil, PublishError, readChunk, readJson, redactSecrets } from './http.js';
+import { markFailure } from './failure.js';
 import type { PublishLogger } from './types.js';
 import type { SaveSecret, SocialAdapter, SocialAdapterOptions, SocialPostRequest, SocialPostResult } from './social.js';
 
@@ -233,15 +234,15 @@ export class LinkedInPublisher implements SocialAdapter {
     };
     this.log(`linkedin: posting ${request.event}`);
     const response = await this.rest(token, 'posts', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }, 60_000, 1).catch((error: unknown) => {
-      throw markUncertain(error);
+      throw markFailure(error, { phase: 'publication' });
     });
     if (response.status !== 201 && !response.ok) {
       const error = httpError('LinkedIn posts', response.status, await readJson(response), this.secrets);
-      throw response.status >= 500 ? markUncertain(error) : error;
+      throw markFailure(error, { phase: 'publication' });
     }
     const urn = response.headers.get('x-restli-id') ?? response.headers.get('x-linkedin-id');
     await response.body?.cancel().catch(() => undefined);
-    if (!urn) throw new PublishError(`LinkedIn accepted ${request.event} but returned no post ID.`);
+    if (!urn) throw markFailure(new PublishError(`LinkedIn accepted ${request.event} but returned no post ID.`), { phase: 'publication' });
     return { remoteId: urn, url: `https://www.linkedin.com/feed/update/${urn}/`, warnings, manualSteps: [] };
   }
 
@@ -353,19 +354,32 @@ export class LinkedInPublisher implements SocialAdapter {
   }
 
   private async waitForVideo(token: string, video: string): Promise<void> {
-    const deadline = this.now().getTime() + this.processingTimeoutMs;
-    while (true) {
-      const response = await this.rest(token, `videos/${encodeURIComponent(video)}`, { method: 'GET' });
-      const body = await readJson(response);
-      if (!response.ok) throw httpError('LinkedIn videos.get', response.status, body, this.secrets);
-      const status = String(body.status ?? '');
-      if (status === 'AVAILABLE') return;
-      if (status === 'PROCESSING_FAILED') {
-        throw new PublishError(`LinkedIn could not process the video: ${String(body.processingFailureReason ?? 'no reason given')}.`);
-      }
-      if (this.now().getTime() >= deadline) throw new PublishError(`LinkedIn was still processing the video (${status || 'unknown'}) after ${Math.round(this.processingTimeoutMs / 60_000)} minutes.`);
-      await this.sleep(this.pollMs);
-    }
+    const timeoutMs = this.processingTimeoutMs;
+    await pollUntil(
+      async () => {
+        const response = await this.rest(token, `videos/${encodeURIComponent(video)}`, { method: 'GET' });
+        const body = await readJson(response);
+        if (!response.ok) throw httpError('LinkedIn videos.get', response.status, body, this.secrets);
+        return { status: String(body.status ?? ''), reason: String(body.processingFailureReason ?? 'no reason given') };
+      },
+      {
+        intervalMs: this.pollMs,
+        timeoutMs,
+        now: () => this.now().getTime(),
+        sleep: this.sleep,
+        failed: (current) =>
+          current.status === 'PROCESSING_FAILED'
+            ? markFailure(new PublishError(`LinkedIn could not process the video: ${current.reason}.`), { phase: 'upload' })
+            : undefined,
+        done: (current) => current.status === 'AVAILABLE',
+        onTimeout: (last) => {
+          throw markFailure(
+            new PublishError(`LinkedIn was still processing the video (${last.status || 'unknown'}) after ${Math.round(timeoutMs / 60_000)} minutes.`),
+            { phase: 'upload' },
+          );
+        },
+      },
+    );
   }
 
   /** Images API: initializeUpload, then PUT the file to the returned URL. */

@@ -5,6 +5,7 @@ import { ValidationError, ensureDir, loadProject, loadSeries, providerForRole, t
 import { imageSize } from './clip-options.js';
 import { BatchSchema, projectTarget, runBatch, seriesTarget, type BatchTarget } from './generate.js';
 import { cropImage, editSize, parseBox, pasteBack, snapBoxAspect, type Box } from './image-ops.js';
+import { committedEpisodeBudgets } from './series.js';
 import { latestVerdicts } from './verdicts.js';
 
 export interface PatchOptions {
@@ -56,9 +57,13 @@ export interface PatchResult {
  * box stays pixel-identical. The result is filed as the next attempt.
  */
 export async function patchImage(projectDir: string, options: PatchOptions): Promise<PatchResult> {
-  const target: BatchTarget = options.seriesDir
-    ? seriesTarget(await loadSeries(options.seriesDir))
-    : projectTarget(await loadProject(projectDir));
+  let target: BatchTarget;
+  if (options.seriesDir) {
+    const loaded = await loadSeries(options.seriesDir);
+    target = seriesTarget(loaded, await committedEpisodeBudgets(options.seriesDir, loaded.series.slug));
+  } else {
+    target = projectTarget(await loadProject(projectDir));
+  }
   const root = target.paths.root;
   const image = resolve(options.image);
   if (!existsSync(image)) throw new ValidationError(`Missing image: ${image}`);

@@ -32,6 +32,7 @@ import {
   saveState,
   withFl2vaAlignment,
   writeJsonAtomic,
+  type BudgetCommitment,
   type LoadedProject,
   type LoadedSeries,
   type LipSyncProviderKind,
@@ -59,6 +60,7 @@ import {
   type ClipOptions,
 } from './clip-options.js';
 import { muxOriginalAudio, probeDuration } from './media.js';
+import { committedEpisodeBudgets } from './series.js';
 
 export const BatchItemSchema = z
   .object({
@@ -250,6 +252,8 @@ export interface BatchTarget {
   paths: { root: string; assets: string; manifest: string; series?: string };
   /** Characters whose names Wan prompts replace with their descriptions. */
   characters?: { id: string; name: string; description: string }[];
+  /** Money the same budget has already promised elsewhere; a series' canon carries its episode budgets. */
+  commitment?: BudgetCommitment;
   saveState(): Promise<void>;
 }
 
@@ -264,8 +268,8 @@ export function projectTarget(project: LoadedProject): BatchTarget {
   };
 }
 
-/** A series canon as a batch target; canon generations need a series budget. */
-export function seriesTarget(loaded: LoadedSeries): BatchTarget {
+/** A series canon as a batch target; canon generations need a series budget and see the committed episode budgets. */
+export function seriesTarget(loaded: LoadedSeries, committedEpisodeBudgetsUsd: number): BatchTarget {
   const { series, state, paths } = loaded;
   if (series.budget_usd === undefined) {
     throw new ConfigError(`series.yaml of "${series.slug}" has no budget_usd; canon generations need a series budget.`);
@@ -280,6 +284,7 @@ export function seriesTarget(loaded: LoadedSeries): BatchTarget {
     config: { providers: series.providers, models: {}, formats: series.formats, batch_cap_usd: series.batch_cap_usd },
     state,
     paths,
+    commitment: { usd: committedEpisodeBudgetsUsd, scope: 'series', label: 'episode budgets' },
     saveState: () => writeJsonAtomic(paths.state, state),
   };
 }
@@ -287,6 +292,55 @@ export function seriesTarget(loaded: LoadedSeries): BatchTarget {
 function roleOverride(config: BatchConfig, role: string): Record<string, unknown> {
   const value = config.models[role];
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+/** A model role as a batch item would run it: the provider, the resolved entry, and the price of one unit. */
+export interface RoleQuote {
+  provider: ProviderKind;
+  role: string;
+  resolved: ReturnType<typeof resolveModelRole>;
+  pricing: ModelPricing;
+  /** The planned cost of `units`; local and mock generations cost nothing. */
+  cost(units: number): number;
+}
+
+export interface RoleQuoteOptions {
+  models: Awaited<ReturnType<typeof loadModelsConfig>>;
+  /** The project or series whose provider and `models.<role>` override apply. */
+  config?: BatchConfig;
+  /** A batch's provider override; without one the config or the role picks the provider. */
+  provider?: ProviderKind;
+  /** An explicit `models.<role>` override; default `config.models[role]`. */
+  override?: Record<string, unknown>;
+}
+
+/**
+ * The one price rule for a model role: role lookup, provider choice, the
+ * project's override, the role's price at that provider, and the zero price of
+ * local and mock generations. `runBatch` and `estimate` both quote through it.
+ */
+export function quoteRole(roleName: string, options: RoleQuoteOptions): RoleQuote {
+  const role = options.models.roles[roleName];
+  if (!role) throw new ValidationError(`Unknown model role "${roleName}". Add it to config/models.yaml.`);
+  const provider: ProviderKind =
+    options.provider ?? (options.config ? providerForRole(options.config, roleName) : (role.provider as ProviderKind));
+  const override = options.override ?? (options.config ? roleOverride(options.config, roleName) : {});
+  const resolved = resolveModelRole(role, provider, override, roleName);
+  const local = provider === 'comfyui' || provider === 'mock';
+  const pricing = local ? ({ unit: 'request', usd: 0 } satisfies ModelPricing) : resolved.pricing;
+  if (!pricing) {
+    throw new ConfigError(
+      `Role "${roleName}" has no pricing entry for provider "${provider}". ` +
+        'Add pricing to config/models.yaml or override models.<role>.pricing in project.yaml.',
+    );
+  }
+  return {
+    provider,
+    role: roleName,
+    resolved,
+    pricing,
+    cost: (units: number) => (local ? 0 : estimateCost(units, pricing)),
+  };
 }
 
 /** Moved to core with the episode rules; re-exported for existing callers. */
@@ -301,9 +355,6 @@ function resolveItem(
   characters: { id: string; name: string; description: string }[] = [],
   lipsyncOverride?: LipSyncProviderKind,
 ): ResolvedItem {
-  const role = models.roles[item.role];
-  if (!role) throw new ValidationError(`Unknown model role "${item.role}". Add it to config/models.yaml.`);
-  const override = roleOverride(config, item.role);
   const chosen =
     item.operation === 'lipSync'
       ? (lipsyncOverride ?? providerForRole(config, item.role))
@@ -326,7 +377,8 @@ function resolveItem(
         'Cut the line with `audio-segment` and drop audioStartSeconds.',
     );
   }
-  const resolved = resolveModelRole(role, provider, override, item.role);
+  const quote = quoteRole(item.role, { models, provider, override: roleOverride(config, item.role) });
+  const { resolved, pricing } = quote;
   const { workflow, ...merged } = { ...resolved.params, ...item.params };
   const { options: clip, rest } = takeClipOptions(merged);
   let params = rest;
@@ -377,15 +429,6 @@ function resolveItem(
   if (pika && item.durationSeconds === undefined && !(pikaLipSync && item.audio)) {
     throw new ValidationError(`${resolved.model} needs durationSeconds; it would fall back to the template's length.`);
   }
-  const pricing =
-    resolved.pricing ??
-    (provider === 'mock' || provider === 'comfyui' ? ({ unit: 'request', usd: 0 } satisfies ModelPricing) : undefined);
-  if (!pricing) {
-    throw new ConfigError(
-      `Role "${item.role}" has no pricing entry for provider "${provider}". ` +
-        'Add pricing to config/models.yaml or override models.<role>.pricing in project.yaml.',
-    );
-  }
 
   const audio = item.audio
     ? resolve(item.audio.startsWith('/') ? item.audio : join(projectRoot, item.audio))
@@ -433,7 +476,7 @@ function resolveItem(
       : pricing.unit === 'image'
         ? Number(params.num_images ?? params.batch_size ?? 1)
         : 1;
-  const cost = estimateCost(units, pricing);
+  const cost = quote.cost(units);
 
   const references = item.references.map((reference) =>
     resolve(reference.startsWith('/') ? reference : join(projectRoot, reference)),
@@ -690,8 +733,8 @@ export async function runBatch(
 ): Promise<BatchRunResult[]> {
   const log = options.log === false ? () => undefined : (...args: unknown[]) => console.log(...args);
   const models = await loadModelsConfig();
-  const resolved = batch.map((item) => {
-    const value = resolveItem(
+  const resolved = batch.map((item) =>
+    resolveItem(
       item,
       project.config,
       models,
@@ -699,19 +742,21 @@ export async function runBatch(
       options.provider,
       project.characters,
       options.lipsyncProvider,
-    );
-    return value.provider === 'mock' || value.provider === 'comfyui' ? { ...value, cost: 0 } : value;
-  });
+    ),
+  );
   const totalEstimate = resolved.reduce((sum, item) => sum + item.cost, 0);
   for (const item of batch) if (item.out) resolveOut(project.paths.root, item.out, project.paths.series);
 
   log(`Batch: ${resolved.length} generation(s), worst-case estimate ${formatUsd(totalEstimate)}`);
+  const committedUsd = project.commitment?.usd ?? 0;
   log(
-    `Budget: ${formatUsd(remainingBudget(project.state))} remaining · batch cap ${formatUsd(
-      effectiveBatchCap(project.config, project.state),
-    )}`,
+    `Budget: ${formatUsd(remainingBudget(project.state, committedUsd))} uncommitted` +
+      (project.commitment
+        ? ` (${formatUsd(project.commitment.usd)} committed to ${project.commitment.label})`
+        : '') +
+      ` · batch cap ${formatUsd(effectiveBatchCap(project.config, project.state, committedUsd))}`,
   );
-  assertAffordable(project.config, project.state, totalEstimate, `${project.label} generation batch`);
+  assertAffordable(project.config, project.state, totalEstimate, `${project.label} generation batch`, project.commitment);
   if (options.dryRun) {
     for (const item of resolved) {
       log(
@@ -779,7 +824,7 @@ export async function runBatch(
 
   log(
     `Done. Actual spend ${formatUsd(actualSpend)} · cache hits ${cacheHits}/${resolved.length} · remaining ${formatUsd(
-      remainingBudget(project.state),
+      remainingBudget(project.state, committedUsd),
     )}`,
   );
   return results;
@@ -824,9 +869,13 @@ async function restoreClip(
 }
 
 export async function generateBatch(options: GenerateOptions): Promise<void> {
-  const project = options.seriesDir
-    ? seriesTarget(await loadSeries(options.seriesDir))
-    : projectTarget(await loadProject(options.projectDir));
+  let project: BatchTarget;
+  if (options.seriesDir) {
+    const loaded = await loadSeries(options.seriesDir);
+    project = seriesTarget(loaded, await committedEpisodeBudgets(options.seriesDir, loaded.series.slug));
+  } else {
+    project = projectTarget(await loadProject(options.projectDir));
+  }
   const batchRaw = await readFile(resolve(options.batchPath), 'utf8');
   let batchData: unknown;
   try {

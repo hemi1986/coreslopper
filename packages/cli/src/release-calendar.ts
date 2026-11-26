@@ -1,36 +1,28 @@
 import { existsSync } from 'node:fs';
 import { readdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { withFileLock } from './file-lock.js';
 import { stringify } from 'yaml';
 import {
   ProjectConfigSchema,
   ReleaseCalendarSchema,
-  ReleaseStatusSchema,
   ValidationError,
   buildCalendar,
   loadReleaseSchedule,
   releasedPublicly,
   zonedToday,
-  readJsonFile,
   readYamlFile,
-  writeJsonAtomic,
   writeTextAtomic,
   type CalendarInput,
   type ReleaseCalendar,
   type ReleaseSchedule,
-  type ReleaseStatus,
   type UploadData,
 } from '@coreslopper/core';
+import { loadStatus, updateStatus } from './release-records.js';
 
-// The project side of the release calendar: where it lives, the other
-// projects it must not collide with, and the user's posting status.
+// The project side of the release calendar: where it lives and the other
+// projects it must not collide with. Its done marks are release records.
 
 export const calendarPath = (projectRoot: string) => join(projectRoot, 'review', 'calendar.yaml');
-export const statusPath = (projectRoot: string) => join(projectRoot, 'review', 'release-status.json');
-/** One lock per project around every write of the release status and the autopilot log: the board and `release-run` both write them. */
-export const releaseLockPath = (projectRoot: string) => join(projectRoot, 'review', '.release.lock');
-export const withReleaseLock = <T>(projectRoot: string, fn: () => Promise<T>) => withFileLock(releaseLockPath(projectRoot), fn);
 
 export async function loadCalendar(projectRoot: string): Promise<ReleaseCalendar | undefined> {
   const path = calendarPath(projectRoot);
@@ -119,38 +111,6 @@ export async function planCalendar(
   const header = '# Release calendar, written by `release`. Times you move here are kept; `calendar --replan` plans again.\n';
   await writeTextAtomic(calendarPath(projectRoot), header + stringify(ReleaseCalendarSchema.parse(calendar)));
   return calendar;
-}
-
-export async function loadStatus(projectRoot: string): Promise<ReleaseStatus> {
-  const path = statusPath(projectRoot);
-  return existsSync(path) ? readJsonFile(path, ReleaseStatusSchema) : { version: 1, items: {} };
-}
-
-/** Mark one calendar event (or any board item) done or open, by the user or the autopilot, and record its live URL. */
-export async function updateStatus(
-  projectRoot: string,
-  id: string,
-  change: { done?: boolean; url?: string | null; by?: 'user' | 'autopilot' },
-  now: Date,
-): Promise<ReleaseStatus> {
-  return withReleaseLock(projectRoot, () => updateStatusUnlocked(projectRoot, id, change, now));
-}
-
-async function updateStatusUnlocked(projectRoot: string, id: string, change: { done?: boolean; url?: string | null; by?: 'user' | 'autopilot' }, now: Date): Promise<ReleaseStatus> {
-  const status = await loadStatus(projectRoot);
-  const item = { ...(status.items[id] ?? { done: false }) };
-  if (change.done !== undefined) {
-    item.done = change.done;
-    item.at = change.done ? now.toISOString() : undefined;
-    if (change.done && change.by) item.by = change.by;
-    else if (!change.done) delete item.by;
-  }
-  if (change.url === null || change.url === '') delete item.url;
-  else if (change.url !== undefined) item.url = change.url;
-  status.items[id] = item;
-  const parsed = ReleaseStatusSchema.parse(status);
-  await writeJsonAtomic(statusPath(projectRoot), parsed);
-  return parsed;
 }
 
 /** `calendar <project>`: plan the calendar alone, from the upload data and the Shorts in renders/shorts/. */

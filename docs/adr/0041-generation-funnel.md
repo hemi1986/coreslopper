@@ -52,11 +52,13 @@ providers' bills. Only the agent changes the model roles.
 
 ## Consequences
 
+- Candidate 06 (2026-11-25) closed the `spend` and `estimate` gaps this ADR listed: the command is gone, so
+  only the generation path writes spend, and `estimate` shares the generation path's price rule and checks the
+  remaining budget as well as the batch cap.
 - Several of these rules are ahead of the code (gaps G-86 and later in `docs/domain/gap-register.md`):
   - fal submissions are retried without an idempotency key.
   - The cache key hashes reference paths.
-  - The `spend` command, and a paid call that returns no file, break the rule that the manifest equals the spend.
-  - `estimate` checks only the batch cap.
+  - A paid call that returns no file breaks the rule that the manifest equals the spend.
   - About 280 lines of ComfyUI routing sit in `generate.ts`, and the provider list is kept five times.
 - `budget.reservedUsd`, the runner's `beforeGenerate` hook, and the `retries` block of `config/defaults.yaml` are
   dead and will be removed.
