@@ -121,7 +121,7 @@ if (command === "start") {
     console.log(`REVIEWS      ${facts.reviews.length ? facts.reviews.join(", ") : "none in docs/reviews/"}`);
   }
   const metrics = facts.uncommitted.length;
-  if (metrics) console.log(`METRICS      ${metrics} collected file(s) uncommitted – commit them first as 'metrics: collect'`);
+  if (metrics) console.log(`METRICS      ${metrics} collected file(s) uncommitted – commit them first as 'chore(metrics): collect'`);
   process.exit(0);
 }
 

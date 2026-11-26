@@ -467,7 +467,7 @@ export function mergeErrors(state: e.MarathonState, id: string, claim: e.Maratho
   }
   errs.push(...mergeBlockerErrors(id, claim, details));
   if (f.repoMapStale) errs.push("the repository map is stale after the merge – run `node .claude/skills/adopt/scripts/repo-map.ts` and commit it with the bookkeeping");
-  if (f.dirty.length) errs.push(`uncommitted changes: ${f.dirty.slice(0, 5).join(", ")}${f.dirty.length > 5 ? ", …" : ""} – commit them as '${id}: done'`);
+  if (f.dirty.length) errs.push(`uncommitted changes: ${f.dirty.slice(0, 5).join(", ")}${f.dirty.length > 5 ? ", …" : ""} – commit them as 'chore(${id}): done'`);
   return errs;
 }
 

@@ -503,7 +503,7 @@ try {
     if (suspects) say("CHECK", `${suspects} possible merge blocker(s) in merged stories – the summary lists them under 'Possible merge blockers – please check'; name them in your last message to the user`);
     if (out.stop!.pr) say("PR", out.stop!.pr);
     else {
-      say("NEXT", `node .claude/skills/metrics/scripts/story-metrics.ts collect --since ${out.startedAt} – the run's sessions, the open ones too; commit what it writes as 'metrics: collect'`);
+      say("NEXT", `node .claude/skills/metrics/scripts/story-metrics.ts collect --since ${out.startedAt} – the run's sessions, the open ones too; commit what it writes as 'chore(metrics): collect'`);
       say("THEN", `${SCRIPT} summary --out .claude/state/marathon-pr.md, push ${out.integrationBranch}, open the pull request, then \`${SCRIPT} finish --pr <url>\``);
     }
     process.exit(0);

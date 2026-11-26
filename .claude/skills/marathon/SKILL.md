@@ -53,7 +53,7 @@ unchanged.
    It names the run after the day, cuts the integration branch `marathon/<date>` from the default branch and puts
    the checkout on it. Defaults: 6 stories, 3 failures in a row, foundation gate on, no budget. Refused → tell the
    user what it printed and stop.
-3. Uncommitted files under `docs/stories/metrics/` came along: commit them as `metrics: collect`.
+3. Uncommitted files under `docs/stories/metrics/` came along: commit them as `chore(metrics): collect`.
 4. Tell the user in two lines what runs (run, branch, limits) – then start the loop without waiting for an answer.
 
 ## The loop – one story per round
@@ -127,7 +127,7 @@ Per reviewer:
    `fix-blockers-first` (code reviewer). The same record goes into the story's metrics.
 
 The review files are yours and the reviewers' to write, never the worker's. When every reviewer of the round is
-recorded, commit `docs/reviews/` and `docs/stories/metrics/` on the story branch as `ST-NNN: review round <n>` and
+recorded, commit `docs/reviews/` and `docs/stories/metrics/` on the story branch as `chore(ST-NNN): review round <n>` and
 follow the `NEXT` of the **last** `review` call:
 
 - **`merge`** → step 5. Minors and questions alone start no worker pass: put the ones that matter into the
@@ -172,7 +172,7 @@ Every sub-step is safe to repeat; after a resume skip what is already done.
 5. `node .claude/skills/user-stories/scripts/render-backlog.ts`, `node .claude/skills/adopt/scripts/repo-map.ts`
    (the merge may have added files or packages; it rewrites `docs/architecture/repo-map.*` and the generated block
    in `AGENTS.md` – bookkeeping, like the backlog), `mark ST-NNN integration end`,
-   `node .claude/skills/metrics/scripts/story-metrics.ts collect`, then commit everything as `ST-NNN: done`.
+   `node .claude/skills/metrics/scripts/story-metrics.ts collect`, then commit everything as `chore(ST-NNN): done`.
 6. Record the merge – it is checked against git, the verify run, the reviews (a `domain`, `tech-task` or `spike`
    story needs an accepting `acceptance-tester`; only `chore` and `task` are fast) and the repository map. The
    details file `.kataster/details/ST-NNN-merged.json` holds **this story's** notes, questions and decisions only –
@@ -200,7 +200,7 @@ foundation gate, a red verify on the integration branch – or when the user end
 1. `node .claude/skills/marathon/scripts/marathon-state.ts finish` (the reason is the `STOP` reason; when the user
    ended the run: `--reason "<why>"`).
 2. Run the `collect --since …` command `finish` printed: it adds what the run's sessions spent outside a phase –
-   this session is still open, so the hooks have not collected it yet. Commit what it wrote as `metrics: collect`.
+   this session is still open, so the hooks have not collected it yet. Commit what it wrote as `chore(metrics): collect`.
    Then `node .claude/skills/marathon/scripts/marathon-state.ts summary --out .claude/state/marathon-pr.md` – the
    summary, the escalations with their reasons, the open questions, the possible merge blockers, the decisions taken
    with a default and the metrics of every story of the run.
@@ -228,7 +228,7 @@ nothing any more, even when they still run in the background. Per line:
 
 | Line | What you do |
 |---|---|
-| `CHECKOUT` with uncommitted paths on a story branch | a pass was cut off mid-work: commit them there as `ST-NNN: wip pass cut off` |
+| `CHECKOUT` with uncommitted paths on a story branch | a pass was cut off mid-work: commit them there as `chore(ST-NNN): wip pass cut off` |
 | `CHECKOUT` with uncommitted paths on the integration branch | step 5 was cut off: go on with it |
 | `REPORT ST-NNN` | the pass ended and handed in its report, but nobody read it: read the file it names and go on with step 3 – no new pass |
 | `CONTINUE ST-NNN` | step 2 with a fresh `story-worker` and the task plus *Continuation – an earlier pass was cut off*; the pass is counted already, as a pass after a cut-off – not as a failure |
