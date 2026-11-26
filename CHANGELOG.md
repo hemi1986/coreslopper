@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.12.0](https://github.com/hemi1986/coreslopper/compare/v0.11.0...v0.12.0) (2026-11-26)
+
+
+### Features
+
+* **episode:** fill every scene with its ambience bed without gaps ([790adc0](https://github.com/hemi1986/coreslopper/commit/790adc0778bd801ef730f354030cc58cf0012775))
+* **render:** mix per-shot sound cues under a true-peak limiter ([5e08c50](https://github.com/hemi1986/coreslopper/commit/5e08c5096d399a45dcd548ab5047c9ef9b378f96))
+* shot sound cues, gap-free ambience beds, true-peak-safe Shorts ([6edb887](https://github.com/hemi1986/coreslopper/commit/6edb8871348cc236404b11dd72d2328bff8e76a4))
+
+
+### Bug Fixes
+
+* **release:** keep Shorts and the teaser under the true-peak target ([edd25df](https://github.com/hemi1986/coreslopper/commit/edd25dff3a938b31a6cbe046aa5ba1f4bdb65b94))
+
 ## [0.11.0](https://github.com/hemi1986/coreslopper/compare/v0.10.1...v0.11.0) (2026-11-26)
 
 
