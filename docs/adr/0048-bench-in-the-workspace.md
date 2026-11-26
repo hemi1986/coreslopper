@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-11-22
 ---
 
@@ -7,7 +7,7 @@ date: 2026-11-22
 
 ## Status
 
-Proposed — 2026-11-22. Amends [ADR 0020](0020-model-bench.md). The adoption of the bench slice recovered it from the
+Accepted — 2026-11-22; accepted by the user on 2026-11-26. Amends [ADR 0020](0020-model-bench.md). The adoption of the bench slice recovered it from the
 code and four questions about how the workflow is used; the code was not reviewed by a user.
 
 ## Context

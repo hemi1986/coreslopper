@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-11-21
 ---
 
@@ -7,7 +7,7 @@ date: 2026-11-21
 
 ## Status
 
-Proposed — 2026-11-21. Records decisions already in the code; amends
+Accepted — 2026-11-21; accepted by the user on 2026-11-26. Records decisions already in the code; amends
 [ADR 0005](0005-symbolic-timing-anchors.md) (word anchors carry an edge too) and
 [ADR 0008](0008-local-audio-analysis.md) (models, fallbacks, the user's vocal stem, backing vocals). The adoption
 of the timing slice recovered it. The user answered four questions about how they work and has not reviewed the

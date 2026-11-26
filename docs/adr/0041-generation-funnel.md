@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-11-21
 ---
 
@@ -7,7 +7,7 @@ date: 2026-11-21
 
 ## Status
 
-Proposed — 2026-11-21. Records decisions already in the code. Amends
+Accepted — 2026-11-21; accepted by the user on 2026-11-26. Records decisions already in the code. Amends
 [ADR 0006](0006-fal-adapter-cache-budget.md) (the interface, resumable batch state, the budget check),
 [ADR 0014](0014-comfyui-local-video.md) (ComfyUI's scope), and [ADR 0017](0017-ltx-lipsync-flf2v-official-templates.md)
 (the local lip-sync, already changed by [ADR 0027](0027-pika-lipsync-audio-guide.md)). The adoption of the
