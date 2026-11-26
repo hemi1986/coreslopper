@@ -723,7 +723,7 @@ The stage of an episode or a meme that makes the takes and ambience: it generate
 _Avoid_: speaker stem, episode track
 
 **Ambience**:
-The background sound of a scene, such as room tone or machine hum, laid under its takes; its prompt is the scene's `atmo` field.
+The background sound of a scene, such as room tone or machine hum, laid under its takes; its prompt is the scene's `atmo` field. In the episode track it fills its whole scene, looped without gaps, and crossfades into the next scene's ambience.
 _Avoid_: background music, soundscape, atmo
 
 **Episode Track**:

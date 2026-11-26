@@ -43,6 +43,12 @@ const MUSIC_GAIN = 0.25;
 const MIX_FORMAT = `aformat=sample_rates=${SAMPLE_RATE}:channel_layouts=stereo`;
 /** Integrated loudness needs 400 ms blocks; a shorter take is measured as played back to back for at least this long. */
 const MIN_MEASURE_SECONDS = 3;
+/** Seconds two neighbouring ambience beds overlap at a scene border (equal-power crossfade). */
+const AMBIENCE_CROSSFADE = 0.8;
+/** Seconds an ambience bed fades out before a scene without ambience or the end of the episode. */
+const AMBIENCE_TAIL = 1.5;
+/** Seconds of crossfade where a looped ambience span repeats. */
+const LOOP_SEAM = 0.5;
 
 interface MixInput {
   file: string;
@@ -50,8 +56,92 @@ interface MixInput {
   /** Seconds of the input that play; longer inputs are trimmed. */
   length: number;
   gain?: number;
-  /** Repeat a short input until it fills its length (ambience). */
+  /**
+   * Repeat the input until it fills its length (ambience). With a span, only
+   * that part of the input (seconds) is looped, so silent or fading ends of a
+   * take never leave a hole in the bed.
+   */
   loop?: boolean;
+  span?: [number, number];
+  /** Seconds of fade-in at the start and fade-out at the end (quarter-sine, equal power). */
+  fadeIn?: number;
+  fadeOut?: number;
+}
+
+/**
+ * The audible span of an ambience take in seconds: from the first to the last
+ * 50 ms window that is no more than `dropDb` (6 dB) under the take's median level.
+ * Leading and trailing silence and slow fade-ins and fade-outs fall outside.
+ * Returns the whole take when nothing stands out or the span would be shorter
+ * than half a second.
+ */
+export function audibleSpan(samples: Float32Array, sampleRate: number, dropDb = 6): [number, number] {
+  const whole: [number, number] = [0, samples.length / sampleRate];
+  const window = Math.max(1, Math.round(sampleRate * 0.05));
+  const levels: number[] = [];
+  for (let start = 0; start + window <= samples.length; start += window) {
+    let sum = 0;
+    for (let index = start; index < start + window; index += 1) sum += samples[index]! * samples[index]!;
+    const rms = Math.sqrt(sum / window);
+    levels.push(rms > 0 ? 20 * Math.log10(rms) : -120);
+  }
+  const audible = levels.filter((level) => level > -70).sort((a, b) => a - b);
+  if (audible.length === 0) return whole;
+  const threshold = audible[Math.floor(audible.length / 2)]! - dropDb;
+  const first = levels.findIndex((level) => level >= threshold);
+  const last = levels.length - 1 - [...levels].reverse().findIndex((level) => level >= threshold);
+  const span: [number, number] = [(first * window) / sampleRate, ((last + 1) * window) / sampleRate];
+  return span[1] - span[0] >= 0.5 ? span : whole;
+}
+
+export interface AmbienceScene {
+  id: string;
+  start: number;
+  end: number;
+  /** The scene has an ambience take. */
+  atmo: boolean;
+}
+
+export interface AmbienceBed {
+  id: string;
+  start: number;
+  length: number;
+  fadeIn: number;
+  fadeOut: number;
+}
+
+/**
+ * Where each scene's ambience bed plays. A bed fills its whole scene; at a
+ * border to another scene with ambience both beds reach `crossfade / 2` over
+ * the border and crossfade there, so the bed never drops out. Before a scene
+ * without ambience, and at the end of the episode, a bed fades out over `tail`
+ * seconds inside its own scene.
+ */
+export function ambienceBeds(
+  scenes: AmbienceScene[],
+  duration: number,
+  crossfade = AMBIENCE_CROSSFADE,
+  tail = AMBIENCE_TAIL,
+): AmbienceBed[] {
+  const beds: AmbienceBed[] = [];
+  const touches = (a: AmbienceScene | undefined, b: AmbienceScene | undefined) =>
+    Boolean(a?.atmo && b?.atmo && Math.abs(a.end - b.start) < 0.01);
+  for (const [index, scene] of scenes.entries()) {
+    if (!scene.atmo) continue;
+    const length = scene.end - scene.start;
+    const fromPrevious = touches(scenes[index - 1], scene);
+    const intoNext = touches(scene, scenes[index + 1]);
+    const start = fromPrevious ? Math.max(0, scene.start - crossfade / 2) : scene.start;
+    const end = intoNext ? Math.min(duration, scene.end + crossfade / 2) : scene.end;
+    beds.push({
+      id: scene.id,
+      start,
+      length: end - start,
+      fadeIn: fromPrevious ? scene.start - start : Math.min(0.05, length / 4),
+      fadeOut: intoNext ? end - scene.end : Math.min(tail, length / 3),
+    });
+  }
+  return beds;
 }
 
 /**
@@ -65,15 +155,40 @@ function mix(inputs: MixInput[], duration: number, destination: string, loudness
   const args = ['-y', '-loglevel', 'error', '-f', 'lavfi', '-t', duration.toFixed(3), '-i', `anullsrc=r=${SAMPLE_RATE}:cl=stereo`];
   const filters: string[] = [];
   const labels = ['[0:a]'];
+  let stream = 0;
   for (const [index, input] of inputs.entries()) {
-    if (input.loop) args.push('-stream_loop', '-1');
-    args.push('-i', input.file);
     const label = `[a${index + 1}]`;
-    filters.push(
-      `[${index + 1}:a]${MIX_FORMAT},` +
-        `atrim=0:${input.length.toFixed(3)},asetpts=PTS-STARTPTS,volume=${input.gain ?? 1},` +
-        `adelay=${Math.round(input.start * 1000)}:all=1${label}`,
-    );
+    let chain: string;
+    if (input.loop && input.span) {
+      // Repeat the audible span with a crossfade at every seam; each copy is its own input stream.
+      const [from, to] = input.span;
+      const span = to - from;
+      const seam = Math.min(LOOP_SEAM, span / 4);
+      const copies = 1 + Math.ceil(Math.max(0, input.length - span) / (span - seam));
+      const parts: string[] = [];
+      for (let n = 0; n < copies; n += 1) {
+        args.push('-i', input.file);
+        stream += 1;
+        parts.push(`[${stream}:a]${MIX_FORMAT},atrim=${from.toFixed(3)}:${to.toFixed(3)},asetpts=PTS-STARTPTS[l${index + 1}c${n}]`);
+      }
+      let current = `[l${index + 1}c0]`;
+      for (let n = 1; n < copies; n += 1) {
+        const next = `[l${index + 1}j${n}]`;
+        parts.push(`${current}[l${index + 1}c${n}]acrossfade=d=${seam.toFixed(3)}:c1=qsin:c2=qsin${next}`);
+        current = next;
+      }
+      filters.push(...parts);
+      chain = `${current}`;
+    } else {
+      if (input.loop) args.push('-stream_loop', '-1');
+      args.push('-i', input.file);
+      stream += 1;
+      chain = `[${stream}:a]${MIX_FORMAT},`;
+    }
+    chain += `atrim=0:${input.length.toFixed(3)},asetpts=PTS-STARTPTS,`;
+    if (input.fadeIn) chain += `afade=t=in:d=${input.fadeIn.toFixed(3)}:curve=qsin,`;
+    if (input.fadeOut) chain += `afade=t=out:st=${(input.length - input.fadeOut).toFixed(3)}:d=${input.fadeOut.toFixed(3)}:curve=qsin,`;
+    filters.push(`${chain}volume=${input.gain ?? 1},adelay=${Math.round(input.start * 1000)}:all=1${label}`);
     labels.push(label);
   }
   filters.push(`${labels.join('')}amix=inputs=${labels.length}:duration=first:normalize=0:dropout_transition=0[mix]`);
@@ -251,18 +366,23 @@ export async function episodeTrack(projectDir: string): Promise<Timing> {
     }
     lineInputs.push(input);
   }
-  const beds: MixInput[] = [];
-  for (const scene of project.script.scenes) {
-    if (!scene.atmo) continue;
+  const scenes: AmbienceScene[] = project.script.scenes.map((scene) => {
     const section = effective.sections.find((candidate) => candidate.id === scene.id)!;
-    beds.push({
-      file: ambiencePath(project, scene.id),
-      start: section.start,
-      length: section.end - section.start,
+    return { id: scene.id, start: section.start, end: section.end, atmo: Boolean(scene.atmo) };
+  });
+  const beds: MixInput[] = ambienceBeds(scenes, effective.audio.duration).map((bed) => {
+    const file = ambiencePath(project, bed.id);
+    return {
+      file,
+      start: bed.start,
+      length: bed.length,
+      fadeIn: bed.fadeIn,
+      fadeOut: bed.fadeOut,
       gain: AMBIENCE_GAIN,
       loop: true,
-    });
-  }
+      span: audibleSpan(decodeMono(file), SAMPLE_RATE),
+    };
+  });
   const music = join(project.paths.root, 'audio', 'music.wav');
   if (existsSync(music)) beds.push({ file: music, start: 0, length: effective.audio.duration, gain: MUSIC_GAIN });
 
