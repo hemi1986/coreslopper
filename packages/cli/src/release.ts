@@ -27,6 +27,7 @@ import {
   releaseIdentity,
   releaseTodos,
   releasedPublicly,
+  loadDefaults,
   repoRoot,
   resolveAnchor,
   safeFileName,
@@ -439,7 +440,7 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
       if (!same) {
         deps.log(`Cutting the canvas: ${window.length} s from ${window.start.toFixed(2)} s (${window.reason})...`);
         await mkdir(join(dir, 'streaming'), { recursive: true });
-        await deps.ffmpeg(canvasArgs(vertical, join(dir, files.canvas), window, project.config.formats.master.fps));
+        await deps.ffmpeg(canvasArgs(vertical, join(dir, files.canvas), window, project.config.formats.master.fps, (await loadDefaults()).render.true_peak_dbtp));
       }
       await writer.generated(files.canvas, 'canvas', spec, 'renders/9x16.mp4');
     }

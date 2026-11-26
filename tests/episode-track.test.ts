@@ -19,7 +19,7 @@ import { blockingReason, takeStatus } from '../packages/cli/src/takes.ts';
 import { resolveBinary } from '../packages/cli/src/media.ts';
 import { importTakes } from '../packages/cli/src/media.ts';
 import { voiceTrack } from '../packages/cli/src/voice-track.ts';
-import { episodeTrack, measureLoudness } from '../packages/cli/src/episode-track.ts';
+import { ambienceBeds, audibleSpan, episodeTrack, measureLoudness } from '../packages/cli/src/episode-track.ts';
 
 const root = process.cwd();
 const episodeDir = join(root, 'projects/demo-episode');
@@ -125,6 +125,48 @@ describe('episode helpers', () => {
     await writeFile(file, 'another take');
     expect(await takeStatus(take, file, 'h1')).toBe('replaced');
     expect(blockingReason('replaced', take, 'l01')).toMatch(/import-takes/);
+  });
+});
+
+describe('ambience beds', () => {
+  it('finds the audible span of a take without silent or fading ends', () => {
+    const rate = 1000;
+    const samples = new Float32Array(10 * rate);
+    for (let i = 0; i < samples.length; i += 1) {
+      const t = i / rate;
+      // 1.5 s silence, a slow fade-in to 3.5 s, full level to 8 s, then silence.
+      const level = t < 1.5 ? 0 : t < 3.5 ? 0.3 * ((t - 1.5) / 2) ** 3 : t < 8 ? 0.3 : 0;
+      samples[i] = level * Math.sin(i * 0.7);
+    }
+    const [from, to] = audibleSpan(samples, rate);
+    expect(from).toBeGreaterThan(2.5);
+    expect(from).toBeLessThan(3.5);
+    expect(to).toBeCloseTo(8, 1);
+    expect(audibleSpan(new Float32Array(rate), rate)).toEqual([0, 1]);
+  });
+
+  it('fills every scene and crossfades over borders between ambiences', () => {
+    const beds = ambienceBeds(
+      [
+        { id: 'a', start: 0, end: 8, atmo: true },
+        { id: 'b', start: 8, end: 11, atmo: true },
+        { id: 'c', start: 11, end: 20, atmo: false },
+        { id: 'd', start: 20, end: 30, atmo: true },
+      ],
+      30,
+      0.8,
+      1.5,
+    );
+    expect(beds.map((bed) => bed.id)).toEqual(['a', 'b', 'd']);
+    const [a, b, d] = beds;
+    expect(a).toMatchObject({ start: 0, fadeOut: expect.closeTo(0.4, 5) });
+    expect(a!.start + a!.length).toBeCloseTo(8.4, 5);
+    expect(b!.start).toBeCloseTo(7.6, 5);
+    expect(b!.fadeIn).toBeCloseTo(0.4, 5);
+    // Before a scene without ambience the bed fades out inside its own scene.
+    expect(b!.start + b!.length).toBeCloseTo(11, 5);
+    expect(b!.fadeOut).toBeCloseTo(1, 5);
+    expect(d).toMatchObject({ start: 20, length: 10, fadeOut: 1.5 });
   });
 });
 

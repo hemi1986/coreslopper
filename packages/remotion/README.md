@@ -21,7 +21,7 @@ The central renderer for coreslopper. It receives a serializable `VideoProps` ob
 - Use `interpolate`, `spring`, `Easing`, and `random(seed)`.
 - Never use `useFrame` as a clock, `Math.random`, `Date.now`, or time-based CSS animation.
 - Make postprocessing and 3D rotation pure functions of the frame.
-- Use the song as the only audio source; mute generated clips and footage.
+- Use the song as the only audio source, apart from a shot's sound cues; mute generated clips and footage.
 
 ## Adding a component
 
@@ -31,6 +31,20 @@ The central renderer for coreslopper. It receives a serializable `VideoProps` ob
 4. Set `motion.component` in `storyboard.yaml`.
 5. Render a still at a representative frame and check 16:9, 9:16, and 1:1.
 6. Run `npm run typecheck` and `npm test`.
+
+## Shot sound cues
+
+Any shot can carry one-shot sounds in `motion.props.chimes`: a list of `{src, at, gainDb, from?, duration?}`.
+
+- `src`: a project audio file, for example `audio/lines/l06_ping.wav`. The CLI turns it into a public path.
+- `at`: seconds from the shot start.
+- `gainDb`: the cue's gain (default 0).
+- `from`: seconds into the file to start at (default 0).
+- `duration`: the longest the cue plays, in seconds.
+
+Use them for a chime on every incoming message, or a slice of a typing take under a typed chat answer. `ShotChimes` (`src/components/ShotChimes.tsx`) plays each cue as a `<Sequence>` with an `<Audio>`, frame-exact, in the Studio and in unmuted renders. A cue is cut at its shot's end, or after `duration`.
+
+`npm run cli -- render` renders muted segments. When it muxes the song (or episode track), it mixes the same cues over it (`soundCues` and `soundCueMix` in `packages/cli/src/render.ts`). The mix ends in a 4x-oversampled true-peak limiter 1 dB under `render.true_peak_dbtp` of `config/defaults.yaml`, so a cue on a loud passage never pushes the render over the target. A cue whose file is missing is left out.
 
 ## Rendering
 

@@ -14,6 +14,7 @@ import {
   loadProject,
   saveState,
   loadBrand,
+  loadDefaults,
   projectAudioPath,
   repoRoot,
   scriptLines,
@@ -27,7 +28,7 @@ import {
 } from '@coreslopper/core';
 import type { BrandFont, ChatMessage, FormatId, VideoProps } from '../../remotion/src/types.js';
 import { webpackOverride } from '../../remotion/webpack-override.js';
-import { resolveBinary } from './media.js';
+import { resolveBinary, truePeakLimiter } from './media.js';
 import { startProgress } from './render-progress.js';
 import { validateProject } from './validate.js';
 
@@ -97,6 +98,23 @@ function publicAsset(path: string | undefined, projectRoot: string, root: string
   return relativePath.split(sep).join('/');
 }
 
+/** `motion.props.chimes[].src` (project-relative audio files) as public paths, so Remotion can serve them. */
+function withPublicChimes(motion: ResolvedShot['motion'], projectRoot: string, root: string): ResolvedShot['motion'] {
+  const chimes = motion?.props?.chimes;
+  if (!motion || !Array.isArray(chimes)) return motion;
+  return {
+    ...motion,
+    props: {
+      ...motion.props,
+      chimes: chimes.map((entry: unknown) => {
+        if (!entry || typeof entry !== 'object') return entry;
+        const cue = entry as Record<string, unknown>;
+        return typeof cue.src === 'string' && cue.src.length > 0 ? { ...cue, src: publicAsset(cue.src, projectRoot, root) } : cue;
+      }),
+    },
+  };
+}
+
 function withPublicAssets(
   shots: ResolvedShot[],
   projectRoot: string,
@@ -105,6 +123,7 @@ function withPublicAssets(
   return shots.map((shot) => ({
     ...shot,
     asset: publicAsset(shot.asset, projectRoot, root),
+    motion: withPublicChimes(shot.motion, projectRoot, root),
     layers: shot.layers?.map((layer) => ({
       ...layer,
       asset: publicAsset(layer.asset, projectRoot, root),
@@ -263,6 +282,78 @@ export async function bundleFor(props: { project: { slug: string } }, root: stri
   });
 }
 
+/** A one-shot sound of a shot (`motion.props.chimes`) on the render's timeline. */
+export interface SoundCue {
+  /** Public (repository-relative) path of the audio file. */
+  src: string;
+  /** Seconds from the start of the rendered range. */
+  delay: number;
+  /** Seconds to skip at the head of the file (`from`, plus the part before the range). */
+  skip: number;
+  /** Longest it may play: until its shot ends, its `duration` is over, or the range ends. */
+  maxSeconds: number;
+  gainDb: number;
+}
+
+/**
+ * Sound cues of every shot's `motion.props.chimes` [{src, at (s from shot start), gainDb,
+ * from? (s into the file), duration? (s it plays at most)}] inside the frame range
+ * `first`..`last`. Remotion plays them as <Sequence>+<Audio> (`ShotChimes`); the segmented
+ * render is muted, so the mux mixes the same cues into the soundtrack.
+ */
+export function soundCues(shots: VideoProps['shots'], fps: number, first: number, last: number): SoundCue[] {
+  const rangeStart = first / fps;
+  const rangeEnd = (last + 1) / fps;
+  const cues: SoundCue[] = [];
+  for (const shot of shots) {
+    const chimes = shot.motion?.props?.chimes;
+    if (!Array.isArray(chimes)) continue;
+    const shotEnd = (shot.startFrame + shot.durationInFrames) / fps;
+    for (const entry of chimes) {
+      if (!entry || typeof entry !== 'object') continue;
+      const { src, at, gainDb, from, duration } = entry as Record<string, unknown>;
+      if (typeof src !== 'string' || src.length === 0) continue;
+      const start = shot.startFrame / fps + (typeof at === 'number' && at > 0 ? at : 0);
+      // `duration` caps a cue (a slice of a longer take); `from` skips into the file.
+      const cap = typeof duration === 'number' && duration > 0 ? start + duration : Number.POSITIVE_INFINITY;
+      const end = Math.min(shotEnd, rangeEnd, cap);
+      if (start >= end || end <= rangeStart) continue;
+      const skip = Math.max(0, rangeStart - start);
+      const head = typeof from === 'number' && from > 0 ? from : 0;
+      cues.push({
+        src,
+        delay: Math.max(0, start - rangeStart),
+        skip: skip + head,
+        maxSeconds: end - start - skip,
+        gainDb: typeof gainDb === 'number' ? gainDb : 0,
+      });
+    }
+  }
+  return cues;
+}
+
+/**
+ * ffmpeg inputs and filter that mix `cues` (inputs from index `firstInput`) over the soundtrack
+ * at input 1. The soundtrack is mastered to the true-peak target already; a cue on top of a loud
+ * passage would push the sum past it, so the mix ends in a true-peak limiter at `truePeakDbtp`.
+ */
+export function soundCueMix(cues: SoundCue[], root: string, firstInput = 2, truePeakDbtp = -1): { inputs: string[]; filter: string } {
+  const inputs = cues.flatMap((cue) => ['-i', join(root, cue.src)]);
+  const parts = ['[1:a]aformat=sample_rates=48000:channel_layouts=stereo[song]'];
+  const labels = ['[song]'];
+  cues.forEach((cue, index) => {
+    const label = `[cue${index}]`;
+    const delayMs = Math.round(cue.delay * 1000);
+    parts.push(
+      `[${firstInput + index}:a]atrim=start=${cue.skip.toFixed(4)}:duration=${cue.maxSeconds.toFixed(4)},asetpts=PTS-STARTPTS,` +
+        `aformat=sample_rates=48000:channel_layouts=stereo,volume=${cue.gainDb.toFixed(2)}dB,adelay=${delayMs}:all=1${label}`,
+    );
+    labels.push(label);
+  });
+  parts.push(`${labels.join('')}amix=inputs=${labels.length}:duration=first:dropout_transition=0:normalize=0,${truePeakLimiter(truePeakDbtp)}[aout]`);
+  return { inputs, filter: parts.join(';') };
+}
+
 function runFfmpeg(args: string[]): Promise<void> {
   return new Promise((resolvePromise, reject) => {
     const child = spawn(resolveBinary('ffmpeg'), ['-hide_banner', '-loglevel', 'error', '-y', ...args], {
@@ -383,7 +474,7 @@ export async function renderProject(options: RenderOptions): Promise<string> {
         console.log(`  segment ${index + 1}/${segments.length} (frames ${start}-${end})`);
         let lastReported = -1;
         // A fresh browser and compositor per segment: caches and leaks never
-        // outlive one segment. Video only; the song is muxed once at the end.
+        // outlive one segment. Video only; the song (and any sound cues) is muxed once at the end.
         await renderMedia({
           composition,
           serveUrl,
@@ -425,12 +516,18 @@ export async function renderProject(options: RenderOptions): Promise<string> {
         ? ['-ss', (first / props.fps).toFixed(6), '-t', duration.toFixed(6), '-i', songPath]
         : [];
       const tempOutput = join(workDir, 'joined.mp4');
+      // Per-shot sound cues (`motion.props.chimes`) are mixed over the soundtrack.
+      const cues = songPath ? soundCues(props.shots, props.fps, first, last).filter((cue) => existsSync(join(root, cue.src))) : [];
+      if (cues.length > 0) console.log(`  mixing ${cues.length} sound cue(s)`);
+      const cueMix = cues.length > 0 ? soundCueMix(cues, root, 2, (await loadDefaults(root)).render.true_peak_dbtp) : undefined;
+      const audioMap = cueMix ? ['-filter_complex', cueMix.filter, '-map', '[aout]'] : ['-map', '1:a:0'];
       await runFfmpeg([
         '-threads', '6',
         '-f', 'concat', '-safe', '0', '-i', listFile,
         ...audioArgs,
+        ...(cueMix?.inputs ?? []),
         '-map', '0:v:0',
-        ...(songPath ? ['-map', '1:a:0', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000'] : []),
+        ...(songPath ? [...audioMap, '-c:a', 'aac', '-b:a', '192k', '-ar', '48000'] : []),
         '-c:v', 'copy',
         '-t', duration.toFixed(6),
         '-movflags', '+faststart',

@@ -65,7 +65,9 @@ previews. "Test render", "media drive" and "Animatic" are not terms.
 - Read the storyboard, timing, bibles and episode script through `loadProject` and `validateProject`. Never write
   them from here.
 - Every format renders the one composition at the master's frame rate. A derivative is never a crop of the master.
-- The song is the only sound. Clips and footage stay muted.
+- The song is the only sound, apart from the shots' sound cues (`motion.props.chimes`). Clips and footage stay
+  muted. Segments render muted; the mux mixes the cues over the song (`soundCues`, `soundCueMix`) and ends in the
+  true-peak limiter (`truePeakLimiter` in `media.ts`), as the Short re-encode does.
 - A preview never replaces a whole render and never goes into the release (G-137).
 - Animate only from `useCurrentFrame()` and `useVideoConfig()`; use `random(seed)`. Determinism is promised per
   machine and pinned Remotion version.

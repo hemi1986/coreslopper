@@ -4,12 +4,14 @@ import { join, relative } from 'node:path';
 import {
   ValidationError,
   ensureDir,
+  loadDefaults,
   loadProject,
+  repoRoot,
   resolveAnchor,
   type Anchor,
   type Timing,
 } from '@coreslopper/core';
-import { resolveBinary } from './media.js';
+import { resolveBinary, truePeakLimiter } from './media.js';
 import {
   SHORT_MAX_SECONDS,
   SHORT_TARGET_SECONDS,
@@ -127,13 +129,15 @@ export function shortFadeFilter(duration: number, fadeIn = SHORT_FADE_IN, fadeOu
 /**
  * ffmpeg arguments for a frame-accurate re-encode of one Short: input seek,
  * the render's frame rate and an exact frame count, H.264 crf 18, AAC 192k,
- * 6 threads.
+ * 6 threads. The audio ends in a true-peak limiter at `truePeakDbtp`, because
+ * the AAC re-encode of a master that sits at the target can overshoot it.
  */
 export function shortFfmpegArgs(
   input: string,
   output: string,
   window: Pick<ShortWindow, 'start' | 'duration'>,
   fps: number,
+  truePeakDbtp = -1,
 ): string[] {
   return [
     '-y',
@@ -152,7 +156,7 @@ export function shortFfmpegArgs(
     '-frames:v',
     String(Math.round(window.duration * fps)),
     '-af',
-    shortFadeFilter(window.duration),
+    `${shortFadeFilter(window.duration)},${truePeakLimiter(truePeakDbtp)}`,
     '-c:v',
     'libx264',
     '-preset',
@@ -221,7 +225,7 @@ export async function cutShort(options: ShortOptions): Promise<string> {
 
   const output = shortPaths(project.paths.renders, name).video;
   await ensureDir(shortsDir(project.paths.renders));
-  execFileSync(resolveBinary('ffmpeg'), shortFfmpegArgs(source, output, window, fps), { stdio: 'inherit' });
+  execFileSync(resolveBinary('ffmpeg'), shortFfmpegArgs(source, output, window, fps, (await loadDefaults(repoRoot())).render.true_peak_dbtp), { stdio: 'inherit' });
   const result = probeVideo(output);
   const problems = shortProblems({ name, ...result });
   if (problems.length) throw new ValidationError(`Short ${output} failed its checks`, problems);

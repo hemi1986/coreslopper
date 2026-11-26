@@ -31,6 +31,20 @@ export function resolveBinary(name: 'ffmpeg' | 'ffprobe'): string {
   }
 }
 
+/** Headroom the true-peak limiter keeps below the target for the AAC encode's overshoot. */
+export const LIMITER_HEADROOM_DB = 1;
+
+/**
+ * An ffmpeg audio filter that keeps a mix under the true-peak target: 4x
+ * oversampled (so sample peaks approximate true peaks), `LIMITER_HEADROOM_DB`
+ * below `truePeakDbtp`, no auto level (the integrated loudness stays as mixed),
+ * and delay compensated (sync).
+ */
+export function truePeakLimiter(truePeakDbtp: number): string {
+  const limit = Math.min(1, Math.max(0.0625, 10 ** ((truePeakDbtp - LIMITER_HEADROOM_DB) / 20)));
+  return `aresample=192000,alimiter=limit=${limit.toFixed(4)}:attack=1:release=50:level=disabled:latency=enabled,aresample=48000`;
+}
+
 /**
  * Put the original clip's audio back on a processed video (e.g. SeedVR2, which
  * re-encodes or drops the sound). Both streams are copied, nothing is re-encoded;
