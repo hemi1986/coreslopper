@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-11-21
 ---
 
@@ -7,7 +7,7 @@ date: 2026-11-21
 
 ## Status
 
-Proposed — 2026-11-21. Records decisions already in the code since commit `73063bc`; amends
+Accepted — 2026-11-21; accepted by the user on 2026-11-26. Records decisions already in the code since commit `73063bc`; amends
 [ADR 0002](0002-autonomous-pipeline.md) ("critics may request bounded retries"). Recovered by the adoption of the
 generation queue; the user has not reviewed it on the code level.
 

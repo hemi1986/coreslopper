@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-11-22
 ---
 
@@ -7,7 +7,7 @@ date: 2026-11-22
 
 ## Status
 
-Proposed — 2026-11-22. Amends [ADR 0033](0033-board-wizard.md) ("it asks no creative questions"). Builds on
+Accepted — 2026-11-22; accepted by the user on 2026-11-26. Amends [ADR 0033](0033-board-wizard.md) ("it asks no creative questions"). Builds on
 [ADR 0016](0016-episode-projects.md) and [ADR 0034](0034-character-library.md).
 
 ## Context

@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-11-21
 ---
 
@@ -7,7 +7,7 @@ date: 2026-11-21
 
 ## Status
 
-Proposed — 2026-11-21. Amends [ADR 0030](0030-board-as-hub.md) ("the production view is read-only") and
+Accepted — 2026-11-21; accepted by the user on 2026-11-26. Amends [ADR 0030](0030-board-as-hub.md) ("the production view is read-only") and
 [ADR 0033](0033-board-wizard.md).
 
 ## Context

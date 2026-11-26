@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-11-22
 ---
 
@@ -7,7 +7,7 @@ date: 2026-11-22
 
 ## Status
 
-Proposed — 2026-11-22. Supersedes the lip-sync default of [ADR 0014](0014-comfyui-local-video.md) and
+Accepted — 2026-11-22; accepted by the user on 2026-11-26. Supersedes the lip-sync default of [ADR 0014](0014-comfyui-local-video.md) and
 [ADR 0015](0015-comfyui-images-lipsync-audio.md) ("when `video` is `comfyui` and `lipsync` is unset, lip-sync falls
 back to `fal`"). Their other decisions, and those carried over into [ADR 0017](0017-ltx-lipsync-flf2v-official-templates.md),
 stay. The Topview default of [ADR 0026](0026-cloud-lipsync-and-lead-only-audio.md) stays.

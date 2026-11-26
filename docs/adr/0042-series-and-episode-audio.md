@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-11-22
 ---
 
@@ -7,7 +7,7 @@ date: 2026-11-22
 
 ## Status
 
-Proposed — 2026-11-22. Records decisions already in the code and closes rules the code leaves open. Amends
+Accepted — 2026-11-22; accepted by the user on 2026-11-26. Records decisions already in the code and closes rules the code leaves open. Amends
 [ADR 0016](0016-episode-projects.md). The layout stays as [ADR 0035](0035-series-in-projects.md) set it, and
 what an episode may add to the canon stays as [ADR 0025](0025-plates-props-character-states.md) set it. The
 adoption of the series slice recovered it. The user answered four questions about how they work and has not

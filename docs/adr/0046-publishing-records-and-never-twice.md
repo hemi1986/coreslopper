@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-11-22
 ---
 
@@ -7,7 +7,7 @@ date: 2026-11-22
 
 ## Status
 
-Proposed — 2026-11-22. Records decisions already in the code and closes rules the code leaves open. Amends
+Accepted — 2026-11-22; accepted by the user on 2026-11-26. Records decisions already in the code and closes rules the code leaves open. Amends
 [ADR 0023](0023-publish-command.md), [ADR 0029](0029-release-autopilot.md) and
 [ADR 0031](0031-watchdog-and-board-container.md). The adoption of the publish slice recovered it from the code and
 four questions about how the workflow is used; the code was not reviewed by a user.

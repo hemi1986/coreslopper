@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-11-22
 ---
 
@@ -7,7 +7,7 @@ date: 2026-11-22
 
 ## Status
 
-Proposed — 2026-11-22. Records decisions already in the code and closes rules the code leaves open. Amends
+Accepted — 2026-11-22; accepted by the user on 2026-11-26. Records decisions already in the code and closes rules the code leaves open. Amends
 [ADR 0025](0025-plates-props-character-states.md) and [ADR 0034](0034-character-library.md). The adoption of the
 character slice recovered it. The user answered four questions about how they work and has not reviewed the
 code.
