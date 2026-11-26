@@ -1,3 +1,8 @@
+---
+status: accepted
+date: 2026-11-08
+---
+
 # Folder-based projects in one workflow repository
 
 **Status:** Accepted

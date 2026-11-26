@@ -1,3 +1,8 @@
+---
+status: accepted
+date: 2026-11-08
+---
+
 # Zod is the schema source of truth; JSON Schema is the cross-language contract
 
 **Status:** Accepted

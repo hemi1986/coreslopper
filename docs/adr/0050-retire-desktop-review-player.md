@@ -1,3 +1,8 @@
+---
+status: accepted
+date: 2026-11-22
+---
+
 # Retire the desktop review player
 
 ## Status

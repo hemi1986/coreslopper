@@ -1,3 +1,8 @@
+---
+status: accepted
+date: 2026-11-20
+---
+
 # Local lip-sync on Pika H3 with an anchored vocal
 
 ## Status

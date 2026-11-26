@@ -1,3 +1,8 @@
+---
+status: accepted
+date: 2026-11-21
+---
+
 # Review in the board, and review rounds the agent answers
 
 ## Status

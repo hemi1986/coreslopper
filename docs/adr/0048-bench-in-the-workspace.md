@@ -1,3 +1,8 @@
+---
+status: proposed
+date: 2026-11-22
+---
+
 # Model bench: the workspace as host, the user's cases as workspace content, one budget rule
 
 ## Status

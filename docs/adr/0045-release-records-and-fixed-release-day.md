@@ -1,3 +1,8 @@
+---
+status: proposed
+date: 2026-11-22
+---
+
 # Release: three records, a release day fixed without the approval, refreshes that never remove a file, and one set of checks
 
 ## Status

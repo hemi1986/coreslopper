@@ -1,3 +1,8 @@
+---
+status: accepted
+date: 2026-11-08
+---
+
 # Remotion is the central renderer; determinism is enforced
 
 **Status:** Accepted

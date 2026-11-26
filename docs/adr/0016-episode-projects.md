@@ -1,3 +1,8 @@
+---
+status: accepted
+date: 2026-11-10
+---
+
 # Episode projects for vertical-drama series
 
 ## Status

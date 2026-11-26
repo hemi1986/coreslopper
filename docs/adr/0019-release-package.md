@@ -1,3 +1,8 @@
+---
+status: accepted
+date: 2026-11-13
+---
+
 # A release package at the end of `qa-export`
 
 ## Status

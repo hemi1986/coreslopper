@@ -1,3 +1,8 @@
+---
+status: accepted
+date: 2026-11-09
+---
+
 # ComfyUI as a local video backend
 
 ## Status

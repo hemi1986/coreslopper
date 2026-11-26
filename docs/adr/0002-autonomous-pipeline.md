@@ -1,3 +1,8 @@
+---
+status: accepted
+date: 2026-11-08
+---
+
 # Autonomous pipeline with automated QA, no creative approval gates
 
 **Status:** Accepted

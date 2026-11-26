@@ -1,3 +1,8 @@
+---
+status: accepted
+date: 2026-11-17
+---
+
 # Plates, prop references, and character states
 
 ## Status

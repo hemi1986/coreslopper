@@ -1,3 +1,8 @@
+---
+status: accepted
+date: 2026-11-16
+---
+
 # Publishing is a user command that uploads privately
 
 ## Status

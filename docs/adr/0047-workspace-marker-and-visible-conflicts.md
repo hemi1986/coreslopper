@@ -1,3 +1,8 @@
+---
+status: proposed
+date: 2026-11-22
+---
+
 # Workspace: the marker as identity, conflicts visible until resolved, only what a workspace runs ships
 
 ## Status

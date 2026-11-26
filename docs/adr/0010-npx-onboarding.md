@@ -1,3 +1,8 @@
+---
+status: accepted
+date: 2026-11-08
+---
+
 # npx onboarding with a versioned runtime snapshot
 
 > Extended by [ADR 0011](0011-higgsfield-provider.md): onboarding also checks and stores Higgsfield credentials.

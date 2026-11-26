@@ -1,3 +1,8 @@
+---
+status: proposed
+date: 2026-11-21
+---
+
 # The generation queue and the art director's verdicts
 
 ## Status

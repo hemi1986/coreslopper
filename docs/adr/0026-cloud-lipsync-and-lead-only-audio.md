@@ -1,3 +1,8 @@
+---
+status: accepted
+date: 2026-11-18
+---
+
 # Lip-sync on Higgsfield and Topview, and lead-only lip-sync audio
 
 ## Status

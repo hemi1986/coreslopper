@@ -1,3 +1,8 @@
+---
+status: accepted
+date: 2026-11-08
+---
+
 # MIT open source with explicit third-party notices
 
 **Status:** Accepted

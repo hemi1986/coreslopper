@@ -1,3 +1,8 @@
+---
+status: proposed
+date: 2026-11-22
+---
+
 # Bibles and character identity: one sheet per recurring character, an append-only canon, and copies in both directions
 
 ## Status

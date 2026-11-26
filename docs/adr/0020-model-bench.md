@@ -1,3 +1,8 @@
+---
+status: accepted
+date: 2026-11-14
+---
+
 # A model bench in `bench/`
 
 ## Status

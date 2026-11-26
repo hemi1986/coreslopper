@@ -1,3 +1,8 @@
+---
+status: proposed
+date: 2026-11-22
+---
+
 # Publishing: four records, publish versus post, never twice on every platform
 
 ## Status

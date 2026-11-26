@@ -1,3 +1,8 @@
+---
+status: accepted
+date: 2026-11-11
+---
+
 # LTX FLF2V lip-sync and the official LTX templates
 
 ## Status

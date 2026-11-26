@@ -1,3 +1,8 @@
+---
+status: accepted
+date: 2026-11-22
+---
+
 # The board's shell: a host without state, a manual refresh, guarded reads
 
 ## Status

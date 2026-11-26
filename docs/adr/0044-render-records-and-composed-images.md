@@ -1,3 +1,8 @@
+---
+status: proposed
+date: 2026-11-22
+---
+
 # Render: one composition for every format, render records, Shorts from the current 9:16 render, and composed images
 
 ## Status
