@@ -59,7 +59,10 @@ This repository runs the Kataster workflow. Discovery lives in `.claude/skills/`
 - **Never guess:** unclear → a hotspot (`HS-n`) or `[OPEN]` plus a row in `OPEN_QUESTIONS.md`.
 - **Project checks:** `docs/engineering/checks.yaml` – what runs at edit time and Stop/CI; architecture boundaries
   in `docs/architecture/boundaries.yaml` with existing debt in the baseline (only new violations fail).
-- **Language:** domain terms exactly as in `CONTEXT.md`; UI words from its `_UI (<lang>)_` lines.
+- **Language:** domain terms exactly as in `CONTEXT.md`; UI words from its `_UI (<lang>)_` lines. Write docs,
+  stories and ADRs in `languages.artifacts`; the installed templates are English and are translated as you fill them.
+  What scripts read stays as in the template: frontmatter keys and values, the headings and markers listed in
+  `docs/workflow.md`, Gherkin keywords and IDs.
 - **1-command rule:** one story = one command + its events on one aggregate, at most 4 Gherkin scenarios. Full
   domain stories are `type: domain`; UI tweaks, refactors, dependencies and setup use the fast lane
   (`type: chore` or `type: task`).
@@ -70,7 +73,14 @@ This repository runs the Kataster workflow. Discovery lives in `.claude/skills/`
 - **ADRs:** new ones are `proposed`; only the user sets `accepted`. A `done` story is never reopened.
 - **Reviews:** `/implement` scales review to the diff. `code-reviewer` and `acceptance-tester` report findings and
   never create stories; fast-lane stories skip the formal review pass.
+- **Worker:** `/implement --worker ST-NNN --base <branch>` (agent `story-worker`) builds one given story and
+  returns a JSON report instead of asking; an open decision is `blocked`, never code. It starts no subagent.
+- **Marathon:** `/marathon` makes the main session the orchestrator of a run: story after story it claims the
+  planned story, starts a `story-worker`, runs the reviews and merges into `marathon/<date>`; one pull request at
+  the end. `.claude/state/marathon.json` changes only through `marathon-state.ts`; `/marathon resume` goes on.
 - **Gate:** `node .claude/skills/implement/scripts/verify.ts`.
+- **Metrics:** workflow skills mark their phases with `story-metrics.ts mark` (the `metrics` skill); never edit
+  `docs/stories/metrics/`, commit it with the work.
 
 Keep this block short: it is loaded into every session. Put rules into the skill that owns them, not here.
 <!-- kataster:end -->

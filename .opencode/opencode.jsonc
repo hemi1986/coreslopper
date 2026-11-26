@@ -11,5 +11,78 @@
 
   "watcher": {
     "ignore": ["**/node_modules/**", "**/.next/**", "**/dist/**", "**/coverage/**"]
-  }
+  },
+  "automations": false,
+  "permissions": [
+    {
+      "action": "shell",
+      "resource": "node .claude/skills/event-storming/scripts/validate-events.ts",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "node .claude/skills/event-storming/scripts/render-event-storming.ts",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "node .claude/skills/user-stories/scripts/*",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "node .claude/skills/research/scripts/*",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "node .claude/skills/adopt/scripts/*",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "node .claude/skills/backlog/scripts/*",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "node .claude/skills/implement/scripts/*",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "node .claude/skills/metrics/scripts/*",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "node .claude/skills/marathon/scripts/*",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "gh issue *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "gh label *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "git status *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "git diff *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "git log *",
+      "effect": "allow"
+    }
+  ]
 }
