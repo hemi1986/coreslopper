@@ -6,13 +6,13 @@ vi.mock('@coreslopper/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@coreslopper/core')>()),
   loadChannel: async () => undefined,
 }));
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { ChannelConfigSchema, platformLimits } from '../packages/core/src/index.ts';
 import { stringify } from 'yaml';
 import { join } from 'node:path';
 import { buildRelease, runRelease } from '../packages/cli/src/release.ts';
 import { boardProject } from '../packages/cli/src/release-board-data.ts';
-import { cleanupFixtures, episodeFixture, episodeUploadYaml, fakeDeps, fixture, jpeg, uploadYaml } from './helpers/release-fixture.ts';
+import { cleanupFixtures, episodeFixture, episodeUploadYaml, fakeDeps, fixture, jpeg, setReleaseDay, uploadYaml } from './helpers/release-fixture.ts';
 
 afterEach(cleanupFixtures);
 
@@ -105,3 +105,27 @@ describe('the caption limit', () => {
   });
 });
 
+describe('an image story', () => {
+  it('ST-044: A story with only an image has no caption', async () => {
+    const dir = await fixture();
+    for (const name of ['Z1-intro', 'Z2-chorus', 'Z3-outro']) await rm(join(dir, 'renders', 'shorts', `${name}-9x16.mp4`));
+
+    const result = await buildRelease({ projectDir: dir, deps: fakeDeps() });
+
+    const story = post(result, 'story');
+    expect(story.files.map((file) => file.role)).toEqual(['story-image']);
+    expect(story.texts.caption).toBeUndefined();
+  });
+
+  it('gives the announcement story a caption only while it shows the teaser', async () => {
+    const dir = await fixture();
+    const result = await buildRelease({ projectDir: dir, deps: fakeDeps() });
+    expect(post(result, 'announce:instagram').texts.caption).toMatchObject({ value: 'Freitag: Neon Rain.\n\n#synthwave', limit: { max: 120 } });
+
+    // The release moves a week and the quick refresh composes nothing: the announcement story falls back to the cover.
+    await setReleaseDay(dir, '2026-12-18');
+    const moved = await buildRelease({ projectDir: dir, stills: false, deps: fakeDeps() });
+    expect(post(moved, 'announce:instagram').files.map((file) => file.role)).toEqual(['cover']);
+    expect(post(moved, 'announce:instagram').texts.caption).toBeUndefined();
+  });
+});
