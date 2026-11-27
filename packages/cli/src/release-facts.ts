@@ -14,6 +14,7 @@ import {
   manifestShape,
   releaseIdentity,
   releaseShape,
+  shortsSourceOf,
   withReleaseDefaults,
   withUrls,
   type LoadedProject,
@@ -135,11 +136,13 @@ export async function loadReleaseFacts(projectRoot: string, root: string): Promi
   const timing = project.effectiveTiming ?? project.timing;
   const meme = kind === 'meme';
   // The shape the release folder was built with; before the first release, the project's (ADR 0057).
-  const shape = manifest ? manifestShape(manifest, kind) : releaseShape({ kind, master: project.config.formats.master, durationSeconds: timing?.audio.duration });
+  const projectForm = { kind, master: project.config.formats.master, durationSeconds: timing?.audio.duration };
+  const shape = manifest ? manifestShape(manifest, kind) : releaseShape(projectForm);
   const oneVideo = meme || shape === 'short-episode';
   const input: ReleaseTextInput = {
     kind,
     shape,
+    shortsSource: shortsSourceOf(shape, projectForm),
     masterFormat: formatId(project.config.formats.master.aspect),
     language,
     slug: project.config.slug,

@@ -29,8 +29,7 @@ import {
   releasedPublicly,
   keptShapeProblem,
   manifestShape,
-  releaseShape,
-  postsVerticalVersion,
+  releaseForm,
   SHORT_FORM_MAX_SECONDS,
   releaseStart,
   loadDefaults,
@@ -329,12 +328,13 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
   const music = kind === 'music-video';
   const meme = kind === 'meme';
   const timing = project.effectiveTiming ?? project.timing;
-  const shape = releaseShape({ kind, master: project.config.formats.master, durationSeconds: timing?.audio.duration });
+  const form = releaseForm({ kind, master: project.config.formats.master, durationSeconds: timing?.audio.duration });
+  const shape = form.shape;
   // A short episode is one video, as a meme is: no main video, thumbnails or Shorts (ADR 0057).
   const shortEpisode = shape === 'short-episode';
   const oneVideo = meme || shortEpisode;
   // A horizontal episode up to 3 minutes posts its vertical version as its one Short, not cut Shorts (ADR 0057).
-  const verticalVersion = postsVerticalVersion({ kind, master: project.config.formats.master, durationSeconds: timing?.audio.duration });
+  const verticalVersion = form.shorts === 'vertical-version';
   const usedSounds = meme ? await usedLibrarySounds(project, root) : [];
   const credits = usedSounds.map((sound) => sound.credit).filter((credit): credit is string => Boolean(credit));
   const dir = releaseDir(project.paths.root);
@@ -555,6 +555,7 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
   const input: ReleaseTextInput = {
     kind,
     shape,
+    shortsSource: form.shorts,
     masterFormat: formatId(project.config.formats.master.aspect),
     language,
     slug,
@@ -595,6 +596,10 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
     ...input,
     tiktokPointer: releaseLabels(language).tt.overlayDefault(youtubeHandle && !/<ID>/.test(youtubeHandle) ? youtubeHandle : 'YouTube'),
   });
+  if (verticalVersion) {
+    const ignored = (data?.shorts ?? []).map((short) => short.name).filter((name) => name !== slug);
+    if (ignored.length) warnings.push(`review/upload.yaml: ${ignored.join(', ')} ignored – the vertical version is this episode's one Short; its texts are the entry named ${slug}`);
+  }
   if (data) {
     errors.push(...plan.problems.errors);
     todos.push(...plan.problems.missing.map((field) => `${field} is missing in review/upload.yaml`));

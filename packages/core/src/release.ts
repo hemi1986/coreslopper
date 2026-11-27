@@ -63,6 +63,38 @@ export function postsVerticalVersion(input: {
   return input.master.width > input.master.height && input.durationSeconds !== undefined && upToThreeMinutes(input.durationSeconds);
 }
 
+/**
+ * Where a release's Shorts come from: cut from the video (`cut`), the
+ * horizontal episode's **Vertical Version** as its one Short
+ * (`vertical-version`), or none – a meme and a short episode are one video
+ * (ADR 0057).
+ */
+export type ShortsSource = 'cut' | 'vertical-version' | 'none';
+
+/** The Shorts source of a release of this shape; `project` decides only an episode's (`postsVerticalVersion`). */
+export function shortsSourceOf(
+  shape: ReleaseShape,
+  project: { kind: ProjectKind; master: { width: number; height: number }; durationSeconds: number | undefined },
+): ShortsSource {
+  if (shape === 'meme' || shape === 'short-episode') return 'none';
+  if (shape === 'episode' && postsVerticalVersion(project)) return 'vertical-version';
+  return 'cut';
+}
+
+/**
+ * The release form of a project: its release shape and where its Shorts come
+ * from. `release`, the calendar, QA, the board and `publish` read the one
+ * answer (ADR 0057).
+ */
+export function releaseForm(input: {
+  kind: ProjectKind;
+  master: { width: number; height: number };
+  durationSeconds: number | undefined;
+}): { shape: ReleaseShape; shorts: ShortsSource } {
+  const shape = releaseShape(input);
+  return { shape, shorts: shortsSourceOf(shape, input) };
+}
+
 /** The shape a manifest recorded; a manifest written before shapes existed reads as its project kind. */
 export function manifestShape(manifest: Pick<ReleaseManifest, 'shape'>, kind: ProjectKind): ReleaseShape {
   return manifest.shape ?? kind;
@@ -406,13 +438,14 @@ export function platformTextProblems(
   data: UploadData,
   limits: PlatformLimits,
   /** `shape` is the release shape (`releaseShape`); the project kind follows from it. */
-  options: { shape: ReleaseShape; credits?: string[]; tiktokPointer?: string; durationSeconds?: number },
+  options: { shape: ReleaseShape; shorts?: ShortsSource; slug?: string; credits?: string[]; tiktokPointer?: string; durationSeconds?: number },
 ): { errors: string[]; missing: string[] } {
   const plan = buildReleasePlan({
     kind: options.shape === 'short-episode' ? 'episode' : options.shape,
     shape: options.shape,
+    shortsSource: options.shorts,
     language: data.language,
-    slug: 'release',
+    slug: options.slug ?? 'release',
     title: '',
     data,
     limits,
@@ -420,7 +453,8 @@ export function platformTextProblems(
     credits: options.credits,
     tiktokPointer: options.tiktokPointer,
     durationSeconds: options.durationSeconds,
-    files: { thumbnails: [], shorts: [] },
+    // The vertical version's texts are checked as its one Short, named by the slug.
+    files: { thumbnails: [], shorts: options.shorts === 'vertical-version' && options.slug ? [{ name: options.slug, video: `shorts/${options.slug}-9x16.mp4` }] : [] },
   });
   return plan.problems;
 }

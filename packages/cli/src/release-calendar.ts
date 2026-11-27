@@ -5,11 +5,12 @@ import { stringify } from 'yaml';
 import {
   ProjectConfigSchema,
   ReleaseCalendarSchema,
+  ReleaseManifestSchema,
+  readJsonFile,
   ValidationError,
   buildCalendar,
   loadReleaseSchedule,
   mainVideoReel,
-  postsVerticalVersion,
   releasedPublicly,
   zonedToday,
   readYamlFile,
@@ -122,6 +123,16 @@ export async function planCalendar(
   return calendar;
 }
 
+/** The vertical version's Short name (the slug) when the release folder holds it, as `release` plans its calendar; else none. */
+async function placedVerticalVersion(projectRoot: string, slug: string): Promise<string[]> {
+  const { releaseDir } = await import('./release.js');
+  const manifestPath = join(releaseDir(projectRoot), 'manifest.json');
+  if (!existsSync(manifestPath)) return [];
+  const manifest = await readJsonFile(manifestPath, ReleaseManifestSchema).catch(() => undefined);
+  const video = `shorts/${slug}-9x16.mp4`;
+  return manifest?.files.some((file) => file.kind === 'short' && file.path === video) && existsSync(join(releaseDir(projectRoot), video)) ? [slug] : [];
+}
+
 /** `calendar <project>`: plan the calendar alone, from the upload data and the Shorts in renders/shorts/. */
 export async function runCalendar(options: {
   projectDir: string;
@@ -132,7 +143,7 @@ export async function runCalendar(options: {
   now?: Date;
   log?: (line: string) => void;
 }): Promise<ReleaseCalendar> {
-  const { loadProject, releaseIdentity, releasedPublicly, releaseShape } = await import('@coreslopper/core');
+  const { loadProject, releaseIdentity, releasedPublicly, releaseForm } = await import('@coreslopper/core');
   const { listShorts, shortName } = await import('./release-files.js');
   const { loadUploadData, uploadPaths } = await import('./upload-text.js');
   const { songJson } = await import('./release.js');
@@ -143,16 +154,16 @@ export async function runCalendar(options: {
   const data = existsSync(uploadPaths(project.paths.root).data) ? await loadUploadData(project.paths.root) : undefined;
   const identity = releaseIdentity(project.config, await songJson(project));
   const duration = (project.effectiveTiming ?? project.timing)?.audio.duration;
-  const vertical = postsVerticalVersion({ kind: project.config.kind, master: project.config.formats.master, durationSeconds: duration });
-  // A horizontal episode up to 3 minutes posts its vertical version, named by the slug, instead of its cut Shorts (ADR 0057).
-  const shorts = vertical ? [project.config.slug] : (await listShorts(project.paths.renders)).map((file) => shortName(file)!).filter(Boolean);
+  const form = releaseForm({ kind: project.config.kind, master: project.config.formats.master, durationSeconds: duration });
+  // A horizontal episode up to 3 minutes posts its vertical version instead of its cut Shorts – the one `release` placed, as `release` plans it (ADR 0057).
+  const shorts = form.shorts === 'vertical-version' ? await placedVerticalVersion(project.paths.root, project.config.slug) : (await listShorts(project.paths.renders)).map((file) => shortName(file)!).filter(Boolean);
   const calendar = await planCalendar(
     project.paths.root,
     calendarInput({
       slug: project.config.slug,
       title: identity.title,
       kind: project.config.kind,
-      shape: releaseShape({ kind: project.config.kind, master: project.config.formats.master, durationSeconds: duration }),
+      shape: form.shape,
       releaseDate: project.config.release?.release_date,
       data,
       shorts,
