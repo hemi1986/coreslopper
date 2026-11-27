@@ -138,7 +138,7 @@
       "path": "packages/cli",
       "score": 0.61,
       "reasons": [
-        "476 changed files in recent history",
+        "485 changed files in recent history",
         "shared library",
         "shared infrastructure – not a domain slice"
       ]
@@ -159,9 +159,9 @@
     },
     {
       "path": "packages/remotion",
-      "score": 0.08,
+      "score": 0.07,
       "reasons": [
-        "13 changed files in recent history",
+        "9 changed files in recent history",
         "shared library",
         "shared infrastructure – not a domain slice"
       ]
@@ -170,7 +170,7 @@
       "path": "packages/core",
       "score": 0.03,
       "reasons": [
-        "128 changed files in recent history",
+        "131 changed files in recent history",
         "shared library",
         "layer package – hosts many concepts, not a domain slice"
       ]
@@ -299,6 +299,7 @@
         "caption",
         "characterization",
         "data",
+        "episode",
         "fact",
         "file",
         "folder",
@@ -311,6 +312,7 @@
         "reel",
         "release",
         "shape",
+        "short",
         "story",
         "text",
         "timer"
@@ -349,6 +351,7 @@
         "tests/release-reel.test.ts",
         "tests/release-routes.test.ts",
         "tests/release-shape.test.ts",
+        "tests/release-short-episode.test.ts",
         "tests/release-story-caption.test.ts",
         "tests/release-x-main.test.ts",
         "tests/release.test.ts"
@@ -367,7 +370,7 @@
       "reasons": [
         "3 layers: cli, core, tests",
         "3 packages",
-        "35 files"
+        "36 files"
       ],
       "adopted": true,
       "adoptedAt": "2026-11-22"

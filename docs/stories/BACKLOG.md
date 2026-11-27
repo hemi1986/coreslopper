@@ -2,17 +2,11 @@
 
 > Generated from `docs/stories/ST-*.md` – **do not edit manually**. Change the story files instead.
 
-**Progress: 28 of 31 domain stories done** · scenarios 96 of 108
+**Progress: 29 of 31 domain stories done** · scenarios 100 of 108
 
-**59 stories** · In Progress: 1 · Ready: 11 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 47 · Superseded: 0
+**59 stories** · In Progress: 0 · Ready: 11 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 48 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
-
-## In Progress
-
-| ID | Title | Type | Context | Priority | Size | Risk | Depends on |
-|---|---|---|---|---|---|---|---|
-| [ST-048](ST-048-a-short-episodes-release.md) | A short episode is released as one video on every platform | domain | Release | must | – | – | ST-047 |
 
 ## Ready
 
@@ -60,6 +54,7 @@ Within each section: by priority, then by story ID, with dependencies pulled in 
 | [ST-045](ST-045-the-main-video-reel-up-to-three-minutes.md) | The main video goes to Instagram as a Reel only up to 3 minutes | domain | Release | must | – | – | – |
 | [ST-046](ST-046-x-carries-the-main-video.md) | The X post carries the main video by default | domain | Release | must | – | – | – |
 | [ST-047](ST-047-the-release-shape-of-an-episode.md) | The release package records whether an episode is a short episode | domain | Release | must | – | – | – |
+| [ST-048](ST-048-a-short-episodes-release.md) | A short episode is released as one video on every platform | domain | Release | must | – | – | ST-047 |
 | [ST-012](ST-012-a-shot-lands-on-the-sound-cue.md) | A shot lands on a sound's cue | domain | Storyboard | should | – | – | ST-011 |
 | [ST-014](ST-014-burned-in-subtitles-for-a-meme.md) | A meme's render carries German subtitles | domain | Render | should | – | – | ST-007 |
 | [ST-020](ST-020-episode-announcement-says-new-episode.md) | An episode's announcement images say "new episode", not "new song" | chore | – | should | – | – | – |
