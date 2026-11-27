@@ -40,7 +40,8 @@ async function musicVideo(seconds: number, options: { instagramPost: boolean }):
 
 describe('the main video as a Reel', () => {
   it('ST-045: A main video of 2:30 gets its Reel', async () => {
-    const { dir, root } = await episodeFixture();
+    // A horizontal episode with its 9:16 render: a vertical one of 2:30 is a short episode, without a main video (ADR 0057).
+    const { dir, root } = await episodeFixture({ horizontal: true });
     await setDuration(dir, 150);
     await writeFile(
       join(dir, 'review', 'upload.yaml'),

@@ -45,7 +45,8 @@ describe('the stories of a release, as they are', () => {
 
 describe('the caption of a story', () => {
   it('ST-044: A story with a video carries its caption', async () => {
-    const { dir, root } = await episodeFixture();
+    // A vertical episode over 3 minutes: it has a main video, Shorts and the release-day story (ADR 0057).
+    const { dir, root } = await episodeFixture({ seconds: 200 });
     await mkdir(join(dir, 'renders', 'shorts'), { recursive: true });
     await writeFile(join(dir, 'renders', 'shorts', 'E1-hook-9x16.mp4'), 'short E1-hook');
     await writeFile(join(dir, 'renders', 'shorts', 'E1-hook-thumb.jpg'), jpeg(1080, 1920));

@@ -435,7 +435,8 @@ describe('release folder', () => {
   });
 
   it('tags an episode announcement "NEUE FOLGE"', async () => {
-    const { dir } = await episodeFixture();
+    // An episode with a main video: a short episode has no 16:9 post image and no story (ADR 0057).
+    const { dir } = await episodeFixture({ seconds: 200 });
     const deps = fakeDeps();
     const result = await buildRelease({ projectDir: dir, deps, render: false });
     expect(result.todos.filter((todo) => todo.includes('not composed'))).toEqual([]);
