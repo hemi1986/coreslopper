@@ -43,7 +43,7 @@ export interface ThumbnailOptions {
   zoom?: number;
   /** Typography key of style.yaml for the hook (default `display`). */
   font?: string;
-  /** `16x9` (default, 1280x720), `9x16` (1080x1920, a Short or story), `3x4` (1080x1440, a TikTok cover), `4x5` (1080x1350, an Instagram feed post), or `1x1` (3000x3000, the streaming cover). */
+  /** `16x9` (default, 1280x720), `9x16` (1080x1920, a Short or story), `3x4` (1080x1440, a TikTok cover), `4x5` (1080x1350, a 4:5 image), or `1x1` (3000x3000, the streaming cover). */
   format?: string;
   /** Scrim strength 0–1 (default 1): lower gives a shorter, fainter fade towards the text. */
   scrim?: number;
