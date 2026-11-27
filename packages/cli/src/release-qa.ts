@@ -9,7 +9,7 @@ import {
   loadProject,
   platformLimits,
   platformTextProblems,
-  releaseShape,
+  releaseForm,
   readJsonFile,
   releaseIdentity,
   releaseTodos,
@@ -21,7 +21,7 @@ import {
   type ReleasePlan,
   withReleaseDefaults,
 } from '@coreslopper/core';
-import { shortProblems } from './release-files.js';
+import { shortProblems, verticalVersionProblems } from './release-files.js';
 import { canvasProblems, probeMedia, videoFacts, videoProblems, wavProblems, type Prober } from './release-media.js';
 import { projectFormats, releaseDir, usedLibrarySounds } from './release.js';
 import { releaseLabels } from './release-texts.js';
@@ -102,6 +102,7 @@ export async function releaseChecks(projectDir: string, probe: Prober = probeMed
 
   // video/: each format with the project's size, frame rate, and length, and the bytes of the current render.
   const duration = project.effectiveTiming?.audio.duration ?? project.timing?.audio.duration;
+  const form = releaseForm({ kind, master: project.config.formats.master, durationSeconds: (project.effectiveTiming ?? project.timing)?.audio.duration });
   const formatIssues: string[] = [];
   const formatTodos: string[] = [];
   for (const format of projectFormats(project)) {
@@ -161,7 +162,8 @@ export async function releaseChecks(projectDir: string, probe: Prober = probeMed
     const badShorts: string[] = [];
     for (const file of shorts) {
       const facts = videoFacts(probe(at(file.path)));
-      const problems = shortProblems({ name: file.path, ...facts });
+      // The vertical version is the whole episode, up to 3 minutes; a cut Short at most 60 s.
+      const problems = file.spec.wholeEpisode === true ? verticalVersionProblems({ name: file.path, ...facts }) : shortProblems({ name: file.path, ...facts });
       const thumb = file.path.replace(/-9x16\.mp4$/, '-thumb.jpg');
       if (!existsSync(at(thumb))) problems.push('no thumbnail');
       else problems.push(...(await thumbnailProblems(at(thumb), '9x16')).map((problem) => `thumbnail ${problem}`));
@@ -169,12 +171,17 @@ export async function releaseChecks(projectDir: string, probe: Prober = probeMed
       if (existsSync(at(tiktok))) problems.push(...(await thumbnailProblems(at(tiktok), '3x4')).map((problem) => `TikTok cover ${problem}`));
       if (problems.length) badShorts.push(`${file.path}: ${problems.join(', ')}`);
     }
+    // A horizontal episode up to 3 minutes has exactly one Short: its vertical version (ADR 0057).
+    const verticalVersion = form.shorts === 'vertical-version';
+    const strays = verticalVersion ? shorts.filter((file) => file.spec.wholeEpisode !== true).map((file) => file.path) : [];
+    if (strays.length) badShorts.push(`${strays.join(', ')}: a cut Short beside the vertical version; run release again`);
+    const expected = verticalVersion ? 1 : 3;
     checks.push(
       badShorts.length
         ? check('Release Shorts', 'FAIL', badShorts.join('; '))
-        : shorts.length < 3
-          ? check('Release Shorts', 'TODO', `${shorts.length} of 3`)
-          : check('Release Shorts', 'PASS', '3 Shorts, 9:16, at most 60 s, 1080x1920 thumbnails'),
+        : shorts.length < expected
+          ? check('Release Shorts', 'TODO', verticalVersion ? `the vertical version shorts/${project.config.slug}-9x16.mp4 is missing; run release` : `${shorts.length} of 3`)
+          : check('Release Shorts', 'PASS', verticalVersion ? 'the vertical version, 9:16, at most 180 s, 1080x1920 thumbnail' : '3 Shorts, 9:16, at most 60 s, 1080x1920 thumbnails'),
     );
   }
 
@@ -245,7 +252,9 @@ export async function releaseChecks(projectDir: string, probe: Prober = probeMed
     const handle = channel?.links.youtube?.handle;
     const durationSeconds = (project.effectiveTiming ?? project.timing)?.audio.duration;
     const problems = platformTextProblems(data, platformLimits(channel), {
-      shape: releaseShape({ kind, master: project.config.formats.master, durationSeconds }),
+      shape: form.shape,
+      shorts: form.shorts,
+      slug: project.config.slug,
       credits,
       durationSeconds,
       tiktokPointer: releaseLabels(data.language).tt.overlayDefault(handle && !/<ID>/.test(handle) ? handle : 'YouTube'),

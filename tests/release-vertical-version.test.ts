@@ -8,9 +8,12 @@ vi.mock('@coreslopper/core', async (importOriginal) => ({
 }));
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { stringify } from 'yaml';
 import { buildRelease } from '../packages/cli/src/release.ts';
-import { runCalendar } from '../packages/cli/src/release-calendar.ts';
-import { cleanupFixtures, diskTree, episodeFixture, fakeDeps, jpeg, videoProbe } from './helpers/release-fixture.ts';
+import { loadCalendar, runCalendar } from '../packages/cli/src/release-calendar.ts';
+import { releaseChecks } from '../packages/cli/src/release-qa.ts';
+import { checkReleaseAssets } from '../packages/cli/src/qa.ts';
+import { cleanupFixtures, diskTree, episodeFixture, episodeUploadYaml, fakeDeps, fixtureProbe, jpeg, videoProbe } from './helpers/release-fixture.ts';
 
 afterEach(cleanupFixtures);
 
@@ -78,13 +81,64 @@ describe('the vertical version of a horizontal episode up to 3 minutes', () => {
     expect(shortsIn(await diskTree(release(dir)))).toEqual(['shorts/E1-hook-9x16.mp4', 'shorts/E1-twist-9x16.mp4']);
   });
 
-  it('plans the vertical version, not the cut Shorts, in the calendar command', async () => {
-    const { dir, root } = await horizontalEpisode(150);
+  it('plans the same Short events in the calendar command as release, and none before the vertical version is placed', async () => {
+    const { dir, root, deps } = await horizontalEpisode(150);
     await cutShorts(dir);
+    const now = new Date('2026-11-28T08:00:00Z');
+    const shortItems = (events: { platform: string; item: string }[]) => [...new Set(events.filter((event) => event.platform === 'shorts').map((event) => event.item))];
 
-    const calendar = await runCalendar({ projectDir: dir, root, now: new Date('2026-11-28T08:00:00Z'), log: () => undefined });
+    const before = await runCalendar({ projectDir: dir, root, now, log: () => undefined });
+    expect(shortItems(before.events)).toEqual([]);
 
-    const items = new Set(calendar.events.filter((event) => event.platform === 'shorts').map((event) => event.item));
-    expect([...items]).toEqual(['demo-episode']);
+    await buildRelease({ projectDir: dir, root, deps: { ...deps, now: () => now }, render: false });
+    const planned = (await loadCalendar(dir))!;
+    const again = await runCalendar({ projectDir: dir, root, now, log: () => undefined });
+
+    expect(shortItems(planned.events)).toEqual(['demo-episode']);
+    expect(again.events.map((event) => event.id)).toEqual(planned.events.map((event) => event.id));
+  });
+
+  it('builds the Shorts posts from the vertical version only, never from cut-Short entries left in upload.yaml', async () => {
+    const { dir, root, deps } = await horizontalEpisode(150);
+    const entry = (name: string, file: string) => ({
+      name,
+      file,
+      title: `${name} #shorts`,
+      description: `Short ${name}.`,
+      hashtags: ['#nightdesk'],
+      tiktok: { caption: `TikTok ${name}`, hashtags: ['#nightdesk'] },
+      instagram: { caption: `Reel ${name}`, hashtags: ['#nightdesk'] },
+    });
+    await writeFile(
+      join(dir, 'review', 'upload.yaml'),
+      stringify({ ...episodeUploadYaml(), shorts: [entry('E1-hook', 'renders/9x16.mp4'), entry('demo-episode', 'renders/9x16.mp4')] }),
+    );
+
+    const result = await buildRelease({ projectDir: dir, root, deps, render: false });
+
+    const shortPosts = result.manifest.plan!.posts.filter((post) => post.id.startsWith('short:'));
+    expect(new Set(shortPosts.map((post) => post.id.split(':')[1]))).toEqual(new Set(['demo-episode']));
+    expect(shortPosts.find((post) => post.id === 'short:demo-episode:youtube')?.texts.title?.value).toBe('demo-episode #shorts');
+    expect(result.warnings.join('\n')).toContain('E1-hook ignored');
+  });
+
+  it("passes release QA's Release Shorts row for a horizontal episode of 150 s", async () => {
+    const { dir, root, deps } = await horizontalEpisode(150);
+    await writeFile(join(dir, 'renders', 'cover-1080x1920.jpg'), jpeg(1080, 1920));
+    await buildRelease({ projectDir: dir, root, deps, render: false });
+
+    const checks = await releaseChecks(dir, fixtureProbe({ 'demo-episode-9x16.mp4': videoProbe(1080, 1920, 150) }), { root });
+
+    expect(checks.find((check) => check.name === 'Release Shorts')).toMatchObject({ result: 'PASS' });
+  });
+
+  it('gives no hint to cut Shorts for a horizontal episode up to 3 minutes', async () => {
+    const { dir } = await horizontalEpisode(150);
+    const paths = { root: dir, renders: join(dir, 'renders') };
+
+    const { checks } = await checkReleaseAssets(paths, { shape: 'episode', master: { width: 1920, height: 1080 }, shorts: 'vertical-version' });
+
+    expect(checks.find((check) => check.name === 'Shorts')).toMatchObject({ result: 'N/A' });
+    expect(checks.find((check) => check.name === 'Short thumbnails')).toMatchObject({ result: 'N/A' });
   });
 });
