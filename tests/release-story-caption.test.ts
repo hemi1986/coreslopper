@@ -7,9 +7,10 @@ vi.mock('@coreslopper/core', async (importOriginal) => ({
   loadChannel: async () => undefined,
 }));
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { ChannelConfigSchema, platformLimits } from '../packages/core/src/index.ts';
 import { stringify } from 'yaml';
 import { join } from 'node:path';
-import { buildRelease } from '../packages/cli/src/release.ts';
+import { buildRelease, runRelease } from '../packages/cli/src/release.ts';
 import { boardProject } from '../packages/cli/src/release-board-data.ts';
 import { cleanupFixtures, episodeFixture, episodeUploadYaml, fakeDeps, fixture, jpeg, uploadYaml } from './helpers/release-fixture.ts';
 
@@ -84,3 +85,23 @@ describe('an optional caption', () => {
     expect(result.manifest.plan!.problems.missing).not.toContain('shorts.Z1-intro.instagram.story');
   });
 });
+
+describe('the caption limit', () => {
+  it('ST-044: A caption over 120 characters breaks a rule', async () => {
+    const dir = await fixture();
+    const upload = uploadYaml();
+    upload.shorts[0]!.instagram.story = 'x'.repeat(121);
+    await writeFile(join(dir, 'review', 'upload.yaml'), stringify(upload));
+
+    const run = runRelease({ projectDir: dir, deps: fakeDeps({ log: () => undefined }) });
+
+    await expect(run).rejects.toMatchObject({ details: expect.arrayContaining(['story: caption has 121 characters, limit 120']) });
+  });
+
+  it('takes the caption limit from the channel', () => {
+    const channel = ChannelConfigSchema.parse({ version: 1, name: 'x', language: 'de', limits: { instagram: { story_caption: 200 } } });
+    expect(platformLimits(channel).instagram.story_caption).toBe(200);
+    expect(platformLimits().instagram.story_caption).toBe(120);
+  });
+});
+
