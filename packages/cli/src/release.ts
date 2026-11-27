@@ -503,6 +503,7 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
       slug,
       title: identity.title,
       kind: input.kind,
+      shape,
       releaseDate: project.config.release?.release_date,
       data,
       shorts: files.shorts.map((short) => short.name),

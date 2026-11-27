@@ -16,6 +16,7 @@ import {
   type CalendarInput,
   type ReleaseCalendar,
   type ReleaseSchedule,
+  type ReleaseShape,
   type UploadData,
 } from '@coreslopper/core';
 import { loadStatus, updateStatus } from './release-records.js';
@@ -64,6 +65,8 @@ export function calendarInput(options: {
   slug: string;
   title: string;
   kind: CalendarInput['kind'];
+  /** The release shape; a short episode has no Shorts, community post, main-video Reel or LinkedIn post (ADR 0057). */
+  shape?: ReleaseShape;
   releaseDate?: string;
   data?: UploadData;
   shorts: string[];
@@ -73,7 +76,8 @@ export function calendarInput(options: {
   const { data } = options;
   // A meme is posted, not announced, and has no feed post, X, LinkedIn, or microsite: it has three platform texts.
   const meme = options.kind === 'meme';
-  const shorts = options.shorts.map((name) => {
+  const shortEpisode = options.shape === 'short-episode';
+  const shorts = (shortEpisode ? [] : options.shorts).map((name) => {
     const short = data?.shorts.find((entry) => entry.name === name);
     if (!short) return { name, platforms: ['youtube', 'tiktok', 'instagram'] as CalendarInput['shorts'][number]['platforms'] };
     const platforms: CalendarInput['shorts'][number]['platforms'] = ['youtube'];
@@ -86,13 +90,14 @@ export function calendarInput(options: {
     slug: options.slug,
     title: options.title,
     kind: options.kind,
+    ...(options.shape ? { shape: options.shape } : {}),
     releaseDate: options.releaseDate,
     shorts,
     announcement: !meme && Boolean(data?.announcement),
-    communityPost: !meme && Boolean(data?.main.community_post),
-    instagramPost: !meme && Boolean(data?.instagram_post) && mainVideoReel(options.durationSeconds),
+    communityPost: !meme && !shortEpisode && Boolean(data?.main.community_post),
+    instagramPost: !meme && !shortEpisode && Boolean(data?.instagram_post) && mainVideoReel(options.durationSeconds),
     x: !meme && Boolean(data?.x),
-    linkedin: !meme && data?.linkedin?.decision === 'post',
+    linkedin: !meme && !shortEpisode && data?.linkedin?.decision === 'post',
     microsite: !meme && Boolean(data?.microsite),
   };
 }
@@ -126,7 +131,7 @@ export async function runCalendar(options: {
   now?: Date;
   log?: (line: string) => void;
 }): Promise<ReleaseCalendar> {
-  const { loadProject, releaseIdentity, releasedPublicly } = await import('@coreslopper/core');
+  const { loadProject, releaseIdentity, releasedPublicly, releaseShape } = await import('@coreslopper/core');
   const { listShorts, shortName } = await import('./release-files.js');
   const { loadUploadData, uploadPaths } = await import('./upload-text.js');
   const { songJson } = await import('./release.js');
@@ -143,6 +148,7 @@ export async function runCalendar(options: {
       slug: project.config.slug,
       title: identity.title,
       kind: project.config.kind,
+      shape: releaseShape({ kind: project.config.kind, master: project.config.formats.master, durationSeconds: (project.effectiveTiming ?? project.timing)?.audio.duration }),
       releaseDate: project.config.release?.release_date,
       data,
       shorts,
