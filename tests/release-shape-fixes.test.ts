@@ -199,3 +199,28 @@ describe('a short episode in publish and the autopilot', () => {
     expect(youtube.videoCalls.filter((call) => call.method === 'postComment')).toEqual([]);
   });
 });
+
+describe('a short episode in publish without a release plan', () => {
+  it('uploads only main, to YouTube and TikTok, and leaves the Shorts out', async () => {
+    for (const [key, value] of Object.entries(ENV)) vi.stubEnv(key, value);
+    const { dir, root } = await shortEpisodeFixture();
+    const short = { name: 'E1-hook', file: 'renders/shorts/E1-hook-9x16.mp4', title: 'Hook #shorts', description: 'Der Anfang.', hashtags: ['#shorts'], platforms: ['youtube', 'tiktok'] };
+    await writeFile(join(dir, 'review', 'upload.yaml'), stringify({ ...shortEpisodeUploadYaml(), shorts: [short] }));
+    const youtube = new MockPublisher('youtube');
+    const tiktok = new MockPublisher('tiktok');
+
+    const summary = await publishProject({
+      projectDir: dir,
+      root,
+      adapters: { youtube, tiktok },
+      probe: () => ({ width: 1080, height: 1920, duration: 22 }),
+      log: () => undefined,
+    });
+
+    expect(summary.plan.warnings.join(' ')).toContain('no release plan yet');
+    expect(summary.plan.steps.map((step) => [step.platform, step.item.name])).toEqual([
+      ['youtube', 'main'],
+      ['tiktok', 'main'],
+    ]);
+  });
+});
