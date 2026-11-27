@@ -692,6 +692,8 @@ export const ScriptLineSchema = z.discriminatedUnion('kind', [
     kind: z.literal('pause'),
     ...ScriptLineBase,
     duration: z.number().positive(),
+    /** Optional English subtitle for on-screen text seen during this pause (a message, a document); not spoken. */
+    text_en: z.string().optional(),
   }),
 ]).superRefine((line, ctx) => {
   // A generated effect needs its length; the sound or prompt rule needs the project kind and stays in validateScript.
