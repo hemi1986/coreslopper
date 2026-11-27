@@ -26,6 +26,12 @@ export const DERIVED_PATHS = {
   story: 'instagram/story-9x16.jpg',
 } as const;
 
+/** The announcement teaser cut from a format's render, e.g. `announce/teaser-4x5.mp4`; 9:16 is `DERIVED_PATHS.teaser`. */
+export const teaserPathOf = (format: string) => `announce/teaser-${format}.mp4`;
+
+/** Whether a release-folder path is an announcement teaser of any format. */
+export const isTeaserPath = (path: string) => /^announce\/teaser-\d+x\d+\.mp4$/.test(path);
+
 /** Length of the announcement teaser in seconds. */
 export const TEASER_SECONDS = 10;
 
@@ -84,6 +90,8 @@ export function derivedImages(options: {
   story: boolean;
   /** An episode's announcement says "new episode"; a music video's says "new song". */
   episode?: boolean;
+  /** Only vertical images: no 16:9 announcement post (a short episode, ADR 0057). */
+  vertical?: boolean;
 }): DerivedImage[] {
   const w = words(options.language);
   const images: DerivedImage[] = [];
@@ -93,7 +101,7 @@ export function derivedImages(options: {
     const date = releaseDateLine(options.releaseAt, options.language);
     const text = [...title(THUMBNAIL_MAX_LINES - 1), date].join('|');
     images.push({ path: DERIVED_PATHS.announceStory, kind: 'announcement', format: '9x16', text, tag: announcementTag });
-    images.push({ path: DERIVED_PATHS.announcePost, kind: 'announcement', format: '16x9', text, tag: announcementTag, layout: 'left' });
+    if (!options.vertical) images.push({ path: DERIVED_PATHS.announcePost, kind: 'announcement', format: '16x9', text, tag: announcementTag, layout: 'left' });
   }
   if (options.story) {
     images.push({ path: DERIVED_PATHS.story, kind: 'story', format: '9x16', text: [...title(THUMBNAIL_MAX_LINES - 1), w.onYouTube].join('|'), tag: w.now });

@@ -23,7 +23,7 @@ import {
 } from '@coreslopper/core';
 import { loadCalendar } from './release-calendar.js';
 import { loadStatus } from './release-records.js';
-import { DERIVED_PATHS } from './release-images.js';
+import { DERIVED_PATHS, isTeaserPath } from './release-images.js';
 import { releaseLabels, type ReleaseTextInput } from './release-texts.js';
 import { loadUploadData, uploadPaths } from './upload-text.js';
 import { releaseDir, songJson, usedSoundCredits } from './release.js';
@@ -97,7 +97,7 @@ export function filesFromManifest(manifest: ReleaseManifest | undefined, masterF
     else if (file.kind === 'lyrics' && file.path.endsWith('.lrc')) files.lyricsLrc = file.path;
     else if (file.path === DERIVED_PATHS.announceStory) files.announceStory = file.path;
     else if (file.path === DERIVED_PATHS.announcePost) files.announcePost = file.path;
-    else if (file.path === DERIVED_PATHS.teaser) files.teaser = file.path;
+    else if (isTeaserPath(file.path)) files.teaser = file.path;
     else if (file.path === DERIVED_PATHS.story) files.story = file.path;
   }
   files.thumbnails.sort();

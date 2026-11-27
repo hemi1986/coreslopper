@@ -67,7 +67,7 @@ import { loadStatus } from './release-records.js';
 import { micrositeSong } from './release-microsite.js';
 import { listThumbnails } from './thumbnail-files.js';
 import { readRecipe, recipePath } from './thumbnail-recipe.js';
-import { DERIVED_PATHS, derivedImages, teaserWindow } from './release-images.js';
+import { DERIVED_PATHS, derivedImages, teaserPathOf, teaserWindow } from './release-images.js';
 import { shortFfmpegArgs } from './short.js';
 import type { ThumbnailOptions } from './thumbnail.js';
 import { loadUploadData, uploadPaths } from './upload-text.js';
@@ -512,7 +512,7 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
     { root, now: deps.now(), replan: options.replan, schedule },
   );
   if (!meme) {
-    await deriveReleaseMedia({ project, dir, writer, files, data, calendar: input.calendar, language, title: identity.title, deps, todos, stills: options.stills !== false });
+    await deriveReleaseMedia({ project, dir, writer, files, data, calendar: input.calendar, language, title: identity.title, deps, todos, stills: options.stills !== false, shortEpisode });
   }
   const youtubeHandle = channel?.links.youtube?.handle;
   const plan = buildReleasePlan({
@@ -571,21 +571,26 @@ async function deriveReleaseMedia(context: {
   deps: ReleaseDeps;
   todos: string[];
   stills: boolean;
+  /** A short episode's announcement images are vertical, its teaser is cut from its master, and it has no story (ADR 0057). */
+  shortEpisode: boolean;
 }): Promise<void> {
-  const { project, dir, writer, files, data, calendar, deps, todos } = context;
+  const { project, dir, writer, files, data, calendar, deps, todos, shortEpisode } = context;
   const releaseAt = calendar.events.find((event) => event.id === 'youtube')?.at;
   const images = derivedImages({
     title: context.title,
     language: context.language,
     releaseAt,
     announcement: Boolean(data?.announcement),
-    story: Boolean(data),
+    story: Boolean(data) && !shortEpisode,
     episode: project.config.kind === 'episode',
+    vertical: shortEpisode,
   });
   if (images.length) {
     const recipe = data?.announcement?.image
       ? { still: data.announcement.image.still, focus: data.announcement.image.focus }
-      : ((await readRecipe(join(project.paths.root, COVER_SOURCE))) ?? (data?.main.thumbnail ? await readRecipe(resolve(project.paths.root, data.main.thumbnail)) : undefined));
+      : ((shortEpisode ? await readRecipe(join(project.paths.root, MEME_COVER_SOURCE)) : undefined) ??
+        (await readRecipe(join(project.paths.root, COVER_SOURCE))) ??
+        (data?.main.thumbnail ? await readRecipe(resolve(project.paths.root, data.main.thumbnail)) : undefined));
     const stillPath = recipe ? [resolve(project.paths.root, recipe.still), resolve(recipe.still)].find((path) => existsSync(path)) : undefined;
     if (!recipe || !stillPath) {
       todos.push(
@@ -636,20 +641,24 @@ async function deriveReleaseMedia(context: {
   }
 
   // The teaser: ten seconds from the first chorus of the 9:16 render, with sound, for the announcement.
+  // A short episode's teaser is cut from its master and named by its format.
   const timing = project.effectiveTiming ?? project.timing;
-  const vertical = join(project.paths.root, 'renders', '9x16.mp4');
+  const masterFormat = formatId(project.config.formats.master.aspect);
+  const sourceRel = shortEpisode ? `renders/${masterFormat}.mp4` : 'renders/9x16.mp4';
+  const teaserPath = shortEpisode ? teaserPathOf(masterFormat) : DERIVED_PATHS.teaser;
+  const vertical = join(project.paths.root, sourceRel);
   if (data?.announcement && timing && existsSync(vertical)) {
     const window = teaserWindow(timing);
     const sourceHash = await hashFileStream(vertical);
     const spec = { start: Number(window.start.toFixed(3)), seconds: Number(window.duration.toFixed(3)), audio: true, sourceSha256: sourceHash };
-    const same = await writer.unchanged(DERIVED_PATHS.teaser, (entry) => entry.spec.sourceSha256 === sourceHash && entry.spec.start === spec.start && entry.spec.seconds === spec.seconds);
+    const same = await writer.unchanged(teaserPath, (entry) => entry.spec.sourceSha256 === sourceHash && entry.spec.start === spec.start && entry.spec.seconds === spec.seconds);
     if (!same) {
       deps.log(`Cutting the teaser: ${spec.seconds} s from ${spec.start.toFixed(2)} s...`);
       await mkdir(join(dir, 'announce'), { recursive: true });
-      await deps.ffmpeg(shortFfmpegArgs(vertical, join(dir, DERIVED_PATHS.teaser), window, project.config.formats.master.fps));
+      await deps.ffmpeg(shortFfmpegArgs(vertical, join(dir, teaserPath), window, project.config.formats.master.fps));
     }
-    await writer.generated(DERIVED_PATHS.teaser, 'announcement', spec, 'renders/9x16.mp4');
-    files.teaser = DERIVED_PATHS.teaser;
+    await writer.generated(teaserPath, 'announcement', spec, sourceRel);
+    files.teaser = teaserPath;
   }
 }
 
