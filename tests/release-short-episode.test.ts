@@ -6,7 +6,7 @@ vi.mock('@coreslopper/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@coreslopper/core')>()),
   loadChannel: async () => undefined,
 }));
-import { readFile, rename, writeFile } from 'node:fs/promises';
+import { readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parse, stringify } from 'yaml';
 import { ReleaseCalendarSchema } from '../packages/core/src/index.ts';
@@ -26,6 +26,15 @@ async function announce(dir: string): Promise<void> {
 async function textsOf(dir: string): Promise<Record<string, string>> {
   const names = (await diskTree(join(release(dir), 'texts'))).sort();
   return Object.fromEntries(await Promise.all(names.map(async (name) => [name, await readFile(join(release(dir), 'texts', name), 'utf8')] as const)));
+}
+
+/** Give the short episode a 4:5 (or other) master: project.yaml and the master render move to the new format. */
+async function masterOf(dir: string, aspect: '4:5'): Promise<void> {
+  const projectPath = join(dir, 'project.yaml');
+  const config = parse(await readFile(projectPath, 'utf8')) as { formats: { master: Record<string, unknown> } };
+  config.formats.master = { ...config.formats.master, aspect, width: 1080, height: 1350 };
+  await writeFile(projectPath, stringify(config));
+  await rename(join(dir, 'renders', '9x16.mp4'), join(dir, 'renders', '4x5.mp4'));
 }
 
 const calendarOf = async (dir: string) => ReleaseCalendarSchema.parse(parse(await readFile(join(dir, 'review', 'calendar.yaml'), 'utf8')));
@@ -71,21 +80,25 @@ describe('the release of a short episode', () => {
     // Its announcement images are vertical: no 16:9 post image, and no release-day story image.
     expect(deps.thumbnails.map((image) => image.format)).toEqual(['9x16']);
     expect(await diskTree(release(dir))).not.toContain('announce/post-16x9.jpg');
+
+    // The master decides, not the 9:16 render: the same episode with a 4:5 master cuts its teaser from renders/4x5.mp4.
+    await masterOf(dir, '4:5');
+    const fourFive = await buildRelease({ projectDir: dir, root, deps: fakeDeps(), render: false });
+
+    expect(fourFive.manifest.shape).toBe('short-episode');
+    expect(fourFive.manifest.files.find((file) => file.path === 'announce/teaser-4x5.mp4')?.source).toBe('renders/4x5.mp4');
   });
 
-  it("cuts a 4:5 short episode's teaser from its 4:5 master", async () => {
+  it("names a 4:5 short episode's missing master render in its texts", async () => {
     const { dir, root } = await shortEpisodeFixture();
-    await announce(dir);
-    const projectPath = join(dir, 'project.yaml');
-    const config = parse(await readFile(projectPath, 'utf8')) as { formats: { master: Record<string, unknown> } };
-    config.formats.master = { ...config.formats.master, aspect: '4:5', width: 1080, height: 1350 };
-    await writeFile(projectPath, stringify(config));
-    await rename(join(dir, 'renders', '9x16.mp4'), join(dir, 'renders', '4x5.mp4'));
+    await masterOf(dir, '4:5');
+    await rm(join(dir, 'renders', '4x5.mp4'));
 
-    const result = await buildRelease({ projectDir: dir, root, deps: fakeDeps(), render: false });
+    await buildRelease({ projectDir: dir, root, deps: fakeDeps(), render: false });
 
-    expect(result.manifest.shape).toBe('short-episode');
-    expect(result.manifest.files.find((file) => file.path === 'announce/teaser-4x5.mp4')?.source).toBe('renders/4x5.mp4');
+    const texts = await textsOf(dir);
+    for (const name of ['youtube.md', 'tiktok.md', 'instagram.md']) expect(texts[name]).toContain('TODO: renders/4x5.mp4');
+    expect(texts['youtube.md']).not.toContain('renders/9x16.mp4');
   });
 
   it('ST-048: A missing TikTok text is a TODO', async () => {
@@ -97,6 +110,18 @@ describe('the release of a short episode', () => {
 
     expect(result?.manifest.plan?.problems.missing).toContain('tiktok');
     expect(result?.todos).toContain('tiktok is missing in review/upload.yaml');
+    expect(result?.errors).toEqual([]);
+  });
+
+  it('makes missing Instagram, X and microsite texts TODOs as well', async () => {
+    const { dir, root } = await shortEpisodeFixture();
+    const { instagram: _i, x: _x, microsite: _m, ...upload } = shortEpisodeUploadYaml();
+    await writeFile(join(dir, 'review', 'upload.yaml'), stringify(upload));
+
+    const result = await runRelease({ projectDir: dir, root, deps: fakeDeps(), render: false });
+
+    expect(result?.manifest.plan?.problems.missing).toEqual(expect.arrayContaining(['instagram', 'x', 'microsite']));
+    for (const field of ['instagram', 'x', 'microsite']) expect(result?.todos).toContain(`${field} is missing in review/upload.yaml`);
     expect(result?.errors).toEqual([]);
   });
 });

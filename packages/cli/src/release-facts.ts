@@ -140,6 +140,7 @@ export async function loadReleaseFacts(projectRoot: string, root: string): Promi
   const input: ReleaseTextInput = {
     kind,
     shape,
+    masterFormat: formatId(project.config.formats.master.aspect),
     language,
     slug: project.config.slug,
     artist: identity.artist,

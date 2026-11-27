@@ -481,6 +481,7 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
   const input: ReleaseTextInput = {
     kind,
     shape,
+    masterFormat: formatId(project.config.formats.master.aspect),
     language,
     slug,
     artist: identity.artist,

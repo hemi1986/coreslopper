@@ -13,7 +13,10 @@ import {
 // adds the folder's headings, counters, checklists, and the language's labels.
 
 /** The plan's input: what `buildReleasePlan` turns into the plan. */
-export type ReleaseTextInput = ReleasePlanInput;
+export type ReleaseTextInput = ReleasePlanInput & {
+  /** The master's format id (`9x16`, `4x5`, ...), for the TODO of a missing master render. */
+  masterFormat?: string;
+};
 
 const postOf = (plan: ReleasePlan, id: string) => plan.posts.find((post) => post.id === id);
 const textOf = (plan: ReleasePlan, id: string, key: string): PlanText | undefined => postOf(plan, id)?.texts[key];
@@ -815,7 +818,7 @@ function linkedinText(plan: ReleasePlan, input: ReleaseTextInput, l: Labels): st
 
 /** The one video's file in the folder (a meme or a short episode): its master, else its 9:16 render. */
 function memeFile(input: ReleaseTextInput, l: Labels): string {
-  return input.files.master ?? input.files.videos?.['9x16'] ?? l.todo('renders/9x16.mp4');
+  return input.files.master ?? input.files.videos?.['9x16'] ?? l.todo(`renders/${input.masterFormat ?? '9x16'}.mp4`);
 }
 
 /** The YouTube Short of a meme or a short episode; a short episode's also carries its hashtags and announcement. */
