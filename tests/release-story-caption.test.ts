@@ -11,7 +11,7 @@ import { stringify } from 'yaml';
 import { join } from 'node:path';
 import { buildRelease } from '../packages/cli/src/release.ts';
 import { boardProject } from '../packages/cli/src/release-board-data.ts';
-import { cleanupFixtures, episodeFixture, episodeUploadYaml, fakeDeps, fixture, jpeg } from './helpers/release-fixture.ts';
+import { cleanupFixtures, episodeFixture, episodeUploadYaml, fakeDeps, fixture, jpeg, uploadYaml } from './helpers/release-fixture.ts';
 
 afterEach(cleanupFixtures);
 
@@ -69,5 +69,18 @@ describe('the caption of a story', () => {
     const result = await buildRelease({ projectDir: dir, root, deps: fakeDeps(), render: false });
 
     expect(post(result, 'story').texts.caption).toMatchObject({ value: 'Neue Folge – jetzt auf YouTube', limit: { max: 120 } });
+  });
+});
+
+describe('an optional caption', () => {
+  it('ST-044: A story without a caption is complete', async () => {
+    const dir = await fixture();
+    const upload = uploadYaml();
+    for (const short of upload.shorts) delete (short.instagram as { story?: string }).story;
+    await writeFile(join(dir, 'review', 'upload.yaml'), stringify(upload));
+
+    const result = await buildRelease({ projectDir: dir, deps: fakeDeps() });
+
+    expect(result.manifest.plan!.problems.missing).not.toContain('shorts.Z1-intro.instagram.story');
   });
 });

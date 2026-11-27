@@ -585,6 +585,10 @@ function instagramText(plan: ReleasePlan, input: ReleaseTextInput, l: Labels): s
     lines.push(`## ${l.announce.heading} (${l.ig.story})`, '', announceImageLine(input, l), '');
     if (caption) lines.push(`### ${l.ig.storyCaption} (${counter(caption, l, input.limits.instagram.story_caption)})`, '', ...block(display(caption.value, l)), '');
   }
+  const storyCaption = postOf(plan, 'story')?.texts.caption;
+  if (storyCaption) {
+    lines.push(`## ${l.ig.story}`, '', `### ${l.ig.storyCaption} (${counter(storyCaption, l, input.limits.instagram.story_caption)})`, '', ...block(display(storyCaption.value, l)), '');
+  }
   for (const post of postsOf(plan, 'instagram')) {
     const name = shortNameOf(post.id);
     if (!name) continue;
@@ -593,7 +597,6 @@ function instagramText(plan: ReleasePlan, input: ReleaseTextInput, l: Labels): s
     const caption = post.texts.caption;
     const note = hashtagNote(caption, l);
     lines.push(`### ${l.ig.caption} (${counter(caption, l, input.limits.instagram.caption)}${note ? `, ${note}` : ''})`, '', ...block(caption ? display(caption.value, l) : l.todo(`shorts.${name}.instagram in review/upload.yaml`)), '');
-    lines.push(`### ${l.ig.story}`, '', ...block(post.texts.story ? display(post.texts.story.value, l) : l.todo(`shorts.${name}.instagram.story`)), '');
     lines.push(`### ${l.checklist}`, '', checkbox(l.ig.cover(post.coverFrame)));
     if (plan.settings.instagramAiLabel) lines.push(checkbox(l.ig.aiLabel));
     lines.push(checkbox(youtube ? `${l.ig.sticker} — ${youtube}` : l.ig.sticker), '');

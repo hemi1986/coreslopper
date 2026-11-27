@@ -405,16 +405,13 @@ export function buildReleasePlan(input: ReleasePlanInput): ReleasePlan {
             instagram ? { count: countHashtags(instagram.caption, instagram.hashtags), max: limits.instagram.hashtags, label: `instagram ${name}` } : undefined,
           ),
         ],
-        ['story', text(instagram?.story)],
       ),
       media: file?.video,
       coverFrame: instagram?.cover_frame,
       url: true,
       errors: identical ? [`${name}: the Instagram and TikTok captions are identical; write one per platform`] : [],
-      missing: [
-        ...(!instagram ? [`shorts.${name}.instagram`] : []),
-        ...(instagram && !instagram.story ? [`shorts.${name}.instagram.story`] : []),
-      ],
+      // The story text is the release-day story's optional caption, never a TODO (HS-267).
+      missing: [...(!instagram ? [`shorts.${name}.instagram`] : [])],
     });
 
     if (short?.x) {
