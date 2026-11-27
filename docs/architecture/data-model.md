@@ -352,7 +352,7 @@ the agent (HS-121).
 | Chat line fields | speaker, `text_de` (shown on screen), `text_en` | yes | EVT-ScriptWritten |
 | Sfx line fields | `sound` or `prompt`, duration, optional `text_en` (on-screen text) | see the source | EVT-ScriptWritten |
 | Sfx line source | exactly one of: `sound` – a Library sound id, memes only, no duration (the length is the sound's trim); or `prompt` with a duration. An episode's sfx line keeps prompt and duration | one of the two | EVT-ScriptWritten (CMD-WriteMemeScript rule), EVT-LibrarySoundTaken |
-| Pause line fields | duration | yes | EVT-ScriptWritten |
+| Pause line fields | duration, optional `text_en` (on-screen text) | duration yes | EVT-ScriptWritten |
 
 `with` (overlap) is parsed and always refused, also for a sound line (HS-257). A sound line's sound cue is reached
 through the anchor `line:<id>:cue`. A meme's script is the same model: before its bibles exist its scenes and

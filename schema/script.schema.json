@@ -290,6 +290,9 @@
                     "duration": {
                       "type": "number",
                       "exclusiveMinimum": 0
+                    },
+                    "text_en": {
+                      "type": "string"
                     }
                   },
                   "required": [

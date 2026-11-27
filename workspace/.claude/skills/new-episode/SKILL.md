@@ -67,7 +67,7 @@ scenes:
 - Line IDs are unique across the script and stay stable: they name the take files and the storyboard anchors.
 - Spoken `text_de` (`dialogue`, `voiceover`, `announcement`) spells out every number, year, time, abbreviation, and symbol in words ("2077" → "zweitausendsiebenundsiebzig", "z. B." → "zum Beispiel"). Chat text is shown, not spoken, and may keep digits.
 - Every `dialogue`, `voiceover`, `announcement`, and `chat` line has `text_en`: it is the English subtitle.
-- An `sfx` line may carry `text_en` when the picture shows readable non-English text during it (a label, a sign); it becomes a subtitle for that text and is never spoken.
+- An `sfx` or `pause` line may carry `text_en` when the picture shows readable non-English text during it (a label, a sign, a message, a document); it becomes a subtitle for that text and is never spoken.
 - Lines play strictly one after another; leave `with` out.
 
 Run `npm run cli -- validate-file projects/<slug>/script.yaml` and fix every reported issue. Then show the user the scene list (set, line count, speakers) and an estimate of the length (speech at about 14 characters per second, plus chat, effect, and pause durations and every `pause_after`), and ask them to confirm or correct it.

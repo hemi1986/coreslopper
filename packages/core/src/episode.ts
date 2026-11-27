@@ -346,14 +346,14 @@ function wrapSubtitle(text: string, width = 42): string {
 /**
  * The subtitles in `language`: one cue per dialogue, voice-over, announcement, and chat line, timed by the
  * (effective) timing, in playing order. English is the translation (`text_en`); German is as spoken (`text_de`).
- * An sfx line carries a cue only for on-screen text, which a script writes in English.
+ * An sfx or pause line carries a cue only for on-screen text, which a script writes in English.
  */
 export function subtitleCues(script: Script, timing: Timing, language: 'en' | 'de' = 'en'): SubtitleCue[] {
   const cues: SubtitleCue[] = [];
   for (const { line } of scriptLines(script)) {
     let text: string | undefined;
-    if (line.kind === 'sfx') {
-      // An sfx line carries a subtitle only for on-screen text (a label, a sign), and only in English.
+    if (line.kind === 'sfx' || line.kind === 'pause') {
+      // An sfx or pause line carries a subtitle only for on-screen text (a label, a sign, a message), and only in English.
       if (language !== 'en' || !line.text_en?.trim()) continue;
       text = line.text_en;
     } else if (isSubtitledLine(line)) {

@@ -4,6 +4,7 @@ import {
   EPISODE_STAGES,
   MUSIC_VIDEO_STAGES,
   ProjectConfigSchema,
+  ScriptLineSchema,
   buildSrt,
   loadProject,
   resolveStoryboard,
@@ -120,6 +121,22 @@ describe('subtitles', () => {
       'Contract · Residual Brandt, Lena · Payer: Brandt, Ilka · Status: under review',
     );
     expect(burnInText('Short line')).toBe('Short line');
+  });
+
+  it('keeps text_en on a pause line and adds a cue for it (on-screen text during the pause)', async () => {
+    const project = await loadProject(episodeDir);
+    const script = structuredClone(project.script!);
+    const scene = script.scenes.find((candidate) => candidate.lines.some((line) => line.kind === 'pause'))!;
+    const index = scene.lines.findIndex((line) => line.kind === 'pause');
+    const pause = scene.lines[index]!;
+    const before = subtitleCues(script, project.effectiveTiming!).length;
+    // Parsed like script.yaml: the schema must not strip the field.
+    scene.lines[index] = ScriptLineSchema.parse({ id: pause.id, kind: 'pause', duration: 1, text_en: 'why did you delete me?' });
+    expect((scene.lines[index] as { text_en?: string }).text_en).toBe('why did you delete me?');
+    const cues = subtitleCues(script, project.effectiveTiming!);
+    expect(cues).toHaveLength(before + 1);
+    expect(cues.find((cue) => cue.id === pause.id)!.text).toBe('why did you delete me?');
+    expect(subtitleCues(script, project.effectiveTiming!, 'de').some((cue) => cue.id === pause.id)).toBe(false);
   });
 
   it('burns the English subtitles in only when the render asks for them', async () => {
