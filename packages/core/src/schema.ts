@@ -925,6 +925,9 @@ export const UploadShortSchema = z.object({
   summary_en: EnglishSummarySchema.optional(),
 });
 
+/** A platform post of a short episode's one video: its own caption and hashtags (ADR 0057). */
+export const UploadPlatformTextSchema = z.object({ caption: z.string().min(1), hashtags: z.array(HashtagSchema).default([]) });
+
 /** The release post on X: the post with a native video, and an optional reply that holds the YouTube link. */
 export const UploadXSchema = z.object({
   post: z.string().min(1),
@@ -976,6 +979,10 @@ export const UploadDataSchema = z
     shorts: z.array(UploadShortSchema).default([]),
     /** The main video's Instagram Reel (`instagram-post`): its best vertical render; only for a main video of at most 180 s (ADR 0057). */
     instagram_post: z.object({ caption: z.string().min(1), hashtags: z.array(HashtagSchema).default([]) }).optional(),
+    /** A short episode's TikTok post of its one video; `main` is its YouTube Short (ADR 0057). Other shapes ignore it. */
+    tiktok: UploadPlatformTextSchema.optional(),
+    /** A short episode's Instagram Reel of its one video; its caption differs from the TikTok one (ADR 0057). Other shapes ignore it. */
+    instagram: UploadPlatformTextSchema.optional(),
     /** Spotify for Artists: the Artist Pick message and the editorial pitch. */
     spotify: z.object({ artist_pick: z.string().min(1).optional(), pitch: z.string().min(1).optional() }).optional(),
     /** The announcement a week before the release: an Instagram story with the cover, a YouTube post, and an X post. */
@@ -1474,6 +1481,13 @@ export const ReleasePlanPostSchema = z.object({
 });
 
 /**
+ * Which posts and files a release has (ADR 0057): a music video, a meme, an
+ * episode, or a short episode – an episode whose master is at least as tall as
+ * wide and whose episode track lasts at most 180 s.
+ */
+export const ReleaseShapeSchema = z.enum(['music-video', 'meme', 'episode', 'short-episode']);
+
+/**
  * One release plan: every post's exact text, files, sources and limits, and
  * what is still missing. `release` writes it into `manifest.json`; the folder
  * texts, QA, the board, the autopilot and `publish` all read it.
@@ -1481,6 +1495,8 @@ export const ReleasePlanPostSchema = z.object({
 export const ReleasePlanSchema = z.object({
   version: z.literal(1),
   kind: z.enum(['music-video', 'episode', 'meme']),
+  /** The release shape the plan was built for; a plan without it reads as its kind. */
+  shape: ReleaseShapeSchema.optional(),
   language: z.string().min(1),
   slug: z.string().min(1),
   artist: z.string().optional(),
@@ -1502,13 +1518,6 @@ export const ReleasePlanSchema = z.object({
   posts: z.array(ReleasePlanPostSchema).default([]),
   problems: z.object({ errors: z.array(z.string()).default([]), missing: z.array(z.string()).default([]) }).prefault({}),
 });
-
-/**
- * Which posts and files a release has (ADR 0057): a music video, a meme, an
- * episode, or a short episode – an episode whose master is at least as tall as
- * wide and whose episode track lasts at most 180 s.
- */
-export const ReleaseShapeSchema = z.enum(['music-video', 'meme', 'episode', 'short-episode']);
 
 /** `renders/release/manifest.json`: every file `release` wrote, the plan, and the open TODOs. */
 export const ReleaseManifestSchema = z.object({

@@ -472,7 +472,7 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
 
   // texts/: one file per platform, from upload.yaml plus the facts.
   let chapters: Chapter[] = [];
-  if (meme) chapters = [];
+  if (oneVideo) chapters = [];
   else if (data?.main.chapters) {
     chapters = data.main.chapters;
     const problems = timing ? chapterProblems(chapters, timing.audio.duration) : [];
@@ -480,6 +480,7 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
   } else if (timing) chapters = chaptersFromSections(timing);
   const input: ReleaseTextInput = {
     kind,
+    shape,
     language,
     slug,
     artist: identity.artist,
@@ -495,8 +496,8 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
   };
   // The calendar: the next free slots under config/release-schedule.yaml; kept times stay.
   const schedule = await loadReleaseSchedule(root);
-  // A meme is a Short, never a Premiere.
-  input.premiere = !meme && schedule.release.premiere;
+  // A meme and a short episode are Shorts, never a Premiere.
+  input.premiere = !oneVideo && schedule.release.premiere;
   input.calendar = await planCalendar(
     project.paths.root,
     calendarInput({
@@ -524,7 +525,7 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
     todos.push(...plan.problems.missing.map((field) => `${field} is missing in review/upload.yaml`));
   }
   const labels = releaseLabels(language);
-  const ics = calendarIcs([input.calendar], (calendar, event) => `${calendar.title}: ${calendarEventLabel(event, labels, input.premiere, kind)}`);
+  const ics = calendarIcs([input.calendar], (calendar, event) => `${calendar.title}: ${calendarEventLabel(event, labels, input.premiere, shape)}`);
   await writer.text('calendar.ics', ics, 'calendar', { events: input.calendar.events.length, release_date: input.calendar.release_date });
   if (data?.microsite && !meme) {
     const lyrics = existsSync(project.paths.lyrics) ? plainLyrics(await readFile(project.paths.lyrics, 'utf8')) : undefined;

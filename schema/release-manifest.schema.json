@@ -101,6 +101,15 @@
             "meme"
           ]
         },
+        "shape": {
+          "type": "string",
+          "enum": [
+            "music-video",
+            "meme",
+            "episode",
+            "short-episode"
+          ]
+        },
         "language": {
           "type": "string",
           "minLength": 1

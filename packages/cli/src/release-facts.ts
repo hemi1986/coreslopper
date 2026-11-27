@@ -11,7 +11,9 @@ import {
   loadReleaseSchedule,
   platformLimits,
   readJsonFile,
+  manifestShape,
   releaseIdentity,
+  releaseShape,
   withReleaseDefaults,
   withUrls,
   type LoadedProject,
@@ -132,8 +134,12 @@ export async function loadReleaseFacts(projectRoot: string, root: string): Promi
   const schedule = await loadReleaseSchedule(root);
   const timing = project.effectiveTiming ?? project.timing;
   const meme = kind === 'meme';
+  // The shape the release folder was built with; before the first release, the project's (ADR 0057).
+  const shape = manifest ? manifestShape(manifest, kind) : releaseShape({ kind, master: project.config.formats.master, durationSeconds: timing?.audio.duration });
+  const oneVideo = meme || shape === 'short-episode';
   const input: ReleaseTextInput = {
     kind,
+    shape,
     language,
     slug: project.config.slug,
     artist: identity.artist,
@@ -142,12 +148,12 @@ export async function loadReleaseFacts(projectRoot: string, root: string): Promi
     release: releaseFacts,
     channel,
     limits,
-    chapters: meme ? [] : (data?.main.chapters ?? (timing ? chaptersFromSections(timing) : [])),
+    chapters: oneVideo ? [] : (data?.main.chapters ?? (timing ? chaptersFromSections(timing) : [])),
     credits: meme ? await usedSoundCredits(project, root) : [],
     files,
     calendar,
-    // A meme is a Short, never a Premiere.
-    premiere: !meme && schedule.release.premiere,
+    // A meme and a short episode are Shorts, never a Premiere.
+    premiere: !oneVideo && schedule.release.premiere,
     durationSeconds: timing?.audio.duration,
   };
   const handle = channel?.links.youtube?.handle;

@@ -4,6 +4,7 @@ import {
   type ChannelConfig,
   type PlanText,
   type ReleasePlan,
+  type ReleaseShape,
   type ReleasePlanInput,
 } from '@coreslopper/core';
 
@@ -105,7 +106,17 @@ interface Labels {
   videoLink: string;
   x: { heading: string; post: string; reply: string; media: (file: string) => string; replyNote: string; short: string };
   li: { heading: string; skipped: (reason: string) => string; reason: string; post: string; hook: (n: number, limit: number) => string; media: (file: string) => string; noLinkNote: string };
-  readme: { heading: string; folders: Record<'video' | 'cover' | 'thumbnails' | 'shorts' | 'audio' | 'streaming' | 'texts', string>; order: string; steps: string[]; memeSteps: string[]; todos: string; none: string; manifest: string };
+  readme: {
+    heading: string;
+    folders: Record<'video' | 'cover' | 'thumbnails' | 'shorts' | 'audio' | 'streaming' | 'texts', string>;
+    order: string;
+    steps: string[];
+    memeSteps: string[];
+    shortEpisodeSteps: string[];
+    todos: string;
+    none: string;
+    manifest: string;
+  };
 }
 
 const EN: Labels = {
@@ -280,6 +291,10 @@ const EN: Labels = {
     memeSteps: [
       'Post the video on YouTube Shorts, TikTok, and Instagram Reels on the release day (texts/youtube.md, texts/tiktok.md, texts/instagram.md).',
       'Set the 1080x1920 cover as the cover on every platform.',
+    ],
+    shortEpisodeSteps: [
+      'Post the video on YouTube Shorts, TikTok, Instagram Reels, and X on the release day, and publish its microsite page (texts/youtube.md, texts/tiktok.md, texts/instagram.md, texts/x.md).',
+      'Set the 1080x1920 cover on YouTube and Instagram, and the 1080x1440 cover on TikTok.',
     ],
     todos: 'Open TODOs',
     none: 'None.',
@@ -460,6 +475,10 @@ const DE: Labels = {
     memeSteps: [
       'Das Video am Release-Tag auf YouTube Shorts, TikTok und Instagram Reels posten (texts/youtube.md, texts/tiktok.md, texts/instagram.md).',
       'Auf jeder Plattform das Cover 1080x1920 setzen.',
+    ],
+    shortEpisodeSteps: [
+      'Das Video am Release-Tag auf YouTube Shorts, TikTok, Instagram Reels und X posten und die Microsite-Seite veröffentlichen (texts/youtube.md, texts/tiktok.md, texts/instagram.md, texts/x.md).',
+      'Auf YouTube und Instagram das Cover 1080x1920 setzen, auf TikTok das Cover 1080x1440.',
     ],
     todos: 'Offene TODOs',
     none: 'Keine.',
@@ -700,14 +719,15 @@ export function calendarEventLabel(
   event: Pick<CalendarEvent, 'step' | 'platform' | 'item'>,
   l: Labels,
   premiere = true,
-  kind: ReleaseTextInput['kind'] = 'music-video',
+  shape: ReleaseShape = 'music-video',
 ): string {
   if (event.step === 'short') return l.cal.short(event.item, l.cal.platforms[event.platform]);
   if (event.step === 'announce') return l.cal.announce[event.platform as 'instagram' | 'youtube' | 'x'] ?? `${l.announce.heading}: ${l.cal.platforms[event.platform]}`;
   if (event.step === 'post') return l.cal.post[event.platform as 'instagram' | 'tiktok' | 'x' | 'linkedin'] ?? l.cal.platforms[event.platform];
-  if (event.step === 'youtube' && kind === 'meme') return l.cal.steps['youtube-short'];
-  // A meme's one video is its Reel; everywhere else the Reel step is the main video's (ADR 0057).
-  if (event.step === 'reel' && kind !== 'meme') return l.cal.steps['main-reel'];
+  // A meme's and a short episode's one video is its Short and its Reel; everywhere else the Reel step is the main video's (ADR 0057).
+  const oneVideo = shape === 'meme' || shape === 'short-episode';
+  if (event.step === 'youtube' && oneVideo) return l.cal.steps['youtube-short'];
+  if (event.step === 'reel' && !oneVideo) return l.cal.steps['main-reel'];
   if (event.step === 'youtube' && premiere) return l.cal.steps.premiere;
   return l.cal.steps[event.step as keyof Labels['cal']['steps']] ?? event.step;
 }
@@ -729,7 +749,7 @@ function planText(input: ReleaseTextInput, l: Labels): string {
   for (const event of calendar.events) {
     const when = calendarWhen(event.at, input.language);
     const offset = Math.round((Date.parse(`${event.at.slice(0, 10)}T12:00:00Z`) - Date.parse(`${calendar.release_date}T12:00:00Z`)) / 86_400_000);
-    lines.push(`| ${offset > 0 ? `+${offset}` : offset} | ${when.weekday} ${when.date} | ${when.time} | ${calendarEventLabel(event, l, input.premiere ?? true, input.kind)} |`);
+    lines.push(`| ${offset > 0 ? `+${offset}` : offset} | ${when.weekday} ${when.date} | ${when.time} | ${calendarEventLabel(event, l, input.premiere ?? true, input.shape ?? input.kind)} |`);
   }
   lines.push('', `_${l.plan.ics}_`);
   return `${lines.join('\n')}\n`;
@@ -793,41 +813,55 @@ function linkedinText(plan: ReleasePlan, input: ReleaseTextInput, l: Labels): st
   return `${lines.join('\n')}\n`;
 }
 
-/** The meme video's file in the folder: its one 9:16 render, or the master when the format list names it. */
+/** The one video's file in the folder (a meme or a short episode): its master, else its 9:16 render. */
 function memeFile(input: ReleaseTextInput, l: Labels): string {
   return input.files.master ?? input.files.videos?.['9x16'] ?? l.todo('renders/9x16.mp4');
 }
 
+/** The YouTube Short of a meme or a short episode; a short episode's also carries its hashtags and announcement. */
 function memeYoutubeText(plan: ReleasePlan, input: ReleaseTextInput, l: Labels): string {
   const post = postOf(plan, 'youtube');
   const title = post?.texts.title;
   const description = post?.texts.description;
   const tags = post?.texts.tags;
+  const hashtags = post?.texts.hashtags;
   const lines = [`# ${l.meme.youtube}`, '', `**${l.file}:** \`${memeFile(input, l)}\``];
   if (input.files.cover) lines.push(l.meme.cover(input.files.cover));
   lines.push('', `## ${l.title} (${counter(title, l, input.limits.youtube.title)})`, '', ...block(title?.value ?? l.todo('main.title')));
   lines.push('', `## ${l.description} (${counter(description, l, input.limits.youtube.description_bytes)})`, '', ...block(description?.value ?? l.todo('main.description')));
+  if (hashtags?.value) lines.push('', `## ${l.hashtagsComma}`, '', ...block(hashtags.value));
   lines.push('', `## ${l.tags} (${counter(tags, l, input.limits.youtube.tags)})`, '', ...block(tags?.value ?? l.todo('main.tags')));
+  const announcement = valueOf(plan, 'announce:youtube', 'text');
+  if (announcement) lines.push('', `## ${l.announce.heading}`, '', announceImageLine(input, l), '', ...block(display(announcement, l)));
   lines.push('', `## ${l.checklist}`, '', checkbox(l.meme.visibility), checkbox(l.yt.synthetic(post?.syntheticMedia ?? plan.settings.youtubeSynthetic)), checkbox(l.yt.kids(post?.madeForKids ?? false)));
   return `${lines.join('\n')}\n`;
 }
 
-function memeTiktokText(plan: ReleasePlan, input: ReleaseTextInput, l: Labels): string {
+/** The TikTok post of a meme or a short episode; a short episode has its own text and TikTok cover. */
+function memeTiktokText(plan: ReleasePlan, input: ReleaseTextInput, l: Labels, missing = 'main.description'): string {
   const caption = postOf(plan, 'tiktok')?.texts.caption;
   const lines = [`# ${l.meme.tiktok}`, '', `**${l.file}:** \`${memeFile(input, l)}\``];
-  if (input.files.cover) lines.push(l.tt.coverUpload(input.files.cover));
-  lines.push('', `### ${l.description} (${counter(caption, l, input.limits.tiktok.caption)})`, '', ...block(caption?.value ?? l.todo('main.description')));
+  const cover = input.files.tiktokCover ?? input.files.cover;
+  if (cover) lines.push(l.tt.coverUpload(cover));
+  lines.push('', `### ${l.description} (${counter(caption, l, input.limits.tiktok.caption)})`, '', ...block(caption?.value ?? l.todo(missing)));
   lines.push('', `### ${l.tt.settings}`, '', checkbox(l.tt.visibility));
   if (plan.settings.tiktokAiLabel) lines.push(checkbox(l.tt.aiLabel));
   return `${lines.join('\n')}\n`;
 }
 
-function memeInstagramText(plan: ReleasePlan, input: ReleaseTextInput, l: Labels): string {
+/** The Reel of a meme or a short episode; a short episode has its own text and, optionally, the announcement story. */
+function memeInstagramText(plan: ReleasePlan, input: ReleaseTextInput, l: Labels, missing = 'main.description'): string {
   const caption = postOf(plan, 'instagram')?.texts.caption;
   const lines = [`# ${l.meme.instagram}`, '', `**${l.file}:** \`${memeFile(input, l)}\``];
   if (input.files.cover) lines.push(l.meme.cover(input.files.cover));
+  const announcement = postOf(plan, 'announce:instagram');
+  if (announcement) {
+    const story = announcement.texts.caption;
+    lines.push('', `## ${l.announce.heading} (${l.ig.story})`, '', announceImageLine(input, l));
+    if (story) lines.push('', `### ${l.ig.storyCaption} (${counter(story, l, input.limits.instagram.story_caption)})`, '', ...block(display(story.value, l)));
+  }
   const note = hashtagNote(caption, l);
-  lines.push('', `### ${l.ig.caption} (${counter(caption, l, input.limits.instagram.caption)}${note ? `, ${note}` : ''})`, '', ...block(caption?.value ?? l.todo('main.description')));
+  lines.push('', `### ${l.ig.caption} (${counter(caption, l, input.limits.instagram.caption)}${note ? `, ${note}` : ''})`, '', ...block(caption?.value ?? l.todo(missing)));
   lines.push('', `### ${l.checklist}`, '', checkbox(l.ig.cover(undefined)));
   if (plan.settings.instagramAiLabel) lines.push(checkbox(l.ig.aiLabel));
   return `${lines.join('\n')}\n`;
@@ -836,12 +870,13 @@ function memeInstagramText(plan: ReleasePlan, input: ReleaseTextInput, l: Labels
 /** The README of the release folder: what lies where, the order, and the open TODOs. */
 export function readmeText(input: ReleaseTextInput, todos: string[]): string {
   const l = releaseLabels(input.language);
+  const oneVideo = input.kind === 'meme' || input.shape === 'short-episode';
   const folders = (
-    input.kind === 'meme'
+    oneVideo
       ? (['video', 'cover', 'texts'] as const)
       : (['video', 'thumbnails', 'shorts', ...(input.kind === 'music-video' ? (['audio', 'streaming'] as const) : []), 'texts'] as const)
   ).map((folder) => `- \`${folder}/\` — ${l.readme.folders[folder]}`);
-  const steps = input.kind === 'meme' ? l.readme.memeSteps : input.kind === 'music-video' ? l.readme.steps : l.readme.steps.slice(1);
+  const steps = input.kind === 'meme' ? l.readme.memeSteps : input.shape === 'short-episode' ? l.readme.shortEpisodeSteps : input.kind === 'music-video' ? l.readme.steps : l.readme.steps.slice(1);
   const lines = [
     `# ${l.readme.heading} — ${input.artist ? `${input.artist} – ` : ''}${input.title}`,
     '',
@@ -868,6 +903,16 @@ export function releaseTexts(plan: ReleasePlan, input: ReleaseTextInput): Record
       'youtube.md': memeYoutubeText(plan, input, l),
       'tiktok.md': memeTiktokText(plan, input, l),
       'instagram.md': memeInstagramText(plan, input, l),
+      'release-plan.md': planText(input, l),
+    };
+  }
+  // A short episode is one video on five platforms: YouTube Shorts, TikTok, Instagram Reels, X and the microsite (ADR 0057).
+  if (input.shape === 'short-episode') {
+    return {
+      'youtube.md': memeYoutubeText(plan, input, l),
+      'tiktok.md': memeTiktokText(plan, input, l, 'tiktok in review/upload.yaml'),
+      'instagram.md': memeInstagramText(plan, input, l, 'instagram in review/upload.yaml'),
+      'x.md': xText(plan, input, l),
       'release-plan.md': planText(input, l),
     };
   }
