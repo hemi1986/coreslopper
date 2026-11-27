@@ -1,6 +1,6 @@
 # Thumbnails
 
-Three YouTube thumbnails per video, made after the master passes. You choose the stills and the words; `npm run cli -- thumbnail` composes the pixels, so the same inputs always give the same JPEG. The vertical thumbnails of the Shorts follow the same rules with `--format 9x16`, their TikTok covers with `--format 3x4`, the streaming cover with `--format 1x1`; [release.md](release.md) covers when to make them.
+Three YouTube thumbnails per main video, made after the master passes; a vertical episode over 3 minutes gets one (#1), a short episode none ([release.md](release.md) names each shape's images). You choose the stills and the words; `npm run cli -- thumbnail` composes the pixels, so the same inputs always give the same JPEG. The vertical thumbnails of the Shorts follow the same rules with `--format 9x16`, their TikTok covers with `--format 3x4`, the streaming cover with `--format 1x1`; [release.md](release.md) covers when to make them.
 
 ## The three thumbnails
 
@@ -61,8 +61,8 @@ The 3000x3000 cover goes to Spotify, Apple Music, and every other store, and is 
 - `--text "<ARTIST>|<TITLE>"`: artist and title only. URLs, handles, prices, platform names and logos, and the tag are refused by the command and by the stores.
 - The layout is fixed: the image above, artist and title centred below, untilted. The command writes an RGB JPEG of exactly 3000x3000.
 - The art director checks it like a thumbnail and also at 64x64: the image still reads, the text may blur, nothing looks like a logo.
-- `release` composes the announcement images (with the release date), the release-day story, and the 4:5 feed image from the cover's recipe, so the cover's still carries the whole campaign: pick it for that too.
+- `release` composes the announcement images (with the release date) and the release-day story from the cover's recipe, so the cover's still carries the whole campaign: pick it for that too.
 
 ## Completion
 
-Three JPEGs in `renders/thumbnails/`, three different subjects, each passed by the art director, and `npm run cli -- qa` reports `Thumbnails: PASS`. For the cover: `renders/cover-3000x3000.jpg` passed by the art director, and `Release cover: PASS` after `release`.
+Three JPEGs in `renders/thumbnails/` (one for a vertical episode over 3 minutes), three different subjects, each passed by the art director, and `npm run cli -- qa` reports `Thumbnails: PASS`. For the cover: `renders/cover-3000x3000.jpg` passed by the art director, and `Release cover: PASS` after `release`.

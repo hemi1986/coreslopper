@@ -76,7 +76,7 @@ export function calendarInput(options: {
   durationSeconds?: number;
 }): CalendarInput {
   const { data } = options;
-  // A meme is posted, not announced, and has no feed post, X, LinkedIn, or microsite: it has three platform texts.
+  // A meme is posted, not announced, and has no main-video Reel, X, LinkedIn, or microsite: it has three platform texts.
   const meme = options.kind === 'meme';
   const shortEpisode = options.shape === 'short-episode';
   const shorts = (shortEpisode ? [] : options.shorts).map((name) => {

@@ -20,7 +20,10 @@ export type AutopilotAction =
   | { kind: 'youtube'; item: string }
   /** A Short to TikTok: an inbox draft, or a direct post for an audited app. */
   | { kind: 'tiktok'; item: string }
-  /** A Reel (Short), the feed post (`main`), or the announcement story. */
+  /**
+   * A Reel (a Short's, a one video's, or the main video's `instagram-post`) or the announcement story.
+   * `feed` is the `post` step of calendars written before ADR 0057; with a video it is posted as a Reel too.
+   */
   | { kind: 'instagram'; placement: 'reel' | 'feed' | 'story'; item: string }
   /** The announcement (`announcement`), the release post (`main`), or a Short. */
   | { kind: 'x'; item: string }
@@ -108,6 +111,7 @@ export function autopilotAction(event: CalendarEvent, settings: Pick<AutopilotSe
   if (platform === 'tiktok' && step === 'post') return { kind: 'tiktok', item: 'main' };
   if (platform === 'instagram' && step === 'short') return { kind: 'instagram', placement: 'reel', item };
   if (platform === 'instagram' && step === 'reel') return { kind: 'instagram', placement: 'reel', item };
+  // An older calendar's `post` step: the main video, which Instagram shares as a Reel (no plain feed video, ADR 0057).
   if (platform === 'instagram' && step === 'post') return { kind: 'instagram', placement: 'feed', item: 'main' };
   // The announcement story needs no link; the release-day story does, and the API cannot add a link sticker.
   if (platform === 'instagram' && step === 'announce') return { kind: 'instagram', placement: 'story', item: 'announcement' };

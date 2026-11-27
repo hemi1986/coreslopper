@@ -20,7 +20,7 @@ Everything else of the release, including the files and texts for Instagram, Spo
 
 ## What it reads and writes
 
-- **`review/upload.yaml`** — the upload data `qa-export` writes ([schema](../schema/upload.schema.json)): per item the file, title, description, tags, hashtags, thumbnail, language, `made_for_kids` (default `false`), `synthetic_media` (default `true`), and `platforms` (main: `[youtube]`, Shorts: `[youtube, tiktok]`). Shorts carry `related: main`. `npm run cli -- upload-text projects/<slug>` renders `review/upload.md` from it.
+- **`review/upload.yaml`** — the upload data `qa-export` writes ([schema](../schema/upload.schema.json)): per item the file, title, description, tags, hashtags, thumbnail, language, `made_for_kids` (default `false`), `synthetic_media` (default `true`), and `platforms` (main: `[youtube]`, Shorts: `[youtube, tiktok]`). Shorts carry `related: main`. A short episode is one video: `publish` uploads only `main`, as a YouTube Short and to TikTok whatever `main.platforms` says, and leaves the `shorts` entries out; it gets no Premiere step and no pinned comment. `npm run cli -- upload-text projects/<slug>` renders `review/upload.md` from it.
 - **`review/publish.json`** — the publish log: one entry per attempt with platform, item, file hash, remote ID, URL, status (`uploaded`, `scheduled`, `draft`, `processing`, `failed`), and time. A file that is already uploaded to a platform is skipped; a new render (new hash) or `--force` uploads again. A failed attempt is retried on the next run, unless it may have gone out anyway: when the answer was lost after the last byte of the video was sent, the entry carries `uncertain: true`, and `publish` skips it until you have checked the platform and run it again with `--force`.
 
 ## What happens per platform
@@ -125,9 +125,10 @@ npm run cli -- release-run --dry-run    # what is due now; posts nothing
 
 | Calendar event | By the autopilot | Still yours |
 |---|---|---|
-| Main video, Shorts on YouTube | Uploaded `youtube_ahead_hours` (24) before their time: private, or scheduled once `youtube_audited: true`. When the main video is public, its pinned comment is posted. | Without the audit: switch it public in Studio at its time. A Premiere is always set in Studio. Pin the comment; set the related video of each Short. |
+| Main video, Shorts on YouTube | Uploaded `youtube_ahead_hours` (24) before their time: private, or scheduled once `youtube_audited: true`. When the main video is public, its pinned comment is posted (not for a short episode or a meme: their one video is a Short). | Without the audit: switch it public in Studio at its time. A Premiere is always set in Studio, for a main video only. Pin the comment; set the related video of each Short. |
+| A short episode's or a meme's video on TikTok | A draft in the inbox at its time, like a Short. | Post the draft from the app. |
 | Shorts on TikTok | A draft in the inbox at its time; a public post with `tiktok_direct` after the audit. | Post the draft from the app (cover, sound). |
-| Instagram Reels, feed post, announcement story | Posted at their time with caption, cover frame, and the AI info label. | The release-day story (it needs the link sticker). |
+| Instagram Reels (of the Shorts, of a short episode or meme, and of a main video of at most 3 minutes), announcement story | Posted at their time with caption, cover frame, and the AI info label. | The release-day story (it needs the link sticker). |
 | X: announcement, release post, Shorts | Posted with the teaser, the main video, a Short, or an image; the release post's reply, when it has one, carries the YouTube link. | — |
 | LinkedIn | Posted with the video and the YouTube link. | — |
 | The day after: links | The Spotify link appended to the YouTube description. | Enter the Spotify link on the board (Spotify tab, "Song"); add it to the pinned comment if you want it there. |
@@ -224,7 +225,7 @@ The autopilot posts the release's LinkedIn post on your personal profile: the te
 
 ### Instagram
 
-The autopilot posts Reels, the feed post, and the announcement story to your own Instagram account through the **Instagram API with Instagram Login** (host `graph.instagram.com`). For your own account the app stays in development mode with Standard Access: no App Review, no business verification. Review (Advanced Access) is only needed to post for accounts you do not own or manage.
+The autopilot posts Reels and the announcement story to your own Instagram account through the **Instagram API with Instagram Login** (host `graph.instagram.com`). For your own account the app stays in development mode with Standard Access: no App Review, no business verification. Review (Advanced Access) is only needed to post for accounts you do not own or manage.
 
 1. **Professional account.** In the Instagram app: Settings → Account type and tools → switch to a **Creator** or **Business** account. The account must be **public**. No Facebook Page is needed for Instagram Login.
 2. **Meta app.** At [developers.facebook.com/apps](https://developers.facebook.com/apps) create an app and add the use case **Manage messaging & content on Instagram** ("Instagram API with Instagram Login"). Leave it in **development mode**.
@@ -248,7 +249,8 @@ The autopilot posts Reels, the feed post, and the announcement story to your own
 | Calendar event | Instagram |
 |---|---|
 | Reel of a Short (`short:<name>:instagram`) | `media_type=REELS`, caption, `share_to_feed=true`, cover frame from `cover_frame` (`thumb_offset`, ms) |
-| Feed post (`instagram-post`) | the 4:5 or 1:1 render as a Reel shared to the grid, or the 4:5 image (`image_url`) |
+| The main video's Reel (`instagram-post`), only for a main video of at most 3 minutes | the best vertical render (9:16, 4:5, 1:1) as a Reel shared to the grid; Instagram has no plain feed video |
+| A short episode's or a meme's Reel (`instagram`) | its one video as a Reel shared to the grid |
 | Announcement story (`announce:instagram`) | `media_type=STORIES` with the announcement image |
 
 Every post carries the **AI info** label (`is_ai_generated=true`, available since June 2026); it can only be set when the post is created.

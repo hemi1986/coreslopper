@@ -23,7 +23,7 @@ Ask in one round, with a recommended answer for each:
 
 - **Title** and **slug** (lowercase, digits, dashes).
 - **Series budget in USD**. Mandatory; never invent it. It covers the canon generations of this skill plus every episode's budget; `new --kind episode` refuses an episode that does not fit.
-- **Master format**: `9x16`, `16x9`, `1x1`, or `4x5`.
+- **Master format**: `9x16`, `16x9`, `1x1`, or `4x5`. The format and the episode length decide how an episode is released: a vertical or square episode of up to 3 minutes is a short episode, one video on YouTube Shorts, TikTok, Instagram Reels, and X; a 16:9 episode keeps its main video (ADR 0057).
 - **Providers**: images and clips (`mock`, `fal`, `higgsfield`, `comfyui`; check `npm run cli -- doctor`), and audio (`comfyui` for generated speech, or `mock` when the user records every line).
 - **Brand kit** (default `example`).
 
