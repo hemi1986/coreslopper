@@ -9,6 +9,7 @@ import {
   buildCalendar,
   loadReleaseSchedule,
   mainVideoReel,
+  postsVerticalVersion,
   releasedPublicly,
   zonedToday,
   readYamlFile,
@@ -141,18 +142,21 @@ export async function runCalendar(options: {
   }
   const data = existsSync(uploadPaths(project.paths.root).data) ? await loadUploadData(project.paths.root) : undefined;
   const identity = releaseIdentity(project.config, await songJson(project));
-  const shorts = (await listShorts(project.paths.renders)).map((file) => shortName(file)!).filter(Boolean);
+  const duration = (project.effectiveTiming ?? project.timing)?.audio.duration;
+  const vertical = postsVerticalVersion({ kind: project.config.kind, master: project.config.formats.master, durationSeconds: duration });
+  // A horizontal episode up to 3 minutes posts its vertical version, named by the slug, instead of its cut Shorts (ADR 0057).
+  const shorts = vertical ? [project.config.slug] : (await listShorts(project.paths.renders)).map((file) => shortName(file)!).filter(Boolean);
   const calendar = await planCalendar(
     project.paths.root,
     calendarInput({
       slug: project.config.slug,
       title: identity.title,
       kind: project.config.kind,
-      shape: releaseShape({ kind: project.config.kind, master: project.config.formats.master, durationSeconds: (project.effectiveTiming ?? project.timing)?.audio.duration }),
+      shape: releaseShape({ kind: project.config.kind, master: project.config.formats.master, durationSeconds: duration }),
       releaseDate: project.config.release?.release_date,
       data,
       shorts,
-      durationSeconds: (project.effectiveTiming ?? project.timing)?.audio.duration,
+      durationSeconds: duration,
     }),
     { root: options.root, now: options.now ?? new Date(), replan: options.replan },
   );

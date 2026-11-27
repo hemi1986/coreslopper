@@ -28,6 +28,8 @@ import {
   releaseTodos,
   releasedPublicly,
   releaseShape,
+  postsVerticalVersion,
+  SHORT_FORM_MAX_SECONDS,
   loadDefaults,
   repoRoot,
   resolveAnchor,
@@ -39,6 +41,7 @@ import {
   writeTextAtomic,
   type Chapter,
   type LoadedProject,
+  type Timing,
   type ReleaseFile,
   type ReleaseFileKind,
   type ReleaseManifest,
@@ -212,6 +215,56 @@ class ReleaseWriter {
   }
 }
 
+/** The format of a horizontal episode's vertical version. */
+const VERTICAL_VERSION_FORMAT = '9x16';
+
+/**
+ * Place a horizontal episode's vertical version – the 9:16 render of the whole
+ * episode – as its one Short `shorts/<slug>-9x16.mp4`, named by the slug, with
+ * the vertical cover as its thumbnail and the TikTok cover (ADR 0057). Without
+ * a current 9:16 render it keeps the earlier copy (HS-167) and the format loop
+ * has reported the TODO; a project without a 9:16 format gets a TODO.
+ */
+async function placeVerticalVersion(input: {
+  writer: ReleaseWriter;
+  project: LoadedProject;
+  slug: string;
+  source: string | undefined;
+  timing: Timing | undefined;
+  deps: ReleaseDeps;
+  todos: string[];
+}): Promise<ReleaseTextInput['files']['shorts']> {
+  const { writer, project, slug, source, timing, deps, todos } = input;
+  const entry: ReleaseTextInput['files']['shorts'][number] = { name: slug, video: `shorts/${slug}-9x16.mp4` };
+  if (source) {
+    await writer.place(source, entry.video, 'short', {
+      aspect: '9:16',
+      maxSeconds: SHORT_FORM_MAX_SECONDS,
+      wholeEpisode: true,
+      duration: timing?.audio.duration,
+      measured: videoFacts(deps.probe(source)),
+    });
+  } else {
+    const earlier = await writer.unchanged(entry.video, (file) => file.kind === 'short');
+    if (earlier) writer.keep(earlier);
+    if (!projectFormats(project).some((format) => format.id === VERTICAL_VERSION_FORMAT)) {
+      todos.push('the vertical version needs a 9:16 render: add 9:16 to formats.derivatives in project.yaml');
+    }
+    if (!earlier) return [];
+  }
+  const thumbnail = join(project.paths.root, VERTICAL_COVER_SOURCE);
+  if (existsSync(thumbnail)) {
+    entry.thumbnail = `shorts/${slug}-thumb.jpg`;
+    await writer.place(thumbnail, entry.thumbnail, 'short-thumbnail', { width: 1080, height: 1920 });
+  } else todos.push(`${VERTICAL_COVER_SOURCE} is missing: compose the vertical version's thumbnail with thumbnail --format 9x16 --out ${VERTICAL_COVER_SOURCE}`);
+  const tiktok = join(project.paths.root, TIKTOK_COVER_SOURCE);
+  if (existsSync(tiktok)) {
+    entry.tiktokCover = `shorts/${slug}-tiktok.jpg`;
+    await writer.place(tiktok, entry.tiktokCover, 'tiktok-cover', { width: 1080, height: 1440 });
+  } else todos.push(`${TIKTOK_COVER_SOURCE} is missing: compose the vertical version's TikTok cover with thumbnail --format 3x4 --out ${TIKTOK_COVER_SOURCE}`);
+  return [entry];
+}
+
 /** song.json as written by setup and import-song; empty when missing or unreadable. */
 export async function songJson(project: LoadedProject): Promise<Record<string, unknown>> {
   try {
@@ -277,6 +330,8 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
   // A short episode is one video, as a meme is: no main video, thumbnails or Shorts (ADR 0057).
   const shortEpisode = shape === 'short-episode';
   const oneVideo = meme || shortEpisode;
+  // A horizontal episode up to 3 minutes posts its vertical version as its one Short, not cut Shorts (ADR 0057).
+  const verticalVersion = postsVerticalVersion({ kind, master: project.config.formats.master, durationSeconds: timing?.audio.duration });
   const usedSounds = meme ? await usedLibrarySounds(project, root) : [];
   const credits = usedSounds.map((sound) => sound.credit).filter((credit): credit is string => Boolean(credit));
   const dir = releaseDir(project.paths.root);
@@ -307,6 +362,8 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
   // video/: every configured format, rendered only when missing or stale; a short episode's one master.
   const files: ReleaseTextInput['files'] = { thumbnails: [], shorts: [] };
   const formats = projectFormats(project);
+  // The vertical version's source: the 9:16 render placed by this run, if it was current or rendered.
+  let verticalSource: string | undefined;
   for (const format of shortEpisode ? formats.slice(0, 1) : formats) {
     const rel = `renders/${format.id}.mp4`;
     const source = join(project.paths.root, rel);
@@ -344,6 +401,7 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
     if (recordedFile && recordedFile !== hash) warnings.push(`${rel} differs from the render recorded in state.json`);
     if (format.id === formatId(project.config.formats.master.aspect)) files.master = path;
     files.videos = { ...files.videos, [format.id]: path };
+    if (format.id === VERTICAL_VERSION_FORMAT) verticalSource = source;
   }
 
   // Subtitles: the episode's English subtitles, or a music video's lyrics as SRT. A meme has its subtitles burned in.
@@ -382,8 +440,11 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
     } else todos.push(`${TIKTOK_COVER_SOURCE} is missing: compose it with thumbnail --format 3x4 --out ${TIKTOK_COVER_SOURCE}`);
   }
 
+  // shorts/: the vertical version as the one Short, with the vertical cover as its thumbnail and the TikTok cover.
+  if (verticalVersion) files.shorts.push(...(await placeVerticalVersion({ writer, project, slug, source: verticalSource, timing, deps, todos })));
+
   // shorts/: each Short with its vertical thumbnail. A meme and a short episode are one video, not a set of Shorts.
-  if (!oneVideo) {
+  if (!oneVideo && !verticalVersion) {
     const shorts = await listShorts(project.paths.renders);
     for (const video of shorts) {
       const name = shortName(video)!;
