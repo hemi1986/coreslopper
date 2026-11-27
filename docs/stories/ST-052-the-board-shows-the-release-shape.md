@@ -23,6 +23,9 @@ Read model `RM-ReleaseBoard` (`docs/domain/events.yaml`). Decided by the user on
 - The tabs show only the platforms the shape has posts on: a short episode shows YouTube, TikTok, Instagram, X and
   Microsite, and no Spotify or LinkedIn.
 - A short episode's YouTube post is headed "Short" and shows the cover, title, description and hashtags (ST-043 form).
+- A short episode's TikTok and Instagram tabs show its one video's posts from the plan (TikTok: caption, hashtags,
+  cover; Instagram: the Reel), and no Story card for a story the plan does not have (marathon 2026-11-27-2, ST-048
+  review; decided by recommendation, delegated by the user).
 - The wording follows the glossary: `_UI (de)_: Short-Folge`, `_UI (en)_: Short episode`.
 
 ## Acceptance Criteria
@@ -30,3 +33,4 @@ Read model `RM-ReleaseBoard` (`docs/domain/events.yaml`). Decided by the user on
 - [ ] A vertical episode of 192 s shows "Episode · 9:16 · 3:12 · over 3 min" (test)
 - [ ] A short episode's board data has no Spotify and no LinkedIn tab (test)
 - [ ] A music video's release view shows no shape line
+- [ ] A short episode's TikTok and Instagram tabs show the plan's posts, and no Story card (test)

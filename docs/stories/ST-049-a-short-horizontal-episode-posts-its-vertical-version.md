@@ -30,6 +30,10 @@ YouTube publishes a 16:9 video as long-form even at under 3 minutes (F12 in
   stale like every format, and placed as `shorts/<slug>-9x16.mp4` with its 1080x1920 thumbnail and TikTok cover.
 - It is the episode's one Short: its YouTube Shorts, TikTok, Reel and X posts. Shorts cut from the episode are not
   placed in the folder.
+- "Up to 3 minutes" is one core rule with a tolerance of 0.05 s – the one `publish` already uses for a Short – shared
+  by this path, the release shape (`SHORT_EPISODE_MAX_SECONDS`), the main video's Reel (`MAIN_REEL_MAX_SECONDS`) and
+  `publish`, so a track that reads "3:00" (180.02 s) is treated alike everywhere (marathon 2026-11-27-2 reviews,
+  decided by recommendation).
 - The main video keeps its three 16:9 thumbnails and its posts.
 - The upload data's one Short entry carries the vertical version's texts.
 
