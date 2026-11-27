@@ -237,7 +237,7 @@ A grid of the storyboard's shots for a fast visual review on the board: per shot
 _Avoid_: thumbnail sheet, shot overview
 
 **Thumbnail**:
-The composed image that represents a finished video on a platform such as YouTube: a generated image with the hook on solid slabs. The main video gets three 1280x720 thumbnails of different subjects, and the user picks one; each Short gets one at 1080x1920.
+The composed image that represents a finished video on a platform such as YouTube: a generated image with the hook on solid slabs. Its format follows the video it represents: a horizontal main video gets three 1280x720 thumbnails of different subjects, and the user picks one; a vertical main video gets one; each Short and each **Short Episode** gets one at 1080x1920.
 _Avoid_: poster, cover, preview image
 
 **Composed Image**:
@@ -245,7 +245,7 @@ An image the `thumbnail` command makes from a generated image, the hook, and the
 _Avoid_: graphic, artwork
 
 **Short**:
-A vertical excerpt of the finished video for YouTube Shorts and similar feeds: 9:16, 30–50 s (never over 60 s), cut from the current 9:16 render on section boundaries with a short fade in and out, stored as `renders/shorts/<name>-9x16.mp4`. The agent picks the excerpts. Each video gets three.
+A vertical excerpt of the finished video for YouTube Shorts and similar feeds: 9:16, 30–50 s (never over 60 s), cut from the current 9:16 render on section boundaries with a short fade in and out, stored as `renders/shorts/<name>-9x16.mp4`. The agent picks the excerpts. A video over 3 minutes gets three; a horizontal episode of at most 3 minutes posts its **Vertical Version** instead, and a **Short Episode** gets none.
 _Avoid_: clip (an AI clip is a generated shot), teaser, reel
 
 **Upload Data**:
@@ -255,6 +255,10 @@ _Avoid_: metadata, upload manifest
 **Upload Text**:
 `review/upload.md`: the main video and the Shorts of the upload data rendered for people, with a pointer to the release folder. It is generated, never edited by hand.
 _Avoid_: metadata, copy, upload package (the **Release Package** is everything to upload)
+
+**Release Shape**:
+Which posts and files a release has: a music video, a meme, an episode, or a **Short Episode**. It is derived from the project's kind, its master's format, and its length, recorded in the release manifest, and kept once a post is ticked off or has a live URL.
+_Avoid_: release path, release type, release mode
 
 **Release Package**:
 Everything a finished song and video need to be published, collected in the **Release Folder**: every format, thumbnails, Shorts, the song as WAV, cover, canvas, lyrics, the platform texts, and the release plan.
@@ -665,6 +669,16 @@ _Avoid_: constraint, max duration
 **Episode**:
 One installment of a series: a project of kind `episode` with a number, a script, and its own budget. It copies the series' formats, providers, and brand once, when it is created.
 _Avoid_: part, chapter
+
+**Short Episode**:
+An episode whose master is at least as tall as wide (9:16, 4:5, 1:1) and whose episode track lasts at most 180 seconds. It is released as one video on YouTube Shorts, TikTok, Instagram Reels, X, and the microsite, with no main video and no Shorts cut from it, and with assets in its own format.
+_Avoid_: vertical episode, mini episode, Short (a Short is an excerpt)
+_UI (de)_: Short-Folge
+_UI (en)_: Short episode
+
+**Vertical Version**:
+The 9:16 render of a whole horizontal episode of at most 180 seconds. It is that episode's one Short on YouTube Shorts, TikTok, Instagram Reels, and X, beside the horizontal main video.
+_Avoid_: vertical cut, Short (a Short is an excerpt)
 
 **Script**:
 The authoritative text of an episode or a meme: its scenes and their script lines, in playing order. It is to an episode or a meme what lyrics are to a music video.
