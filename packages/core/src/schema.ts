@@ -1503,10 +1503,19 @@ export const ReleasePlanSchema = z.object({
   problems: z.object({ errors: z.array(z.string()).default([]), missing: z.array(z.string()).default([]) }).prefault({}),
 });
 
+/**
+ * Which posts and files a release has (ADR 0057): a music video, a meme, an
+ * episode, or a short episode – an episode whose master is at least as tall as
+ * wide and whose episode track lasts at most 180 s.
+ */
+export const ReleaseShapeSchema = z.enum(['music-video', 'meme', 'episode', 'short-episode']);
+
 /** `renders/release/manifest.json`: every file `release` wrote, the plan, and the open TODOs. */
 export const ReleaseManifestSchema = z.object({
   version: z.literal(1),
   project: z.string().min(1),
+  /** The release shape this run derived; a manifest without it reads as its project kind (`manifestShape`). */
+  shape: ReleaseShapeSchema.optional(),
   generated_at: z.string().min(1),
   files: z.array(ReleaseFileSchema).default([]),
   plan: ReleasePlanSchema.optional(),
@@ -1841,3 +1850,4 @@ export type ReleasePlan = z.infer<typeof ReleasePlanSchema>;
 export type ReleaseFile = z.infer<typeof ReleaseFileSchema>;
 export type ReleaseFileKind = z.infer<typeof ReleaseFileKindSchema>;
 export type ReleaseManifest = z.infer<typeof ReleaseManifestSchema>;
+export type ReleaseShape = z.infer<typeof ReleaseShapeSchema>;
