@@ -93,7 +93,7 @@ Keep this block short: it is loaded into every session. Put rules into the skill
 - **Layout:** `packages/` (4), `scripts/` (2)
 - **Detail:** `docs/architecture/repo-map.md` – package list, dependency edges, consumers, adoption ranking.
 - **Concept slices:** `pose` (cli, core, scripts, tests), `episode` (cli, core, tests), `generate` (cli, scripts, tests), `sery` (cli, tests), `clip` (cli, tests) – candidates for `/adopt`, not confirmed domains.
-- **Adopted slices:** `packages/remotion`, concept `timing`, concept `release`, concept `thumbnail`, concept `bench`, concept `review`, concept `media`, concept `board`, concept `publish`, concept `character`, concept `render`. Everything else is **not adopted**: run `/adopt` before inferring domain there.
+- **Adopted slices:** `packages/remotion`, concept `timing`, concept `release`, concept `thumbnail`, concept `bench`, concept `review`, concept `media`, concept `board`, concept `publish`, concept `character`, concept `render`, concept `pipeline`, concept `verdict`, concept `storyboard`, concept `generation`, concept `series`, concept `workspace`. Everything else is **not adopted**: run `/adopt` before inferring domain there.
 
 ## Commands
 

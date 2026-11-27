@@ -1,7 +1,7 @@
 {
   "tool": "kataster",
-  "version": "0.7.0",
-  "installedAt": "2026-11-26T21:55:10.849Z",
+  "version": "0.7.1",
+  "installedAt": "2026-11-27T21:02:03.091Z",
   "files": {
     ".claude/agents/acceptance-tester.md": "1c4207ea243f1e0160e14b2e2627a32fda22bd630238219b4ec142827cdb9712",
     ".claude/agents/code-reviewer.md": "fedbae05b8f6426cd3e9f6f8312a9edf9ddf523723d89bbd52d232919304770d",
@@ -32,7 +32,7 @@
     ".claude/lib/discovery.ts": "136b0069342febf19222069079c51e8fc50ee7adf76c47b3c82ae3ec3eb38c79",
     ".claude/lib/engineering.ts": "299153067fc4f987f93355807ff6be3b4dc8c26b12a28156e228324e8c236651",
     ".claude/lib/gaps.ts": "4cd24629d962d05c860673a53b202e1c7803f55184bc39a937f6c587c3639340",
-    ".claude/lib/git.ts": "b46cda51fe909553a1abce845a51a062aaef6680d0524dbe4a9c877dd08d7b5e",
+    ".claude/lib/git.ts": "0952c7e3b6309eac00434ba27558bbaa93f71441f091885068812bec9c6b1fbf",
     ".claude/lib/glob.ts": "eca83ee80ad01f593a37aa63871f88d8e9fee73bb5a498d7d63343e63d212846",
     ".claude/lib/lease.ts": "2aa59bb4b4a6a5c8aadddc6e63c15a1d5bbcfcc9bfbcbf3b8ef8994999452c0e",
     ".claude/lib/marathon.ts": "38eb27cddef2dffd650bc117f6f218cf1d7b40b865f57ee8e501469e1d5bbbb1",
@@ -44,10 +44,10 @@
     ".claude/lib/metrics.ts": "fb679e83e541898e7eed83e492db27ec3476f6c220f2a124cde9083c66e8fa31",
     ".claude/lib/nx.ts": "58500892fa5737dc3e713e2bdca9593e5dd301e5e889f364596ede126e08caed",
     ".claude/lib/permission-rules.ts": "cb31c8a221382df94c2d8a7a2b6b0a3ef2e88b4b1f9809636a7592cbefe9e18b",
-    ".claude/lib/repo.ts": "5f741c935f430584a0b2830ce952b3c8ffd30e9e39613cfe496920496be2ec9d",
+    ".claude/lib/repo.ts": "b1e4410e97ce951ba876a54ae998a5b1d48ff0128bf717d339444daa5e007f79",
     ".claude/lib/research.ts": "89de24d5a1346fcb7f13937a6fb163ae6bdb39a1fba658d25a248babf36805eb",
     ".claude/lib/shell.ts": "5635240fea514527d132e721fa6581f8f7ac7622db0b0d71f6eb1cf7750f18cf",
-    ".claude/lib/slices.ts": "f0821d1afb829522daa5b15830e703f87e34e2e67c9ecdc5125526c6e914c040",
+    ".claude/lib/slices.ts": "48da1bdb644d7794e899b387d2b01799d47326acaea2d1fcded817d3ef094497",
     ".claude/lib/toolgraph.ts": "cd0e4de666d6fa56fe5698984ca909378d17a9e87504174b487adf1f52d5fb2b",
     ".claude/lib/turbo.ts": "abd37ae5a57860b331bd1ddeb8b971a686289602f5e7517fbac3dd1e72206c26",
     ".claude/lib/worker.ts": "110b32c86dada1edcc1f0d55381a2ce210cc21d09e39e2e4765c7b49c26deaed",
@@ -57,7 +57,7 @@
     ".claude/skills/adopt/scripts/boundary-check.ts": "d647a2dd9e82a14d9dccde28b1cdaa7b78a9169a642eeaca8e4e4d2461422274",
     ".claude/skills/adopt/scripts/gap-register.ts": "cdfd45c31af3921e3d2d2c36ac610a1561d73c39a0a533418cc701ce5e056edf",
     ".claude/skills/adopt/scripts/package-doc.ts": "778e9ebc1025944e0287aa0f00fd7eb33381bd6885ca348fe73c1cf38390edb7",
-    ".claude/skills/adopt/scripts/repo-map.ts": "72ffe11c603e1e784ff526cfed21f64441811bbe1890dcdff2f7720bdbc02f32",
+    ".claude/skills/adopt/scripts/repo-map.ts": "8d0c4cbbae4e646dbe1e1fe044096b809cc7e66668935535b04d662f2fcf1bf0",
     ".claude/skills/adopt/scripts/rule-doc.ts": "39c1fa262b84f3f9590b3640942832582fda23c0465deaf06aba1750c0723683",
     ".claude/skills/adopt/scripts/slice-doc.ts": "314f927c6396ec0d65794353f1dfdc68ccc6aa1a8e3cea6659f1a3f1e54765a3",
     ".claude/skills/adopt/scripts/slice.ts": "2c99f37d85c488d7d5b29eadd40a22c6266e3a6f6614001ddd396a0636eec190",
@@ -158,7 +158,7 @@
     ".opencode/commands/shape.md": "76bb7ebd39f86e9cfcb1b86026ded8555f999a49b1785fb6e28d1f7ade38947b",
     ".opencode/opencode.jsonc": "639e599089c50e7dedfc6f60756512b24c71838b121e59f9da8e82bc53d2bc1b",
     ".opencode/plugins/kataster/index.ts": "ed216e599cf1e3dab4dc2940ebebaa53eea52befbe879184e0b1be35806bda02",
-    "AGENTS.md": "ac19e62be14512be2868f3f70199beb4080eacd50a227eaa589633ef08ecc884"
+    "AGENTS.md": "c091cb7583d1dedf5500a6203128c339c644c6382353203d1fd669cbfa11bd6c"
   },
   "seeded": [
     "docs/adr/README.md",

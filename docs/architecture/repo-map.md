@@ -55,6 +55,12 @@ Files that share a concept stem or a table across layers. These are suggestions 
 | production | cli, core | 3 | – | 2 layers: cli, core; 2 packages; 3 files | – |
 | queue | cli, tests | 3 | – | 2 layers: cli, tests; 2 packages; 3 files | – |
 | render | cli, tests | 3 | – | 2 layers: cli, tests; 2 packages; 3 files | yes |
+| pipeline | – | 0 | – | marked adopted manually | yes |
+| verdict | – | 0 | – | marked adopted manually | yes |
+| storyboard | – | 0 | – | marked adopted manually | yes |
+| generation | – | 0 | – | marked adopted manually | yes |
+| series | – | 0 | – | marked adopted manually | yes |
+| workspace | – | 0 | – | marked adopted manually | yes |
 
 Adopt a concept slice with:
 
@@ -74,7 +80,7 @@ node .claude/skills/adopt/scripts/repo-map.ts --adopt-slice <name>
 
 | # | Package | Score | Why |
 |---|---|---|---|
-| 1 | `packages/cli` (@coreslopper/cli) | 0.61 | 550 changed files in recent history; shared library; shared infrastructure – not a domain slice |
+| 1 | `packages/cli` (@coreslopper/cli) | 0.61 | 549 changed files in recent history; shared library; shared infrastructure – not a domain slice |
 | 2 | `scripts/audio-analysis` (coreslopper-audio-analysis) | 0.16 | 12 changed files in recent history |
 | 3 | `scripts/pose` (coreslopper-pose) | 0.16 | 6 changed files in recent history |
 | 4 | `packages/remotion` (@coreslopper/remotion) | 0.10 | 38 changed files in recent history; shared library; shared infrastructure – not a domain slice |
