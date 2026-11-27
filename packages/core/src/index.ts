@@ -11,6 +11,7 @@ export * from './palette.js';
 export * from './bench.js';
 export * from './release.js';
 export * from './release-plan.js';
+export * from './short-form.js';
 export * from './flex.js';
 export * from './fl2va.js';
 export * from './calendar.js';

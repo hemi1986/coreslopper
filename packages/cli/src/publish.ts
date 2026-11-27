@@ -17,9 +17,11 @@ import {
   projectPaths,
   readJsonFile,
   readYamlFile,
-  releaseShape,
+  releaseForm,
   repoRoot,
+  SHORT_FORM_MAX_SECONDS,
   soundLicenceTodos,
+  upToThreeMinutes,
   type PlatformLimits,
   type ProjectConfig,
   type PublishEntry,
@@ -27,6 +29,7 @@ import {
   type PublishPlatform,
   type ReleasePlan,
   type ReleaseShape,
+  type ShortsSource,
   type UploadData,
   type UploadMain,
   type UploadShort,
@@ -60,7 +63,7 @@ export const YOUTUBE_LIMITS = {
   tagChars: PLATFORM_LIMITS.youtube.tags,
   hashtags: PLATFORM_LIMITS.youtube.hashtags,
   thumbnailBytes: 2 * 1024 * 1024,
-  shortSeconds: 180,
+  shortSeconds: SHORT_FORM_MAX_SECONDS,
   /** Longest upload of a channel that has not verified its phone number. */
   unverifiedSeconds: 15 * 60,
 } as const;
@@ -243,7 +246,7 @@ export function platformProblems(
       if (!['.jpg', '.jpeg', '.png'].includes(extname(item.thumbnail ?? '').toLowerCase())) errors.push(`${label}: thumbnail must be JPEG or PNG`);
     }
     if (probe && item.kind === 'short') {
-      if (probe.duration > YOUTUBE_LIMITS.shortSeconds + 0.05) errors.push(`${label}: ${probe.duration.toFixed(1)} s, a Short is at most ${YOUTUBE_LIMITS.shortSeconds} s`);
+      if (!upToThreeMinutes(probe.duration)) errors.push(`${label}: ${probe.duration.toFixed(1)} s, a Short is at most ${YOUTUBE_LIMITS.shortSeconds} s`);
       if (probe.height < probe.width) errors.push(`${label}: ${probe.width}x${probe.height}, a Short must be vertical or square`);
     }
     if (probe && item.kind === 'main' && probe.duration > YOUTUBE_LIMITS.unverifiedSeconds) {
@@ -486,14 +489,14 @@ async function uploadSounds(projectDir: string, root: string): Promise<{ config:
 }
 
 /**
- * The release shape of a project without a release folder, derived as `release`
+ * The release form (shape and Shorts source) of a project without a release folder, derived as `release`
  * derives it (ADR 0057). A project that does not load has no known length, so an
  * episode stays an episode.
  */
-async function fallbackShape(projectDir: string, config: ProjectConfig): Promise<ReleaseShape> {
+async function fallbackForm(projectDir: string, config: ProjectConfig): Promise<{ shape: ReleaseShape; shorts: ShortsSource }> {
   const loaded = config.kind === 'episode' ? await loadProject(projectDir).catch(() => undefined) : undefined;
   const timing = loaded?.effectiveTiming ?? loaded?.timing;
-  return releaseShape({ kind: config.kind, master: config.formats.master, durationSeconds: timing?.audio.duration });
+  return releaseForm({ kind: config.kind, master: config.formats.master, durationSeconds: timing?.audio.duration });
 }
 
 /**
@@ -515,11 +518,15 @@ export async function publishProject(options: PublishOptions): Promise<PublishSu
   const handle = channel?.links.youtube?.handle;
   // The plan `release` wrote; without a release folder, the texts of review/upload.yaml alone.
   const storedPlan = await loadReleasePlan(projectDir);
+  const form = await fallbackForm(projectDir, config);
+  // The vertical version is the one Short: only the entry named by the slug (ADR 0057).
+  const fallbackShorts = form.shorts === 'vertical-version' ? data.shorts.filter((short) => short.name === config.slug) : data.shorts;
   const releasePlan =
     storedPlan ??
     buildReleasePlan({
       kind: config.kind,
-      shape: await fallbackShape(projectDir, config),
+      shape: form.shape,
+      shortsSource: form.shorts,
       language: data.language,
       slug: config.slug,
       title: config.title,
@@ -529,7 +536,7 @@ export async function publishProject(options: PublishOptions): Promise<PublishSu
       limits,
       chapters: data.main.chapters ?? [],
       credits,
-      files: { thumbnails: [], shorts: data.shorts.map((short) => ({ name: short.name, video: short.file })) },
+      files: { thumbnails: [], shorts: fallbackShorts.map((short) => ({ name: short.name, video: short.file })) },
       tiktokPointer: releaseLabels(data.language).tt.overlayDefault(handle && !/<ID>/.test(handle) ? handle : 'YouTube'),
     });
   const plan = await buildPublishPlan(projectDir, data, log, { ...options, meme, credits, plan: releasePlan, limits, todos: soundLicenceTodos(sounds) });

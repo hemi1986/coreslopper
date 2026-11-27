@@ -8,7 +8,8 @@ import {
   type ReleaseShape,
   type UploadData,
 } from './schema.js';
-import type { Chapter, PlatformLimits } from './release.js';
+import type { Chapter, PlatformLimits, ShortsSource } from './release.js';
+import { SHORT_FORM_MAX_SECONDS, upToThreeMinutes } from './short-form.js';
 
 // One release plan: every post's exact text, files, source and limits, and what
 // is still to write. It is assembled once from the project, `review/upload.yaml`,
@@ -38,14 +39,15 @@ export interface ReleasePlanFiles {
 }
 
 /** The longest main video that still gets its Instagram Reel, in seconds (ADR 0057). */
-export const MAIN_REEL_MAX_SECONDS = 180;
+export const MAIN_REEL_MAX_SECONDS = SHORT_FORM_MAX_SECONDS;
 
 /**
  * Whether the main video goes to Instagram as a Reel: only up to 3 minutes,
- * 180 s included. An unknown length (no timing) keeps the Reel.
+ * 180 s included, within `upToThreeMinutes`'s tolerance. An unknown length (no
+ * timing) keeps the Reel.
  */
 export function mainVideoReel(durationSeconds: number | undefined): boolean {
-  return durationSeconds === undefined || durationSeconds <= MAIN_REEL_MAX_SECONDS;
+  return durationSeconds === undefined || upToThreeMinutes(durationSeconds);
 }
 
 /** The video of the main video's Reel: the best vertical render there is – 9:16, 4:5, 1:1 – else the master. */
@@ -67,6 +69,13 @@ export interface ReleasePlanInput {
   kind: 'music-video' | 'episode' | 'meme';
   /** The release shape (`releaseShape`, or the manifest's). A short episode posts its one video on every platform (ADR 0057). */
   shape: ReleaseShape;
+  /**
+   * Where the Shorts come from (`releaseForm`); `vertical-version` posts only the
+   * vertical version in `files.shorts`, with the texts of the upload data's entry
+   * named by the slug. Without it, a short episode and a meme have none and every
+   * other release cuts its Shorts.
+   */
+  shortsSource?: ShortsSource;
   language: string;
   slug: string;
   artist?: string;
@@ -284,11 +293,15 @@ export function buildReleasePlan(input: ReleasePlanInput): ReleasePlan {
   const posts: DraftPost[] = [];
   const youtubeSynthetic = main?.synthetic_media ?? input.channel?.disclosure.youtube_synthetic ?? true;
   const youtubeTitle = (name?: string): DraftLimit => ({ max: limits.youtube.title, label: name ? `youtube ${name}` : meme || shortEpisode ? 'youtube short' : 'youtube main', field: 'title' });
-  const dataShorts = shortEpisode ? [] : (data?.shorts ?? []);
-  const shorts = [
-    ...dataShorts.map((short) => short.name),
-    ...(shortEpisode ? [] : files.shorts.map((short) => short.name).filter((name) => !dataShorts.some((short) => short.name === name))),
-  ];
+  // The vertical version is the one Short: only the one in the folder, with the texts named by the slug – never a cut Short's (ADR 0057).
+  const verticalVersion = input.shortsSource === 'vertical-version';
+  const dataShorts = shortEpisode ? [] : verticalVersion ? (data?.shorts ?? []).filter((short) => short.name === input.slug) : (data?.shorts ?? []);
+  const shorts = verticalVersion
+    ? files.shorts.map((short) => short.name)
+    : [
+        ...dataShorts.map((short) => short.name),
+        ...(shortEpisode ? [] : files.shorts.map((short) => short.name).filter((name) => !dataShorts.some((short) => short.name === name))),
+      ];
   const feed = files.videos?.['4x5'] ?? files.videos?.['1x1'];
   const firstShortVideo = files.shorts[0]?.video;
   const firstShortThumb = files.shorts[0]?.thumbnail;
@@ -531,7 +544,7 @@ export function buildReleasePlan(input: ReleasePlanInput): ReleasePlan {
       needsYoutube: true,
       pointer: 'youtube',
       url: true,
-      errors: linkedin.media !== 'main' && !files.shorts.some((short) => short.name === linkedin.media) && !(data?.shorts ?? []).some((short) => short.name === linkedin.media) ? [`linkedin: media ${linkedin.media} is not main or a Short`] : [],
+      errors: linkedin.media !== 'main' && !files.shorts.some((short) => short.name === linkedin.media) && !dataShorts.some((short) => short.name === linkedin.media) ? [`linkedin: media ${linkedin.media} is not main or a Short`] : [],
     });
   }
 
