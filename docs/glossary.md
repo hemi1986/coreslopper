@@ -438,6 +438,12 @@ _Avoid_: late post, overdue
 The comment under the main video from the upload data, posted by the autopilot once the video is public. Pinning it stays a click in YouTube Studio.
 _Avoid_: first comment
 
+**Story Caption**:
+The optional caption of an Instagram story that shows a video, at most 120 characters (`limits.instagram.story_caption`). A story that shows only an image has none, and a story carries no other text.
+_Avoid_: story text
+_UI (de)_: Bildunterschrift
+_UI (en)_: Caption
+
 **Publish Log**:
 `review/publish.json`: one entry per upload attempt with platform, item, file hash, remote ID, URL, status, and time. A file already in it for a platform is not uploaded again.
 _Avoid_: upload history, manifest (the **Manifest** records generations)
