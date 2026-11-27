@@ -10,7 +10,7 @@ depends_on: []
 labels: [feature:platform-formats]
 feature: platform-formats
 sources: [docs/research/platform-video-formats.md]
-status: ready
+status: done
 ---
 
 ## Task
@@ -24,7 +24,7 @@ The description keeps its hashtags with `#`, because YouTube reads them there (F
 changes. Decided by the user on 2026-11-27 (feature `platform-formats`, Q1).
 
 ## Acceptance Criteria
-- [ ] The main video's YouTube post shows the hashtags `#a`, `#b` of the upload data as `a, b` (test)
-- [ ] Each Short's YouTube post shows its hashtags the same way (test)
-- [ ] The YouTube descriptions still end with `#a #b` (test)
-- [ ] `texts/youtube.md` lists the hashtags in the same form as the board
+- [x] The main video's YouTube post shows the hashtags `#a`, `#b` of the upload data as `a, b` (test)
+- [x] Each Short's YouTube post shows its hashtags the same way (test)
+- [x] The YouTube descriptions still end with `#a #b` (test)
+- [x] `texts/youtube.md` lists the hashtags in the same form as the board
