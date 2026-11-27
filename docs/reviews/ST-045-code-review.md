@@ -1,0 +1,38 @@
+# Code review – ST-045: The main video goes to Instagram as a Reel only up to 3 minutes
+Base: marathon/2026-11-27-2 · Commits: 3 · Date: 2026-11-27
+
+Scope of this review: the diff `marathon/2026-11-27-2...HEAD`, plus a second, bug-focused pass over the shared
+platform code (`packages/core/src/release-plan.ts`, `calendar.ts`, `release.ts`, `schema.ts`) and its consumers
+(release, calendar, QA, board, autopilot, publish).
+
+What was checked and holds:
+- **One 180-second rule.** `mainVideoReel` (`packages/core/src/release-plan.ts:36`) is the only comparison. The
+  release plan uses it (`release-plan.ts:450`). The calendar uses it (`packages/cli/src/release-calendar.ts:93`).
+  QA reaches it through `platformTextProblems` → `buildReleasePlan` (`packages/core/src/release.ts:341`,
+  `packages/cli/src/release-qa.ts:247`). The board reads only the plan's post (`packages/cli/src/release-board-data.ts:421-430`).
+  Release, `calendar`, QA and the board facts all take the same length, `(effectiveTiming ?? timing).audio.duration`.
+  The one caller that leaves it out is in row 1.
+- **Older manifests and calendars still parse.** `CalendarEventSchema.step` is `z.string()`
+  (`schema.ts:1122`), so the old `post` step parses. When the events are planned again, only the kept `at` carries
+  over and the step becomes `reel` (`calendar.ts:165-167`). `ReleaseFileKindSchema` keeps `feed-image`
+  (`schema.ts:1376`). Plan file roles are `z.string()` (`schema.ts:1433`), so the old `feed-video`/`feed-image` roles
+  parse. `filesFromManifest` ignores the old feed image. The next run unlinks an old `instagram/feed-4x5.jpg`
+  because it is in the previous manifest but not in the current one (`packages/cli/src/release.ts:524-527`). This
+  is checked by reading the code. No test covers it (row 5).
+- **Autopilot.** The new `reel` step maps to `{ placement: 'reel', item: 'main' }` (`packages/core/src/autopilot.ts:107`).
+  The Instagram adapter posts it as `REELS`. `reelVideo` falls back to the master, so the media is always a video.
+- Language check green. Scenario tests `ST-045: …` exist with the exact titles and check each "Then".
+  110 tests in the touched release, calendar and autopilot suites pass.
+
+| # | Severity | Area | File:line | Finding | Source (ADR, rule, glossary, smell) | Suggested direction |
+|---|---|---|---|---|---|---|
+| 1 | minor | Domain rule / design | packages/cli/src/publish.ts:506; packages/core/src/release-plan.ts:61; packages/cli/src/release-calendar.ts:71 | `durationSeconds` is optional, and leaving it out means "keep the Reel". The fallback plan in `publishProject` (used when there is no release folder) leaves it out, so for a main video over 180 s it still holds `instagram-post`, and that post's text problems can count in the publish plan. Any future caller that forgets the field disagrees with release, the calendar and QA without any error. | CMD-BuildReleasePackage rule "Reel only when ≤ 180 s"; ADR 0057; smell: silent default on a rule input | Pass the length in `publish.ts`, or make the field required as `number \| undefined` in `ReleasePlanInput`, `calendarInput` and `platformTextProblems`, so every caller has to state it. |
+| 2 | minor | Design | packages/cli/src/release.ts:290,479; packages/cli/src/release-facts.ts:132,150; packages/cli/src/release-calendar.ts:149; packages/cli/src/release-qa.ts:102,247 | "The main video's length" is worked out as `(effectiveTiming ?? timing)?.audio.duration` in four modules. In `release-qa.ts` it is worked out twice in a slightly different form (line 102 and line 247). The 180-s rule is only as consistent as these copies. | Duplicated Code; ADR 0057 (the same length decides the release shape in ST-047) | Use one helper that gives the main video's length for a loaded project, and have release, `calendar`, QA and the facts call it. Reuse `duration` from line 102 in `release-qa.ts`. |
+| 3 | question | Domain rule | packages/core/src/release-plan.ts:36-37 | The limit is compared with the exact `timing.audio.duration`, which is usually not a whole number (for example 180.02 s for a song that reads "3:00"). A song like that loses its Reel, and only an exact `180` counts as "exactly 3 minutes". ST-047 and the short-episode rules use the same "at most 180 s" and need the same answer. | Story rule "180 s still counts"; ADR 0057; glossary *Short Episode* | Developer decides: (a) keep the exact comparison, (b) compare whole seconds (round or floor), or (c) compare against the length of the rendered master. Record the answer in one place (`MAIN_REEL_MAX_SECONDS` / `mainVideoReel`) so ST-047 reuses it. |
+| 4 | minor | Domain rule / UX | packages/core/src/release-plan.ts:449-470 | Over 180 s, an `instagram_post` text that is in `upload.yaml` is dropped without a word. The plan, QA and the board say nothing, so the user's written caption disappears without any signal. The story only says it is "not asked for". | Story Context, 4th bullet; ADR 0057 | Either accept this as intended, or add a warning (not a TODO): "instagram_post is not used: the main video is over 3 minutes". |
+| 5 | minor | Test quality | tests/release-reel.test.ts | Compatibility with older data is only checked by reading the code. No test covers (a) an older `review/calendar.yaml` whose `instagram-post` event has step `post` and gets step `reel` with its kept time on the next run, (b) an older `manifest.json` with a `feed-image` file kind and `feed-video` role that parses and whose `instagram/feed-4x5.jpg` is removed. Until a run plans again, an old `post` event still maps to `placement: 'feed'` (`autopilot.ts:108`) and the label "Instagram feed post" (`release-texts.ts:228,408`). | tdd: the scenario's backward-compatibility promise ("older projects stay valid") has no test | Add one test at the `buildRelease` seam that starts from an older calendar and manifest fixture and checks the event's step and time, the manifest kinds and the folder tree. |
+| 6 | minor | Test quality / docs | packages/core/src/autopilot.ts:22,107; docs/publishing.md:130,227,251; packages/cli/src/release-calendar.ts:74 | The autopilot now posts `instagram-post` as a Reel instead of a feed post, but no autopilot test covers that. The comment at `autopilot.ts:22` still says "the feed post (`main`)". `docs/publishing.md:251` still describes "the 4:5 or 1:1 render … or the 4:5 image". ST-055 covers `release.md`, `thumbnails.md` and `release-platforms.md`, but not `publishing.md`. The comment at `release-calendar.ts:74` says "no feed post". | ADR 0057; publish slice (`.claude/rules/publish.md`) | Add a test in `tests/release-autopilot-plan.test.ts` that the `instagram-post` event gives `{ kind: 'instagram', placement: 'reel', item: 'main' }`. Update the two comments. Fix `publishing.md` here or add it to ST-055. |
+| 7 | minor | Code smell | packages/cli/src/release-texts.ts:97,223,403,710 | `main-reel` is added to `cal.steps` as if it were a calendar step, but no event carries it. It is only a label that `calendarEventLabel` picks with a special case on `kind !== 'meme'`. Readers of the `steps` record will look for a `main-reel` step that does not exist. | Mysterious Name | Keep the label beside the other per-event labels (for example `l.ig.post`, which already says "Reel: main video") and pick it by event id `instagram-post`, not by step and kind. |
+
+Verdict: ready to merge
+Most important finding: #1. The 180-second rule is applied the same way in release, the calendar, QA and the board, but the publish fallback plan leaves out the length, and the optional `durationSeconds` lets any caller silently keep the Reel.
