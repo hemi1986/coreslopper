@@ -66,3 +66,14 @@ export async function listThumbnails(renders: string): Promise<string[]> {
     .sort()
     .map((name) => join(dir, name));
 }
+
+/** The cover of a meme or a short episode, relative to the project: the skill composes it with `thumbnail --format 9x16`. */
+export const VERTICAL_COVER_SOURCE = 'renders/cover-1080x1920.jpg';
+/** A short episode's TikTok cover, relative to the project: the skill composes it with `thumbnail --format 3x4` (ADR 0057). */
+export const TIKTOK_COVER_SOURCE = 'renders/cover-1080x1440.jpg';
+
+/** A short episode's two covers (ADR 0057), with the thumbnail format each one is checked against. */
+export const SHORT_EPISODE_COVERS: readonly { path: string; format: ThumbnailFormat }[] = [
+  { path: VERTICAL_COVER_SOURCE, format: '9x16' },
+  { path: TIKTOK_COVER_SOURCE, format: '3x4' },
+];

@@ -65,7 +65,7 @@ import { readmeText, releaseLabels, releaseTexts, calendarEventLabel, type Relea
 import { calendarInput, planCalendar } from './release-calendar.js';
 import { loadStatus } from './release-records.js';
 import { micrositeSong } from './release-microsite.js';
-import { listThumbnails } from './thumbnail-files.js';
+import { TIKTOK_COVER_SOURCE, VERTICAL_COVER_SOURCE, listThumbnails } from './thumbnail-files.js';
 import { readRecipe, recipePath } from './thumbnail-recipe.js';
 import { DERIVED_PATHS, derivedImages, teaserPathOf, teaserWindow } from './release-images.js';
 import { shortFfmpegArgs } from './short.js';
@@ -91,9 +91,7 @@ export async function loadReleasePlan(projectDir: string): Promise<ReleasePlan |
 /** The cover source the skill composes with `thumbnail --format 1x1`. */
 export const COVER_SOURCE = 'renders/cover-3000x3000.jpg';
 /** The cover of a meme or a short episode: the skill composes it with `thumbnail --format 9x16`. */
-export const MEME_COVER_SOURCE = 'renders/cover-1080x1920.jpg';
-/** A short episode's TikTok cover: the skill composes it with `thumbnail --format 3x4` (ADR 0057). */
-export const TIKTOK_COVER_SOURCE = 'renders/cover-1080x1440.jpg';
+export const MEME_COVER_SOURCE = VERTICAL_COVER_SOURCE;
 
 export interface ReleaseDeps {
   probe: Prober;

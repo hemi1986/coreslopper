@@ -10,7 +10,7 @@ depends_on: [ST-047]
 labels: [feature:platform-formats]
 feature: platform-formats
 sources: [docs/research/platform-video-formats.md]
-status: ready
+status: in-progress
 ---
 
 ## Task
@@ -25,7 +25,7 @@ user, 2026-11-27, Q8, Q9):
   JPEG and one 1080x1440 TikTok cover under 2 MB.
 
 ## Acceptance Criteria
-- [ ] A horizontal episode with one thumbnail still WARNs "1 of 3" (test)
-- [ ] A vertical episode over 180 s with one thumbnail is a PASS (test)
-- [ ] A short episode reports `Thumbnails` and `Shorts` as N/A and FAILs `Cover` for a cover of the wrong size (test)
-- [ ] `status` lists a short episode's cover and TikTok cover instead of thumbnails
+- [x] A horizontal episode with one thumbnail still WARNs "1 of 3" (test)
+- [x] A vertical episode over 180 s with one thumbnail is a PASS (test)
+- [x] A short episode reports `Thumbnails` and `Shorts` as N/A and FAILs `Cover` for a cover of the wrong size (test)
+- [x] `status` lists a short episode's cover and TikTok cover instead of thumbnails
