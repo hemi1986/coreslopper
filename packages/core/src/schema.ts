@@ -974,7 +974,7 @@ export const UploadDataSchema = z
     language: z.string().min(2),
     main: UploadMainSchema,
     shorts: z.array(UploadShortSchema).default([]),
-    /** The Instagram feed post of the release: the main video in the feed format (4:5 or 1:1 render), or the cover without one. */
+    /** The main video's Instagram Reel (`instagram-post`): its best vertical render; only for a main video of at most 180 s (ADR 0057). */
     instagram_post: z.object({ caption: z.string().min(1), hashtags: z.array(HashtagSchema).default([]) }).optional(),
     /** Spotify for Artists: the Artist Pick message and the editorial pitch. */
     spotify: z.object({ artist_pick: z.string().min(1).optional(), pitch: z.string().min(1).optional() }).optional(),
@@ -1372,7 +1372,7 @@ export const ReleaseFileKindSchema = z.enum([
   'announcement',
   /** The release-day story image. */
   'story',
-  /** The 4:5 Instagram feed image, when the project has no feed-format render. */
+  /** The 4:5 Instagram feed image of older release folders; `release` no longer composes it (ADR 0057). */
   'feed-image',
 ]);
 

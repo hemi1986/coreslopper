@@ -3,16 +3,16 @@ import { THUMBNAIL_MAX_LINES, THUMBNAIL_MAX_WORDS } from '../../remotion/src/lib
 
 // The images and the teaser `release` derives from the cover's still for the
 // posts of the calendar: the announcement a week before (story and post, with
-// the release date on them), the release-day story, and the feed image when
-// there is no feed-format render. Pure: what to compose; release.ts renders.
+// the release date on them) and the release-day story. Pure: what to compose;
+// release.ts renders.
 
-export type DerivedKind = 'announcement' | 'story' | 'feed-image';
+export type DerivedKind = 'announcement' | 'story';
 
 export interface DerivedImage {
   /** Path inside the release folder. */
   path: string;
   kind: DerivedKind;
-  format: '9x16' | '16x9' | '4x5';
+  format: '9x16' | '16x9';
   /** Hook lines separated by `|`, as `thumbnail --text` takes them. */
   text: string;
   tag: string;
@@ -24,7 +24,6 @@ export const DERIVED_PATHS = {
   announcePost: 'announce/post-16x9.jpg',
   teaser: 'announce/teaser-9x16.mp4',
   story: 'instagram/story-9x16.jpg',
-  feedImage: 'instagram/feed-4x5.jpg',
 } as const;
 
 /** Length of the announcement teaser in seconds. */
@@ -37,7 +36,6 @@ const WORDS = {
     newEpisode: 'NEUE FOLGE',
     now: 'JETZT',
     onYouTube: 'AUF YOUTUBE',
-    fresh: 'NEU',
   },
   en: {
     days: ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'],
@@ -45,7 +43,6 @@ const WORDS = {
     newEpisode: 'NEW EPISODE',
     now: 'OUT NOW',
     onYouTube: 'ON YOUTUBE',
-    fresh: 'NEW',
   },
 };
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
@@ -77,7 +74,7 @@ export function titleLines(title: string, maxLines: number): string[] | undefine
   return lines.length > 0 && lines.length <= maxLines ? lines : undefined;
 }
 
-/** The images to compose for a release: the announcement (with the date of the main video), the release-day story, the feed image. */
+/** The images to compose for a release: the announcement (with the date of the main video) and the release-day story. */
 export function derivedImages(options: {
   title: string;
   language: string;
@@ -85,9 +82,6 @@ export function derivedImages(options: {
   releaseAt?: string;
   announcement: boolean;
   story: boolean;
-  /** The project has a 4:5 or 1:1 render for the feed post: no feed image needed. */
-  feedVideo: boolean;
-  feedPost: boolean;
   /** An episode's announcement says "new episode"; a music video's says "new song". */
   episode?: boolean;
 }): DerivedImage[] {
@@ -103,10 +97,6 @@ export function derivedImages(options: {
   }
   if (options.story) {
     images.push({ path: DERIVED_PATHS.story, kind: 'story', format: '9x16', text: [...title(THUMBNAIL_MAX_LINES - 1), w.onYouTube].join('|'), tag: w.now });
-  }
-  if (options.feedPost && !options.feedVideo) {
-    const lines = title(THUMBNAIL_MAX_LINES);
-    images.push({ path: DERIVED_PATHS.feedImage, kind: 'feed-image', format: '4x5', text: lines.length ? lines.join('|') : w.fresh, tag: w.now });
   }
   return images;
 }

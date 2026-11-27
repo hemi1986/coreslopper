@@ -335,7 +335,7 @@ export function soundLicenceTodos(sounds: UsedSound[]): string[] {
 export function platformTextProblems(
   data: UploadData,
   limits: PlatformLimits,
-  options: { music?: boolean; kind?: 'music-video' | 'episode' | 'meme'; credits?: string[]; tiktokPointer?: string } = { music: true },
+  options: { music?: boolean; kind?: 'music-video' | 'episode' | 'meme'; credits?: string[]; tiktokPointer?: string; durationSeconds?: number } = { music: true },
 ): { errors: string[]; missing: string[] } {
   const kind = options.kind ?? (options.music === false ? 'episode' : 'music-video');
   const plan = buildReleasePlan({
@@ -348,6 +348,7 @@ export function platformTextProblems(
     chapters: [],
     credits: options.credits,
     tiktokPointer: options.tiktokPointer,
+    durationSeconds: options.durationSeconds,
     files: { thumbnails: [], shorts: [] },
   });
   return plan.problems;

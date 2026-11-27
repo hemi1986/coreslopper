@@ -106,6 +106,7 @@ export interface CalendarInput {
   shorts: { name: string; platforms: ('youtube' | 'tiktok' | 'instagram' | 'x')[] }[];
   announcement: boolean;
   communityPost: boolean;
+  /** The main video's Reel (`instagram-post`): upload text and a main video of at most 180 s. */
   instagramPost: boolean;
   x: boolean;
   linkedin: boolean;
@@ -191,7 +192,7 @@ export function buildCalendar(input: CalendarInput, context: CalendarContext): R
     push('story', 'instagram', 'story', at(0, release.video_time));
   }
   if (input.communityPost) push('community', 'youtube', 'community', at(0, release.video_time));
-  if (input.instagramPost) push('instagram-post', 'instagram', 'post', at(0, posts.instagram));
+  if (input.instagramPost) push('instagram-post', 'instagram', 'reel', at(0, posts.instagram));
   if (input.x) push('x', 'x', 'post', at(0, posts.x));
   if (input.microsite) push('microsite', 'microsite', 'page', at(0, release.video_time));
   if (music) push('links', 'youtube', 'links', at(steps.links, steps.task_time));

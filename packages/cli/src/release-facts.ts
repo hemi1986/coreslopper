@@ -98,7 +98,6 @@ export function filesFromManifest(manifest: ReleaseManifest | undefined, masterF
     else if (file.path === DERIVED_PATHS.announcePost) files.announcePost = file.path;
     else if (file.path === DERIVED_PATHS.teaser) files.teaser = file.path;
     else if (file.path === DERIVED_PATHS.story) files.story = file.path;
-    else if (file.path === DERIVED_PATHS.feedImage) files.feedImage = file.path;
   }
   files.thumbnails.sort();
   files.shorts.sort((a, b) => a.name.localeCompare(b.name));

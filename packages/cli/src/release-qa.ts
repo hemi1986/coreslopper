@@ -244,6 +244,7 @@ export async function releaseChecks(projectDir: string, probe: Prober = probeMed
     const problems = platformTextProblems(data, platformLimits(channel), {
       kind,
       credits,
+      durationSeconds: (project.effectiveTiming ?? project.timing)?.audio.duration,
       tiktokPointer: releaseLabels(data.language).tt.overlayDefault(handle && !/<ID>/.test(handle) ? handle : 'YouTube'),
     });
     textErrors.push(...problems.errors);
