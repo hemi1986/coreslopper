@@ -18,6 +18,14 @@ export function subtitleSafeArea(width: number, height: number): { bottom: numbe
   return { bottom: 0.08, side: 0.1 };
 }
 
+/**
+ * The text of a cue as burned in: the cue's line breaks are the SRT's (about 42 characters a line), which the
+ * burned-in box is often too narrow for, so the box wraps the text itself and keeps its lines balanced.
+ */
+export function burnInText(text: string): string {
+  return text.replace(/\s*\n\s*/g, ' ').trim();
+}
+
 /** Burned-in subtitles inside the format's safe area; frame-driven, no fades. */
 export function Subtitles({ cues, style, width, height }: SubtitlesProps) {
   const frame = useCurrentFrame();
@@ -49,11 +57,12 @@ export function Subtitles({ cues, style, width, height }: SubtitlesProps) {
           fontSize,
           lineHeight: 1.25,
           textAlign: 'center',
-          whiteSpace: 'pre-line',
+          whiteSpace: 'normal',
+          textWrap: 'balance',
           borderRadius: Math.round(fontSize * 0.2),
         }}
       >
-        {cue.text}
+        {burnInText(cue.text)}
       </div>
     </div>
   );

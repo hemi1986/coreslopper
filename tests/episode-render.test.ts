@@ -12,7 +12,7 @@ import {
 } from '@coreslopper/core';
 import { buildVideoProps, formatConfig, masterFormatId, outputPath } from '../packages/cli/src/render.ts';
 import { subtitlesPath } from '../packages/cli/src/subtitles.ts';
-import { subtitleSafeArea } from '../packages/remotion/src/components/Subtitles.tsx';
+import { burnInText, subtitleSafeArea } from '../packages/remotion/src/components/Subtitles.tsx';
 
 const root = process.cwd();
 const episodeDir = join(root, 'projects/demo-episode');
@@ -113,6 +113,13 @@ describe('subtitles', () => {
     const cues = subtitleCues(script, project.effectiveTiming!);
     expect(cues).toHaveLength(before + 1);
     expect(cues.find((cue) => cue.id === sfx!.id)!.text).toBe('DIARY');
+  });
+
+  it('burns a cue in without the SRT line breaks, so the box wraps it once, balanced', () => {
+    expect(burnInText('Contract · Residual Brandt, Lena · Payer:\nBrandt, Ilka · Status: under review')).toBe(
+      'Contract · Residual Brandt, Lena · Payer: Brandt, Ilka · Status: under review',
+    );
+    expect(burnInText('Short line')).toBe('Short line');
   });
 
   it('burns the English subtitles in only when the render asks for them', async () => {
