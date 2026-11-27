@@ -1091,7 +1091,7 @@ events:
     name: Release package built
     aggregate: AGG-ReleasePackage
     pivotal: true
-    data: [Project, Files, TODOs, Warnings, Generated at]
+    data: [Project, Release shape, Files, TODOs, Warnings, Generated at]
     description: "release writes renders/release/ – video, subtitles, thumbnails, Shorts, the song as WAV, cover, canvas, lyrics, announcement and feed images, calendar.ics, the microsite data, texts/, README.md – and manifest.json last (packages/cli/src/release.ts:207-447)"
   - id: EVT-ReleaseRulesBroken
     name: Release rules broken
@@ -2088,6 +2088,9 @@ commands:
       - The texts are in the project's language and the brief's tone, one per platform; the Instagram and TikTok captions differ (skill rule; the code refuses identical captions, packages/core/src/release.ts:307-309)
       - The channel's hashtag sets are applied by the agent; no code reads them (skill rule, video-qa release.md:5,83; HS-181)
       - The agent decides post or skip for LinkedIn with a reason from the song's theme (skill rule, ADR 0028)
+      - A story carries no text of its own; a story that shows a video may carry a caption of at most 120 characters, optional and never a TODO (user, 2026-11-27, HS-267, feature platform-formats)
+      - The X post carries the main video by default; a Short stays selectable, and the reply with the YouTube link is optional (user, 2026-11-27, feature platform-formats)
+      - A short episode has one text per platform – the YouTube Shorts title, description and hashtags, a TikTok caption, a Reel caption, an X post, the microsite texts – and an optional announcement; no Shorts, no pinned or community post, no LinkedIn (user, 2026-11-27, HS-266)
   - id: CMD-BuildReleasePackage
     name: Build the release package
     actor: ACT-StageRunner
@@ -2104,6 +2107,12 @@ commands:
       - The announcement, story and feed images are composed from the cover's recipe, again whenever the release day moves – by a full run only (the code does this, release.ts:455-549; HS-171)
       - Text files are laid out from the upload data with chapters, footer, credits and links; a live URL reaches every text that points to the main video, in the folder and on the board alike (decided 2026-11-22, HS-166; only the board fields get it – gap register)
       - The folder's files and the board's posts come from one layout of the release folder and one release context (decided 2026-11-22, HS-175; the layout is spelled in three files, the context twice – gap register)
+      - The release shape is derived from the project – music video, meme, episode or short episode – and recorded in the manifest; an episode is a short episode when its master is at least as tall as wide and its episode track lasts at most 180 s (user, 2026-11-27, HS-266)
+      - A short episode's folder holds its one master video, one 1080x1920 cover and one 1080x1440 TikTok cover; no main-video thumbnails, Shorts, streaming cover or feed image. Its posts go out on the release day to YouTube Shorts, TikTok, Instagram Reels, X and the microsite (user, 2026-11-27, HS-266)
+      - A horizontal episode of at most 180 s keeps its main video and three thumbnails; instead of cut Shorts, its vertical version – the 9:16 render of the whole episode – is its one Short (user, 2026-11-27, HS-266)
+      - A vertical episode over 180 s gets one main-video thumbnail; its Shorts are cut from its master (user, 2026-11-27, HS-266)
+      - The main video goes to Instagram as a Reel only when it lasts at most 180 s; there is no image post in its place (user, 2026-11-27, feature platform-formats)
+      - Once the release status holds a done mark or a live URL, a run whose release shape differs from the manifest's fails and changes nothing (user, 2026-11-27, HS-268)
   - id: CMD-RenderUploadText
     name: Render the upload text
     actor: ACT-StageRunner
@@ -2119,6 +2128,7 @@ commands:
       - --replan drops every time the user moved and plans the events again (the code does this, calendar.ts:136)
       - The calendar of a project with distribution internal is no other release – it books no release day and no slot for any other project's plan (user, 2026-11-22, ST-040)
       - A replan never moves a proposed release day the distributor may already have – it stays until the user moves it (decided 2026-11-22, HS-165; --replan proposes again – gap register)
+      - A short episode's calendar plans YouTube Shorts, TikTok, the Reel, X and the microsite on the release day, the announcement when there is one, and no story, community post or LinkedIn (user, 2026-11-27, HS-266)
   - id: CMD-MarkCalendarEventDone
     name: Mark a calendar event done
     actor: ACT-User
@@ -2156,6 +2166,7 @@ commands:
       - A used library sound with an unknown licence, or one that needs a credit without its credit text, is a TODO; it never fails the release (user, 2026-11-22, HS-261)
       - A file whose hash differs from the manifest, a format that is not the current render, a bad WAV, cover or canvas, section tags in lyrics.txt, a missing text file, a broken limit, or an unmarked <ID> fails (the code does this, release-qa.ts:80-221)
       - A gap only the user can close is a TODO, in the release checks and in the upload checks alike; WARN is only for advice (decided 2026-11-22, HS-172; Upload text and Upload data use WARN – gap register)
+      - QA expects the assets of the release shape – three thumbnails for a horizontal main video, one for a vertical one; for a short episode one 1080x1920 cover and one TikTok cover, and Thumbnails and Shorts are N/A (user, 2026-11-27, HS-266)
 
   - id: CMD-AuthorizePlatform
     name: Authorize a platform
@@ -2736,8 +2747,8 @@ read_models:
     name: Release board
     fed_by: [EVT-ReleasePackageBuilt, EVT-ReleaseCalendarPlanned, EVT-UploadDataWritten, EVT-CalendarEventMarkedDone, EVT-LiveUrlRecorded, EVT-ReleaseApproved, EVT-ApprovalWithdrawn]
     used_by: [ACT-User]
-    fields: [Platform, Post, Files, Texts, Limits, Settings, Target, Checklist, Done, Live URL, Approval, Approval stale, Blockers]
-    description: "boardProject per project with a release folder or a calendar: per platform the posts with their files, the texts to copy with live counters, the settings and checklists, the done marks and live URLs, the approval and its blockers (packages/cli/src/release-board-data.ts:432-703); the user's way to release (user, 2026-11-22). A broken upload.yaml shows as no texts (HS-173)"
+    fields: [Release shape, Platform, Post, Files, Texts, Limits, Settings, Target, Checklist, Done, Live URL, Approval, Approval stale, Blockers]
+    description: "boardProject per project with a release folder or a calendar: per platform the posts with their files, the texts to copy with live counters, the settings and checklists, the done marks and live URLs, the approval and its blockers (packages/cli/src/release-board-data.ts:432-703); the user's way to release (user, 2026-11-22). A broken upload.yaml shows as no texts (HS-173). It names the release shape and why (format, length), shows only that shape's platforms, lists YouTube hashtags comma-separated without '#', and a short episode's YouTube post asks for the series playlist (user, 2026-11-27, feature platform-formats)"
   - id: RM-WorkspaceReleaseCalendar
     name: Workspace release calendar
     fed_by: [EVT-ReleaseCalendarPlanned, EVT-CalendarEventMarkedDone]
@@ -2760,7 +2771,7 @@ read_models:
     name: Microsite song
     fed_by: [EVT-ReleasePackageBuilt, EVT-LiveUrlRecorded]
     used_by: [EXT-Microsite]
-    fields: [Slug, Artist, Title, Language, Release day, Teaser, Text, Quote, Lyrics, Images, Links, Shorts, Profiles, Disclosure, Credits]
+    fields: [Slug, Artist, Title, Language, Release day, Teaser, Text, Quote, Lyrics, Images, Aspect, Links, Shorts, Profiles, Disclosure, Credits]
     description: "renders/release/microsite/<slug>.json, written when the upload data has a microsite block (packages/cli/src/release-microsite.ts:8-77; release.ts:416-420); the user wants the microsite (user, 2026-11-22). It is a published language with no schema (HS-178)"
 
   - id: RM-AutopilotBoard
@@ -4164,6 +4175,21 @@ hotspots:
     refs: [AGG-LibrarySound, CMD-CheckRelease]
     status: resolved
     resolution: "A field of its own: an optional credit on the library sound, entered with sound add and sound edit; a licence that asks for attribution without a credit stays a release TODO (user, 2026-11-22)"
+  - id: HS-266
+    question: "An episode up to 3 minutes is to be released as one Short with no main video. YouTube counts only a square or vertical video up to 3 minutes as a Short; a 16:9 video stays long-form (F12 in docs/research/platform-video-formats.md). When is an episode a short episode, and what do the other episodes get?"
+    refs: [CMD-BuildReleasePackage, CMD-PlanReleaseCalendar, AGG-ReleasePackage]
+    status: resolved
+    resolution: "A short episode has a master at least as tall as wide (9:16, 4:5, 1:1) and an episode track of at most 180 s, derived, not set. One video to YouTube Shorts (series playlist as a checklist line), TikTok, Instagram Reels, X and the microsite; one 9:16 cover and one 3:4 TikTok cover; optional announcement with a teaser from its master. A horizontal episode up to 180 s keeps its main video and posts its whole 9:16 render as its one Short. A vertical episode over 180 s gets one main-video thumbnail and Shorts cut from its master (user, 2026-11-27)"
+  - id: HS-267
+    question: "The upload data has a story text per Short and for the announcement, but Instagram stories have no text field, and no primary source names a limit for text added to a story (F7 in docs/research/platform-video-formats.md). What remains of the story text?"
+    refs: [CMD-WriteUploadData]
+    status: resolved
+    resolution: "A story has no text of its own. A story that shows a video may carry a caption of at most 120 characters, the limit the user sees in the Instagram app; it is optional and never a TODO. An image story has no text (user, 2026-11-27)"
+  - id: HS-268
+    question: "The release shape follows the episode's length. A cut after the first posts can move an episode across 180 s, and a new release run would then remove files that posts already used. Does the shape follow the episode or stay?"
+    refs: [CMD-BuildReleasePackage, AGG-ReleaseStatus]
+    status: resolved
+    resolution: "The shape is recorded in the manifest. Until the release status holds a done mark or a live URL it follows the project; after that, a run whose shape differs fails and changes nothing (user, 2026-11-27)"
 
 flows:
   - id: FLOW-AutonomousStage
@@ -4232,3 +4258,6 @@ flows:
   - id: FLOW-SoundLibrary
     name: From a sound file to a library sound the meme skill can pick
     sequence: [ACT-User, CMD-AddLibrarySound, EVT-LibrarySoundAdded, CMD-UpdateLibrarySound, EVT-LibrarySoundUpdated, POL-ValidateEverySoundEntryEdit, CMD-ValidateLibrarySound, CMD-CheckSoundLibrary, EVT-SoundLibraryChecked, RM-SoundLibrary]
+  - id: FLOW-ShortEpisodeRelease
+    name: From a short episode's upload data to its one video on every platform
+    sequence: [ACT-StageRunner, CMD-WriteUploadData, EVT-UploadDataWritten, CMD-BuildReleasePackage, EVT-ReleaseCalendarPlanned, EVT-ReleasePackageBuilt, CMD-CheckRelease, EVT-ReleaseChecked, RM-ReleaseBoard, ACT-User, CMD-MarkCalendarEventDone, EVT-CalendarEventMarkedDone, CMD-RecordLiveUrl, EVT-LiveUrlRecorded, RM-MicrositeSong]

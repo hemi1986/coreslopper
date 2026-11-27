@@ -331,6 +331,7 @@ list in the series (`packages/cli/src/series.ts:43-74`).
 | Batch cap | Money, `batch_cap_usd`; default 30 % of the remaining series budget | no | EVT-SeriesCreated |
 | Episode plan | list of Planned Episode: number (unique), title, logline | default empty | EVT-SeriesCreated |
 | Creative limits | `episode_seconds` {min, max}, `lipsync_seconds_max` | no | EVT-SeriesCreated |
+| YouTube playlist | title and, once it exists, URL of the series playlist; a missing URL is a release TODO of a short episode (feature platform-formats) | no | the user |
 | Canon spend | Money, `state.json` `budget.spentUsd`; `totalUsd` must equal the series budget (HS-107) | yes | EVT-CanonSpendRecorded |
 
 **Derived**: Episode budgets (sum of the episodes' `budget_usd`) and the Uncommitted Series Budget (series budget −
@@ -545,9 +546,10 @@ song, the effective timing, the `release:` block of `project.yaml`, `config/chan
 |---|---|---|---|
 | File | path in the folder: `video/<slug>-<format>.mp4`, `video/<slug>.<lang>.srt`, `thumbnails/thumb-1..3.jpg`, `shorts/<name>-9x16.mp4` with `-thumb.jpg` and `-tiktok.jpg`; music only `audio/<Artist> - <Title>.wav`, `streaming/cover-3000x3000.jpg`, `canvas-9x16.mp4`, `lyrics.txt`, `lyrics.lrc`; `announce/`, `instagram/`, `calendar.ics`, `microsite/<slug>.json`, `texts/*.md`, `README.md` | yes | EVT-ReleasePackageBuilt |
 | Kind, bytes, SHA-256, specification, source | per file; the source relative to the project or `generated` | yes | EVT-ReleasePackageBuilt |
+| Release shape | `music-video` \| `meme` \| `episode` \| `short-episode`; derived from kind, master format and episode length, kept once the release status has a done mark or a live URL (HS-266, HS-268) | yes (a manifest without it reads as its kind) | EVT-ReleasePackageBuilt |
 | TODOs | the gaps only the user can close | yes | EVT-ReleasePackageBuilt |
 | Generated at | Timestamp | yes | EVT-ReleasePackageBuilt |
-| Upload data | per platform the texts of the main video and every Short, the Instagram post, Spotify, the announcement, X, LinkedIn (post or skip with a reason), the microsite | for the texts | EVT-UploadDataWritten |
+| Upload data | per platform the texts of the main video and every Short, the Instagram post (the main video's Reel), Spotify, the announcement, X (media `main` by default, the link reply optional), LinkedIn (post or skip with a reason), the microsite; a story's caption of at most 120 characters, only for a story with a video (HS-267) | for the texts | EVT-UploadDataWritten |
 | Release metadata | artist, title, genres, language, explicit, release day, songwriters, producer, label, ISRC, AI credits (lyrics, music, vocals, instrumental: none \| partial \| full), AI tool, licence note; the channel's release defaults fill gaps | no (each missing one a TODO) | the user |
 
 **Not part of it**: errors and warnings of a run (printed, not stored). **Derived**: `review/upload.md`
