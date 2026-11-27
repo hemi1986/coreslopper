@@ -49,8 +49,8 @@
       "role": "layer",
       "roleReasons": [
         "generic package name (@coreslopper/core)",
-        "19 concept stems in this package",
-        "11 shared with other packages"
+        "21 concept stems in this package",
+        "12 shared with other packages"
       ]
     },
     {
@@ -71,8 +71,8 @@
       "role": "layer",
       "roleReasons": [
         "generic package name (@coreslopper/providers)",
-        "13 concept stems in this package",
-        "1 shared with other packages"
+        "14 concept stems in this package",
+        "2 shared with other packages"
       ]
     },
     {
@@ -113,6 +113,24 @@
       "roleReasons": [
         "no layer signal"
       ]
+    },
+    {
+      "name": "coreslopper-pose",
+      "path": "scripts/pose",
+      "kind": "package",
+      "language": "Python",
+      "manifest": "scripts/pose/pyproject.toml",
+      "scripts": {},
+      "entryPoints": [],
+      "internalDeps": [],
+      "externalDeps": 1,
+      "consumers": [],
+      "hasTests": true,
+      "adopted": false,
+      "role": "domain",
+      "roleReasons": [
+        "no layer signal"
+      ]
     }
   ],
   "ranking": [
@@ -120,41 +138,48 @@
       "path": "packages/cli",
       "score": 0.61,
       "reasons": [
-        "358 changed files in recent history",
+        "550 changed files in recent history",
         "shared library",
         "shared infrastructure – not a domain slice"
       ]
     },
     {
       "path": "scripts/audio-analysis",
-      "score": 0.19,
+      "score": 0.16,
       "reasons": [
-        "27 changed files in recent history"
+        "12 changed files in recent history"
+      ]
+    },
+    {
+      "path": "scripts/pose",
+      "score": 0.16,
+      "reasons": [
+        "6 changed files in recent history"
       ]
     },
     {
       "path": "packages/remotion",
-      "score": 0.16,
+      "score": 0.1,
       "reasons": [
-        "62 changed files in recent history",
+        "38 changed files in recent history",
         "shared library",
         "shared infrastructure – not a domain slice"
       ]
     },
     {
       "path": "packages/core",
-      "score": 0.04,
+      "score": 0.03,
       "reasons": [
-        "119 changed files in recent history",
+        "147 changed files in recent history",
         "shared library",
         "layer package – hosts many concepts, not a domain slice"
       ]
     },
     {
       "path": "packages/providers",
-      "score": 0.03,
+      "score": 0.02,
       "reasons": [
-        "80 changed files in recent history",
+        "56 changed files in recent history",
         "shared library",
         "layer package – hosts many concepts, not a domain slice"
       ]
@@ -198,6 +223,40 @@
       "adoptedAt": "2026-11-22"
     },
     {
+      "name": "pose",
+      "terms": [
+        "extract",
+        "pose",
+        "track"
+      ],
+      "tables": [],
+      "files": [
+        "packages/cli/src/pose-extract.ts",
+        "packages/core/src/pose.ts",
+        "scripts/pose/pose_core.py",
+        "scripts/pose/tests/test_pose_core.py",
+        "tests/pose-track.test.ts"
+      ],
+      "packages": [
+        "?",
+        "packages/cli",
+        "packages/core",
+        "scripts/pose"
+      ],
+      "layers": [
+        "cli",
+        "core",
+        "scripts",
+        "tests"
+      ],
+      "score": 21,
+      "reasons": [
+        "4 layers: cli, core, scripts, tests",
+        "4 packages",
+        "5 files"
+      ]
+    },
+    {
       "name": "episode",
       "terms": [
         "episode",
@@ -239,12 +298,15 @@
         "calendar",
         "characterization",
         "data",
+        "fact",
         "file",
         "folder",
         "image",
+        "internal",
         "media",
         "microsite",
         "plan",
+        "record",
         "release",
         "text",
         "timer"
@@ -254,23 +316,33 @@
         "packages/cli/src/board/release.js",
         "packages/cli/src/release-autopilot.ts",
         "packages/cli/src/release-board-data.ts",
+        "packages/cli/src/release-board-routes.ts",
         "packages/cli/src/release-board.ts",
         "packages/cli/src/release-calendar.ts",
+        "packages/cli/src/release-facts.ts",
         "packages/cli/src/release-files.ts",
         "packages/cli/src/release-images.ts",
         "packages/cli/src/release-media.ts",
         "packages/cli/src/release-microsite.ts",
         "packages/cli/src/release-qa.ts",
+        "packages/cli/src/release-records.ts",
         "packages/cli/src/release-texts.ts",
         "packages/cli/src/release-timer.ts",
         "packages/cli/src/release.ts",
+        "packages/core/src/release-plan.ts",
         "packages/core/src/release.ts",
         "tests/helpers/release-fixture.ts",
         "tests/release-autopilot-plan.test.ts",
         "tests/release-autopilot.test.ts",
         "tests/release-calendar.test.ts",
         "tests/release-characterization.test.ts",
+        "tests/release-facts.test.ts",
         "tests/release-folder.test.ts",
+        "tests/release-images.test.ts",
+        "tests/release-internal.test.ts",
+        "tests/release-plan.test.ts",
+        "tests/release-records.test.ts",
+        "tests/release-routes.test.ts",
         "tests/release.test.ts"
       ],
       "packages": [
@@ -287,7 +359,7 @@
       "reasons": [
         "3 layers: cli, core, tests",
         "3 packages",
-        "21 files"
+        "31 files"
       ],
       "adopted": true,
       "adoptedAt": "2026-11-22"
@@ -473,20 +545,28 @@
       "terms": [
         "board",
         "characterization",
+        "feedback",
+        "http",
         "production",
+        "release",
         "review",
         "shell",
+        "sound",
         "watch",
         "wizard"
       ],
       "tables": [],
       "files": [
+        "packages/cli/src/board-http.ts",
         "packages/cli/src/board-production.ts",
         "packages/cli/src/board-review.ts",
         "packages/cli/src/board-wizard.ts",
+        "tests/board-feedback.test.ts",
         "tests/board-production.test.ts",
+        "tests/board-release.test.ts",
         "tests/board-review.test.ts",
         "tests/board-shell-characterization.test.ts",
+        "tests/board-sounds.test.ts",
         "tests/board-watch.test.ts",
         "tests/board-wizard.test.ts"
       ],
@@ -502,7 +582,7 @@
       "reasons": [
         "2 layers: cli, tests",
         "2 packages",
-        "8 files"
+        "12 files"
       ],
       "adopted": true,
       "adoptedAt": "2026-11-22"
@@ -513,8 +593,10 @@
         "auth",
         "autopilot",
         "characterization",
+        "failure",
         "instagram",
         "linkedin",
+        "poll",
         "publish",
         "setup"
       ],
@@ -525,8 +607,10 @@
         "packages/cli/src/publish.ts",
         "tests/publish-autopilot-adapters.test.ts",
         "tests/publish-characterization.test.ts",
+        "tests/publish-failure.test.ts",
         "tests/publish-instagram.test.ts",
         "tests/publish-linkedin.test.ts",
+        "tests/publish-poll.test.ts",
         "tests/publish-x.test.ts",
         "tests/publish.test.ts"
       ],
@@ -542,7 +626,7 @@
       "reasons": [
         "2 layers: cli, tests",
         "2 packages",
-        "9 files"
+        "11 files"
       ],
       "adopted": true,
       "adoptedAt": "2026-11-22"
@@ -609,16 +693,19 @@
       "adoptedAt": "2026-11-22"
     },
     {
-      "name": "init",
+      "name": "clip",
       "terms": [
-        "command",
-        "init"
+        "audio",
+        "clip",
+        "duration",
+        "option"
       ],
       "tables": [],
       "files": [
-        "packages/cli/src/init-command.ts",
-        "packages/cli/src/init.ts",
-        "tests/init.test.ts"
+        "packages/cli/src/clip-audio.ts",
+        "packages/cli/src/clip-options.ts",
+        "tests/clip-audio.test.ts",
+        "tests/clip-duration.test.ts"
       ],
       "packages": [
         "?",
@@ -628,11 +715,11 @@
         "cli",
         "tests"
       ],
-      "score": 11,
+      "score": 12,
       "reasons": [
         "2 layers: cli, tests",
         "2 packages",
-        "3 files"
+        "4 files"
       ]
     },
     {
@@ -646,7 +733,63 @@
       "files": [
         "packages/cli/src/lipsync-audio.ts",
         "tests/lipsync-audio.test.ts",
+        "tests/lipsync-default.test.ts",
         "tests/lipsync-routing.test.ts"
+      ],
+      "packages": [
+        "?",
+        "packages/cli"
+      ],
+      "layers": [
+        "cli",
+        "tests"
+      ],
+      "score": 12,
+      "reasons": [
+        "2 layers: cli, tests",
+        "2 packages",
+        "4 files"
+      ]
+    },
+    {
+      "name": "sound",
+      "terms": [
+        "cue",
+        "sound"
+      ],
+      "tables": [],
+      "files": [
+        "packages/cli/src/board/sounds.js",
+        "packages/cli/src/sound-library.ts",
+        "tests/sound-cues.test.ts",
+        "tests/sound-library.test.ts"
+      ],
+      "packages": [
+        "?",
+        "packages/cli"
+      ],
+      "layers": [
+        "cli",
+        "tests"
+      ],
+      "score": 12,
+      "reasons": [
+        "2 layers: cli, tests",
+        "2 packages",
+        "4 files"
+      ]
+    },
+    {
+      "name": "init",
+      "terms": [
+        "command",
+        "init"
+      ],
+      "tables": [],
+      "files": [
+        "packages/cli/src/init-command.ts",
+        "packages/cli/src/init.ts",
+        "tests/init.test.ts"
       ],
       "packages": [
         "?",
@@ -743,170 +886,6 @@
         "2 layers: cli, tests",
         "2 packages",
         "3 files"
-      ],
-      "adopted": true,
-      "adoptedAt": "2026-11-22"
-    },
-    {
-      "name": "state",
-      "terms": [
-        "characterization",
-        "state"
-      ],
-      "tables": [],
-      "files": [
-        "packages/core/src/state.ts",
-        "tests/state-characterization.test.ts",
-        "tests/state.test.ts"
-      ],
-      "packages": [
-        "?",
-        "packages/core"
-      ],
-      "layers": [
-        "core",
-        "tests"
-      ],
-      "score": 11,
-      "reasons": [
-        "2 layers: core, tests",
-        "2 packages",
-        "3 files"
-      ]
-    },
-    {
-      "name": "autopilot",
-      "terms": [
-        "autopilot",
-        "state"
-      ],
-      "tables": [],
-      "files": [
-        "packages/cli/src/autopilot-state.ts",
-        "packages/core/src/autopilot.ts"
-      ],
-      "packages": [
-        "packages/cli",
-        "packages/core"
-      ],
-      "layers": [
-        "cli",
-        "core"
-      ],
-      "score": 10,
-      "reasons": [
-        "2 layers: cli, core",
-        "2 packages",
-        "2 files"
-      ]
-    },
-    {
-      "name": "clip",
-      "terms": [
-        "clip",
-        "duration",
-        "option"
-      ],
-      "tables": [],
-      "files": [
-        "packages/cli/src/clip-options.ts",
-        "tests/clip-duration.test.ts"
-      ],
-      "packages": [
-        "?",
-        "packages/cli"
-      ],
-      "layers": [
-        "cli",
-        "tests"
-      ],
-      "score": 10,
-      "reasons": [
-        "2 layers: cli, tests",
-        "2 packages",
-        "2 files"
-      ]
-    },
-    {
-      "name": "pipeline",
-      "terms": [],
-      "tables": [],
-      "files": [],
-      "packages": [],
-      "layers": [],
-      "score": 0,
-      "reasons": [
-        "marked adopted manually"
-      ],
-      "adopted": true,
-      "adoptedAt": "2026-11-22"
-    },
-    {
-      "name": "verdict",
-      "terms": [],
-      "tables": [],
-      "files": [],
-      "packages": [],
-      "layers": [],
-      "score": 0,
-      "reasons": [
-        "marked adopted manually"
-      ],
-      "adopted": true,
-      "adoptedAt": "2026-11-22"
-    },
-    {
-      "name": "storyboard",
-      "terms": [],
-      "tables": [],
-      "files": [],
-      "packages": [],
-      "layers": [],
-      "score": 0,
-      "reasons": [
-        "marked adopted manually"
-      ],
-      "adopted": true,
-      "adoptedAt": "2026-11-22"
-    },
-    {
-      "name": "generation",
-      "terms": [],
-      "tables": [],
-      "files": [],
-      "packages": [],
-      "layers": [],
-      "score": 0,
-      "reasons": [
-        "marked adopted manually"
-      ],
-      "adopted": true,
-      "adoptedAt": "2026-11-22"
-    },
-    {
-      "name": "series",
-      "terms": [],
-      "tables": [],
-      "files": [],
-      "packages": [],
-      "layers": [],
-      "score": 0,
-      "reasons": [
-        "marked adopted manually"
-      ],
-      "adopted": true,
-      "adoptedAt": "2026-11-22"
-    },
-    {
-      "name": "workspace",
-      "terms": [],
-      "tables": [],
-      "files": [],
-      "packages": [],
-      "layers": [],
-      "score": 0,
-      "reasons": [
-        "marked adopted manually"
       ],
       "adopted": true,
       "adoptedAt": "2026-11-22"
