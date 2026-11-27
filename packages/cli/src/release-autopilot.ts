@@ -321,9 +321,10 @@ export const COMMENT_EVENT = 'youtube:comment';
  * a plain failure, which is retried up to `retries` times.
  */
 async function ensurePinnedComment(dir: string, facts: ReleaseFacts, deps: AutopilotDeps, ready: Record<string, boolean>) {
-  // A meme is posted as a Short: its one text is the caption, not a pinned comment under a main video.
+  // A meme and a short episode are posted as a Short: their one text is the caption, not a pinned comment under a main video.
   const status = await loadStatus(dir);
-  const pinned = facts.input.kind === 'meme' ? undefined : releasePlan(facts, status).posts.find((post) => post.id === 'youtube')?.texts.pinned?.value ?? facts.data?.main.pinned_comment;
+  const oneVideo = facts.input.kind === 'meme' || facts.input.shape === 'short-episode';
+  const pinned = oneVideo ? undefined : releasePlan(facts, status).posts.find((post) => post.id === 'youtube')?.texts.pinned?.value ?? facts.data?.main.pinned_comment;
   const settings = facts.schedule.autopilot;
   const item = status.items.youtube;
   if (!pinned || !item?.done || item.manual || !settings.platforms.includes('youtube') || !ready.youtube) return undefined;
@@ -436,7 +437,8 @@ async function act(dir: string, item: AutopilotEventPlan, facts: ReleaseFacts, s
     }
     const studio = entry.remote_id ? `https://studio.youtube.com/video/${entry.remote_id}/edit` : 'YouTube Studio';
     const steps: string[] = [];
-    if (action.item === 'main' && facts.input.kind !== 'meme' && facts.schedule.release.premiere) steps.push(`Schedule it as a Premiere at ${item.event.at} in ${studio} (the API cannot).`);
+    // A meme and a short episode are Shorts: `premiere` of the release facts is false for them (ADR 0057).
+    if (action.item === 'main' && facts.input.premiere) steps.push(`Schedule it as a Premiere at ${item.event.at} in ${studio} (the API cannot).`);
     else if (entry.status !== 'scheduled') steps.push(`Switch it to public at ${item.event.at} in ${studio} (an unaudited API project uploads private only).`);
     if (action.item !== 'main') steps.push(`Set the related video to the main video in ${studio}.`);
     return { status: entry.status === 'scheduled' ? 'scheduled' : 'uploaded', remote_id: entry.remote_id, url: entry.url, publish_at: entry.publish_at, warnings: entry.warnings, manual_steps: steps };

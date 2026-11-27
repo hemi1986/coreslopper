@@ -990,6 +990,8 @@ export const UploadDataSchema = z
       .object({
         text: z.string().min(1),
         hashtags: z.array(HashtagSchema).default([]),
+        /** The caption of the announcement story while it shows the teaser; at most 120 characters, optional. The text and its hashtags are not counted against it. */
+        story: z.string().min(1).optional(),
         /** The still the announcement and story images are composed from; without it, the still of the cover's recipe. */
         image: z.object({ still: z.string().min(1), focus: z.string().regex(/^\d*\.?\d+,\d*\.?\d+$/, 'use x,y fractions such as 0.5,0.35').optional() }).optional(),
       })
@@ -999,9 +1001,12 @@ export const UploadDataSchema = z
     microsite: UploadMicrositeSchema.optional(),
   })
   .superRefine((data, ctx) => {
-    const seen = new Set<string>(['main']);
+    const seen = new Set<string>();
     data.shorts.forEach((short, index) => {
-      if (seen.has(short.name)) {
+      // `main` names the main video (`x.media: main`, `--only main`): a Short of that name would be ambiguous.
+      if (short.name === 'main') {
+        ctx.addIssue({ code: 'custom', path: ['shorts', index, 'name'], message: 'a Short may not be named "main": main is the main video' });
+      } else if (seen.has(short.name)) {
         ctx.addIssue({ code: 'custom', path: ['shorts', index, 'name'], message: `duplicate item name "${short.name}"` });
       }
       seen.add(short.name);

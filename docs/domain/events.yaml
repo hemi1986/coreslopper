@@ -2760,7 +2760,7 @@ read_models:
     name: Release checks
     fed_by: [EVT-ReleasePackageBuilt, EVT-ReleaseChecked]
     used_by: [ACT-StageRunner, ACT-User]
-    fields: [Release package, Release files, Release formats, Release thumbnails, Release Shorts, Release audio, Release cover, Release canvas, Release lyrics, Release texts, Release metadata, Upload text, Upload data]
+    fields: [Release package, Release files, Release formats, Release thumbnails, Release Shorts, Release audio, Release cover, Release canvas, Release lyrics, Release texts, Release unused texts, Release metadata, Upload text, Upload data]
     description: "The release rows of review/report.md; only FAIL blocks READY (release-qa.ts:56-231; qa.ts:419-421)"
   - id: RM-UploadText
     name: Upload text

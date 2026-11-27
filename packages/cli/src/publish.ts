@@ -203,9 +203,14 @@ export function selectItems(
     item.description = memeDescription(data, main.credits);
     item.caption = memeCaption(data, main.credits);
   }
+  // A short episode is one video: its YouTube Short and TikTok post come from the plan, whatever main.platforms says, and the upload data's Shorts are left out (ADR 0057).
+  const oneVideo = main.plan?.shape === 'short-episode';
+  const mainPlatforms: PublishPlatform[] = oneVideo
+    ? (['youtube', 'tiktok'] as const).filter((platform) => main.plan!.posts.some((post) => post.id === platform))
+    : data.main.platforms;
   const all = [
-    { item, platforms: data.main.platforms },
-    ...data.shorts.map((short) => {
+    { item, platforms: mainPlatforms },
+    ...(oneVideo ? [] : data.shorts).map((short) => {
       const shortItem = toItem(projectDir, data, short, 'short');
       if (main.plan) applyPlan(shortItem, main.plan, { youtube: `short:${short.name}:youtube`, tiktok: `short:${short.name}:tiktok` });
       return { item: shortItem, platforms: short.platforms };
@@ -216,7 +221,7 @@ export function selectItems(
   if (only === 'shorts') return all.slice(1);
   const match = all.filter(({ item }) => item.name === only);
   if (match.length === 0) {
-    throw new ValidationError(`--only ${only}: no such item. Use main, shorts, or one of: ${data.shorts.map((s) => s.name).join(', ') || '(no Shorts)'}.`);
+    throw new ValidationError(`--only ${only}: no such item. Use main, shorts, or one of: ${(oneVideo ? [] : data.shorts).map((s) => s.name).join(', ') || '(no Shorts)'}.`);
   }
   return match;
 }

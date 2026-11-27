@@ -29,6 +29,7 @@ import {
   releasedPublicly,
   keptShapeProblem,
   manifestShape,
+  provisionalShapeTodo,
   releaseForm,
   SHORT_FORM_MAX_SECONDS,
   releaseStart,
@@ -371,6 +372,8 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
 
   if (music) todos.push(...releaseTodos(releaseFacts, channel, identity));
   if (meme) todos.push(...soundLicenceTodos(usedSounds));
+  const provisional = provisionalShapeTodo({ kind, durationSeconds: timing?.audio.duration });
+  if (provisional) todos.push(provisional);
   todos.push(...channelTodos(channel));
   await mkdir(dir, { recursive: true });
 

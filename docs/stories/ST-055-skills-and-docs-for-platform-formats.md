@@ -10,7 +10,7 @@ depends_on: [ST-044, ST-045, ST-046, ST-048, ST-049]
 labels: [feature:platform-formats]
 feature: platform-formats
 sources: [docs/research/platform-video-formats.md]
-status: ready
+status: in-progress
 ---
 
 ## Task
@@ -45,11 +45,11 @@ ST-044 to ST-048, decided by recommendation, delegated by the user):
   the plan whatever `main.platforms` says, no Premiere step and no pinned comment.
 
 ## Acceptance Criteria
-- [ ] `release.md` describes the short-episode and the vertical-version paths with their commands
-- [ ] No skill or doc asks for a story text, an Instagram feed image, or a Short for the X post by default
-- [ ] `docs/release-platforms.md` cites the research file for every changed figure
-- [ ] `announcement.story` is the announcement story's caption; an announcement text over 120 characters no longer fails release (test)
-- [ ] QA WARNs for a story text on another Short and for `instagram_post` over 3 minutes; a Short named `main` is invalid upload data (test)
-- [ ] An episode without `timing.json` gets the provisional-shape TODO (test)
-- [ ] A short episode publishes only its one video, reaches TikTok without `tiktok` in `main.platforms`, and gets no Premiere step or pinned comment (test)
-- [ ] `npm test` passes (the skill and doc checks)
+- [x] `release.md` describes the short-episode and the vertical-version paths with their commands
+- [x] No skill or doc asks for a story text, an Instagram feed image, or a Short for the X post by default
+- [x] `docs/release-platforms.md` cites the research file for every changed figure
+- [x] `announcement.story` is the announcement story's caption; an announcement text over 120 characters no longer fails release (test)
+- [x] QA WARNs for a story text on another Short and for `instagram_post` over 3 minutes; a Short named `main` is invalid upload data (test)
+- [x] An episode without `timing.json` gets the provisional-shape TODO (test)
+- [x] A short episode publishes only its one video, reaches TikTok without `tiktok` in `main.platforms`, and gets no Premiere step or pinned comment (test)
+- [x] `npm test` passes (the skill and doc checks)

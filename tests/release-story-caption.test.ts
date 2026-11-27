@@ -121,7 +121,7 @@ describe('an image story', () => {
   it('gives the announcement story a caption only while it shows the teaser', async () => {
     const dir = await fixture();
     const result = await buildRelease({ projectDir: dir, deps: fakeDeps() });
-    expect(post(result, 'announce:instagram').texts.caption).toMatchObject({ value: 'Freitag: Neon Rain.\n\n#synthwave', limit: { max: 120 } });
+    expect(post(result, 'announce:instagram').texts.caption).toMatchObject({ value: 'Bald: Neon Rain', limit: { max: 120 } });
 
     // The release moves a week and the quick refresh composes nothing: the announcement story falls back to the cover.
     await setReleaseDay(dir, '2026-12-18');
@@ -141,7 +141,7 @@ describe('the caption on the board and in the folder', () => {
     const story = instagram.posts.find((entry) => entry.id === 'story')!;
     expect(story.fields).toEqual([{ label: 'Bildunterschrift', value: 'Neu: Teil 1', limit: 120, unit: 'chars' }]);
     const announce = instagram.posts.find((entry) => entry.id === 'announce:instagram')!;
-    expect(announce.fields).toEqual([{ label: 'Bildunterschrift', value: 'Freitag: Neon Rain.\n\n#synthwave', limit: 120, unit: 'chars' }]);
+    expect(announce.fields).toEqual([{ label: 'Bildunterschrift', value: 'Bald: Neon Rain', limit: 120, unit: 'chars' }]);
     const reel = instagram.posts.find((entry) => entry.id === 'short:Z1-intro:instagram')!;
     expect(reel.fields.map((field) => field.label)).not.toContain('Bildunterschrift');
 

@@ -49,6 +49,16 @@ export function releaseShape(input: {
 }
 
 /**
+ * The TODO of an episode whose release shape is provisional: without a built
+ * episode track (`timing.json`) its length is unknown, so it releases as an
+ * episode until `episode-track` ran (ADR 0057). Undefined for every other project.
+ */
+export function provisionalShapeTodo(input: { kind: ProjectKind; durationSeconds: number | undefined }): string | undefined {
+  if (input.kind !== 'episode' || input.durationSeconds !== undefined) return undefined;
+  return 'timing.json is missing: the release shape (episode) is provisional until episode-track builds the episode track; run release again after it';
+}
+
+/**
  * Whether a project posts its **Vertical Version** – the 9:16 render of the
  * whole episode – as its one Short instead of cut Shorts: a horizontal episode
  * whose episode track lasts at most 3 minutes (ADR 0057, HS-266). An episode

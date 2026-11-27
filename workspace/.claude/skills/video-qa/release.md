@@ -4,6 +4,20 @@ Everything the user needs to publish, in one folder: `renders/release/` (on the 
 
 Write every text in the project's language (`song.json` `language`, the language of the brief) and in the tone of the brief: a satire sounds like the song, not like a press release. Facts come from the project files only: spend from `state.json`, models from `assets/manifest.jsonl`, credits from `song.json`, the brief, and the `release:` block of `project.yaml`, and links, footer lines, and hashtag sets from `config/channel.yaml` when it exists. A tool, model, cost, person, name, ISRC, or right that is not in those files does not go into the texts; `release` marks the gap as a TODO for the user.
 
+## Pick the path
+
+The release shape follows from `project.yaml` (`kind`, `formats.master`) and the length of `timing.json`; `release` records it in `manifest.json` as `shape` (ADR 0057):
+
+| Project | Shape | Path |
+|---|---|---|
+| `kind: meme` | meme | [A meme's release package](#a-memes-release-package) |
+| An episode whose master is at least as tall as wide (9:16, 4:5, 1:1), up to 3 minutes | short episode | [A short episode's release package](#a-short-episodes-release-package) |
+| A 16:9 episode up to 3 minutes | episode | Sections 1–8; its one Short is the **vertical version** (sections 2–4) |
+| A vertical episode over 3 minutes | episode | Sections 1–8 with one main-video thumbnail (section 1) |
+| A music video, a 16:9 episode over 3 minutes | music video, episode | Sections 1–8 |
+
+An episode without `timing.json` has no length yet: `release` builds it as an episode and leaves a TODO that the shape is provisional. Run `episode-track` first, then release. Once a post went out, the shape is kept: a run with another shape fails and changes nothing.
+
 ## A meme's release package
 
 A meme (`kind: meme`) takes this path instead of sections 1–8: it has no thumbnails, Shorts, song WAV, canvas, lyrics, or announcement. Its folder is one 9:16 video, one 1080x1920 cover, and the TikTok, YouTube Shorts, and Instagram Reels texts (ADR 0051).
@@ -21,11 +35,40 @@ A meme (`kind: meme`) takes this path instead of sections 1–8: it has no thumb
 
 Done when the folder holds the video, the cover, and the three platform texts, and `qa` reports no FAIL in the release checks.
 
+## A short episode's release package
+
+A short episode takes this path instead of sections 1–8. It is one video, posted on the release day to YouTube Shorts, TikTok, Instagram Reels, X, and the microsite: no main video, Shorts, 16:9 thumbnails, story, community post, pinned comment, or LinkedIn. Its folder is the master video, one 1080x1920 cover, and one 1080x1440 TikTok cover.
+
+1. Compose both covers from the strongest still, with the hook as their text (the rules in [thumbnails.md](thumbnails.md)):
+
+   ```bash
+   npm run cli -- thumbnail projects/<slug> --still <still> --text "<HOOK>" --format 9x16 \
+     --out projects/<slug>/renders/cover-1080x1920.jpg
+   npm run cli -- thumbnail projects/<slug> --still <still> --text "<HOOK>" --format 3x4 \
+     --out projects/<slug>/renders/cover-1080x1440.jpg
+   ```
+
+2. Run the `art-director` agent on both covers with the rules of section 6 for 9:16 Short thumbnails and 3:4 TikTok covers; re-compose until each passes.
+3. Write `review/upload.yaml` (the facts as in section 7) with one text per platform:
+   - `main`: `file: renders/<master>.mp4` (e.g. `renders/9x16.mp4`), the YouTube Shorts title and description, `hashtags`, `tags`, `made_for_kids`, `synthetic_media`, `platforms: [youtube]`. `publish` and the autopilot also post it to TikTok from the release plan.
+   - `tiktok` and `instagram`: `caption` and `hashtags` each, two different texts (identical captions fail).
+   - `x`: `post` and `hashtags`; `reply` is optional and carries the YouTube link.
+   - `microsite`: `teaser` and `text`.
+   - `announcement`: optional, with `text`, `hashtags`, and an optional `story` caption of at most 120 characters; its teaser is cut from the master.
+
+   `shorts`, `instagram_post`, `spotify`, `linkedin`, `pinned_comment`, and `community_post` stay out: a short episode does not use them.
+4. `npm run cli -- release projects/<slug> --no-render` writes `renders/release/`: `video/<slug>-<master>.mp4`, `cover/<slug>-1080x1920.jpg`, `cover/<slug>-1080x1440.jpg`, and `texts/youtube.md`, `texts/tiktok.md`, `texts/instagram.md`, `texts/x.md`, `texts/release-plan.md`. The release calendar plans the five posts on the release day, and the announcement a week before when there is one. Adding the Short to the series' YouTube playlist is a checklist line for the user.
+5. `npm run cli -- qa projects/<slug>` reports no FAIL; `Release cover`, `Release formats`, and `Release texts` are PASS.
+
+Done when the folder holds the video, both covers, and the five platform texts, the art director passed both covers, and `qa` reports no FAIL in the release checks.
+
 ## 1. Main video thumbnails
 
-Make the three 16:9 thumbnails with [thumbnails.md](thumbnails.md).
+Make the three 16:9 thumbnails with [thumbnails.md](thumbnails.md). A vertical episode over 3 minutes gets one: `thumb-1-<subject>.jpg`.
 
 ## 2. Pick three Shorts
+
+A 16:9 episode up to 3 minutes cuts no Shorts: its one Short is its **vertical version**, the 9:16 render of the whole episode, which `release` places as `shorts/<slug>-9x16.mp4`. It needs `9:16` in `formats.derivatives` of `project.yaml`. Skip sections 2 and 3, compose its thumbnail and TikTok cover as the vertical covers in section 4, and write its texts as the one `shorts` entry with `name: <slug>` and `file: renders/9x16.mp4` (section 7); `release` ignores every other entry.
 
 Read the sections and lines of `timing.effective.json` and the storyboard. Pick three moments that each work alone in the first second, with no intro needed:
 
@@ -64,6 +107,8 @@ npm run cli -- thumbnail projects/<slug> --format 9x16 \
 
 The vertical layout is fixed: the face in the upper middle, the hook in the lower part above the Shorts buttons, its first line inside the central square that grid views show. Name each file `<short-name>-thumb.jpg` beside its video.
 
+For the vertical version, compose the same two images once from a still of the whole episode, at the paths `release` takes them from: `--format 9x16 --out projects/<slug>/renders/cover-1080x1920.jpg` and `--format 3x4 --out projects/<slug>/renders/cover-1080x1440.jpg`.
+
 ### TikTok covers
 
 TikTok shows a cover only as a 3:4 tile in the profile grid and crops a 9:16 upload to its middle, so each Short also gets a 1080x1440 TikTok cover: the same still and hook as its Short thumbnail, composed again with `--format 3x4` (the hook sits in the lower part, above the view count). Name it `<short-name>-tiktok.jpg` beside its video:
@@ -86,7 +131,7 @@ npm run cli -- thumbnail projects/<slug> --format 1x1 \
 
 ## 6. Review the images
 
-Run the `art-director` agent on all six thumbnails, the three TikTok covers, and the cover with the rules in [thumbnails.md](thumbnails.md). For the 9:16 Short thumbnails also: the hook reads at a quarter size, the face sits above the text and inside the central square, nothing important lies in the bottom 15 % (the Shorts UI). For the 3:4 TikTok covers: the hook reads in a 120x160 grid tile, the face sits above the text, nothing important lies in the bottom 12 % (the view count). Re-compose until each passes.
+Run the `art-director` agent on all thumbnails (three, or one for a vertical episode over 3 minutes), the Short thumbnails and TikTok covers (three each, or one each for the vertical version), and the cover with the rules in [thumbnails.md](thumbnails.md). For the 9:16 Short thumbnails also: the hook reads at a quarter size, the face sits above the text and inside the central square, nothing important lies in the bottom 15 % (the Shorts UI). For the 3:4 TikTok covers: the hook reads in a 120x160 grid tile, the face sits above the text, nothing important lies in the bottom 12 % (the view count). Re-compose until each passes.
 
 ## 7. Write `review/upload.yaml`
 
@@ -140,7 +185,7 @@ shorts:
       caption: "<the Reel's own hook and one line of context; no #shorts>"
       hashtags: ['#topic']           # at most 5, counting those in the caption
       cover_frame: 1.5               # second of the Reel with the hook visible
-      story: "<optional: at most 120 characters>"  # the caption of the release-day story; only the first Short's is used, and only while the story shows its video
+      # story: "<at most 120 characters>"  # optional, first Short only: the caption of the release-day story, which shows that Short's video; QA warns about it on any other Short
     tiktok:
       caption: "<short, spoken-sounding, a question or a dare>"
       hashtags: ['#topic']
@@ -148,21 +193,22 @@ shorts:
       pinned_comment: "<optional>"
     platforms: [youtube, tiktok]
     # x: { post: "<the Short's line for X>", hashtags: ['#topic'] }   # optional: the Short also goes to X
-instagram_post:                    # the main video in the feed format (4:5 or 1:1 render) on the release day
+instagram_post:                    # the main video's Reel on the release day; only for a main video of at most 3 minutes (QA warns otherwise)
   caption: "<the hook in the first 125 characters, then one line of context>"
   hashtags: ['#topic']             # at most 5, counting those in the caption
 spotify:
   artist_pick: "<one line pinned on the artist profile>"
   pitch: "<at most 500 characters: mood, genre, instruments, story>"
 announcement:                      # a week before: Instagram story, YouTube post, X with the teaser
-  text: "<the release day and one line that makes people curious>"  # with its hashtags at most 120 characters: it is also the story's caption
+  text: "<the release day and one line that makes people curious>"  # the YouTube post and the X post
   hashtags: ['#topic']             # at most 5
+  # story: "<at most 120 characters>"   # optional: the announcement story's caption while it shows the teaser
   # image: { still: assets/image/keyframe/<hash>-0.png, focus: "0.5,0.35" }   # only when the cover has no recipe
 x:
   post: "<at most 280 characters with the hashtags>"
   hashtags: ['#topic']             # one or two
-  reply: "<'Full video:' in the project's language>"  # optional; release appends the YouTube link
-  media: main                      # main (the whole main video, the default) or a Short name
+  # reply: "<'Full video:' in the project's language>"  # optional; release appends the YouTube link
+  # media: <Short name>            # optional: without it the post carries the whole main video
 linkedin:
   decision: post                   # post | skip
   reason: "<one sentence: why the song does or does not suit LinkedIn>"
@@ -181,7 +227,9 @@ microsite:
 
 - Write each platform's text for that platform: YouTube explains, Instagram hooks in the first line, TikTok talks. Identical Instagram and TikTok captions fail the check.
 - Quote every value that contains `#`: unquoted, YAML reads `#…` as a comment and drops it.
-- Every Short in `renders/shorts/` gets an entry; `related: main` becomes a checklist item, since YouTube sets the related video only by hand.
+- Every Short in `renders/shorts/` gets an entry; `related: main` becomes a checklist item, since YouTube sets the related video only by hand. No Short is named `main`: that name is the main video.
+- Stories carry no text. Only a story that shows a video takes an optional caption of at most 120 characters: the first Short's `instagram.story` and `announcement.story`.
+- The X post carries the main video unless `x.media` names a Short; the board notes that X takes more than 140 seconds only with Premium.
 - `made_for_kids` and `synthetic_media` follow the brief; `config/channel.yaml` sets the disclosure defaults of the other platforms.
 - Episodes have no `spotify` block.
 - **LinkedIn is a decision.** Post when the song has a political, work, business, tech, or AI angle that a professional audience discusses (war profits, data sovereignty, AI and jobs, how an AI pipeline makes a video); skip a love song, a party song, or plain satire without that angle. Write the reason in either case. A post reads as a person's story told in the first person.
@@ -196,10 +244,10 @@ npm run cli -- release projects/<slug>
 npm run cli -- upload-text projects/<slug>
 ```
 
-`release` renders only formats that are missing or stale, copies (hardlinks) everything else, converts the song to a deliverable WAV only when needed, cuts the Spotify canvas, writes the lyrics files, then plans the release calendar (`review/calendar.yaml`, the next free slots under `config/release-schedule.yaml`; times already planned stay while the release day stays). With the calendar's dates it cuts the 10 s announcement teaser, composes the dated announcement images, the release-day story, and (without a 4:5 or 1:1 render) the 4:5 feed image from the cover's recipe, lays out `texts/` and `README.md`, and records `manifest.json`. A TODO asking for a still means the cover has no recipe: compose the cover again with `thumbnail`, or set `announcement.image`. Broken limits end the run with `✖ The release package breaks <n> rule(s)` and one `- ` line per rule: fix `upload.yaml` and run it again. When it reports that the canvas window shows lyrics, run it again with `--canvas-from <seconds or anchor>` on a part without lyrics (an instrumental or the drop) and check a frame of `streaming/canvas-9x16.mp4` with the art director: no text, no logos. `upload-text` keeps `review/upload.md` as a pointer to the folder. A proposed release date (no `release.release_date` yet) stays a TODO for the user: the date in `project.yaml` is theirs. The user releases from `npm run cli -- release-board`, a server they start themselves: their approval there hands the release to the autopilot.
+`release` renders only formats that are missing or stale, copies (hardlinks) everything else, converts the song to a deliverable WAV only when needed, cuts the Spotify canvas, writes the lyrics files, then plans the release calendar (`review/calendar.yaml`, the next free slots under `config/release-schedule.yaml`; times already planned stay while the release day stays). With the calendar's dates it cuts the 10 s announcement teaser, composes the dated announcement images and the release-day story from the cover's recipe, lays out `texts/` and `README.md`, and records `manifest.json`. A TODO asking for a still means the cover has no recipe: compose the cover again with `thumbnail`, or set `announcement.image`. Broken limits end the run with `✖ The release package breaks <n> rule(s)` and one `- ` line per rule: fix `upload.yaml` and run it again. When it reports that the canvas window shows lyrics, run it again with `--canvas-from <seconds or anchor>` on a part without lyrics (an instrumental or the drop) and check a frame of `streaming/canvas-9x16.mp4` with the art director: no text, no logos. `upload-text` keeps `review/upload.md` as a pointer to the folder. A proposed release date (no `release.release_date` yet) stays a TODO for the user: the date in `project.yaml` is theirs. The user releases from `npm run cli -- release-board`, a server they start themselves: their approval there hands the release to the autopilot.
 
 `npm run cli -- publish projects/<slug> --dry-run` also checks the YouTube and TikTok limits; uploading stays the user's command.
 
 ## Completion
 
-`npm run cli -- qa projects/<slug>` reports no FAIL in `Thumbnails`, `Shorts`, `Short thumbnails`, `Upload text`, `Upload data`, and every `Release …` check, and `Release texts` is PASS: every text written, every limit kept. TODO remains only where the user still has to supply a fact (`Release metadata`, a `<ID>` link, a sound's licence or credit in `Release sounds`) or choose a canvas window; `renders/release/README.md` lists them. The art director passed the six thumbnails, the cover, and the announcement and story images in `renders/release/announce/` and `renders/release/instagram/`.
+`npm run cli -- qa projects/<slug>` reports no FAIL in `Thumbnails`, `Shorts`, `Short thumbnails`, `Upload text`, `Upload data`, and every `Release …` check, and `Release texts` is PASS: every text written, every limit kept. A `Release unused texts` WARN names a text the release does not use: remove it from `upload.yaml`. TODO remains only where the user still has to supply a fact (`Release metadata`, a `<ID>` link, a sound's licence or credit in `Release sounds`) or choose a canvas window; `renders/release/README.md` lists them. The art director passed the thumbnails, the Short thumbnails and TikTok covers, the cover, and the announcement and story images in `renders/release/announce/` and `renders/release/instagram/`.

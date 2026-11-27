@@ -412,6 +412,10 @@
             "pattern": "^#[\\p{L}\\p{N}_]+$"
           }
         },
+        "story": {
+          "type": "string",
+          "minLength": 1
+        },
         "image": {
           "type": "object",
           "properties": {
