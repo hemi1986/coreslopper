@@ -4,15 +4,20 @@
 
 **Progress: 24 of 31 domain stories done** · scenarios 80 of 108
 
-**59 stories** · In Progress: 0 · Ready: 17 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 42 · Superseded: 0
+**59 stories** · In Progress: 1 · Ready: 16 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 42 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
+
+## In Progress
+
+| ID | Title | Type | Context | Priority | Size | Risk | Depends on |
+|---|---|---|---|---|---|---|---|
+| [ST-043](ST-043-youtube-hashtags-without-hash-on-the-board.md) | The board lists YouTube hashtags comma-separated without "#" | chore | – | must | – | – | – |
 
 ## Ready
 
 | ID | Title | Type | Context | Priority | Size | Risk | Depends on |
 |---|---|---|---|---|---|---|---|
-| [ST-043](ST-043-youtube-hashtags-without-hash-on-the-board.md) | The board lists YouTube hashtags comma-separated without "#" | chore | – | must | – | – | – |
 | [ST-044](ST-044-a-story-has-only-a-caption-on-its-video.md) | A story carries no text, only an optional caption of at most 120 characters on its video | domain | Release | must | – | – | – |
 | [ST-045](ST-045-the-main-video-reel-up-to-three-minutes.md) | The main video goes to Instagram as a Reel only up to 3 minutes | domain | Release | must | – | – | – |
 | [ST-046](ST-046-x-carries-the-main-video.md) | The X post carries the main video by default | domain | Release | must | – | – | – |
