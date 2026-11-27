@@ -186,31 +186,31 @@ describe('TODO detection and text limits', () => {
 
   it('checks the platform limits and asks for one text per platform', () => {
     const data = UploadDataSchema.parse(uploadYaml());
-    expect(platformTextProblems(data, platformLimits())).toEqual({ errors: [], missing: [] });
+    expect(platformTextProblems(data, platformLimits(), { shape: 'music-video' })).toEqual({ errors: [], missing: [] });
     const broken = uploadYaml();
     broken.shorts[0]!.instagram.hashtags = ['#a', '#b', '#c', '#d', '#e', '#f'];
     broken.shorts[1]!.tiktok.caption = broken.shorts[1]!.instagram.caption;
     (broken as { spotify: { pitch: string } }).spotify.pitch = 'x'.repeat(501);
-    const { errors } = platformTextProblems(UploadDataSchema.parse(broken), platformLimits());
+    const { errors } = platformTextProblems(UploadDataSchema.parse(broken), platformLimits(), { shape: 'music-video' });
     expect(errors.join('\n')).toContain('instagram Z1-intro: 6 hashtags, limit 5');
     expect(errors.join('\n')).toContain('Z2-chorus: the Instagram and TikTok captions are identical');
     expect(errors.join('\n')).toContain('spotify: pitch has 501 characters, limit 500');
     const lenient = ChannelConfigSchema.parse({ version: 1, name: 'x', language: 'de', limits: { instagram: { hashtags: 10 } } });
-    expect(platformTextProblems(UploadDataSchema.parse(broken), platformLimits(lenient)).errors.join()).not.toContain('6 hashtags');
+    expect(platformTextProblems(UploadDataSchema.parse(broken), platformLimits(lenient), { shape: 'music-video' }).errors.join()).not.toContain('6 hashtags');
   });
 
   it('checks a meme caption with its credits against the platform limits', () => {
     const data = UploadDataSchema.parse(memeUploadYaml());
-    expect(platformTextProblems(data, platformLimits(), { kind: 'meme' })).toEqual({ errors: [], missing: [] });
+    expect(platformTextProblems(data, platformLimits(), { shape: 'meme' })).toEqual({ errors: [], missing: [] });
     const many = UploadDataSchema.parse({ ...memeUploadYaml(), main: { ...memeUploadYaml().main, hashtags: ['#a', '#b', '#c', '#d', '#e', '#f'] } });
-    expect(platformTextProblems(many, platformLimits(), { kind: 'meme' }).errors).toContain('instagram: 6 hashtags, limit 5');
-    const errors = platformTextProblems(data, platformLimits(), { kind: 'meme', credits: ['x'.repeat(2200)] }).errors.join('\n');
+    expect(platformTextProblems(many, platformLimits(), { shape: 'meme' }).errors).toContain('instagram: 6 hashtags, limit 5');
+    const errors = platformTextProblems(data, platformLimits(), { shape: 'meme', credits: ['x'.repeat(2200)] }).errors.join('\n');
     expect(errors).toContain('tiktok: caption has');
     expect(errors).toContain('instagram: caption has');
     const long = UploadDataSchema.parse({ ...memeUploadYaml(), main: { ...memeUploadYaml().main, description: 'x'.repeat(5001) } });
-    expect(platformTextProblems(long, platformLimits(), { kind: 'meme' }).errors.join('\n')).toContain('youtube short: description has');
+    expect(platformTextProblems(long, platformLimits(), { shape: 'meme' }).errors.join('\n')).toContain('youtube short: description has');
     const tagged = UploadDataSchema.parse({ ...memeUploadYaml(), main: { ...memeUploadYaml().main, tags: ['x'.repeat(501)] } });
-    expect(platformTextProblems(tagged, platformLimits(), { kind: 'meme' }).errors.join('\n')).toContain('youtube short: tags have');
+    expect(platformTextProblems(tagged, platformLimits(), { shape: 'meme' }).errors.join('\n')).toContain('youtube short: tags have');
   });
 
   it('lays out per-platform texts in the project language with channel links and TODOs', () => {
@@ -223,6 +223,7 @@ describe('TODO detection and text limits', () => {
     });
     const input: ReleaseTextInput = {
       kind: 'music-video',
+      shape: 'music-video',
       language: 'de',
       slug: 'neon',
       artist: 'Neon Static',

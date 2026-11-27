@@ -101,8 +101,8 @@ export interface CalendarInput {
   slug: string;
   title: string;
   kind: 'music-video' | 'episode' | 'meme';
-  /** The release shape; without it the kind's. A short episode is one video, posted like a meme (ADR 0057). */
-  shape?: ReleaseShape;
+  /** The release shape (`releaseShape`). A short episode is one video, posted like a meme (ADR 0057). */
+  shape: ReleaseShape;
   /** `release.release_date` from project.yaml: the user's date always wins. */
   releaseDate?: string;
   /** Shorts in their order, with the platforms each one goes to. */

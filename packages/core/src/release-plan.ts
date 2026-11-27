@@ -65,8 +65,8 @@ export function xVideo(files: Pick<ReleasePlanFiles, 'master' | 'shorts'>, media
 /** Everything a release plan is made from. */
 export interface ReleasePlanInput {
   kind: 'music-video' | 'episode' | 'meme';
-  /** The release shape; without it the kind's. A short episode posts its one video on every platform (ADR 0057). */
-  shape?: ReleaseShape;
+  /** The release shape (`releaseShape`, or the manifest's). A short episode posts its one video on every platform (ADR 0057). */
+  shape: ReleaseShape;
   language: string;
   slug: string;
   artist?: string;
@@ -651,7 +651,7 @@ export function buildReleasePlan(input: ReleasePlanInput): ReleasePlan {
     artist: input.artist,
     title: input.title,
     durationSeconds: input.durationSeconds,
-    ...(input.shape ? { shape: input.shape } : {}),
+    shape: input.shape,
     // A meme and a short episode are Shorts, never a Premiere.
     premiere: !meme && !shortEpisode && Boolean(input.premiere),
     settings: settingsOf(input),

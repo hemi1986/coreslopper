@@ -245,7 +245,6 @@ export async function releaseChecks(projectDir: string, probe: Prober = probeMed
     const handle = channel?.links.youtube?.handle;
     const durationSeconds = (project.effectiveTiming ?? project.timing)?.audio.duration;
     const problems = platformTextProblems(data, platformLimits(channel), {
-      kind,
       shape: releaseShape({ kind, master: project.config.formats.master, durationSeconds }),
       credits,
       durationSeconds,

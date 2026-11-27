@@ -66,7 +66,7 @@ export function calendarInput(options: {
   title: string;
   kind: CalendarInput['kind'];
   /** The release shape; a short episode has no Shorts, community post, main-video Reel or LinkedIn post (ADR 0057). */
-  shape?: ReleaseShape;
+  shape: ReleaseShape;
   releaseDate?: string;
   data?: UploadData;
   shorts: string[];
@@ -90,7 +90,7 @@ export function calendarInput(options: {
     slug: options.slug,
     title: options.title,
     kind: options.kind,
-    ...(options.shape ? { shape: options.shape } : {}),
+    shape: options.shape,
     releaseDate: options.releaseDate,
     shorts,
     announcement: !meme && Boolean(data?.announcement),

@@ -19,6 +19,7 @@ const input: CalendarInput = {
   slug: 'neon',
   title: 'Neon',
   kind: 'music-video',
+  shape: 'music-video',
   releaseDate: '2026-12-11',
   shorts: [{ name: 'N1-hook', platforms: ['youtube', 'tiktok', 'instagram', 'x'] }],
   announcement: true,

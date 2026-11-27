@@ -31,6 +31,7 @@ const input = (extra: Partial<CalendarInput> = {}): CalendarInput => ({
   linkedin: false,
   microsite: false,
   ...extra,
+  shape: extra.shape ?? extra.kind ?? 'music-video',
 });
 
 const upload = (change: (data: ReturnType<typeof uploadYaml>) => void = () => undefined) => {
@@ -74,9 +75,9 @@ describe('the release approval', () => {
 describe('the platform texts', () => {
   it('counts every link in an X post as 23 characters and adds 24 for the reply’s link', () => {
     const link = `https://example.com/${'a'.repeat(200)}`;
-    expect(platformTextProblems(upload((data) => (data.x.post = `Out now ${link}`)), limits).errors).toEqual([]);
+    expect(platformTextProblems(upload((data) => (data.x.post = `Out now ${link}`)), limits, { shape: 'music-video' }).errors).toEqual([]);
     const reply = upload((data) => (data.x.reply = 'x'.repeat(257)));
-    expect(platformTextProblems(reply, limits).errors).toEqual(['x: reply with the link has 281 characters, limit 280']);
+    expect(platformTextProblems(reply, limits, { shape: 'music-video' }).errors).toEqual(['x: reply with the link has 281 characters, limit 280']);
   });
 
   it('keeps the first LinkedIn paragraph within what shows before “see more”, and its media a Short or main', () => {
@@ -84,7 +85,7 @@ describe('the platform texts', () => {
       data.linkedin.post = `${'w'.repeat(211)}\n\nMore.`;
       (data.linkedin as { media?: string }).media = 'Z9-missing';
     });
-    expect(platformTextProblems(long, limits).errors).toEqual([
+    expect(platformTextProblems(long, limits, { shape: 'music-video' }).errors).toEqual([
       'linkedin: the first paragraph has 211 characters; only 210 show before "see more"',
       'linkedin: media Z9-missing is not main or a Short',
     ]);

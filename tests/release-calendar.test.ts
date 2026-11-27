@@ -33,6 +33,7 @@ const input = (slug: string, shorts = ['A1-hook', 'A2-chorus', 'A3-drop'], extra
   linkedin: false,
   microsite: true,
   ...extra,
+  shape: extra.shape ?? extra.kind ?? 'music-video',
 });
 
 const shortDays = (calendar: ReleaseCalendar) =>
