@@ -363,11 +363,12 @@ export function soundLicenceTodos(sounds: UsedSound[]): string[] {
 export function platformTextProblems(
   data: UploadData,
   limits: PlatformLimits,
-  options: { music?: boolean; kind?: 'music-video' | 'episode' | 'meme'; credits?: string[]; tiktokPointer?: string; durationSeconds?: number } = { music: true },
+  /** `shape` is the release shape (`releaseShape`); the project kind follows from it. */
+  options: { shape: ReleaseShape; credits?: string[]; tiktokPointer?: string; durationSeconds?: number },
 ): { errors: string[]; missing: string[] } {
-  const kind = options.kind ?? (options.music === false ? 'episode' : 'music-video');
   const plan = buildReleasePlan({
-    kind,
+    kind: options.shape === 'short-episode' ? 'episode' : options.shape,
+    shape: options.shape,
     language: data.language,
     slug: 'release',
     title: '',

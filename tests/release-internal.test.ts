@@ -63,7 +63,7 @@ describe('release of an internal project', () => {
 function planNeon(dir: string, input: Partial<Parameters<typeof calendarInput>[0]> = {}) {
   return planCalendar(
     dir,
-    calendarInput({ slug: 'neon', title: 'Neon Rain', kind: 'music-video', shorts: [], ...input }),
+    calendarInput({ slug: 'neon', title: 'Neon Rain', kind: 'music-video', shape: 'music-video', shorts: [], ...input }),
     { root: join(dir, '..', '..'), now: new Date('2026-11-13T09:00:00Z') },
   );
 }

@@ -351,7 +351,7 @@ export async function boardProject(projectRoot: string, root: string, options: {
   };
   const heading = (id: string, fallback: string) => {
     const event = calendar?.events.find((entry) => entry.id === id);
-    return event ? calendarEventLabel(event, l, input.premiere, input.kind) : fallback;
+    return event ? calendarEventLabel(event, l, input.premiere, input.shape ?? input.kind) : fallback;
   };
   const videoUrl = status.items.youtube?.url ?? `[${l.videoLink}]`;
   const profile = (platform: string) => channel?.links[platform]?.url ?? channel?.links[platform]?.handle;
@@ -639,7 +639,7 @@ export async function boardProject(projectRoot: string, root: string, options: {
     hasRelease: Boolean(manifest) && releasedPublicly(project.config),
     todos: manifest?.todos ?? [b.noRelease.replace('<slug>', project.config.slug)],
     platforms,
-    calendar: (calendar?.events ?? []).map((event) => ({ ...event, label: calendarEventLabel(event, l, input.premiere, input.kind) })),
+    calendar: (calendar?.events ?? []).map((event) => ({ ...event, label: calendarEventLabel(event, l, input.premiere, input.shape ?? input.kind) })),
     status,
     microsite,
   };

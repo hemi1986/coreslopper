@@ -47,6 +47,7 @@ const input = (overrides: Partial<ReleasePlanInput> = {}): ReleasePlanInput => (
   tiktokPointer: 'Ganzes Video auf YouTube: @neonstatic',
   durationSeconds: 12,
   ...overrides,
+  shape: overrides.shape ?? overrides.kind ?? 'music-video',
 });
 
 const text = (plan: ReturnType<typeof buildReleasePlan>, id: string, key: string) => plan.posts.find((post) => post.id === id)?.texts[key];

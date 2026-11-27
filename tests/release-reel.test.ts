@@ -40,7 +40,8 @@ async function musicVideo(seconds: number, options: { instagramPost: boolean }):
 
 describe('the main video as a Reel', () => {
   it('ST-045: A main video of 2:30 gets its Reel', async () => {
-    const { dir, root } = await episodeFixture();
+    // A horizontal episode with its 9:16 render: a vertical one of 2:30 is a short episode, without a main video (ADR 0057).
+    const { dir, root } = await episodeFixture({ horizontal: true });
     await setDuration(dir, 150);
     await writeFile(
       join(dir, 'review', 'upload.yaml'),
@@ -103,7 +104,7 @@ describe('the checks of the Reel text', () => {
     const upload = uploadYaml() as Partial<ReturnType<typeof uploadYaml>>;
     delete upload.instagram_post;
     const data = UploadDataSchema.parse(upload);
-    const missing = (durationSeconds?: number) => platformTextProblems(data, platformLimits(undefined), { kind: 'music-video', durationSeconds }).missing;
+    const missing = (durationSeconds?: number) => platformTextProblems(data, platformLimits(undefined), { shape: 'music-video', durationSeconds }).missing;
     expect(missing(180)).toContain('instagram_post');
     expect(missing(181)).not.toContain('instagram_post');
     // Without a timing the length is unknown: the Reel stays.

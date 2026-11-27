@@ -9,6 +9,7 @@ import {
   loadProject,
   platformLimits,
   platformTextProblems,
+  releaseShape,
   readJsonFile,
   releaseIdentity,
   releaseTodos,
@@ -39,9 +40,10 @@ export interface ReleaseCheck {
  * The texts every release folder has, read from the plan: `spotify.md` only for
  * a music video, `linkedin.md` only when the plan holds a LinkedIn post.
  */
-export function expectedTexts(plan: Pick<ReleasePlan, 'kind' | 'posts'> | 'music-video' | 'episode' | 'meme'): string[] {
+export function expectedTexts(plan: Pick<ReleasePlan, 'kind' | 'posts' | 'shape'> | 'music-video' | 'episode' | 'meme'): string[] {
   const kind = typeof plan === 'string' ? plan : plan.kind;
   if (kind === 'meme') return ['youtube.md', 'tiktok.md', 'instagram.md', 'release-plan.md'];
+  if (typeof plan !== 'string' && plan.shape === 'short-episode') return ['youtube.md', 'tiktok.md', 'instagram.md', 'x.md', 'release-plan.md'];
   const linkedin = typeof plan !== 'string' && plan.posts.some((post) => post.id === 'linkedin');
   return ['youtube.md', 'shorts.md', 'instagram.md', 'tiktok.md', ...(kind === 'music-video' ? ['spotify.md'] : []), 'x.md', ...(linkedin ? ['linkedin.md'] : []), 'release-plan.md'];
 }
@@ -241,10 +243,11 @@ export async function releaseChecks(projectDir: string, probe: Prober = probeMed
     const data = await loadUploadData(project.paths.root);
     const channel = await loadChannel(root);
     const handle = channel?.links.youtube?.handle;
+    const durationSeconds = (project.effectiveTiming ?? project.timing)?.audio.duration;
     const problems = platformTextProblems(data, platformLimits(channel), {
-      kind,
+      shape: releaseShape({ kind, master: project.config.formats.master, durationSeconds }),
       credits,
-      durationSeconds: (project.effectiveTiming ?? project.timing)?.audio.duration,
+      durationSeconds,
       tiktokPointer: releaseLabels(data.language).tt.overlayDefault(handle && !/<ID>/.test(handle) ? handle : 'YouTube'),
     });
     textErrors.push(...problems.errors);

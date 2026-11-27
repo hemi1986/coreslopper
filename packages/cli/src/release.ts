@@ -67,7 +67,7 @@ import { loadStatus } from './release-records.js';
 import { micrositeSong } from './release-microsite.js';
 import { listThumbnails } from './thumbnail-files.js';
 import { readRecipe, recipePath } from './thumbnail-recipe.js';
-import { DERIVED_PATHS, derivedImages, teaserWindow } from './release-images.js';
+import { DERIVED_PATHS, derivedImages, teaserPathOf, teaserWindow } from './release-images.js';
 import { shortFfmpegArgs } from './short.js';
 import type { ThumbnailOptions } from './thumbnail.js';
 import { loadUploadData, uploadPaths } from './upload-text.js';
@@ -90,8 +90,10 @@ export async function loadReleasePlan(projectDir: string): Promise<ReleasePlan |
 
 /** The cover source the skill composes with `thumbnail --format 1x1`. */
 export const COVER_SOURCE = 'renders/cover-3000x3000.jpg';
-/** A meme's cover: the skill composes it with `thumbnail --format 9x16`. */
+/** The cover of a meme or a short episode: the skill composes it with `thumbnail --format 9x16`. */
 export const MEME_COVER_SOURCE = 'renders/cover-1080x1920.jpg';
+/** A short episode's TikTok cover: the skill composes it with `thumbnail --format 3x4` (ADR 0057). */
+export const TIKTOK_COVER_SOURCE = 'renders/cover-1080x1440.jpg';
 
 export interface ReleaseDeps {
   probe: Prober;
@@ -272,6 +274,11 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
   // A music video releases a song; an episode and a meme release a video only.
   const music = kind === 'music-video';
   const meme = kind === 'meme';
+  const timing = project.effectiveTiming ?? project.timing;
+  const shape = releaseShape({ kind, master: project.config.formats.master, durationSeconds: timing?.audio.duration });
+  // A short episode is one video, as a meme is: no main video, thumbnails or Shorts (ADR 0057).
+  const shortEpisode = shape === 'short-episode';
+  const oneVideo = meme || shortEpisode;
   const usedSounds = meme ? await usedLibrarySounds(project, root) : [];
   const credits = usedSounds.map((sound) => sound.credit).filter((credit): credit is string => Boolean(credit));
   const dir = releaseDir(project.paths.root);
@@ -288,7 +295,6 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
   const todos: string[] = [];
   const errors: string[] = [];
   const warnings: string[] = [];
-  const timing = project.effectiveTiming ?? project.timing;
 
   let data: UploadData | undefined;
   if (existsSync(uploadPaths(project.paths.root).data)) data = await loadUploadData(project.paths.root);
@@ -300,9 +306,10 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
   todos.push(...channelTodos(channel));
   await mkdir(dir, { recursive: true });
 
-  // video/: every configured format, rendered only when missing or stale.
+  // video/: every configured format, rendered only when missing or stale; a short episode's one master.
   const files: ReleaseTextInput['files'] = { thumbnails: [], shorts: [] };
-  for (const format of projectFormats(project)) {
+  const formats = projectFormats(project);
+  for (const format of shortEpisode ? formats.slice(0, 1) : formats) {
     const rel = `renders/${format.id}.mp4`;
     const source = join(project.paths.root, rel);
     const recorded = project.state.artifacts[`render:${rel}:inputs`];
@@ -350,8 +357,8 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
     await writer.text(files.subtitles, buildLyricsSrt(timing), 'subtitles', { language, lines: timing.lines.length });
   }
 
-  // thumbnails/: the upload thumbnail first, then the alternates (or the folder's order). A meme has a 9:16 cover instead.
-  if (!meme) {
+  // thumbnails/: the upload thumbnail first, then the alternates (or the folder's order). A meme and a short episode have a 9:16 cover instead.
+  if (!oneVideo) {
     const available = await listThumbnails(project.paths.renders);
     const ordered = data?.main.thumbnail
       ? [data.main.thumbnail, ...data.main.alternate_thumbnails].map((file) => resolve(project.paths.root, file)).filter((file) => existsSync(file))
@@ -369,9 +376,16 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
       await writer.place(cover, files.cover, 'cover', { width: 1080, height: 1920, format: 'jpeg', color: 'rgb' });
     } else todos.push(`${MEME_COVER_SOURCE} is missing: compose it with thumbnail --format 9x16 --out ${MEME_COVER_SOURCE}`);
   }
+  if (shortEpisode) {
+    const tiktok = join(project.paths.root, TIKTOK_COVER_SOURCE);
+    if (existsSync(tiktok)) {
+      files.tiktokCover = `cover/${slug}-1080x1440.jpg`;
+      await writer.place(tiktok, files.tiktokCover, 'tiktok-cover', { width: 1080, height: 1440 });
+    } else todos.push(`${TIKTOK_COVER_SOURCE} is missing: compose it with thumbnail --format 3x4 --out ${TIKTOK_COVER_SOURCE}`);
+  }
 
-  // shorts/: each Short with its vertical thumbnail. A meme is one video, not a set of Shorts.
-  if (!meme) {
+  // shorts/: each Short with its vertical thumbnail. A meme and a short episode are one video, not a set of Shorts.
+  if (!oneVideo) {
     const shorts = await listShorts(project.paths.renders);
     for (const video of shorts) {
       const name = shortName(video)!;
@@ -458,7 +472,7 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
 
   // texts/: one file per platform, from upload.yaml plus the facts.
   let chapters: Chapter[] = [];
-  if (meme) chapters = [];
+  if (oneVideo) chapters = [];
   else if (data?.main.chapters) {
     chapters = data.main.chapters;
     const problems = timing ? chapterProblems(chapters, timing.audio.duration) : [];
@@ -466,6 +480,8 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
   } else if (timing) chapters = chaptersFromSections(timing);
   const input: ReleaseTextInput = {
     kind,
+    shape,
+    masterFormat: formatId(project.config.formats.master.aspect),
     language,
     slug,
     artist: identity.artist,
@@ -481,14 +497,15 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
   };
   // The calendar: the next free slots under config/release-schedule.yaml; kept times stay.
   const schedule = await loadReleaseSchedule(root);
-  // A meme is a Short, never a Premiere.
-  input.premiere = !meme && schedule.release.premiere;
+  // A meme and a short episode are Shorts, never a Premiere.
+  input.premiere = !oneVideo && schedule.release.premiere;
   input.calendar = await planCalendar(
     project.paths.root,
     calendarInput({
       slug,
       title: identity.title,
       kind: input.kind,
+      shape,
       releaseDate: project.config.release?.release_date,
       data,
       shorts: files.shorts.map((short) => short.name),
@@ -497,7 +514,7 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
     { root, now: deps.now(), replan: options.replan, schedule },
   );
   if (!meme) {
-    await deriveReleaseMedia({ project, dir, writer, files, data, calendar: input.calendar, language, title: identity.title, deps, todos, stills: options.stills !== false });
+    await deriveReleaseMedia({ project, dir, writer, files, data, calendar: input.calendar, language, title: identity.title, deps, todos, stills: options.stills !== false, shortEpisode });
   }
   const youtubeHandle = channel?.links.youtube?.handle;
   const plan = buildReleasePlan({
@@ -509,7 +526,7 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
     todos.push(...plan.problems.missing.map((field) => `${field} is missing in review/upload.yaml`));
   }
   const labels = releaseLabels(language);
-  const ics = calendarIcs([input.calendar], (calendar, event) => `${calendar.title}: ${calendarEventLabel(event, labels, input.premiere, kind)}`);
+  const ics = calendarIcs([input.calendar], (calendar, event) => `${calendar.title}: ${calendarEventLabel(event, labels, input.premiere, shape)}`);
   await writer.text('calendar.ics', ics, 'calendar', { events: input.calendar.events.length, release_date: input.calendar.release_date });
   if (data?.microsite && !meme) {
     const lyrics = existsSync(project.paths.lyrics) ? plainLyrics(await readFile(project.paths.lyrics, 'utf8')) : undefined;
@@ -529,7 +546,7 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
   const manifest: ReleaseManifest = {
     version: 1,
     project: slug,
-    shape: releaseShape({ kind, master: project.config.formats.master, durationSeconds: timing?.audio.duration }),
+    shape,
     generated_at: deps.now().toISOString(),
     files: writer.files,
     plan,
@@ -556,21 +573,26 @@ async function deriveReleaseMedia(context: {
   deps: ReleaseDeps;
   todos: string[];
   stills: boolean;
+  /** A short episode's announcement images are vertical, its teaser is cut from its master, and it has no story (ADR 0057). */
+  shortEpisode: boolean;
 }): Promise<void> {
-  const { project, dir, writer, files, data, calendar, deps, todos } = context;
+  const { project, dir, writer, files, data, calendar, deps, todos, shortEpisode } = context;
   const releaseAt = calendar.events.find((event) => event.id === 'youtube')?.at;
   const images = derivedImages({
     title: context.title,
     language: context.language,
     releaseAt,
     announcement: Boolean(data?.announcement),
-    story: Boolean(data),
+    story: Boolean(data) && !shortEpisode,
     episode: project.config.kind === 'episode',
+    vertical: shortEpisode,
   });
   if (images.length) {
     const recipe = data?.announcement?.image
       ? { still: data.announcement.image.still, focus: data.announcement.image.focus }
-      : ((await readRecipe(join(project.paths.root, COVER_SOURCE))) ?? (data?.main.thumbnail ? await readRecipe(resolve(project.paths.root, data.main.thumbnail)) : undefined));
+      : ((shortEpisode ? await readRecipe(join(project.paths.root, MEME_COVER_SOURCE)) : undefined) ??
+        (await readRecipe(join(project.paths.root, COVER_SOURCE))) ??
+        (data?.main.thumbnail ? await readRecipe(resolve(project.paths.root, data.main.thumbnail)) : undefined));
     const stillPath = recipe ? [resolve(project.paths.root, recipe.still), resolve(recipe.still)].find((path) => existsSync(path)) : undefined;
     if (!recipe || !stillPath) {
       todos.push(
@@ -621,20 +643,24 @@ async function deriveReleaseMedia(context: {
   }
 
   // The teaser: ten seconds from the first chorus of the 9:16 render, with sound, for the announcement.
+  // A short episode's teaser is cut from its master and named by its format.
   const timing = project.effectiveTiming ?? project.timing;
-  const vertical = join(project.paths.root, 'renders', '9x16.mp4');
+  const masterFormat = formatId(project.config.formats.master.aspect);
+  const sourceRel = shortEpisode ? `renders/${masterFormat}.mp4` : 'renders/9x16.mp4';
+  const teaserPath = shortEpisode ? teaserPathOf(masterFormat) : DERIVED_PATHS.teaser;
+  const vertical = join(project.paths.root, sourceRel);
   if (data?.announcement && timing && existsSync(vertical)) {
     const window = teaserWindow(timing);
     const sourceHash = await hashFileStream(vertical);
     const spec = { start: Number(window.start.toFixed(3)), seconds: Number(window.duration.toFixed(3)), audio: true, sourceSha256: sourceHash };
-    const same = await writer.unchanged(DERIVED_PATHS.teaser, (entry) => entry.spec.sourceSha256 === sourceHash && entry.spec.start === spec.start && entry.spec.seconds === spec.seconds);
+    const same = await writer.unchanged(teaserPath, (entry) => entry.spec.sourceSha256 === sourceHash && entry.spec.start === spec.start && entry.spec.seconds === spec.seconds);
     if (!same) {
       deps.log(`Cutting the teaser: ${spec.seconds} s from ${spec.start.toFixed(2)} s...`);
       await mkdir(join(dir, 'announce'), { recursive: true });
-      await deps.ffmpeg(shortFfmpegArgs(vertical, join(dir, DERIVED_PATHS.teaser), window, project.config.formats.master.fps));
+      await deps.ffmpeg(shortFfmpegArgs(vertical, join(dir, teaserPath), window, project.config.formats.master.fps));
     }
-    await writer.generated(DERIVED_PATHS.teaser, 'announcement', spec, 'renders/9x16.mp4');
-    files.teaser = DERIVED_PATHS.teaser;
+    await writer.generated(teaserPath, 'announcement', spec, sourceRel);
+    files.teaser = teaserPath;
   }
 }
 

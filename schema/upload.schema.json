@@ -344,6 +344,46 @@
         "caption"
       ]
     },
+    "tiktok": {
+      "type": "object",
+      "properties": {
+        "caption": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hashtags": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^#[\\p{L}\\p{N}_]+$"
+          }
+        }
+      },
+      "required": [
+        "caption"
+      ]
+    },
+    "instagram": {
+      "type": "object",
+      "properties": {
+        "caption": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hashtags": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^#[\\p{L}\\p{N}_]+$"
+          }
+        }
+      },
+      "required": [
+        "caption"
+      ]
+    },
     "spotify": {
       "type": "object",
       "properties": {
