@@ -62,7 +62,6 @@ interface Labels {
     storyCaption: string;
     sticker: string;
     post: string;
-    postImage: string;
     postVideo: (file: string) => string;
   };
   tt: { heading: string; description: string; cover: string; coverUpload: (file: string) => string; coverFrame: string; settings: string; visibility: string; aiLabel: string; schedule: string; overlayDefault: (handle: string) => string; afterPost: string; pinned: string };
@@ -95,7 +94,7 @@ interface Labels {
     ics: string;
   };
   cal: {
-    steps: Record<'distributor' | 'pitch' | 'canvas' | 'song' | 'artist-pick' | 'youtube' | 'youtube-short' | 'premiere' | 'community' | 'story' | 'reel' | 'page' | 'links', string>;
+    steps: Record<'distributor' | 'pitch' | 'canvas' | 'song' | 'artist-pick' | 'youtube' | 'youtube-short' | 'premiere' | 'community' | 'story' | 'reel' | 'main-reel' | 'page' | 'links', string>;
     announce: Record<'instagram' | 'youtube' | 'x', string>;
     post: Record<'instagram' | 'tiktok' | 'x' | 'linkedin', string>;
     short: (name: string, platform: string) => string;
@@ -147,9 +146,8 @@ const EN: Labels = {
     story: 'Story',
     storyCaption: 'Caption',
     sticker: 'Add a link sticker to the YouTube video (or the Spotify link after release)',
-    post: 'Feed post for the release',
-    postImage: 'Image: the streaming cover or thumbnail 1',
-    postVideo: (file) => `Video: \`${file}\` (the main video in the feed format)`,
+    post: 'Reel: main video',
+    postVideo: (file) => `Video: \`${file}\` (the main video, as vertical as there is)`,
   },
   tt: {
     heading: 'TikTok',
@@ -222,6 +220,7 @@ const EN: Labels = {
       community: 'YouTube post about the video',
       story: 'Instagram story with a link sticker to the video',
       reel: 'Post the video as an Instagram Reel (texts/instagram.md)',
+      'main-reel': 'Reel: main video',
       page: 'Publish the song page on the microsite',
       links: 'Add the Spotify link to the YouTube description and the pinned comment',
     },
@@ -327,9 +326,8 @@ const DE: Labels = {
     story: 'Story',
     storyCaption: 'Bildunterschrift',
     sticker: 'Link-Sticker zum YouTube-Video setzen (nach dem Release: Spotify-Link)',
-    post: 'Feed-Post zum Release',
-    postImage: 'Bild: das Streaming-Cover oder Thumbnail 1',
-    postVideo: (file) => `Video: \`${file}\` (das Hauptvideo im Feed-Format)`,
+    post: 'Reel: Hauptvideo',
+    postVideo: (file) => `Video: \`${file}\` (das Hauptvideo, so hochkant wie vorhanden)`,
   },
   tt: {
     heading: 'TikTok',
@@ -402,6 +400,7 @@ const DE: Labels = {
       community: 'YouTube-Post zum Video',
       story: 'Instagram-Story mit Link-Sticker zum Video',
       reel: 'Das Video als Instagram Reel posten (texts/instagram.md)',
+      'main-reel': 'Reel: Hauptvideo',
       page: 'Song-Seite auf der Microsite veröffentlichen',
       links: 'Spotify-Link in YouTube-Beschreibung und angepinnten Kommentar eintragen',
     },
@@ -601,10 +600,10 @@ function instagramText(plan: ReleasePlan, input: ReleaseTextInput, l: Labels): s
     if (plan.settings.instagramAiLabel) lines.push(checkbox(l.ig.aiLabel));
     lines.push(checkbox(youtube ? `${l.ig.sticker} — ${youtube}` : l.ig.sticker), '');
   }
-  const feed = postOf(plan, 'instagram-post')?.texts.caption;
-  if (feed) {
-    const video = feedVideo(input);
-    lines.push(`## ${l.ig.post}`, '', `_${video ? l.ig.postVideo(video) : l.ig.postImage}_`, '', ...block(display(feed.value, l)), '');
+  const reel = postOf(plan, 'instagram-post');
+  if (reel?.texts.caption) {
+    const video = reel.media ?? l.todo('main video');
+    lines.push(`## ${l.ig.post}`, '', `_${l.ig.postVideo(video)}_`, '', ...block(display(reel.texts.caption.value, l)), '');
   }
   return `${lines.join('\n').trimEnd()}\n`;
 }
@@ -707,6 +706,8 @@ export function calendarEventLabel(
   if (event.step === 'announce') return l.cal.announce[event.platform as 'instagram' | 'youtube' | 'x'] ?? `${l.announce.heading}: ${l.cal.platforms[event.platform]}`;
   if (event.step === 'post') return l.cal.post[event.platform as 'instagram' | 'tiktok' | 'x' | 'linkedin'] ?? l.cal.platforms[event.platform];
   if (event.step === 'youtube' && kind === 'meme') return l.cal.steps['youtube-short'];
+  // A meme's one video is its Reel; everywhere else the Reel step is the main video's (ADR 0057).
+  if (event.step === 'reel' && kind !== 'meme') return l.cal.steps['main-reel'];
   if (event.step === 'youtube' && premiere) return l.cal.steps.premiere;
   return l.cal.steps[event.step as keyof Labels['cal']['steps']] ?? event.step;
 }

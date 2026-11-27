@@ -14,7 +14,7 @@ import {
 } from '@coreslopper/core';
 import { checklistKey, loadAutopilotLog } from './release-records.js';
 import { micrositeSong, type MicrositeSong } from './release-microsite.js';
-import { calendarEventLabel, distributorRows, feedVideo, mediaFile } from './release-texts.js';
+import { calendarEventLabel, distributorRows, mediaFile } from './release-texts.js';
 import { autopilotReadiness, lastRun } from './autopilot-state.js';
 import { loadReleaseFacts, type ReleaseFacts } from './release-facts.js';
 
@@ -195,8 +195,6 @@ const BOARD = {
     announcePost: 'Post-Bild mit Termin',
     teaserFile: 'Teaser (10 s)',
     storyImage: 'Story-Bild',
-    feedImageFile: 'Feed-Bild (4:5)',
-    feedImageCheck: 'Feed-Bild als Beitrag',
     master: 'Hauptvideo',
     upload: 'Thumbnail (Upload)',
     alt: (n: number) => `Thumbnail ${n} (Testen und vergleichen)`,
@@ -240,10 +238,7 @@ const BOARD = {
     igAi: '„KI-Info“ einschalten',
     igCover: (s?: number) => (s !== undefined ? `Titelbild: ${s.toFixed(1)} s ins Reel (oder Thumbnail hochladen)` : 'Titelbild mit sichtbarem Hook'),
     sticker: 'Link-Sticker zum Hauptvideo',
-    feedImage: 'Bild: Streaming-Cover (4:5 zuschneiden)',
-    feedVideo: 'Hauptvideo (Feed-Format)',
-    feedVideoCheck: 'Hauptvideo im Feed-Format als Beitrag; das Cover-Bild als Titelbild',
-    longReel: 'Länger als 3 min: Instagram empfiehlt das Video Nicht-Followern nicht; die Reels der Shorts tragen die Reichweite',
+    reelCheck: 'Hauptvideo als Reel; das Cover-Bild als Titelbild',
     canvasCheck: 'Canvas in Spotify for Artists hochladen (Song → Canvas)',
     spotifyUrl: 'Spotify-Link des Songs im Board eintragen, sobald er live ist',
     linksStep: 'Spotify-Link in YouTube-Beschreibung und angepinnten Kommentar',
@@ -264,8 +259,6 @@ const BOARD = {
     announcePost: 'Post image with the date',
     teaserFile: 'Teaser (10 s)',
     storyImage: 'Story image',
-    feedImageFile: 'Feed image (4:5)',
-    feedImageCheck: 'The feed image as the post',
     master: 'Main video',
     upload: 'Thumbnail (upload)',
     alt: (n: number) => `Thumbnail ${n} (Test & compare)`,
@@ -309,10 +302,7 @@ const BOARD = {
     igAi: 'Turn on "AI info"',
     igCover: (s?: number) => (s !== undefined ? `Cover: ${s.toFixed(1)} s into the Reel (or upload the thumbnail)` : 'Cover with the hook visible'),
     sticker: 'Link sticker to the main video',
-    feedImage: 'Image: the streaming cover (crop to 4:5)',
-    feedVideo: 'Main video (feed format)',
-    feedVideoCheck: 'Main video in the feed format as the post; the cover image as its cover',
-    longReel: 'Longer than 3 min: Instagram does not recommend it to non-followers; the Shorts’ Reels carry the reach',
+    reelCheck: 'Main video as the Reel; the cover image as its cover',
     canvasCheck: 'Upload the Canvas in Spotify for Artists (song → Canvas)',
     spotifyUrl: 'Enter the song’s Spotify link in the board once it is live',
     linksStep: 'Spotify link into the YouTube description and the pinned comment',
@@ -434,13 +424,9 @@ export async function boardProject(projectRoot: string, root: string, options: {
       id: 'instagram-post',
       heading: heading('instagram-post', l.ig.post),
       at: at('instagram-post'),
-      files: feedVideo(input)
-        ? [...file(b.feedVideo, feedVideo(input)), ...file(b.cover, files.cover)]
-        : files.feedImage
-          ? file(b.feedImageFile, files.feedImage)
-          : file(b.cover, files.cover),
+      files: [...file(b.master, planPost('instagram-post')?.media), ...file(b.cover, files.cover)],
       fields: field(b.caption, display(instagramCaption.value), { ...limitOf('instagram-post', 'caption'), note: hashtagNoteOf('instagram-post', 'caption') }),
-      checklist: checklist('instagram-post', [feedVideo(input) ? b.feedVideoCheck : files.feedImage ? b.feedImageCheck : b.feedImage, b.igAi, ...((input.durationSeconds ?? 0) > 180 ? [b.longReel] : [])]),
+      checklist: checklist('instagram-post', [b.reelCheck, b.igAi]),
       url: true,
     });
   }

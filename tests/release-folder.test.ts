@@ -445,21 +445,9 @@ describe('release folder', () => {
     expect(tag('instagram/story-9x16.jpg')).toBe('JETZT');
   });
 
-  it('composes a 4:5 feed image without a feed-format render, and asks for a still without a recipe', async () => {
+  it('asks for a still without a recipe', async () => {
     const dir = await fixture();
-    await rm(join(dir, 'renders', '1x1.mp4'));
-    const config = parse(await readFile(join(dir, 'project.yaml'), 'utf8'));
-    config.formats.derivatives = config.formats.derivatives.filter((format: { aspect: string }) => format.aspect !== '1:1');
-    await writeFile(join(dir, 'project.yaml'), stringify(config));
-    const deps = fakeDeps();
-    await buildRelease({ projectDir: dir, deps });
-    expect(deps.thumbnails.find((call) => call.format === '4x5')?.text).toBe('NEON RAIN');
-    const board = await boardProject(dir, join(dir, '..', '..'));
-    const feed = board.platforms.find((platform) => platform.id === 'instagram')!.posts.find((post) => post.id === 'instagram-post')!;
-    expect(feed.files.map((file) => file.path)).toEqual(['instagram/feed-4x5.jpg']);
-
     await rm(join(dir, 'renders', 'cover-3000x3000.recipe.json'));
-    await rm(join(dir, 'renders', 'release'), { recursive: true });
     const result = await buildRelease({ projectDir: dir, deps: fakeDeps() });
     expect(result.todos.some((todo) => todo.includes('set announcement.image'))).toBe(true);
   });
@@ -849,9 +837,9 @@ describe('release board', () => {
     const x = board.platforms.find((platform) => platform.id === 'x')!.posts.find((post) => post.id === 'x')!;
     expect(x.fields.find((field) => field.label === 'Antwort mit Link')?.value).toBe('Ganzes Video: [Link zum Hauptvideo]');
     expect(board.platforms.find((platform) => platform.id === 'linkedin')!.skipped).toBeUndefined();
-    // The square render is the feed version: the Instagram feed post and LinkedIn carry it.
-    const feed = board.platforms.find((platform) => platform.id === 'instagram')!.posts.find((post) => post.id === 'instagram-post')!;
-    expect(feed.files.map((entry) => entry.path)).toEqual(['video/neon-1x1.mp4', 'streaming/cover-3000x3000.jpg']);
+    // The main video's Reel carries the 9:16 render (ADR 0057); the square render stays the feed version for LinkedIn.
+    const reel = board.platforms.find((platform) => platform.id === 'instagram')!.posts.find((post) => post.id === 'instagram-post')!;
+    expect(reel.files.map((entry) => entry.path)).toEqual(['video/neon-9x16.mp4', 'streaming/cover-3000x3000.jpg']);
     expect(board.platforms.find((platform) => platform.id === 'linkedin')!.posts[0]!.files.map((entry) => entry.path)).toEqual(['video/neon-1x1.mp4']);
     // Every post with a date is a calendar event, so its done state is the calendar's.
     const ids = new Set(board.calendar.map((event) => event.id));

@@ -24,7 +24,22 @@ export interface ReleasePlanFiles {
   announcePost?: string;
   teaser?: string;
   story?: string;
-  feedImage?: string;
+}
+
+/** The longest main video that still gets its Instagram Reel, in seconds (ADR 0057). */
+export const MAIN_REEL_MAX_SECONDS = 180;
+
+/**
+ * Whether the main video goes to Instagram as a Reel: only up to 3 minutes,
+ * 180 s included. An unknown length (no timing) keeps the Reel.
+ */
+export function mainVideoReel(durationSeconds: number | undefined): boolean {
+  return durationSeconds === undefined || durationSeconds <= MAIN_REEL_MAX_SECONDS;
+}
+
+/** The video of the main video's Reel: the best vertical render there is – 9:16, 4:5, 1:1 – else the master. */
+export function reelVideo(files: Pick<ReleasePlanFiles, 'videos' | 'master'>): string | undefined {
+  return files.videos?.['9x16'] ?? files.videos?.['4x5'] ?? files.videos?.['1x1'] ?? files.master;
 }
 
 /** Everything a release plan is made from. */
@@ -431,31 +446,28 @@ export function buildReleasePlan(input: ReleasePlanInput): ReleasePlan {
     }
   }
 
-  // The Instagram feed post of the release.
-  posts.push({
-    id: 'instagram-post',
-    platform: 'instagram',
-    files: feed
-      ? [...(files.cover ? [{ role: 'cover', path: files.cover }] : []), { role: 'feed-video', path: feed }]
-      : files.feedImage
-        ? [{ role: 'feed-image', path: files.feedImage }]
-        : files.cover
-          ? [{ role: 'cover', path: files.cover }]
-          : [],
-    texts: texts(
-      [
-        'caption',
-        text(
-          data?.instagram_post ? [data.instagram_post.caption.trim(), data.instagram_post.hashtags.join(' ')].filter(Boolean).join('\n\n') : undefined,
-          data?.instagram_post ? { max: limits.instagram.caption, label: 'instagram post', field: 'caption' } : undefined,
-          data?.instagram_post ? { count: countHashtags(data.instagram_post.caption, data.instagram_post.hashtags), max: limits.instagram.hashtags, label: 'instagram post' } : undefined,
-        ),
-      ],
-    ),
-    media: files.videos?.['4x5'] ?? files.videos?.['1x1'] ?? files.feedImage ?? files.cover,
-    url: true,
-    missing: [...(!data?.instagram_post ? ['instagram_post'] : [])],
-  });
+  // The main video's Reel: only when the main video lasts at most 3 minutes (ADR 0057).
+  if (mainVideoReel(input.durationSeconds)) {
+    const reel = reelVideo(files);
+    posts.push({
+      id: 'instagram-post',
+      platform: 'instagram',
+      files: [...(reel ? [{ role: 'video', path: reel }] : []), ...(files.cover ? [{ role: 'cover', path: files.cover }] : [])],
+      texts: texts(
+        [
+          'caption',
+          text(
+            data?.instagram_post ? [data.instagram_post.caption.trim(), data.instagram_post.hashtags.join(' ')].filter(Boolean).join('\n\n') : undefined,
+            data?.instagram_post ? { max: limits.instagram.caption, label: 'instagram post', field: 'caption' } : undefined,
+            data?.instagram_post ? { count: countHashtags(data.instagram_post.caption, data.instagram_post.hashtags), max: limits.instagram.hashtags, label: 'instagram post' } : undefined,
+          ),
+        ],
+      ),
+      media: reel,
+      url: true,
+      missing: [...(!data?.instagram_post ? ['instagram_post'] : [])],
+    });
+  }
 
   // X: the release post and its reply.
   const x = data?.x;

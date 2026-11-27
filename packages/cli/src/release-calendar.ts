@@ -8,6 +8,7 @@ import {
   ValidationError,
   buildCalendar,
   loadReleaseSchedule,
+  mainVideoReel,
   releasedPublicly,
   zonedToday,
   readYamlFile,
@@ -66,6 +67,8 @@ export function calendarInput(options: {
   releaseDate?: string;
   data?: UploadData;
   shorts: string[];
+  /** The main video's length: over 180 s it gets no Reel. */
+  durationSeconds?: number;
 }): CalendarInput {
   const { data } = options;
   // A meme is posted, not announced, and has no feed post, X, LinkedIn, or microsite: it has three platform texts.
@@ -87,7 +90,7 @@ export function calendarInput(options: {
     shorts,
     announcement: !meme && Boolean(data?.announcement),
     communityPost: !meme && Boolean(data?.main.community_post),
-    instagramPost: !meme && Boolean(data?.instagram_post),
+    instagramPost: !meme && Boolean(data?.instagram_post) && mainVideoReel(options.durationSeconds),
     x: !meme && Boolean(data?.x),
     linkedin: !meme && data?.linkedin?.decision === 'post',
     microsite: !meme && Boolean(data?.microsite),
@@ -143,6 +146,7 @@ export async function runCalendar(options: {
       releaseDate: project.config.release?.release_date,
       data,
       shorts,
+      durationSeconds: (project.effectiveTiming ?? project.timing)?.audio.duration,
     }),
     { root: options.root, now: options.now ?? new Date(), replan: options.replan },
   );

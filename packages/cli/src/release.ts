@@ -116,7 +116,7 @@ export interface ReleaseOptions {
   canvasSeconds?: number;
   /** Plan the release calendar again instead of keeping the times it holds. */
   replan?: boolean;
-  /** Compose the announcement, story, and feed images (default). `false` keeps the ones already in the folder: the board's quick refresh. */
+  /** Compose the announcement and story images (default). `false` keeps the ones already in the folder: the board's quick refresh. */
   stills?: boolean;
   deps?: Partial<ReleaseDeps>;
 }
@@ -491,6 +491,7 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
       releaseDate: project.config.release?.release_date,
       data,
       shorts: files.shorts.map((short) => short.name),
+      durationSeconds: input.durationSeconds,
     }),
     { root, now: deps.now(), replan: options.replan, schedule },
   );
@@ -537,9 +538,8 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
 }
 
 /**
- * The announcement images and teaser, the release-day story image, and the feed
- * image without a feed-format render: composed from the announcement still or
- * the cover's recipe, again only when the text (the release date) or the still
+ * The announcement images and teaser and the release-day story image: composed
+ * from the announcement still or the cover's recipe, again only when the text (the release date) or the still
  * changed. The teaser is cut from the 9:16 render.
  */
 async function deriveReleaseMedia(context: {
@@ -563,8 +563,6 @@ async function deriveReleaseMedia(context: {
     releaseAt,
     announcement: Boolean(data?.announcement),
     story: Boolean(data),
-    feedVideo: Boolean(files.videos?.['4x5'] ?? files.videos?.['1x1']),
-    feedPost: Boolean(data?.instagram_post),
     episode: project.config.kind === 'episode',
   });
   if (images.length) {
@@ -576,7 +574,7 @@ async function deriveReleaseMedia(context: {
       todos.push(
         recipe
           ? `the still of the announcement images is missing: ${recipe.still}`
-          : 'the announcement, story, and feed images need a still: set announcement.image in review/upload.yaml, or compose the cover again with thumbnail (it records its recipe)',
+          : 'the announcement and story images need a still: set announcement.image in review/upload.yaml, or compose the cover again with thumbnail (it records its recipe)',
       );
     } else {
       const stillHash = await hashFileStream(stillPath);
@@ -618,7 +616,6 @@ async function deriveReleaseMedia(context: {
     if (image.path === DERIVED_PATHS.announceStory) files.announceStory = image.path;
     if (image.path === DERIVED_PATHS.announcePost) files.announcePost = image.path;
     if (image.path === DERIVED_PATHS.story) files.story = image.path;
-    if (image.path === DERIVED_PATHS.feedImage) files.feedImage = image.path;
   }
 
   // The teaser: ten seconds from the first chorus of the 9:16 render, with sound, for the announcement.
