@@ -4,15 +4,20 @@
 
 **Progress: 27 of 31 domain stories done** · scenarios 92 of 108
 
-**59 stories** · In Progress: 0 · Ready: 13 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 46 · Superseded: 0
+**59 stories** · In Progress: 1 · Ready: 12 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 46 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
+
+## In Progress
+
+| ID | Title | Type | Context | Priority | Size | Risk | Depends on |
+|---|---|---|---|---|---|---|---|
+| [ST-047](ST-047-the-release-shape-of-an-episode.md) | The release package records whether an episode is a short episode | domain | Release | must | – | – | – |
 
 ## Ready
 
 | ID | Title | Type | Context | Priority | Size | Risk | Depends on |
 |---|---|---|---|---|---|---|---|
-| [ST-047](ST-047-the-release-shape-of-an-episode.md) | The release package records whether an episode is a short episode | domain | Release | must | – | – | – |
 | [ST-048](ST-048-a-short-episodes-release.md) | A short episode is released as one video on every platform | domain | Release | must | – | – | ST-047 |
 | [ST-050](ST-050-qa-expects-the-assets-of-the-release-shape.md) | QA expects the thumbnails and covers of the release shape | task | – | must | – | – | ST-047 |
 | [ST-051](ST-051-the-release-shape-is-kept-once-posted.md) | The release shape is kept once the release has started | domain | Release | must | – | – | ST-047 |
