@@ -16,5 +16,6 @@
 ],"reviews":[
 {"key":"acceptance-tester|2026-11-27T23:09:54.490Z","agent":"acceptance-tester","verdict":"accepted","blocker":0,"major":0,"minor":0,"question":2,"at":"2026-11-27T23:09:54.490Z"},
 {"key":"code-reviewer|2026-11-27T23:11:47.195Z","agent":"code-reviewer","verdict":"fix-blockers-first","blocker":1,"major":1,"minor":4,"question":1,"at":"2026-11-27T23:11:47.195Z"},
-{"key":"code-reviewer|2026-11-27T23:15:57.849Z","agent":"code-reviewer","verdict":"ready-to-merge","blocker":0,"major":0,"minor":5,"question":1,"at":"2026-11-27T23:15:57.849Z"}
+{"key":"code-reviewer|2026-11-27T23:15:57.849Z","agent":"code-reviewer","verdict":"ready-to-merge","blocker":0,"major":0,"minor":5,"question":1,"at":"2026-11-27T23:15:57.849Z"},
+{"key":"code-reviewer|2026-11-27T23:16:55.779Z","agent":"code-reviewer","verdict":"ready-to-merge","blocker":0,"major":0,"minor":5,"question":1,"at":"2026-11-27T23:16:55.779Z"}
 ]}
