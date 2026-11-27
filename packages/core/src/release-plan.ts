@@ -162,6 +162,11 @@ function youtubeDescription(input: ReleasePlanInput): string {
     .join('\n\n');
 }
 
+/** The hashtag list YouTube's field takes: comma-separated, without the leading `#` (the description keeps it). */
+function hashtagList(hashtags: string[] | undefined): string | undefined {
+  return hashtags?.map((tag) => tag.replace(/^#+/, '')).join(', ');
+}
+
 function text(value: string | undefined, limit?: DraftLimit, hashtags?: DraftText['hashtags']): DraftText | undefined {
   if (value === undefined || !value.trim()) return undefined;
   return { value: value.trim(), ...(limit ? { limit } : {}), ...(hashtags ? { hashtags } : {}) };
@@ -318,7 +323,7 @@ export function buildReleasePlan(input: ReleasePlanInput): ReleasePlan {
     texts: texts(
       ['title', text(main?.title, youtubeTitle())],
       ['description', text(description, { max: limits.youtube.description_bytes, unit: 'bytes', label: 'youtube main', field: 'description' })],
-      ['hashtags', text(main?.hashtags.join(', '))],
+      ['hashtags', text(hashtagList(main?.hashtags))],
       ['tags', text(main?.tags.join(', '), { max: limits.youtube.tags, label: 'youtube main', field: 'tags', verb: 'have' })],
       ['pinned', text(main?.pinned_comment)],
       ['community', text(main?.community_post)],
@@ -356,7 +361,7 @@ export function buildReleasePlan(input: ReleasePlanInput): ReleasePlan {
       texts: texts(
         ['title', text(short?.title, youtubeTitle(name))],
         ['description', text(short ? [short.description.trim(), short.hashtags.join(' ')].filter(Boolean).join('\n\n') : undefined)],
-        ['hashtags', text(short?.hashtags.join(', '))],
+        ['hashtags', text(hashtagList(short?.hashtags))],
       ),
       url: true,
     });

@@ -71,6 +71,16 @@ describe('the release plan', () => {
     );
   });
 
+  it('lists the YouTube hashtags comma-separated without "#", and keeps "#" in the descriptions', () => {
+    const plan = buildReleasePlan(input());
+    expect(text(plan, 'youtube', 'hashtags')?.value).toBe('synthwave, neon');
+    expect(text(plan, 'youtube', 'description')?.value.endsWith('\n\n#synthwave #neon')).toBe(true);
+    for (const name of ['Z1-intro', 'Z2-chorus']) {
+      expect(text(plan, `short:${name}:youtube`, 'hashtags')?.value).toBe('synthwave, shorts');
+      expect(text(plan, `short:${name}:youtube`, 'description')?.value.endsWith('\n\n#synthwave #shorts')).toBe(true);
+    }
+  });
+
   it('takes every text limit from platformLimits, including a channel override', () => {
     const lenient = ChannelConfigSchema.parse({ ...channel, limits: { tiktok: { caption: 10 } } });
     const plan = buildReleasePlan(input({ channel: lenient, limits: platformLimits(lenient) }));

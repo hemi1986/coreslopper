@@ -834,6 +834,15 @@ describe('release board', () => {
     const main = youtube.posts.find((post) => post.id === 'youtube')!;
     expect(main.files.map((file) => file.path)).toEqual(['video/neon-16x9.mp4', 'thumbnails/thumb-1.jpg', 'thumbnails/thumb-2.jpg', 'thumbnails/thumb-3.jpg', 'video/neon.de.srt']);
     expect(main.fields.find((field) => field.label === 'Titel')).toMatchObject({ limit: 100, unit: 'chars' });
+    expect(main.fields.find((field) => field.label === 'Hashtags, kommagetrennt')?.value).toBe('synthwave, neon');
+    expect(main.fields.find((field) => field.label === 'Beschreibung')?.value).toMatch(/\n\n#synthwave #neon$/);
+    for (const post of board.platforms.find((platform) => platform.id === 'shorts')!.posts.filter((entry) => entry.id.endsWith(':youtube'))) {
+      expect(post.fields.find((field) => field.label === 'Hashtags, kommagetrennt')?.value).toBe('synthwave, shorts');
+      expect(post.fields.find((field) => field.label === 'Beschreibung')?.value).toMatch(/\n\n#synthwave #shorts$/);
+    }
+    const youtubeMd = await readFile(join(release, 'texts', 'youtube.md'), 'utf8');
+    expect(youtubeMd).toContain('## Hashtags, kommagetrennt\n\n```text\nsynthwave, neon\n```');
+    expect(await readFile(join(release, 'texts', 'shorts.md'), 'utf8')).toContain('### Hashtags, kommagetrennt\n\n```text\nsynthwave, shorts\n```');
     const tiktok = board.platforms.find((platform) => platform.id === 'tiktok')!;
     expect(tiktok.posts.map((post) => post.id)).toEqual(['short:Z1-intro:tiktok', 'short:Z2-chorus:tiktok', 'short:Z3-outro:tiktok']);
     expect(tiktok.posts[0]!.files.map((file) => file.path)).toEqual(['shorts/Z1-intro-9x16.mp4', 'shorts/Z1-intro-tiktok.jpg']);
