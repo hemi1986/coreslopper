@@ -20,3 +20,24 @@ What holds up:
 
 Verdict: fix blockers first.
 Most important: `releaseStart` counts the board's checklist ticks (`youtube#…`) as done marks, so a preparation tick freezes the shape before anything was posted (#1).
+
+## Round 2
+Base: marathon/2026-11-28 · Commits: 8 (fixes 0aa5712, b046520, cd79f2a) · Date: 2026-11-28
+
+A bug-focused pass over the whole diff. `tests/release-shape.test.ts` is green (17/17). `check-language.ts` is OK.
+
+How the round 1 findings stand:
+- #1 (merge blocker, rule-bypass) is fixed. `releaseStart` skips every key that contains `#`. Calendar event ids never contain `#`: they are fixed names (`youtube`, `tiktok`, `instagram-post`, …) or `short:<name>:<platform>`, and a Short name must match `^[A-Za-z0-9][A-Za-z0-9_-]*$` (schema.ts:896). So only checklist keys (`checklistKey`, release-records.ts:34) are skipped. The new test ticks `youtube#synthetic content disclosed`, cuts the track to 190 s, and checks the manifest's shape `episode`.
+- #2 (major) is fixed. When the manifest exists, cannot be read, and the release started, the run throws before `mkdir` and writes nothing. The test compares a snapshot of the folder. Before the first post, the lenient rebuild stays, and a test covers that too.
+- #6 (minor) is fixed. The doc comment now says "first in the status file's key order", and a test covers an older manifest without `shape`. That test checks both the refused run and the run with the same shape.
+- #3, #4 and #7 were skipped on purpose and stay minor. #5 stays an open question for the developer.
+
+New findings:
+
+| # | Severity | Area | File:line | Finding | Source (ADR, rule, glossary, smell) | Suggested direction |
+|---|---|---|---|---|---|---|
+| 8 | minor | design | packages/core/src/release.ts:64 | Core now knows the checklist key format (`#` as the separator), but the format is defined in the CLI (`checklistKey`, packages/cli/src/release-records.ts:34). If `checklistKey` changes its separator, `releaseStart` silently counts ticks as done marks again, and only the new test catches it. Core cannot import the CLI, so the knowledge is duplicated across the package seam. | Smell: Duplicated Code / Shotgun Surgery; package import direction (AGENTS.md) | Move `checklistKey`, plus an `isChecklistKey` predicate, into core next to `releaseStart`, and let the CLI import them from there. |
+| 9 | minor | domain rule | packages/cli/src/release.ts:289 | The guard runs only when `manifest.json` exists. If a started release's manifest was deleted, or the whole release folder was, the run builds the new shape with no check. This matches the story's wording ("differs from the manifest's"), and deleting the folder is a deliberate reset. The status still holds done marks for posts made with the old shape, though. | CMD-BuildReleasePackage rule (HS-268) | Leave as is, and name it in the ADR 0057 consequences. Or treat a missing manifest with `releaseStart(status)` set like an unreadable one. The developer decides. |
+
+Verdict: ready to merge.
+Most important: the round 1 merge blocker (#1, checklist ticks counted as done marks) is fixed and covered by a test. No merge blocker is open.
