@@ -16,6 +16,7 @@ import {
   repoRoot,
   soundLicenceTodos,
   unmarkedPlaceholders,
+  unusedTexts,
   type LoadedProject,
   type ReleaseManifest,
   type ReleasePlan,
@@ -245,6 +246,7 @@ export async function releaseChecks(projectDir: string, probe: Prober = probeMed
     todoMarks += text.split('\n').filter((line) => line.includes(`${TODO}:`)).length;
   }
   const textErrors: string[] = [];
+  const unused: string[] = [];
   let textTodos = 0;
   if (existsSync(uploadPaths(project.paths.root).data)) {
     const data = await loadUploadData(project.paths.root);
@@ -261,6 +263,8 @@ export async function releaseChecks(projectDir: string, probe: Prober = probeMed
     });
     textErrors.push(...problems.errors);
     textTodos = problems.missing.length;
+    // Texts the release does not use are a warning, naming the field: the agent wrote them for nothing.
+    unused.push(...(plan ? unusedTexts(data, plan, durationSeconds) : []));
   } else textTodos += 1;
   checks.push(
     missingTexts.length || textErrors.length || unmarked.length
@@ -273,6 +277,7 @@ export async function releaseChecks(projectDir: string, probe: Prober = probeMed
         ? check('Release texts', 'TODO', `${todoMarks} TODO line(s) in texts/; ${textTodos} text(s) still to write in review/upload.yaml`)
         : check('Release texts', 'PASS', `${texts.length} files, limits kept`),
   );
+  if (unused.length) checks.push(check('Release unused texts', 'WARN', unused.join('; ')));
 
   if (music) {
     const meta = await song(project);

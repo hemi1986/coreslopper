@@ -75,7 +75,7 @@ export function uploadYaml() {
     title: `Regen ${n} 🌧️ #synthwave #shorts`,
     description: `Moment ${n}.\nGanzes Video: Link oben ☝️`,
     hashtags: ['#synthwave', '#shorts'],
-    instagram: { caption: `Reel ${n}: Neonregen.`, hashtags: ['#synthwave', '#neon'], cover_frame: 1.5, story: `Neu: Teil ${n}` },
+    instagram: { caption: `Reel ${n}: Neonregen.`, hashtags: ['#synthwave', '#neon'], cover_frame: 1.5, ...(n === 1 ? { story: `Neu: Teil ${n}` } : {}) },
     tiktok: { caption: `Teil ${n} im Regen`, hashtags: ['#synthwave'], overlay: 'Ganzes Video auf YouTube: @neonstatic' },
   });
   return {
@@ -95,7 +95,7 @@ export function uploadYaml() {
     shorts: [short('Z1-intro', 1), short('Z2-chorus', 2), short('Z3-outro', 3)],
     spotify: { artist_pick: 'Neu: Neon Rain', pitch: 'Treibender Synthwave mit Regen und Neon.' },
     instagram_post: { caption: 'Neon Rain, das ganze Video im Feed.', hashtags: ['#synthwave'] },
-    announcement: { text: 'Freitag: Neon Rain.', hashtags: ['#synthwave'] },
+    announcement: { text: 'Freitag: Neon Rain.', hashtags: ['#synthwave'], story: 'Bald: Neon Rain' },
     x: { post: 'Neon Rain ist da. Zwölf Sekunden Regen.', hashtags: ['#synthwave'], reply: 'Ganzes Video:', media: 'Z1-intro' },
     linkedin: {
       decision: 'post',

@@ -50,6 +50,32 @@ export function mainVideoReel(durationSeconds: number | undefined): boolean {
   return durationSeconds === undefined || upToThreeMinutes(durationSeconds);
 }
 
+/**
+ * The texts of the upload data a release does not use, each named by its
+ * field: a Short's story caption when the release-day story shows another
+ * Short (or none), and `instagram_post` when the main video lasts over 3
+ * minutes and gets no Reel (ADR 0057). QA warns about them; they never fail.
+ */
+export function unusedTexts(data: UploadData, plan: Pick<ReleasePlan, 'posts' | 'kind' | 'shape'>, durationSeconds: number | undefined): string[] {
+  const unused: string[] = [];
+  const shape = plan.shape ?? plan.kind;
+  const story = plan.posts.find((post) => post.id === 'story');
+  const shown = story?.files.find((file) => file.role === 'video')?.path;
+  const shownName = shown ? /^shorts\/(.+)-9x16\.mp4$/.exec(shown)?.[1] : undefined;
+  if (shape !== 'meme' && shape !== 'short-episode') {
+    for (const short of data.shorts) {
+      if (!short.instagram?.story || short.name === shownName) continue;
+      unused.push(
+        `shorts.${short.name}.instagram.story: the release-day story ${shownName ? `shows ${shownName}` : 'shows no Short'}, so this caption is not used`,
+      );
+    }
+    if (data.instagram_post && durationSeconds !== undefined && !mainVideoReel(durationSeconds)) {
+      unused.push('instagram_post: the main video lasts over 3 minutes and gets no Reel, so this text is not used');
+    }
+  }
+  return unused;
+}
+
 /** The video of the main video's Reel: the best vertical render there is – 9:16, 4:5, 1:1 – else the master. */
 export function reelVideo(files: Pick<ReleasePlanFiles, 'videos' | 'master'>): string | undefined {
   return files.videos?.['9x16'] ?? files.videos?.['4x5'] ?? files.videos?.['1x1'] ?? files.master;
@@ -597,8 +623,8 @@ export function buildReleasePlan(input: ReleasePlanInput): ReleasePlan {
           : files.cover
             ? [{ role: 'cover', path: files.cover }]
             : [],
-        // The announcement story carries a caption only while it shows the teaser (HS-267).
-        texts: texts(['caption', files.announceStory && files.teaser ? text(announcement, storyCaption('announcement story')) : undefined]),
+        // The announcement story carries its own optional caption, and only while it shows the teaser (HS-267).
+        texts: texts(['caption', files.announceStory && files.teaser && data.announcement.story ? text(data.announcement.story, storyCaption('announcement story')) : undefined]),
         media: files.announceStory ?? files.cover,
       });
       posts.push({
