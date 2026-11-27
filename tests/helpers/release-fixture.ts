@@ -319,6 +319,13 @@ export async function episodeFixture(options: { seconds?: number; horizontal?: b
   await cp(join(process.cwd(), 'projects', 'demo-series'), join(root, 'projects', 'demo-series'), { recursive: true });
   const dir = join(root, 'projects', 'demo-episode');
   await cp(join(process.cwd(), 'projects', 'demo-episode'), dir, { recursive: true });
+  // A local checkout may hold the demo's generated, git-ignored renders and
+  // effective timing; a clean checkout (CI) does not. Drop them and write the
+  // placeholder master, so the fixture is the same everywhere.
+  await rm(join(dir, 'renders'), { recursive: true, force: true });
+  await rm(join(dir, 'timing.effective.json'), { force: true });
+  await mkdir(join(dir, 'renders'), { recursive: true });
+  await writeFile(join(dir, 'renders', '9x16.mp4'), 'render 9x16');
   if (options.horizontal) {
     const projectPath = join(dir, 'project.yaml');
     const config = parse(await readFile(projectPath, 'utf8')) as { formats: Record<string, unknown> };
