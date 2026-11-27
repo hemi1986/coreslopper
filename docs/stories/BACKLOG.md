@@ -4,15 +4,9 @@
 
 **Progress: 24 of 31 domain stories done** · scenarios 80 of 108
 
-**59 stories** · In Progress: 1 · Ready: 16 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 42 · Superseded: 0
+**59 stories** · In Progress: 0 · Ready: 16 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 43 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
-
-## In Progress
-
-| ID | Title | Type | Context | Priority | Size | Risk | Depends on |
-|---|---|---|---|---|---|---|---|
-| [ST-043](ST-043-youtube-hashtags-without-hash-on-the-board.md) | The board lists YouTube hashtags comma-separated without "#" | chore | – | must | – | – | – |
 
 ## Ready
 
@@ -60,6 +54,7 @@ Within each section: by priority, then by story ID, with dependencies pulled in 
 | [ST-036](ST-036-an-internal-project-gets-no-release-package.md) | An internal project gets no release package | domain | Release | must | – | – | – |
 | [ST-037](ST-037-internal-projects-end-after-qa.md) | Internal projects are created as such and end after QA | task | – | must | – | – | ST-036 |
 | [ST-038](ST-038-local-lip-sync-by-default-in-comfyui-projects.md) | ComfyUI projects lip-sync locally by default | task | – | must | – | – | – |
+| [ST-043](ST-043-youtube-hashtags-without-hash-on-the-board.md) | The board lists YouTube hashtags comma-separated without "#" | chore | – | must | – | – | – |
 | [ST-012](ST-012-a-shot-lands-on-the-sound-cue.md) | A shot lands on a sound's cue | domain | Storyboard | should | – | – | ST-011 |
 | [ST-014](ST-014-burned-in-subtitles-for-a-meme.md) | A meme's render carries German subtitles | domain | Render | should | – | – | ST-007 |
 | [ST-020](ST-020-episode-announcement-says-new-episode.md) | An episode's announcement images say "new episode", not "new song" | chore | – | should | – | – | – |
