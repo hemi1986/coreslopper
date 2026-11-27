@@ -89,6 +89,7 @@ export function filesFromManifest(manifest: ReleaseManifest | undefined, masterF
     else if (file.kind === 'short' && name) short(name).video = file.path;
     else if (file.kind === 'short-thumbnail' && name) short(name).thumbnail = file.path;
     else if (file.kind === 'tiktok-cover' && name) short(name).tiktokCover = file.path;
+    else if (file.kind === 'tiktok-cover') files.tiktokCover = file.path;
     else if (file.kind === 'audio') files.audio = file.path;
     else if (file.kind === 'cover') files.cover = file.path;
     else if (file.kind === 'canvas') files.canvas = file.path;

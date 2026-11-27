@@ -90,8 +90,10 @@ export async function loadReleasePlan(projectDir: string): Promise<ReleasePlan |
 
 /** The cover source the skill composes with `thumbnail --format 1x1`. */
 export const COVER_SOURCE = 'renders/cover-3000x3000.jpg';
-/** A meme's cover: the skill composes it with `thumbnail --format 9x16`. */
+/** The cover of a meme or a short episode: the skill composes it with `thumbnail --format 9x16`. */
 export const MEME_COVER_SOURCE = 'renders/cover-1080x1920.jpg';
+/** A short episode's TikTok cover: the skill composes it with `thumbnail --format 3x4` (ADR 0057). */
+export const TIKTOK_COVER_SOURCE = 'renders/cover-1080x1440.jpg';
 
 export interface ReleaseDeps {
   probe: Prober;
@@ -272,6 +274,11 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
   // A music video releases a song; an episode and a meme release a video only.
   const music = kind === 'music-video';
   const meme = kind === 'meme';
+  const timing = project.effectiveTiming ?? project.timing;
+  const shape = releaseShape({ kind, master: project.config.formats.master, durationSeconds: timing?.audio.duration });
+  // A short episode is one video, as a meme is: no main video, thumbnails or Shorts (ADR 0057).
+  const shortEpisode = shape === 'short-episode';
+  const oneVideo = meme || shortEpisode;
   const usedSounds = meme ? await usedLibrarySounds(project, root) : [];
   const credits = usedSounds.map((sound) => sound.credit).filter((credit): credit is string => Boolean(credit));
   const dir = releaseDir(project.paths.root);
@@ -288,7 +295,6 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
   const todos: string[] = [];
   const errors: string[] = [];
   const warnings: string[] = [];
-  const timing = project.effectiveTiming ?? project.timing;
 
   let data: UploadData | undefined;
   if (existsSync(uploadPaths(project.paths.root).data)) data = await loadUploadData(project.paths.root);
@@ -300,9 +306,10 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
   todos.push(...channelTodos(channel));
   await mkdir(dir, { recursive: true });
 
-  // video/: every configured format, rendered only when missing or stale.
+  // video/: every configured format, rendered only when missing or stale; a short episode's one master.
   const files: ReleaseTextInput['files'] = { thumbnails: [], shorts: [] };
-  for (const format of projectFormats(project)) {
+  const formats = projectFormats(project);
+  for (const format of shortEpisode ? formats.slice(0, 1) : formats) {
     const rel = `renders/${format.id}.mp4`;
     const source = join(project.paths.root, rel);
     const recorded = project.state.artifacts[`render:${rel}:inputs`];
@@ -350,8 +357,8 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
     await writer.text(files.subtitles, buildLyricsSrt(timing), 'subtitles', { language, lines: timing.lines.length });
   }
 
-  // thumbnails/: the upload thumbnail first, then the alternates (or the folder's order). A meme has a 9:16 cover instead.
-  if (!meme) {
+  // thumbnails/: the upload thumbnail first, then the alternates (or the folder's order). A meme and a short episode have a 9:16 cover instead.
+  if (!oneVideo) {
     const available = await listThumbnails(project.paths.renders);
     const ordered = data?.main.thumbnail
       ? [data.main.thumbnail, ...data.main.alternate_thumbnails].map((file) => resolve(project.paths.root, file)).filter((file) => existsSync(file))
@@ -369,9 +376,16 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
       await writer.place(cover, files.cover, 'cover', { width: 1080, height: 1920, format: 'jpeg', color: 'rgb' });
     } else todos.push(`${MEME_COVER_SOURCE} is missing: compose it with thumbnail --format 9x16 --out ${MEME_COVER_SOURCE}`);
   }
+  if (shortEpisode) {
+    const tiktok = join(project.paths.root, TIKTOK_COVER_SOURCE);
+    if (existsSync(tiktok)) {
+      files.tiktokCover = `cover/${slug}-1080x1440.jpg`;
+      await writer.place(tiktok, files.tiktokCover, 'tiktok-cover', { width: 1080, height: 1440 });
+    } else todos.push(`${TIKTOK_COVER_SOURCE} is missing: compose it with thumbnail --format 3x4 --out ${TIKTOK_COVER_SOURCE}`);
+  }
 
-  // shorts/: each Short with its vertical thumbnail. A meme is one video, not a set of Shorts.
-  if (!meme) {
+  // shorts/: each Short with its vertical thumbnail. A meme and a short episode are one video, not a set of Shorts.
+  if (!oneVideo) {
     const shorts = await listShorts(project.paths.renders);
     for (const video of shorts) {
       const name = shortName(video)!;
@@ -529,7 +543,7 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
   const manifest: ReleaseManifest = {
     version: 1,
     project: slug,
-    shape: releaseShape({ kind, master: project.config.formats.master, durationSeconds: timing?.audio.duration }),
+    shape,
     generated_at: deps.now().toISOString(),
     files: writer.files,
     plan,

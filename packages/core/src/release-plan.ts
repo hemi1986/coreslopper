@@ -17,6 +17,8 @@ export interface ReleasePlanFiles {
   shorts: { name: string; video: string; thumbnail?: string; tiktokCover?: string }[];
   audio?: string;
   cover?: string;
+  /** A short episode's 1080x1440 TikTok cover (ADR 0057). */
+  tiktokCover?: string;
   canvas?: string;
   lyricsTxt?: string;
   lyricsLrc?: string;

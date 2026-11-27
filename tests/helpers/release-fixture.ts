@@ -404,3 +404,42 @@ export async function diskTree(dir: string): Promise<string[]> {
     .sort();
 }
 
+
+/**
+ * The upload data of a short episode in German: `main` is its YouTube Short,
+ * with its own TikTok, Instagram, X and microsite texts and no announcement.
+ */
+export function shortEpisodeUploadYaml() {
+  return {
+    version: 1,
+    language: 'de',
+    main: {
+      file: 'renders/9x16.mp4',
+      title: 'After Midnight #shorts',
+      description: 'Eine Nachricht kurz vor Geschäftsschluss.',
+      hashtags: ['#nightdesk', '#shorts'],
+      tags: ['night desk'],
+      platforms: ['youtube'],
+    },
+    tiktok: { caption: 'Kurz vor Geschäftsschluss kommt noch eine Nachricht.', hashtags: ['#nightdesk'] },
+    instagram: { caption: 'Folge 1: die letzte Nachricht des Tages.', hashtags: ['#nightdesk'] },
+    x: { post: 'Neue Folge: After Midnight.', hashtags: ['#nightdesk'] },
+    microsite: { teaser: 'Eine Nachricht kurz vor Geschäftsschluss.', text: 'Folge 1 der Night Desk.' },
+  };
+}
+
+/**
+ * A short episode: the demo episode (9:16, 22 s) with its 1080x1920 cover, its
+ * 1080x1440 TikTok cover and the short episode's upload data – and, as left
+ * over from an episode release, three 16:9 thumbnails and a cut Short.
+ */
+export async function shortEpisodeFixture(): Promise<{ dir: string; root: string }> {
+  const { dir, root } = await episodeFixture();
+  await writeFile(join(dir, 'renders', 'cover-1080x1920.jpg'), jpeg(1080, 1920));
+  await writeFile(join(dir, 'renders', 'cover-1080x1440.jpg'), jpeg(1080, 1440));
+  await mkdir(join(dir, 'renders', 'shorts'), { recursive: true });
+  await writeFile(join(dir, 'renders', 'shorts', 'E1-hook-9x16.mp4'), 'short E1-hook');
+  await writeFile(join(dir, 'renders', 'shorts', 'E1-hook-thumb.jpg'), jpeg(1080, 1920));
+  await writeFile(join(dir, 'review', 'upload.yaml'), stringify(shortEpisodeUploadYaml()));
+  return { dir, root };
+}
