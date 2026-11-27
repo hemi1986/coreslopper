@@ -27,6 +27,7 @@ import {
   releaseIdentity,
   releaseTodos,
   releasedPublicly,
+  releaseShape,
   loadDefaults,
   repoRoot,
   resolveAnchor,
@@ -528,6 +529,7 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
   const manifest: ReleaseManifest = {
     version: 1,
     project: slug,
+    shape: releaseShape({ kind, master: project.config.formats.master, durationSeconds: timing?.audio.duration }),
     generated_at: deps.now().toISOString(),
     files: writer.files,
     plan,
