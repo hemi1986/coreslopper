@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { srtTime } from './episode.js';
 import { readYamlFile } from './project.js';
 import { buildReleasePlan } from './release-plan.js';
+import { SHORT_FORM_MAX_SECONDS, upToThreeMinutes } from './short-form.js';
 import {
   ChannelConfigSchema,
   PLATFORM_LIMITS,
@@ -26,8 +27,8 @@ export async function loadChannel(root: string): Promise<ChannelConfig | undefin
   return existsSync(path) ? readYamlFile(path, ChannelConfigSchema) : undefined;
 }
 
-/** The longest episode track a short episode may have, in seconds; 180 s still counts (ADR 0057, HS-266). */
-export const SHORT_EPISODE_MAX_SECONDS = 180;
+/** The longest episode track a short episode may have, in seconds; 180 s still counts, within `upToThreeMinutes`'s tolerance (ADR 0057, HS-266). */
+export const SHORT_EPISODE_MAX_SECONDS = SHORT_FORM_MAX_SECONDS;
 
 /**
  * The release shape of a project (ADR 0057): a music video and a meme take
@@ -42,8 +43,23 @@ export function releaseShape(input: {
 }): ReleaseShape {
   if (input.kind !== 'episode') return input.kind;
   const upright = input.master.height >= input.master.width;
-  const short = input.durationSeconds !== undefined && input.durationSeconds <= SHORT_EPISODE_MAX_SECONDS;
+  const short = input.durationSeconds !== undefined && upToThreeMinutes(input.durationSeconds);
   return upright && short ? 'short-episode' : 'episode';
+}
+
+/**
+ * Whether a project posts its **Vertical Version** – the 9:16 render of the
+ * whole episode – as its one Short instead of cut Shorts: a horizontal episode
+ * whose episode track lasts at most 3 minutes (ADR 0057, HS-266). An episode
+ * without a built track cuts its Shorts.
+ */
+export function postsVerticalVersion(input: {
+  kind: ProjectKind;
+  master: { width: number; height: number };
+  durationSeconds: number | undefined;
+}): boolean {
+  if (input.kind !== 'episode') return false;
+  return input.master.width > input.master.height && input.durationSeconds !== undefined && upToThreeMinutes(input.durationSeconds);
 }
 
 /** The shape a manifest recorded; a manifest written before shapes existed reads as its project kind. */

@@ -9,6 +9,7 @@ import {
   type UploadData,
 } from './schema.js';
 import type { Chapter, PlatformLimits } from './release.js';
+import { SHORT_FORM_MAX_SECONDS, upToThreeMinutes } from './short-form.js';
 
 // One release plan: every post's exact text, files, source and limits, and what
 // is still to write. It is assembled once from the project, `review/upload.yaml`,
@@ -38,14 +39,15 @@ export interface ReleasePlanFiles {
 }
 
 /** The longest main video that still gets its Instagram Reel, in seconds (ADR 0057). */
-export const MAIN_REEL_MAX_SECONDS = 180;
+export const MAIN_REEL_MAX_SECONDS = SHORT_FORM_MAX_SECONDS;
 
 /**
  * Whether the main video goes to Instagram as a Reel: only up to 3 minutes,
- * 180 s included. An unknown length (no timing) keeps the Reel.
+ * 180 s included, within `upToThreeMinutes`'s tolerance. An unknown length (no
+ * timing) keeps the Reel.
  */
 export function mainVideoReel(durationSeconds: number | undefined): boolean {
-  return durationSeconds === undefined || durationSeconds <= MAIN_REEL_MAX_SECONDS;
+  return durationSeconds === undefined || upToThreeMinutes(durationSeconds);
 }
 
 /** The video of the main video's Reel: the best vertical render there is – 9:16, 4:5, 1:1 – else the master. */

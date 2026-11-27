@@ -19,7 +19,9 @@ import {
   readYamlFile,
   releaseShape,
   repoRoot,
+  SHORT_FORM_MAX_SECONDS,
   soundLicenceTodos,
+  upToThreeMinutes,
   type PlatformLimits,
   type ProjectConfig,
   type PublishEntry,
@@ -60,7 +62,7 @@ export const YOUTUBE_LIMITS = {
   tagChars: PLATFORM_LIMITS.youtube.tags,
   hashtags: PLATFORM_LIMITS.youtube.hashtags,
   thumbnailBytes: 2 * 1024 * 1024,
-  shortSeconds: 180,
+  shortSeconds: SHORT_FORM_MAX_SECONDS,
   /** Longest upload of a channel that has not verified its phone number. */
   unverifiedSeconds: 15 * 60,
 } as const;
@@ -243,7 +245,7 @@ export function platformProblems(
       if (!['.jpg', '.jpeg', '.png'].includes(extname(item.thumbnail ?? '').toLowerCase())) errors.push(`${label}: thumbnail must be JPEG or PNG`);
     }
     if (probe && item.kind === 'short') {
-      if (probe.duration > YOUTUBE_LIMITS.shortSeconds + 0.05) errors.push(`${label}: ${probe.duration.toFixed(1)} s, a Short is at most ${YOUTUBE_LIMITS.shortSeconds} s`);
+      if (!upToThreeMinutes(probe.duration)) errors.push(`${label}: ${probe.duration.toFixed(1)} s, a Short is at most ${YOUTUBE_LIMITS.shortSeconds} s`);
       if (probe.height < probe.width) errors.push(`${label}: ${probe.width}x${probe.height}, a Short must be vertical or square`);
     }
     if (probe && item.kind === 'main' && probe.duration > YOUTUBE_LIMITS.unverifiedSeconds) {
