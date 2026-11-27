@@ -4,6 +4,7 @@ import {
   formatUsd,
   loadProject,
   nextStage,
+  releaseShape,
   releasedPublicly,
   remainingBudget,
   setupSkill,
@@ -12,7 +13,7 @@ import {
 } from '@coreslopper/core';
 import { join, relative } from 'node:path';
 import { openRoundSummaries } from './board-review.js';
-import { listThumbnails } from './thumbnail-files.js';
+import { SHORT_EPISODE_COVERS, listThumbnails } from './thumbnail-files.js';
 import { listShorts, shortName, shortPaths } from './release-files.js';
 
 export async function printStatus(projectDir: string): Promise<void> {
@@ -32,7 +33,11 @@ export async function printStatus(projectDir: string): Promise<void> {
   );
   const next = nextStage(state);
   const interactive = next && stageDefinition(next.id, state.kind)?.interactive;
-  const thumbnails = await listThumbnails(loaded.paths.renders);
+  // A short episode has a cover and a TikTok cover instead of thumbnails (ADR 0057).
+  const shape = releaseShape({ kind: config.kind, master: config.formats.master, durationSeconds: (loaded.effectiveTiming ?? loaded.timing)?.audio.duration });
+  const covers = SHORT_EPISODE_COVERS.map((cover) => cover.path).filter((path) => existsSync(join(loaded.paths.root, path)));
+  const thumbnails = shape === 'short-episode' ? [] : await listThumbnails(loaded.paths.renders);
+  if (shape === 'short-episode' && covers.length) console.log(`Covers: ${covers.join(', ')}`);
   if (thumbnails.length) {
     console.log(`Thumbnails: ${thumbnails.map((file) => relative(loaded.paths.root, file)).join(', ')}`);
   }
