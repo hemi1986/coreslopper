@@ -191,4 +191,14 @@ describe('the release shape once the release has started', () => {
       /the release started as short-episode.*live URL of x.*episode/s,
     );
   });
+  it('a board checklist tick is no done mark: the shape still follows the episode', async () => {
+    const { dir, root } = await episode('9:16', 170);
+    await buildRelease({ projectDir: dir, root, deps: fakeDeps(), render: false });
+    await setStatus(dir, { 'youtube#synthetic content disclosed': { done: true } });
+    await setTrack(dir, 190);
+
+    await buildRelease({ projectDir: dir, root, deps: fakeDeps(), render: false });
+
+    expect(await manifestOnDisk(dir)).toBe('episode');
+  });
 });

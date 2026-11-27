@@ -54,11 +54,14 @@ export function manifestShape(manifest: Pick<ReleaseManifest, 'shape'>, kind: Pr
 
 /**
  * What started the release: the first done mark or live URL in the release
- * status, in the status's own order. Until there is one, the release shape
- * follows the project; after it, the shape is kept (HS-268).
+ * status, first in the status file's key order. Until there is one, the
+ * release shape follows the project; after it, the shape is kept (HS-268).
+ * A board checklist tick (`<event>#<line>`) is a preparation step, not a done
+ * mark: nothing went online with it.
  */
 export function releaseStart(status: Pick<ReleaseStatus, 'items'>): string | undefined {
   for (const [id, item] of Object.entries(status.items)) {
+    if (id.includes('#')) continue;
     if (item.done) return `the done mark ${id}`;
     if (item.url) return `the live URL of ${id}`;
   }
