@@ -252,6 +252,8 @@ export function buildReleasePlan(input: ReleasePlanInput): ReleasePlan {
   const feed = files.videos?.['4x5'] ?? files.videos?.['1x1'];
   const firstShortVideo = files.shorts[0]?.video;
   const firstShortThumb = files.shorts[0]?.thumbnail;
+  const storyCaption = (label: string): DraftLimit => ({ max: limits.instagram.story_caption, label, field: 'caption' });
+  const storyCaptionOf = (name: string | undefined) => data?.shorts.find((short) => short.name === name)?.instagram?.story;
 
   if (meme) {
     const caption = memeCaption(input.data, input.credits);
@@ -526,7 +528,8 @@ export function buildReleasePlan(input: ReleasePlanInput): ReleasePlan {
         ...(files.story ? [{ role: 'story-image', path: files.story }] : firstShortThumb ? [{ role: 'thumbnail', path: firstShortThumb }] : []),
         ...(firstShortVideo ? [{ role: 'video', path: firstShortVideo }] : []),
       ],
-      texts: texts(['story', text(data?.shorts.find((short) => short.instagram?.story)?.instagram?.story)]),
+      // A story has no text field: only a story that shows a video carries a caption (HS-267).
+      texts: texts(['caption', firstShortVideo ? text(storyCaptionOf(files.shorts[0]?.name), storyCaption('story')) : undefined]),
       media: files.story ?? files.cover,
       pointer: 'youtube',
       needsYoutube: true,
@@ -549,7 +552,8 @@ export function buildReleasePlan(input: ReleasePlanInput): ReleasePlan {
           : files.cover
             ? [{ role: 'cover', path: files.cover }]
             : [],
-        texts: texts(['story', text(announcement)]),
+        // The announcement story carries a caption only while it shows the teaser (HS-267).
+        texts: texts(['caption', files.announceStory && files.teaser ? text(announcement, storyCaption('announcement story')) : undefined]),
         media: files.announceStory ?? files.cover,
       });
       posts.push({

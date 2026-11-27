@@ -6,11 +6,12 @@ vi.mock('@coreslopper/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@coreslopper/core')>()),
   loadChannel: async () => undefined,
 }));
-import { readFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { stringify } from 'yaml';
 import { join } from 'node:path';
 import { buildRelease } from '../packages/cli/src/release.ts';
 import { boardProject } from '../packages/cli/src/release-board-data.ts';
-import { cleanupFixtures, fakeDeps, fixture } from './helpers/release-fixture.ts';
+import { cleanupFixtures, episodeFixture, episodeUploadYaml, fakeDeps, fixture, jpeg } from './helpers/release-fixture.ts';
 
 afterEach(cleanupFixtures);
 
@@ -38,5 +39,35 @@ describe('the stories of a release, as they are', () => {
     expect(post(result, 'announce:instagram').files.map((file) => file.path)).toEqual(['announce/teaser-9x16.mp4', 'announce/story-9x16.jpg']);
     const instagram = await readFile(join(result.dir, 'texts', 'instagram.md'), 'utf8');
     expect(instagram).toContain('Story: `announce/story-9x16.jpg`');
+  });
+});
+
+describe('the caption of a story', () => {
+  it('ST-044: A story with a video carries its caption', async () => {
+    const { dir, root } = await episodeFixture();
+    await mkdir(join(dir, 'renders', 'shorts'), { recursive: true });
+    await writeFile(join(dir, 'renders', 'shorts', 'E1-hook-9x16.mp4'), 'short E1-hook');
+    await writeFile(join(dir, 'renders', 'shorts', 'E1-hook-thumb.jpg'), jpeg(1080, 1920));
+    const upload = episodeUploadYaml();
+    await writeFile(
+      join(dir, 'review', 'upload.yaml'),
+      stringify({
+        ...upload,
+        shorts: [
+          {
+            name: 'E1-hook',
+            file: 'renders/shorts/E1-hook-9x16.mp4',
+            title: 'After Midnight #shorts',
+            description: 'Der Anfang.',
+            hashtags: ['#nightdesk', '#shorts'],
+            instagram: { caption: 'Kurz vor Geschäftsschluss.', story: 'Neue Folge – jetzt auf YouTube' },
+          },
+        ],
+      }),
+    );
+
+    const result = await buildRelease({ projectDir: dir, root, deps: fakeDeps(), render: false });
+
+    expect(post(result, 'story').texts.caption).toMatchObject({ value: 'Neue Folge – jetzt auf YouTube', limit: { max: 120 } });
   });
 });
