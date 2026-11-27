@@ -201,4 +201,28 @@ describe('the release shape once the release has started', () => {
 
     expect(await manifestOnDisk(dir)).toBe('episode');
   });
+
+  it('a started release with an unreadable manifest fails and changes nothing', async () => {
+    const { dir, root } = await episode('9:16', 170);
+    await buildRelease({ projectDir: dir, root, deps: fakeDeps(), render: false });
+    await setStatus(dir, { youtube: { done: true } });
+    await writeFile(join(dir, 'renders', 'release', 'manifest.json'), '{"version": 1');
+    await setTrack(dir, 190);
+    const before = await snapshot(dir);
+
+    await expect(buildRelease({ projectDir: dir, root, deps: fakeDeps(), render: false })).rejects.toThrow(/manifest\.json cannot be read/);
+
+    expect(await snapshot(dir)).toEqual(before);
+  });
+
+  it('an unreadable manifest before the first post is built again', async () => {
+    const { dir, root } = await episode('9:16', 170);
+    await buildRelease({ projectDir: dir, root, deps: fakeDeps(), render: false });
+    await writeFile(join(dir, 'renders', 'release', 'manifest.json'), '{"version": 1');
+    await setTrack(dir, 190);
+
+    await buildRelease({ projectDir: dir, root, deps: fakeDeps(), render: false });
+
+    expect(await manifestOnDisk(dir)).toBe('episode');
+  });
 });
