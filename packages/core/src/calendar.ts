@@ -7,6 +7,7 @@ import {
   type CalendarPlatform,
   type ReleaseCalendar,
   type ReleaseSchedule,
+  type ReleaseShape,
 } from './schema.js';
 
 // The release calendar: when what goes online where. Pure date arithmetic in
@@ -100,12 +101,15 @@ export interface CalendarInput {
   slug: string;
   title: string;
   kind: 'music-video' | 'episode' | 'meme';
+  /** The release shape (`releaseShape`). A short episode is one video, posted like a meme (ADR 0057). */
+  shape: ReleaseShape;
   /** `release.release_date` from project.yaml: the user's date always wins. */
   releaseDate?: string;
   /** Shorts in their order, with the platforms each one goes to. */
   shorts: { name: string; platforms: ('youtube' | 'tiktok' | 'instagram' | 'x')[] }[];
   announcement: boolean;
   communityPost: boolean;
+  /** The main video's Reel (`instagram-post`): upload text and a main video of at most 180 s. */
   instagramPost: boolean;
   x: boolean;
   linkedin: boolean;
@@ -183,15 +187,16 @@ export function buildCalendar(input: CalendarInput, context: CalendarContext): R
     push('artist-pick', 'spotify', 'artist-pick', at(0, steps.task_time));
   }
   push('youtube', 'youtube', 'youtube', at(0, release.video_time));
-  if (input.kind === 'meme') {
+  if (input.kind === 'meme' || input.shape === 'short-episode') {
     // A meme is one video posted the same day on all three vertical platforms: no story, no announcement, no extras.
+    // A short episode posts its one video there too, plus X and the microsite, and keeps its optional announcement.
     push('tiktok', 'tiktok', 'post', at(0, release.video_time));
     push('instagram', 'instagram', 'reel', at(0, posts.instagram));
   } else {
     push('story', 'instagram', 'story', at(0, release.video_time));
   }
   if (input.communityPost) push('community', 'youtube', 'community', at(0, release.video_time));
-  if (input.instagramPost) push('instagram-post', 'instagram', 'post', at(0, posts.instagram));
+  if (input.instagramPost) push('instagram-post', 'instagram', 'reel', at(0, posts.instagram));
   if (input.x) push('x', 'x', 'post', at(0, posts.x));
   if (input.microsite) push('microsite', 'microsite', 'page', at(0, release.video_time));
   if (music) push('links', 'youtube', 'links', at(steps.links, steps.task_time));

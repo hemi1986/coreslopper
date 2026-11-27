@@ -8,9 +8,9 @@ The release board assigns each file of the release folder to its posts:
 
 | File | Goes to |
 |---|---|
-| `video/<slug>-16x9.mp4` (master) | YouTube main video; Spotify music video (beta, 16:9 only) |
+| `video/<slug>-16x9.mp4` (master) | YouTube main video; X release post (default); Spotify music video (beta, 16:9 only) |
 | `video/<slug>-4x5.mp4` or `-1x1.mp4` (feed format) | Instagram feed post of the release; LinkedIn post |
-| `shorts/<name>-9x16.mp4` | YouTube Shorts, TikTok, Instagram Reels, X posts, Instagram story |
+| `shorts/<name>-9x16.mp4` | YouTube Shorts, TikTok, Instagram Reels, X posts of a Short, Instagram story |
 | `thumbnails/thumb-1.jpg` (2, 3) | YouTube thumbnail (Test & compare); YouTube post |
 | `shorts/<name>-thumb.jpg` / `-tiktok.jpg` | Shorts and Reel cover / TikTok cover (3:4) |
 | `streaming/cover-3000x3000.jpg` | Distributor; announcement; Instagram feed post cover |
@@ -81,6 +81,8 @@ Pointers to YouTube: bio link, pinned comment, a text line in the caption or on 
 | Stories | 9:16, up to 60 s per segment; link sticker for all accounts | [Instagram](https://about.instagram.com/blog/announcements/expanding-sharing-links-in-stories-to-everyone) |
 | Scheduling | Native for professional accounts, up to 75 days ahead | [Instagram help](https://help.instagram.com/iphone-app/439971288310029) |
 
+A story has no text field; a story that shows a video takes a caption of at most 120 characters in the app (`limits.instagram.story_caption`), an image story none.
+
 Pointers to YouTube: a story link sticker on release day, a bio link, a pinned comment; caption links are not clickable.
 
 ## Spotify for Artists
@@ -112,7 +114,7 @@ Spotify has no link out to YouTube; the equivalent is the music video on Spotify
 | Links | X says it dropped the link penalty in July 2026; data still shows weak reach for link posts | [ppc.land](https://ppc.land/x-drops-year-old-link-penalty-musk-tells-zuckerberg-on-platform/) |
 | Hashtags | 1–2 (unverified) | — |
 
-Post the Short natively and put the YouTube link in a reply.
+The release post carries the whole main video natively (`x.media: main`, the default) or a Short it names; the board notes X Premium when the main video is over 140 s. The YouTube link goes in the optional reply.
 
 ## LinkedIn
 

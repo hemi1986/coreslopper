@@ -5,6 +5,7 @@ import type {
   AutopilotSettings,
   CalendarEvent,
   ReleaseCalendar,
+  ReleasePlan,
   ReleaseStatus,
 } from './schema.js';
 
@@ -89,6 +90,8 @@ export interface AutopilotContext {
   ready?: Partial<Record<AutopilotPlatform, boolean>>;
   /** The main video goes out as a Premiere, which only YouTube Studio can set. */
   premiere?: boolean;
+  /** The release plan: a post whose plan says it needs no YouTube link (an X post without a reply) waits for nothing. Omit to wait as before. */
+  plan?: Pick<ReleasePlan, 'posts'>;
   /** Minutes after which a running attempt counts as stuck. */
   stuckMinutes?: number;
 }
@@ -121,8 +124,16 @@ export function actionPlatform(action: AutopilotAction): AutopilotPlatform {
   return action.kind === 'links' ? 'youtube' : action.kind;
 }
 
-/** Actions that link to the live main video. */
-const needsYouTube = (action: AutopilotAction) => action.kind === 'linkedin' || (action.kind === 'x' && action.item === 'main');
+/**
+ * Actions that link to the live main video: LinkedIn and the X release post,
+ * unless the plan says the event's post carries no link (an X post without a
+ * reply, ST-046). Without a plan, or without the event's post in it, they wait.
+ */
+function needsYouTube(action: AutopilotAction, event: CalendarEvent, plan: AutopilotContext['plan']): boolean {
+  if (!(action.kind === 'linkedin' || (action.kind === 'x' && action.item === 'main'))) return false;
+  const post = plan?.posts.find((entry) => entry.id === event.id);
+  return post ? post.needsYoutube === true : true;
+}
 
 /** The YouTube video ID of the main video, from the log or the URL on the board. */
 export function mainVideoId(status: ReleaseStatus, log: AutopilotLog): string | undefined {
@@ -201,7 +212,7 @@ function planEvent(event: CalendarEvent, context: AutopilotContext): AutopilotEv
   const late = action.kind !== 'links' && !forced && attempts === 0 && now.getTime() - at > settings.late_hours * HOUR;
   if (late) return { ...withDue, state: 'missed', needsUser: true };
 
-  if (needsYouTube(action) && !(status.items.youtube?.done && status.items.youtube.url)) {
+  if (needsYouTube(action, event, context.plan) && !(status.items.youtube?.done && status.items.youtube.url)) {
     return { ...withDue, state: 'blocked', block: 'youtube' };
   }
   if (action.kind === 'links') {

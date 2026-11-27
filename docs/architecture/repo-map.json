@@ -138,7 +138,7 @@
       "path": "packages/cli",
       "score": 0.61,
       "reasons": [
-        "549 changed files in recent history",
+        "486 changed files in recent history",
         "shared library",
         "shared infrastructure – not a domain slice"
       ]
@@ -147,7 +147,7 @@
       "path": "scripts/audio-analysis",
       "score": 0.16,
       "reasons": [
-        "12 changed files in recent history"
+        "11 changed files in recent history"
       ]
     },
     {
@@ -159,9 +159,9 @@
     },
     {
       "path": "packages/remotion",
-      "score": 0.1,
+      "score": 0.07,
       "reasons": [
-        "38 changed files in recent history",
+        "8 changed files in recent history",
         "shared library",
         "shared infrastructure – not a domain slice"
       ]
@@ -170,7 +170,7 @@
       "path": "packages/core",
       "score": 0.03,
       "reasons": [
-        "147 changed files in recent history",
+        "131 changed files in recent history",
         "shared library",
         "layer package – hosts many concepts, not a domain slice"
       ]
@@ -179,7 +179,7 @@
       "path": "packages/providers",
       "score": 0.02,
       "reasons": [
-        "56 changed files in recent history",
+        "36 changed files in recent history",
         "shared library",
         "layer package – hosts many concepts, not a domain slice"
       ]
@@ -296,8 +296,10 @@
         "autopilot",
         "board",
         "calendar",
+        "caption",
         "characterization",
         "data",
+        "episode",
         "fact",
         "file",
         "folder",
@@ -307,7 +309,11 @@
         "microsite",
         "plan",
         "record",
+        "reel",
         "release",
+        "shape",
+        "short",
+        "story",
         "text",
         "timer"
       ],
@@ -332,6 +338,7 @@
         "packages/core/src/release-plan.ts",
         "packages/core/src/release.ts",
         "tests/helpers/release-fixture.ts",
+        "tests/qa-release-shape.test.ts",
         "tests/release-autopilot-plan.test.ts",
         "tests/release-autopilot.test.ts",
         "tests/release-calendar.test.ts",
@@ -342,7 +349,12 @@
         "tests/release-internal.test.ts",
         "tests/release-plan.test.ts",
         "tests/release-records.test.ts",
+        "tests/release-reel.test.ts",
         "tests/release-routes.test.ts",
+        "tests/release-shape.test.ts",
+        "tests/release-short-episode.test.ts",
+        "tests/release-story-caption.test.ts",
+        "tests/release-x-main.test.ts",
         "tests/release.test.ts"
       ],
       "packages": [
@@ -359,7 +371,7 @@
       "reasons": [
         "3 layers: cli, core, tests",
         "3 packages",
-        "31 files"
+        "37 files"
       ],
       "adopted": true,
       "adoptedAt": "2026-11-22"

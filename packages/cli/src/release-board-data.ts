@@ -11,10 +11,11 @@ import {
   type AutopilotPlatform,
   type CalendarEvent,
   type ReleaseStatus,
+  X_FREE_VIDEO_SECONDS,
 } from '@coreslopper/core';
 import { checklistKey, loadAutopilotLog } from './release-records.js';
 import { micrositeSong, type MicrositeSong } from './release-microsite.js';
-import { calendarEventLabel, distributorRows, feedVideo, mediaFile } from './release-texts.js';
+import { calendarEventLabel, distributorRows, mediaFile } from './release-texts.js';
 import { autopilotReadiness, lastRun } from './autopilot-state.js';
 import { loadReleaseFacts, type ReleaseFacts } from './release-facts.js';
 
@@ -195,8 +196,6 @@ const BOARD = {
     announcePost: 'Post-Bild mit Termin',
     teaserFile: 'Teaser (10 s)',
     storyImage: 'Story-Bild',
-    feedImageFile: 'Feed-Bild (4:5)',
-    feedImageCheck: 'Feed-Bild als Beitrag',
     master: 'Hauptvideo',
     upload: 'Thumbnail (Upload)',
     alt: (n: number) => `Thumbnail ${n} (Testen und vergleichen)`,
@@ -217,7 +216,7 @@ const BOARD = {
     pinned: 'Angepinnter Kommentar',
     text: 'Text',
     caption: 'Caption',
-    story: 'Story-Text',
+    storyCaption: 'Bildunterschrift',
     post: 'Post',
     reply: 'Antwort mit Link',
     pitch: 'Pitch',
@@ -240,10 +239,7 @@ const BOARD = {
     igAi: '„KI-Info“ einschalten',
     igCover: (s?: number) => (s !== undefined ? `Titelbild: ${s.toFixed(1)} s ins Reel (oder Thumbnail hochladen)` : 'Titelbild mit sichtbarem Hook'),
     sticker: 'Link-Sticker zum Hauptvideo',
-    feedImage: 'Bild: Streaming-Cover (4:5 zuschneiden)',
-    feedVideo: 'Hauptvideo (Feed-Format)',
-    feedVideoCheck: 'Hauptvideo im Feed-Format als Beitrag; das Cover-Bild als Titelbild',
-    longReel: 'Länger als 3 min: Instagram empfiehlt das Video Nicht-Followern nicht; die Reels der Shorts tragen die Reichweite',
+    reelCheck: 'Hauptvideo als Reel; das Cover-Bild als Titelbild',
     canvasCheck: 'Canvas in Spotify for Artists hochladen (Song → Canvas)',
     spotifyUrl: 'Spotify-Link des Songs im Board eintragen, sobald er live ist',
     linksStep: 'Spotify-Link in YouTube-Beschreibung und angepinnten Kommentar',
@@ -252,6 +248,7 @@ const BOARD = {
     distributorCheck: 'Formular in dieser Reihenfolge ausfüllen; KI-Angaben setzen',
     xVideo: 'Video direkt hochladen',
     xReply: 'Antwort direkt nach dem Post setzen',
+    xPremium: 'Über 140 s nur mit X Premium',
     liVideo: 'Video direkt hochladen',
     pageCheck: 'Song-Seite aus microsite/<slug>.json veröffentlichen',
     youtubePointer: 'Hauptvideo auf YouTube',
@@ -264,8 +261,6 @@ const BOARD = {
     announcePost: 'Post image with the date',
     teaserFile: 'Teaser (10 s)',
     storyImage: 'Story image',
-    feedImageFile: 'Feed image (4:5)',
-    feedImageCheck: 'The feed image as the post',
     master: 'Main video',
     upload: 'Thumbnail (upload)',
     alt: (n: number) => `Thumbnail ${n} (Test & compare)`,
@@ -286,7 +281,7 @@ const BOARD = {
     pinned: 'Pinned comment',
     text: 'Text',
     caption: 'Caption',
-    story: 'Story text',
+    storyCaption: 'Caption',
     post: 'Post',
     reply: 'Reply with the link',
     pitch: 'Pitch',
@@ -309,10 +304,7 @@ const BOARD = {
     igAi: 'Turn on "AI info"',
     igCover: (s?: number) => (s !== undefined ? `Cover: ${s.toFixed(1)} s into the Reel (or upload the thumbnail)` : 'Cover with the hook visible'),
     sticker: 'Link sticker to the main video',
-    feedImage: 'Image: the streaming cover (crop to 4:5)',
-    feedVideo: 'Main video (feed format)',
-    feedVideoCheck: 'Main video in the feed format as the post; the cover image as its cover',
-    longReel: 'Longer than 3 min: Instagram does not recommend it to non-followers; the Shorts’ Reels carry the reach',
+    reelCheck: 'Main video as the Reel; the cover image as its cover',
     canvasCheck: 'Upload the Canvas in Spotify for Artists (song → Canvas)',
     spotifyUrl: 'Enter the song’s Spotify link in the board once it is live',
     linksStep: 'Spotify link into the YouTube description and the pinned comment',
@@ -321,6 +313,7 @@ const BOARD = {
     distributorCheck: 'Fill in the form in this order; set the AI credits',
     xVideo: 'Upload the video natively',
     xReply: 'Reply right after posting',
+    xPremium: 'Over 140 s only with X Premium',
     liVideo: 'Upload the video natively',
     pageCheck: 'Publish the song page from microsite/<slug>.json',
     youtubePointer: 'Main video on YouTube',
@@ -358,7 +351,7 @@ export async function boardProject(projectRoot: string, root: string, options: {
   };
   const heading = (id: string, fallback: string) => {
     const event = calendar?.events.find((entry) => entry.id === id);
-    return event ? calendarEventLabel(event, l, input.premiere, input.kind) : fallback;
+    return event ? calendarEventLabel(event, l, input.premiere, input.shape ?? input.kind) : fallback;
   };
   const videoUrl = status.items.youtube?.url ?? `[${l.videoLink}]`;
   const profile = (platform: string) => channel?.links[platform]?.url ?? channel?.links[platform]?.handle;
@@ -411,19 +404,19 @@ export async function boardProject(projectRoot: string, root: string, options: {
       heading: heading('announce:instagram', l.announce.heading),
       at: at('announce:instagram'),
       files: files.announceStory ? [...file(b.announceStory, files.announceStory), ...file(b.teaserFile, files.teaser)] : file(b.cover, files.cover),
-      fields: field(b.story, planValue('announce:instagram', 'story')),
+      fields: field(b.storyCaption, planValue('announce:instagram', 'caption'), limitOf('announce:instagram', 'caption')),
       checklist: [],
       url: false,
     });
   }
-  const firstStory = meme ? undefined : planValue('story', 'story');
+  const firstStory = meme ? undefined : planValue('story', 'caption');
   if (!meme) {
     instagramPosts.push({
       id: 'story',
       heading: heading('story', l.ig.story),
       at: at('story'),
       files: [...(files.story ? file(b.storyImage, files.story) : file(b.thumb, files.shorts[0]?.thumbnail)), ...file(b.video, files.shorts[0]?.video)],
-      fields: field(b.story, firstStory),
+      fields: field(b.storyCaption, firstStory, limitOf('story', 'caption')),
       checklist: checklist('story', [b.sticker]),
       pointer: videoUrl,
     });
@@ -434,13 +427,9 @@ export async function boardProject(projectRoot: string, root: string, options: {
       id: 'instagram-post',
       heading: heading('instagram-post', l.ig.post),
       at: at('instagram-post'),
-      files: feedVideo(input)
-        ? [...file(b.feedVideo, feedVideo(input)), ...file(b.cover, files.cover)]
-        : files.feedImage
-          ? file(b.feedImageFile, files.feedImage)
-          : file(b.cover, files.cover),
+      files: [...file(b.master, planPost('instagram-post')?.media), ...file(b.cover, files.cover)],
       fields: field(b.caption, display(instagramCaption.value), { ...limitOf('instagram-post', 'caption'), note: hashtagNoteOf('instagram-post', 'caption') }),
-      checklist: checklist('instagram-post', [feedVideo(input) ? b.feedVideoCheck : files.feedImage ? b.feedImageCheck : b.feedImage, b.igAi, ...((input.durationSeconds ?? 0) > 180 ? [b.longReel] : [])]),
+      checklist: checklist('instagram-post', [b.reelCheck, b.igAi]),
       url: true,
     });
   }
@@ -448,15 +437,17 @@ export async function boardProject(projectRoot: string, root: string, options: {
     xPosts.push({ id: 'announce:x', heading: heading('announce:x', l.announce.heading), at: at('announce:x'), files: files.teaser ? file(b.teaserFile, files.teaser) : files.announcePost ? file(b.announcePost, files.announcePost) : file(b.cover, files.cover), fields: field(b.post, display(planValue('announce:x', 'post')), limitOf('announce:x', 'post')), checklist: [], url: true });
   }
   const xPost = planText('x', 'post');
+  // The main video on X: over 140 s only an account with Premium can post it (F9).
+  const xPremium = Boolean(files.master) && planPost('x')?.media === files.master && (plan.durationSeconds ?? 0) > X_FREE_VIDEO_SECONDS;
   if (!meme && xPost) {
     xPosts.push({
       id: 'x',
       heading: heading('x', l.x.post),
       at: at('x'),
-      files: file(b.video, mediaFile(input, data?.x?.media ?? files.shorts[0]?.name)),
-      fields: [...field(b.post, display(xPost.value), limitOf('x', 'post')), ...field(b.reply, display(planValue('x', 'reply')), limitOf('x', 'reply'))],
-      checklist: checklist('x', [b.xVideo, b.xReply]),
-      pointer: videoUrl,
+      files: file(b.video, planPost('x')?.media),
+      fields: [...field(b.post, display(xPost.value), { ...limitOf('x', 'post'), ...(xPremium ? { note: b.xPremium } : {}) }), ...field(b.reply, display(planValue('x', 'reply')), limitOf('x', 'reply'))],
+      checklist: checklist('x', planText('x', 'reply') ? [b.xVideo, b.xReply] : [b.xVideo]),
+      ...(planText('x', 'reply') ? { pointer: videoUrl } : {}),
       url: true,
     });
   }
@@ -648,7 +639,7 @@ export async function boardProject(projectRoot: string, root: string, options: {
     hasRelease: Boolean(manifest) && releasedPublicly(project.config),
     todos: manifest?.todos ?? [b.noRelease.replace('<slug>', project.config.slug)],
     platforms,
-    calendar: (calendar?.events ?? []).map((event) => ({ ...event, label: calendarEventLabel(event, l, input.premiere, input.kind) })),
+    calendar: (calendar?.events ?? []).map((event) => ({ ...event, label: calendarEventLabel(event, l, input.premiere, input.shape ?? input.kind) })),
     status,
     microsite,
   };
@@ -667,7 +658,7 @@ export async function autopilotView(facts: ReleaseFacts, options: { now?: Date; 
   if (!facts.calendar) blockers.push('no release calendar yet: run release');
   const log = await loadAutopilotLog(facts.project.paths.root);
   const plans = facts.calendar
-    ? planAutopilot({ calendar: facts.calendar, status: facts.status, log, settings, now, ready, premiere: facts.input.premiere })
+    ? planAutopilot({ calendar: facts.calendar, status: facts.status, log, settings, now, ready, premiere: facts.input.premiere, plan: facts.plan })
     : [];
   const events: Record<string, BoardAutopilotEvent> = {};
   for (const plan of plans) {

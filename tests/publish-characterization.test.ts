@@ -16,6 +16,7 @@ const input: CalendarInput = {
   slug: 'song',
   title: 'Song',
   kind: 'music-video',
+  shape: 'music-video',
   releaseDate: '2026-12-11',
   shorts: [],
   announcement: true,

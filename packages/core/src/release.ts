@@ -9,7 +9,10 @@ import {
   ReleaseMetadataSchema,
   type ChannelConfig,
   type ProjectConfig,
+  type ProjectKind,
+  type ReleaseManifest,
   type ReleaseMetadata,
+  type ReleaseShape,
   type Timing,
   type UploadData,
 } from './schema.js';
@@ -21,6 +24,31 @@ import {
 export async function loadChannel(root: string): Promise<ChannelConfig | undefined> {
   const path = join(root, 'config', 'channel.yaml');
   return existsSync(path) ? readYamlFile(path, ChannelConfigSchema) : undefined;
+}
+
+/** The longest episode track a short episode may have, in seconds; 180 s still counts (ADR 0057, HS-266). */
+export const SHORT_EPISODE_MAX_SECONDS = 180;
+
+/**
+ * The release shape of a project (ADR 0057): a music video and a meme take
+ * their kind; an episode is a short episode when its master is at least as tall
+ * as wide (9:16, 4:5, 1:1) and its episode track lasts at most 180 s. An
+ * episode without a built track is an episode.
+ */
+export function releaseShape(input: {
+  kind: ProjectKind;
+  master: { width: number; height: number };
+  durationSeconds: number | undefined;
+}): ReleaseShape {
+  if (input.kind !== 'episode') return input.kind;
+  const upright = input.master.height >= input.master.width;
+  const short = input.durationSeconds !== undefined && input.durationSeconds <= SHORT_EPISODE_MAX_SECONDS;
+  return upright && short ? 'short-episode' : 'episode';
+}
+
+/** The shape a manifest recorded; a manifest written before shapes existed reads as its project kind. */
+export function manifestShape(manifest: Pick<ReleaseManifest, 'shape'>, kind: ProjectKind): ReleaseShape {
+  return manifest.shape ?? kind;
 }
 
 /** A project with `distribution: internal` is never released publicly: no release package, no release calendar. */
@@ -335,11 +363,12 @@ export function soundLicenceTodos(sounds: UsedSound[]): string[] {
 export function platformTextProblems(
   data: UploadData,
   limits: PlatformLimits,
-  options: { music?: boolean; kind?: 'music-video' | 'episode' | 'meme'; credits?: string[]; tiktokPointer?: string } = { music: true },
+  /** `shape` is the release shape (`releaseShape`); the project kind follows from it. */
+  options: { shape: ReleaseShape; credits?: string[]; tiktokPointer?: string; durationSeconds?: number },
 ): { errors: string[]; missing: string[] } {
-  const kind = options.kind ?? (options.music === false ? 'episode' : 'music-video');
   const plan = buildReleasePlan({
-    kind,
+    kind: options.shape === 'short-episode' ? 'episode' : options.shape,
+    shape: options.shape,
     language: data.language,
     slug: 'release',
     title: '',
@@ -348,6 +377,7 @@ export function platformTextProblems(
     chapters: [],
     credits: options.credits,
     tiktokPointer: options.tiktokPointer,
+    durationSeconds: options.durationSeconds,
     files: { thumbnails: [], shorts: [] },
   });
   return plan.problems;

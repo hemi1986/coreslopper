@@ -6,7 +6,7 @@ import { loadProject, writeTextAtomic } from '@coreslopper/core';
 
 // The recipe of a thumbnail: the still, focus, and options it was composed
 // from, written beside the JPEG as `<name>.recipe.json`. `release` composes
-// the announcement, story, and feed images from the cover's recipe, so they
+// the announcement and story images from the cover's recipe, so they
 // follow the release date without the agent choosing a still again.
 
 export const ThumbnailRecipeSchema = z.object({

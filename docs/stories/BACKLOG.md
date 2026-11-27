@@ -2,9 +2,9 @@
 
 > Generated from `docs/stories/ST-*.md` – **do not edit manually**. Change the story files instead.
 
-**Progress: 24 of 31 domain stories done** · scenarios 80 of 108
+**Progress: 29 of 31 domain stories done** · scenarios 100 of 108
 
-**59 stories** · In Progress: 0 · Ready: 16 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 43 · Superseded: 0
+**59 stories** · In Progress: 0 · Ready: 10 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 49 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
 
@@ -12,12 +12,6 @@ Within each section: by priority, then by story ID, with dependencies pulled in 
 
 | ID | Title | Type | Context | Priority | Size | Risk | Depends on |
 |---|---|---|---|---|---|---|---|
-| [ST-044](ST-044-a-story-has-only-a-caption-on-its-video.md) | A story carries no text, only an optional caption of at most 120 characters on its video | domain | Release | must | – | – | – |
-| [ST-045](ST-045-the-main-video-reel-up-to-three-minutes.md) | The main video goes to Instagram as a Reel only up to 3 minutes | domain | Release | must | – | – | – |
-| [ST-046](ST-046-x-carries-the-main-video.md) | The X post carries the main video by default | domain | Release | must | – | – | – |
-| [ST-047](ST-047-the-release-shape-of-an-episode.md) | The release package records whether an episode is a short episode | domain | Release | must | – | – | – |
-| [ST-048](ST-048-a-short-episodes-release.md) | A short episode is released as one video on every platform | domain | Release | must | – | – | ST-047 |
-| [ST-050](ST-050-qa-expects-the-assets-of-the-release-shape.md) | QA expects the thumbnails and covers of the release shape | task | – | must | – | – | ST-047 |
 | [ST-051](ST-051-the-release-shape-is-kept-once-posted.md) | The release shape is kept once the release has started | domain | Release | must | – | – | ST-047 |
 | [ST-049](ST-049-a-short-horizontal-episode-posts-its-vertical-version.md) | A horizontal episode of up to 3 minutes posts its vertical version as its one Short | domain | Release | should | – | – | ST-047 |
 | [ST-055](ST-055-skills-and-docs-for-platform-formats.md) | The release skill and the platform docs follow the release shapes | task | – | must | – | – | ST-044, ST-045, ST-046, ST-048, ST-049 |
@@ -55,6 +49,12 @@ Within each section: by priority, then by story ID, with dependencies pulled in 
 | [ST-037](ST-037-internal-projects-end-after-qa.md) | Internal projects are created as such and end after QA | task | – | must | – | – | ST-036 |
 | [ST-038](ST-038-local-lip-sync-by-default-in-comfyui-projects.md) | ComfyUI projects lip-sync locally by default | task | – | must | – | – | – |
 | [ST-043](ST-043-youtube-hashtags-without-hash-on-the-board.md) | The board lists YouTube hashtags comma-separated without "#" | chore | – | must | – | – | – |
+| [ST-044](ST-044-a-story-has-only-a-caption-on-its-video.md) | A story carries no text, only an optional caption of at most 120 characters on its video | domain | Release | must | – | – | – |
+| [ST-045](ST-045-the-main-video-reel-up-to-three-minutes.md) | The main video goes to Instagram as a Reel only up to 3 minutes | domain | Release | must | – | – | – |
+| [ST-046](ST-046-x-carries-the-main-video.md) | The X post carries the main video by default | domain | Release | must | – | – | – |
+| [ST-047](ST-047-the-release-shape-of-an-episode.md) | The release package records whether an episode is a short episode | domain | Release | must | – | – | – |
+| [ST-048](ST-048-a-short-episodes-release.md) | A short episode is released as one video on every platform | domain | Release | must | – | – | ST-047 |
+| [ST-050](ST-050-qa-expects-the-assets-of-the-release-shape.md) | QA expects the thumbnails and covers of the release shape | task | – | must | – | – | ST-047 |
 | [ST-012](ST-012-a-shot-lands-on-the-sound-cue.md) | A shot lands on a sound's cue | domain | Storyboard | should | – | – | ST-011 |
 | [ST-014](ST-014-burned-in-subtitles-for-a-meme.md) | A meme's render carries German subtitles | domain | Render | should | – | – | ST-007 |
 | [ST-020](ST-020-episode-announcement-says-new-episode.md) | An episode's announcement images say "new episode", not "new song" | chore | – | should | – | – | – |

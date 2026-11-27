@@ -11,15 +11,17 @@ import {
   isSubtitledLine,
   loadProject,
   projectAudioPath,
+  releaseShape,
   releasedPublicly,
   repoRoot,
   scriptLines,
   writeTextAtomic,
+  type ReleaseShape,
 } from '@coreslopper/core';
 import { validateProject } from './validate.js';
 import { buildVideoProps, bundleFor, masterFormatId, renderLimits } from './render.js';
 import { subtitlesPath } from './subtitles.js';
-import { listThumbnails, thumbnailProblems } from './thumbnail-files.js';
+import { SHORT_EPISODE_COVERS, listThumbnails, thumbnailProblems } from './thumbnail-files.js';
 import {
   SHORTS_PER_VIDEO,
   listShorts,
@@ -104,8 +106,11 @@ export function checkContinuityRefs(
     : { name: 'Continuity references', result: 'PASS', evidence: `${named.size} plate/prop/state reference(s) exist` };
 }
 
-/** Three 1280x720 JPEGs under 2 MB in renders/thumbnails/; fewer is a warning, a bad file a failure. */
-export async function checkThumbnails(renders: string, root: string): Promise<{ check: Check; files: string[] }> {
+/**
+ * The 1280x720 JPEGs under 2 MB in renders/thumbnails/: `expected` of them
+ * (three by default, ADR 0018); fewer is a warning, a bad file a failure.
+ */
+export async function checkThumbnails(renders: string, root: string, expected = 3): Promise<{ check: Check; files: string[] }> {
   const files = await listThumbnails(renders);
   const bad: string[] = [];
   for (const file of files) {
@@ -114,10 +119,69 @@ export async function checkThumbnails(renders: string, root: string): Promise<{ 
   }
   const check: Check = bad.length
     ? { name: 'Thumbnails', result: 'FAIL', evidence: bad.join('; ') }
-    : files.length < 3
-      ? { name: 'Thumbnails', result: 'WARN', evidence: `${files.length} of 3 in renders/thumbnails/; run thumbnail` }
-      : { name: 'Thumbnails', result: 'PASS', evidence: `${files.length} JPEGs, 1280x720, under 2 MB` };
+    : files.length < expected
+      ? { name: 'Thumbnails', result: 'WARN', evidence: `${files.length} of ${expected} in renders/thumbnails/; run thumbnail` }
+      : { name: 'Thumbnails', result: 'PASS', evidence: `${files.length} JPEG${files.length === 1 ? '' : 's'}, 1280x720, under 2 MB` };
   return { check, files: files.map((file) => relative(root, file)) };
+}
+
+/**
+ * A short episode's covers (ADR 0057): one 1080x1920 JPEG and one 1080x1440
+ * TikTok cover, each under 2 MB. A wrong file is a failure, a missing one a
+ * warning, as a missing thumbnail is.
+ */
+export async function checkCover(projectDir: string): Promise<{ check: Check; files: string[] }> {
+  const bad: string[] = [];
+  const missing: string[] = [];
+  const files: string[] = [];
+  for (const cover of SHORT_EPISODE_COVERS) {
+    const path = join(projectDir, cover.path);
+    if (!existsSync(path)) {
+      missing.push(`${cover.path} is missing; run thumbnail --format ${cover.format} --out ${cover.path}`);
+      continue;
+    }
+    files.push(cover.path);
+    const problems = await thumbnailProblems(path, cover.format);
+    if (problems.length) bad.push(`${cover.path}: ${problems.join(', ')}`);
+  }
+  const check: Check = bad.length
+    ? { name: 'Cover', result: 'FAIL', evidence: bad.join('; ') }
+    : missing.length
+      ? { name: 'Cover', result: 'WARN', evidence: missing.join('; ') }
+      : { name: 'Cover', result: 'PASS', evidence: 'cover 1080x1920 and TikTok cover 1080x1440, JPEGs under 2 MB' };
+  return { check, files };
+}
+
+/**
+ * The thumbnails, covers and Shorts the release shape expects (ADR 0057): a
+ * short episode has two covers and no thumbnails or Shorts; a vertical
+ * episode's main video needs one thumbnail; every other video three.
+ */
+export async function checkReleaseAssets(
+  paths: { root: string; renders: string },
+  release: { shape: ReleaseShape; master: { width: number; height: number } },
+  probe?: (path: string) => Omit<ShortProbe, 'name'>,
+): Promise<{ checks: Check[]; thumbnails: string[]; covers: string[]; shorts: string[]; shortNames: string[] }> {
+  if (release.shape === 'short-episode') {
+    const cover = await checkCover(paths.root);
+    const none = 'a short episode is one video with its covers (ADR 0057)';
+    return {
+      checks: [
+        { name: 'Thumbnails', result: 'N/A', evidence: none },
+        { name: 'Shorts', result: 'N/A', evidence: none },
+        { name: 'Short thumbnails', result: 'N/A', evidence: none },
+        cover.check,
+      ],
+      thumbnails: [],
+      covers: cover.files,
+      shorts: [],
+      shortNames: [],
+    };
+  }
+  const vertical = release.shape === 'episode' && release.master.height >= release.master.width;
+  const thumbnails = await checkThumbnails(paths.renders, paths.root, vertical ? 1 : 3);
+  const shorts = await checkShorts(paths.renders, paths.root, probe);
+  return { checks: [thumbnails.check, ...shorts.checks], thumbnails: thumbnails.files, covers: [], shorts: shorts.files, shortNames: shorts.names };
 }
 
 /**
@@ -331,20 +395,22 @@ function episodeChecks(project: Awaited<ReturnType<typeof loadProject>>, duratio
   return checks;
 }
 
-/** The checks of a public release: thumbnails, Shorts, upload text and data, and the release package. */
-async function releasePackageChecks(paths: { root: string; renders: string; review: string }): Promise<{ checks: Check[]; thumbnails: string[]; shorts: string[] }> {
-  const thumbnails = await checkThumbnails(paths.renders, paths.root);
-  const shorts = await checkShorts(paths.renders, paths.root);
+/** The checks of a public release: the assets of its shape, upload text and data, and the release package. */
+async function releasePackageChecks(
+  paths: { root: string; renders: string; review: string },
+  release: { shape: ReleaseShape; master: { width: number; height: number } },
+): Promise<{ checks: Check[]; thumbnails: string[]; covers: string[]; shorts: string[] }> {
+  const assets = await checkReleaseAssets(paths, release);
   return {
     checks: [
-      thumbnails.check,
-      ...shorts.checks,
-      await checkUploadText(paths.review, paths.root, shorts.names),
-      await checkUploadData(paths.root, shorts.names),
+      ...assets.checks,
+      await checkUploadText(paths.review, paths.root, assets.shortNames),
+      await checkUploadData(paths.root, assets.shortNames),
       ...(await releaseChecks(paths.root, undefined, { root: repoRoot() })),
     ],
-    thumbnails: thumbnails.files,
-    shorts: shorts.files,
+    thumbnails: assets.thumbnails,
+    covers: assets.covers,
+    shorts: assets.shorts,
   };
 }
 
@@ -393,10 +459,18 @@ export async function runQa(options: QaOptions): Promise<string> {
   // An internal project is never released publicly: no thumbnails, Shorts,
   // upload text, or release package to check, so READY rests on the renders.
   const release = releasedPublicly(project.config)
-    ? await releasePackageChecks(project.paths)
+    ? await releasePackageChecks(project.paths, {
+        shape: releaseShape({
+          kind: project.config.kind,
+          master: project.config.formats.master,
+          durationSeconds: (project.effectiveTiming ?? project.timing)?.audio.duration,
+        }),
+        master: project.config.formats.master,
+      })
     : {
         checks: [{ name: 'Release package', result: 'N/A', evidence: 'distribution: internal; not released publicly' } satisfies Check],
         thumbnails: [],
+        covers: [],
         shorts: [],
       };
   checks.push(...release.checks);
@@ -454,6 +528,7 @@ export async function runQa(options: QaOptions): Promise<string> {
     `READY: ${ready ? 'yes' : 'no'}${todos ? ` · ${todos} TODO(s) for the user, see renders/release/README.md` : ''}`,
     '',
     ...(release.thumbnails.length ? ['## Thumbnails', '', ...release.thumbnails.map((file) => `- \`${file}\``), ''] : []),
+    ...(release.covers.length ? ['## Covers', '', ...release.covers.map((file) => `- \`${file}\``), ''] : []),
     ...(release.shorts.length ? ['## Shorts', '', ...release.shorts.map((file) => `- \`${file}\``), ''] : []),
     'Visual checks (sync, readability, character consistency) are performed by the `qa-checker` agent using stills and clip frames.',
     '',

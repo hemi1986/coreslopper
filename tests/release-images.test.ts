@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DERIVED_PATHS, derivedImages } from '../packages/cli/src/release-images.ts';
 
-const announcement = { title: 'After Midnight', releaseAt: '2026-12-11T18:00:00+01:00', announcement: true, story: false, feedVideo: true, feedPost: false };
+const announcement = { title: 'After Midnight', releaseAt: '2026-12-11T18:00:00+01:00', announcement: true, story: false };
 
 describe('derived images', () => {
   it('tags an episode announcement "new episode" in German and English', () => {
@@ -27,13 +27,12 @@ describe('derived images', () => {
     }
   });
 
-  it('leaves the story and feed images as they are for an episode', () => {
-    const images = derivedImages({ ...announcement, language: 'de', episode: true, story: true, feedPost: true, feedVideo: false });
+  it('leaves the story image as it is for an episode', () => {
+    const images = derivedImages({ ...announcement, language: 'de', episode: true, story: true });
     expect(images.map((image) => [image.path, image.tag])).toEqual([
       [DERIVED_PATHS.announceStory, 'NEUE FOLGE'],
       [DERIVED_PATHS.announcePost, 'NEUE FOLGE'],
       [DERIVED_PATHS.story, 'JETZT'],
-      [DERIVED_PATHS.feedImage, 'JETZT'],
     ]);
   });
 });

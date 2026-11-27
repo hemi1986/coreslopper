@@ -14,7 +14,7 @@ depends_on: []
 labels: [feature:platform-formats]
 feature: platform-formats
 sources: [docs/research/platform-video-formats.md]
-status: ready
+status: done
 ---
 
 ## Story

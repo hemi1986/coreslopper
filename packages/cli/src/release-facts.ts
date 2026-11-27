@@ -11,7 +11,9 @@ import {
   loadReleaseSchedule,
   platformLimits,
   readJsonFile,
+  manifestShape,
   releaseIdentity,
+  releaseShape,
   withReleaseDefaults,
   withUrls,
   type LoadedProject,
@@ -23,7 +25,7 @@ import {
 } from '@coreslopper/core';
 import { loadCalendar } from './release-calendar.js';
 import { loadStatus } from './release-records.js';
-import { DERIVED_PATHS } from './release-images.js';
+import { DERIVED_PATHS, isTeaserPath } from './release-images.js';
 import { releaseLabels, type ReleaseTextInput } from './release-texts.js';
 import { loadUploadData, uploadPaths } from './upload-text.js';
 import { releaseDir, songJson, usedSoundCredits } from './release.js';
@@ -89,6 +91,7 @@ export function filesFromManifest(manifest: ReleaseManifest | undefined, masterF
     else if (file.kind === 'short' && name) short(name).video = file.path;
     else if (file.kind === 'short-thumbnail' && name) short(name).thumbnail = file.path;
     else if (file.kind === 'tiktok-cover' && name) short(name).tiktokCover = file.path;
+    else if (file.kind === 'tiktok-cover') files.tiktokCover = file.path;
     else if (file.kind === 'audio') files.audio = file.path;
     else if (file.kind === 'cover') files.cover = file.path;
     else if (file.kind === 'canvas') files.canvas = file.path;
@@ -96,9 +99,8 @@ export function filesFromManifest(manifest: ReleaseManifest | undefined, masterF
     else if (file.kind === 'lyrics' && file.path.endsWith('.lrc')) files.lyricsLrc = file.path;
     else if (file.path === DERIVED_PATHS.announceStory) files.announceStory = file.path;
     else if (file.path === DERIVED_PATHS.announcePost) files.announcePost = file.path;
-    else if (file.path === DERIVED_PATHS.teaser) files.teaser = file.path;
+    else if (isTeaserPath(file.path)) files.teaser = file.path;
     else if (file.path === DERIVED_PATHS.story) files.story = file.path;
-    else if (file.path === DERIVED_PATHS.feedImage) files.feedImage = file.path;
   }
   files.thumbnails.sort();
   files.shorts.sort((a, b) => a.name.localeCompare(b.name));
@@ -132,8 +134,13 @@ export async function loadReleaseFacts(projectRoot: string, root: string): Promi
   const schedule = await loadReleaseSchedule(root);
   const timing = project.effectiveTiming ?? project.timing;
   const meme = kind === 'meme';
+  // The shape the release folder was built with; before the first release, the project's (ADR 0057).
+  const shape = manifest ? manifestShape(manifest, kind) : releaseShape({ kind, master: project.config.formats.master, durationSeconds: timing?.audio.duration });
+  const oneVideo = meme || shape === 'short-episode';
   const input: ReleaseTextInput = {
     kind,
+    shape,
+    masterFormat: formatId(project.config.formats.master.aspect),
     language,
     slug: project.config.slug,
     artist: identity.artist,
@@ -142,12 +149,12 @@ export async function loadReleaseFacts(projectRoot: string, root: string): Promi
     release: releaseFacts,
     channel,
     limits,
-    chapters: meme ? [] : (data?.main.chapters ?? (timing ? chaptersFromSections(timing) : [])),
+    chapters: oneVideo ? [] : (data?.main.chapters ?? (timing ? chaptersFromSections(timing) : [])),
     credits: meme ? await usedSoundCredits(project, root) : [],
     files,
     calendar,
-    // A meme is a Short, never a Premiere.
-    premiere: !meme && schedule.release.premiere,
+    // A meme and a short episode are Shorts, never a Premiere.
+    premiere: !oneVideo && schedule.release.premiere,
     durationSeconds: timing?.audio.duration,
   };
   const handle = channel?.links.youtube?.handle;

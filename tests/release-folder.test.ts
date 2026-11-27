@@ -186,31 +186,31 @@ describe('TODO detection and text limits', () => {
 
   it('checks the platform limits and asks for one text per platform', () => {
     const data = UploadDataSchema.parse(uploadYaml());
-    expect(platformTextProblems(data, platformLimits())).toEqual({ errors: [], missing: [] });
+    expect(platformTextProblems(data, platformLimits(), { shape: 'music-video' })).toEqual({ errors: [], missing: [] });
     const broken = uploadYaml();
     broken.shorts[0]!.instagram.hashtags = ['#a', '#b', '#c', '#d', '#e', '#f'];
     broken.shorts[1]!.tiktok.caption = broken.shorts[1]!.instagram.caption;
     (broken as { spotify: { pitch: string } }).spotify.pitch = 'x'.repeat(501);
-    const { errors } = platformTextProblems(UploadDataSchema.parse(broken), platformLimits());
+    const { errors } = platformTextProblems(UploadDataSchema.parse(broken), platformLimits(), { shape: 'music-video' });
     expect(errors.join('\n')).toContain('instagram Z1-intro: 6 hashtags, limit 5');
     expect(errors.join('\n')).toContain('Z2-chorus: the Instagram and TikTok captions are identical');
     expect(errors.join('\n')).toContain('spotify: pitch has 501 characters, limit 500');
     const lenient = ChannelConfigSchema.parse({ version: 1, name: 'x', language: 'de', limits: { instagram: { hashtags: 10 } } });
-    expect(platformTextProblems(UploadDataSchema.parse(broken), platformLimits(lenient)).errors.join()).not.toContain('6 hashtags');
+    expect(platformTextProblems(UploadDataSchema.parse(broken), platformLimits(lenient), { shape: 'music-video' }).errors.join()).not.toContain('6 hashtags');
   });
 
   it('checks a meme caption with its credits against the platform limits', () => {
     const data = UploadDataSchema.parse(memeUploadYaml());
-    expect(platformTextProblems(data, platformLimits(), { kind: 'meme' })).toEqual({ errors: [], missing: [] });
+    expect(platformTextProblems(data, platformLimits(), { shape: 'meme' })).toEqual({ errors: [], missing: [] });
     const many = UploadDataSchema.parse({ ...memeUploadYaml(), main: { ...memeUploadYaml().main, hashtags: ['#a', '#b', '#c', '#d', '#e', '#f'] } });
-    expect(platformTextProblems(many, platformLimits(), { kind: 'meme' }).errors).toContain('instagram: 6 hashtags, limit 5');
-    const errors = platformTextProblems(data, platformLimits(), { kind: 'meme', credits: ['x'.repeat(2200)] }).errors.join('\n');
+    expect(platformTextProblems(many, platformLimits(), { shape: 'meme' }).errors).toContain('instagram: 6 hashtags, limit 5');
+    const errors = platformTextProblems(data, platformLimits(), { shape: 'meme', credits: ['x'.repeat(2200)] }).errors.join('\n');
     expect(errors).toContain('tiktok: caption has');
     expect(errors).toContain('instagram: caption has');
     const long = UploadDataSchema.parse({ ...memeUploadYaml(), main: { ...memeUploadYaml().main, description: 'x'.repeat(5001) } });
-    expect(platformTextProblems(long, platformLimits(), { kind: 'meme' }).errors.join('\n')).toContain('youtube short: description has');
+    expect(platformTextProblems(long, platformLimits(), { shape: 'meme' }).errors.join('\n')).toContain('youtube short: description has');
     const tagged = UploadDataSchema.parse({ ...memeUploadYaml(), main: { ...memeUploadYaml().main, tags: ['x'.repeat(501)] } });
-    expect(platformTextProblems(tagged, platformLimits(), { kind: 'meme' }).errors.join('\n')).toContain('youtube short: tags have');
+    expect(platformTextProblems(tagged, platformLimits(), { shape: 'meme' }).errors.join('\n')).toContain('youtube short: tags have');
   });
 
   it('lays out per-platform texts in the project language with channel links and TODOs', () => {
@@ -223,6 +223,7 @@ describe('TODO detection and text limits', () => {
     });
     const input: ReleaseTextInput = {
       kind: 'music-video',
+      shape: 'music-video',
       language: 'de',
       slug: 'neon',
       artist: 'Neon Static',
@@ -435,7 +436,8 @@ describe('release folder', () => {
   });
 
   it('tags an episode announcement "NEUE FOLGE"', async () => {
-    const { dir } = await episodeFixture();
+    // An episode with a main video: a short episode has no 16:9 post image and no story (ADR 0057).
+    const { dir } = await episodeFixture({ seconds: 200 });
     const deps = fakeDeps();
     const result = await buildRelease({ projectDir: dir, deps, render: false });
     expect(result.todos.filter((todo) => todo.includes('not composed'))).toEqual([]);
@@ -445,21 +447,9 @@ describe('release folder', () => {
     expect(tag('instagram/story-9x16.jpg')).toBe('JETZT');
   });
 
-  it('composes a 4:5 feed image without a feed-format render, and asks for a still without a recipe', async () => {
+  it('asks for a still without a recipe', async () => {
     const dir = await fixture();
-    await rm(join(dir, 'renders', '1x1.mp4'));
-    const config = parse(await readFile(join(dir, 'project.yaml'), 'utf8'));
-    config.formats.derivatives = config.formats.derivatives.filter((format: { aspect: string }) => format.aspect !== '1:1');
-    await writeFile(join(dir, 'project.yaml'), stringify(config));
-    const deps = fakeDeps();
-    await buildRelease({ projectDir: dir, deps });
-    expect(deps.thumbnails.find((call) => call.format === '4x5')?.text).toBe('NEON RAIN');
-    const board = await boardProject(dir, join(dir, '..', '..'));
-    const feed = board.platforms.find((platform) => platform.id === 'instagram')!.posts.find((post) => post.id === 'instagram-post')!;
-    expect(feed.files.map((file) => file.path)).toEqual(['instagram/feed-4x5.jpg']);
-
     await rm(join(dir, 'renders', 'cover-3000x3000.recipe.json'));
-    await rm(join(dir, 'renders', 'release'), { recursive: true });
     const result = await buildRelease({ projectDir: dir, deps: fakeDeps() });
     expect(result.todos.some((todo) => todo.includes('set announcement.image'))).toBe(true);
   });
@@ -849,9 +839,9 @@ describe('release board', () => {
     const x = board.platforms.find((platform) => platform.id === 'x')!.posts.find((post) => post.id === 'x')!;
     expect(x.fields.find((field) => field.label === 'Antwort mit Link')?.value).toBe('Ganzes Video: [Link zum Hauptvideo]');
     expect(board.platforms.find((platform) => platform.id === 'linkedin')!.skipped).toBeUndefined();
-    // The square render is the feed version: the Instagram feed post and LinkedIn carry it.
-    const feed = board.platforms.find((platform) => platform.id === 'instagram')!.posts.find((post) => post.id === 'instagram-post')!;
-    expect(feed.files.map((entry) => entry.path)).toEqual(['video/neon-1x1.mp4', 'streaming/cover-3000x3000.jpg']);
+    // The main video's Reel carries the 9:16 render (ADR 0057); the square render stays the feed version for LinkedIn.
+    const reel = board.platforms.find((platform) => platform.id === 'instagram')!.posts.find((post) => post.id === 'instagram-post')!;
+    expect(reel.files.map((entry) => entry.path)).toEqual(['video/neon-9x16.mp4', 'streaming/cover-3000x3000.jpg']);
     expect(board.platforms.find((platform) => platform.id === 'linkedin')!.posts[0]!.files.map((entry) => entry.path)).toEqual(['video/neon-1x1.mp4']);
     // Every post with a date is a calendar event, so its done state is the calendar's.
     const ids = new Set(board.calendar.map((event) => event.id));

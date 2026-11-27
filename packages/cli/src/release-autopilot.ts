@@ -247,6 +247,7 @@ async function runProject(dir: string, slug: string, options: AutopilotOptions, 
       now: deps.now(),
       ready,
       premiere: facts.input.premiere,
+      plan: facts.plan,
     });
   };
   if (!facts.calendar || !approvalHolds(facts.status, facts.calendar)) {
@@ -506,7 +507,7 @@ export async function autopilotOverview(root: string, options: { now?: Date; env
     }
     const settings = facts.schedule.autopilot;
     const { ready, notes } = autopilotReadiness(settings, options.env, now);
-    const plans = planAutopilot({ calendar: facts.calendar, status: facts.status, log: await loadAutopilotLog(dir), settings, now, ready, premiere: facts.input.premiere });
+    const plans = planAutopilot({ calendar: facts.calendar, status: facts.status, log: await loadAutopilotLog(dir), settings, now, ready, premiere: facts.input.premiere, plan: facts.plan });
     log(`${facts.input.slug}: ${facts.status.approval ? `approved ${facts.status.approval.at.slice(0, 10)}` : 'not approved'} (release ${facts.calendar.release_date})`);
     for (const plan of plans) {
       const when = plan.event.at.slice(0, 16).replace('T', ' ');

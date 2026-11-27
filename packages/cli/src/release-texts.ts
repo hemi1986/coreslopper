@@ -4,6 +4,7 @@ import {
   type ChannelConfig,
   type PlanText,
   type ReleasePlan,
+  type ReleaseShape,
   type ReleasePlanInput,
 } from '@coreslopper/core';
 
@@ -12,7 +13,10 @@ import {
 // adds the folder's headings, counters, checklists, and the language's labels.
 
 /** The plan's input: what `buildReleasePlan` turns into the plan. */
-export type ReleaseTextInput = ReleasePlanInput;
+export type ReleaseTextInput = ReleasePlanInput & {
+  /** The master's format id (`9x16`, `4x5`, ...), for the TODO of a missing master render. */
+  masterFormat?: string;
+};
 
 const postOf = (plan: ReleasePlan, id: string) => plan.posts.find((post) => post.id === id);
 const textOf = (plan: ReleasePlan, id: string, key: string): PlanText | undefined => postOf(plan, id)?.texts[key];
@@ -59,9 +63,9 @@ interface Labels {
     cover: (seconds?: number) => string;
     aiLabel: string;
     story: string;
+    storyCaption: string;
     sticker: string;
     post: string;
-    postImage: string;
     postVideo: (file: string) => string;
   };
   tt: { heading: string; description: string; cover: string; coverUpload: (file: string) => string; coverFrame: string; settings: string; visibility: string; aiLabel: string; schedule: string; overlayDefault: (handle: string) => string; afterPost: string; pinned: string };
@@ -94,7 +98,7 @@ interface Labels {
     ics: string;
   };
   cal: {
-    steps: Record<'distributor' | 'pitch' | 'canvas' | 'song' | 'artist-pick' | 'youtube' | 'youtube-short' | 'premiere' | 'community' | 'story' | 'reel' | 'page' | 'links', string>;
+    steps: Record<'distributor' | 'pitch' | 'canvas' | 'song' | 'artist-pick' | 'youtube' | 'youtube-short' | 'premiere' | 'community' | 'story' | 'reel' | 'main-reel' | 'page' | 'links', string>;
     announce: Record<'instagram' | 'youtube' | 'x', string>;
     post: Record<'instagram' | 'tiktok' | 'x' | 'linkedin', string>;
     short: (name: string, platform: string) => string;
@@ -105,7 +109,17 @@ interface Labels {
   videoLink: string;
   x: { heading: string; post: string; reply: string; media: (file: string) => string; replyNote: string; short: string };
   li: { heading: string; skipped: (reason: string) => string; reason: string; post: string; hook: (n: number, limit: number) => string; media: (file: string) => string; noLinkNote: string };
-  readme: { heading: string; folders: Record<'video' | 'cover' | 'thumbnails' | 'shorts' | 'audio' | 'streaming' | 'texts', string>; order: string; steps: string[]; memeSteps: string[]; todos: string; none: string; manifest: string };
+  readme: {
+    heading: string;
+    folders: Record<'video' | 'cover' | 'thumbnails' | 'shorts' | 'audio' | 'streaming' | 'texts', string>;
+    order: string;
+    steps: string[];
+    memeSteps: string[];
+    shortEpisodeSteps: string[];
+    todos: string;
+    none: string;
+    manifest: string;
+  };
 }
 
 const EN: Labels = {
@@ -144,10 +158,10 @@ const EN: Labels = {
     cover: (seconds) => (seconds !== undefined ? `Cover frame: ${seconds.toFixed(1)} s into the Reel` : 'Cover frame: pick one with the hook visible'),
     aiLabel: 'Turn on "AI info" (made with AI) under Advanced settings',
     story: 'Story',
+    storyCaption: 'Caption',
     sticker: 'Add a link sticker to the YouTube video (or the Spotify link after release)',
-    post: 'Feed post for the release',
-    postImage: 'Image: the streaming cover or thumbnail 1',
-    postVideo: (file) => `Video: \`${file}\` (the main video in the feed format)`,
+    post: 'Reel: main video',
+    postVideo: (file) => `Video: \`${file}\` (the main video, as vertical as there is)`,
   },
   tt: {
     heading: 'TikTok',
@@ -220,11 +234,12 @@ const EN: Labels = {
       community: 'YouTube post about the video',
       story: 'Instagram story with a link sticker to the video',
       reel: 'Post the video as an Instagram Reel (texts/instagram.md)',
+      'main-reel': 'Reel: main video',
       page: 'Publish the song page on the microsite',
       links: 'Add the Spotify link to the YouTube description and the pinned comment',
     },
     announce: { instagram: 'Announcement: Instagram story', youtube: 'Announcement: YouTube post', x: 'Announcement on X' },
-    post: { instagram: 'Instagram feed post', tiktok: 'Post the video on TikTok (texts/tiktok.md)', x: 'Post on X with the video; YouTube link in the reply', linkedin: 'LinkedIn post' },
+    post: { instagram: 'Instagram feed post', tiktok: 'Post the video on TikTok (texts/tiktok.md)', x: 'Post on X with the video (texts/x.md)', linkedin: 'LinkedIn post' },
     short: (name, platform) => `${name} on ${platform}`,
     platforms: { distributor: 'Distributor', spotify: 'Spotify', youtube: 'YouTube', shorts: 'YouTube Shorts', tiktok: 'TikTok', instagram: 'Instagram', x: 'X', linkedin: 'LinkedIn', microsite: 'Microsite' },
   },
@@ -280,6 +295,10 @@ const EN: Labels = {
       'Post the video on YouTube Shorts, TikTok, and Instagram Reels on the release day (texts/youtube.md, texts/tiktok.md, texts/instagram.md).',
       'Set the 1080x1920 cover as the cover on every platform.',
     ],
+    shortEpisodeSteps: [
+      'Post the video on YouTube Shorts, TikTok, Instagram Reels, and X on the release day, and publish its microsite page (texts/youtube.md, texts/tiktok.md, texts/instagram.md, texts/x.md).',
+      'Set the 1080x1920 cover on YouTube and Instagram, and the 1080x1440 cover on TikTok.',
+    ],
     todos: 'Open TODOs',
     none: 'None.',
     manifest: 'manifest.json lists every file with its size, SHA-256, specification, and source.',
@@ -323,10 +342,10 @@ const DE: Labels = {
     cover: (seconds) => (seconds !== undefined ? `Titelbild: ${seconds.toFixed(1)} s ins Reel` : 'Titelbild: ein Frame mit sichtbarem Hook'),
     aiLabel: '„KI-Info“ (Mit KI erstellt) unter Erweiterte Einstellungen einschalten',
     story: 'Story',
+    storyCaption: 'Bildunterschrift',
     sticker: 'Link-Sticker zum YouTube-Video setzen (nach dem Release: Spotify-Link)',
-    post: 'Feed-Post zum Release',
-    postImage: 'Bild: das Streaming-Cover oder Thumbnail 1',
-    postVideo: (file) => `Video: \`${file}\` (das Hauptvideo im Feed-Format)`,
+    post: 'Reel: Hauptvideo',
+    postVideo: (file) => `Video: \`${file}\` (das Hauptvideo, so hochkant wie vorhanden)`,
   },
   tt: {
     heading: 'TikTok',
@@ -399,11 +418,12 @@ const DE: Labels = {
       community: 'YouTube-Post zum Video',
       story: 'Instagram-Story mit Link-Sticker zum Video',
       reel: 'Das Video als Instagram Reel posten (texts/instagram.md)',
+      'main-reel': 'Reel: Hauptvideo',
       page: 'Song-Seite auf der Microsite veröffentlichen',
       links: 'Spotify-Link in YouTube-Beschreibung und angepinnten Kommentar eintragen',
     },
     announce: { instagram: 'Ankündigung: Instagram-Story', youtube: 'Ankündigung: YouTube-Post', x: 'Ankündigung auf X' },
-    post: { instagram: 'Instagram-Feed-Post', tiktok: 'Das Video auf TikTok posten (texts/tiktok.md)', x: 'Post auf X mit Video; YouTube-Link als Antwort', linkedin: 'LinkedIn-Beitrag' },
+    post: { instagram: 'Instagram-Feed-Post', tiktok: 'Das Video auf TikTok posten (texts/tiktok.md)', x: 'Post auf X mit Video (texts/x.md)', linkedin: 'LinkedIn-Beitrag' },
     short: (name, platform) => `${name} auf ${platform}`,
     platforms: { distributor: 'Distributor', spotify: 'Spotify', youtube: 'YouTube', shorts: 'YouTube Shorts', tiktok: 'TikTok', instagram: 'Instagram', x: 'X', linkedin: 'LinkedIn', microsite: 'Microsite' },
   },
@@ -458,6 +478,10 @@ const DE: Labels = {
     memeSteps: [
       'Das Video am Release-Tag auf YouTube Shorts, TikTok und Instagram Reels posten (texts/youtube.md, texts/tiktok.md, texts/instagram.md).',
       'Auf jeder Plattform das Cover 1080x1920 setzen.',
+    ],
+    shortEpisodeSteps: [
+      'Das Video am Release-Tag auf YouTube Shorts, TikTok, Instagram Reels und X posten und die Microsite-Seite veröffentlichen (texts/youtube.md, texts/tiktok.md, texts/instagram.md, texts/x.md).',
+      'Auf YouTube und Instagram das Cover 1080x1920 setzen, auf TikTok das Cover 1080x1440.',
     ],
     todos: 'Offene TODOs',
     none: 'Keine.',
@@ -576,8 +600,16 @@ function shortsText(plan: ReleasePlan, input: ReleaseTextInput, l: Labels): stri
 function instagramText(plan: ReleasePlan, input: ReleaseTextInput, l: Labels): string {
   const lines = [`# ${l.ig.heading}`, ''];
   const youtube = channelLinkOf(input.channel, 'youtube', l);
-  const announcement = postOf(plan, 'announce:instagram')?.texts.story;
-  if (announcement) lines.push(`## ${l.announce.heading} (${l.ig.story})`, '', announceImageLine(input, l), '', ...block(display(announcement.value, l)), '');
+  const announcement = postOf(plan, 'announce:instagram');
+  if (announcement) {
+    const caption = announcement.texts.caption;
+    lines.push(`## ${l.announce.heading} (${l.ig.story})`, '', announceImageLine(input, l), '');
+    if (caption) lines.push(`### ${l.ig.storyCaption} (${counter(caption, l, input.limits.instagram.story_caption)})`, '', ...block(display(caption.value, l)), '');
+  }
+  const storyCaption = postOf(plan, 'story')?.texts.caption;
+  if (storyCaption) {
+    lines.push(`## ${l.ig.story}`, '', `### ${l.ig.storyCaption} (${counter(storyCaption, l, input.limits.instagram.story_caption)})`, '', ...block(display(storyCaption.value, l)), '');
+  }
   for (const post of postsOf(plan, 'instagram')) {
     const name = shortNameOf(post.id);
     if (!name) continue;
@@ -586,15 +618,14 @@ function instagramText(plan: ReleasePlan, input: ReleaseTextInput, l: Labels): s
     const caption = post.texts.caption;
     const note = hashtagNote(caption, l);
     lines.push(`### ${l.ig.caption} (${counter(caption, l, input.limits.instagram.caption)}${note ? `, ${note}` : ''})`, '', ...block(caption ? display(caption.value, l) : l.todo(`shorts.${name}.instagram in review/upload.yaml`)), '');
-    lines.push(`### ${l.ig.story}`, '', ...block(post.texts.story ? display(post.texts.story.value, l) : l.todo(`shorts.${name}.instagram.story`)), '');
     lines.push(`### ${l.checklist}`, '', checkbox(l.ig.cover(post.coverFrame)));
     if (plan.settings.instagramAiLabel) lines.push(checkbox(l.ig.aiLabel));
     lines.push(checkbox(youtube ? `${l.ig.sticker} — ${youtube}` : l.ig.sticker), '');
   }
-  const feed = postOf(plan, 'instagram-post')?.texts.caption;
-  if (feed) {
-    const video = feedVideo(input);
-    lines.push(`## ${l.ig.post}`, '', `_${video ? l.ig.postVideo(video) : l.ig.postImage}_`, '', ...block(display(feed.value, l)), '');
+  const reel = postOf(plan, 'instagram-post');
+  if (reel?.texts.caption) {
+    const video = reel.media ?? l.todo('main video');
+    lines.push(`## ${l.ig.post}`, '', `_${l.ig.postVideo(video)}_`, '', ...block(display(reel.texts.caption.value, l)), '');
   }
   return `${lines.join('\n').trimEnd()}\n`;
 }
@@ -691,12 +722,15 @@ export function calendarEventLabel(
   event: Pick<CalendarEvent, 'step' | 'platform' | 'item'>,
   l: Labels,
   premiere = true,
-  kind: ReleaseTextInput['kind'] = 'music-video',
+  shape: ReleaseShape = 'music-video',
 ): string {
   if (event.step === 'short') return l.cal.short(event.item, l.cal.platforms[event.platform]);
   if (event.step === 'announce') return l.cal.announce[event.platform as 'instagram' | 'youtube' | 'x'] ?? `${l.announce.heading}: ${l.cal.platforms[event.platform]}`;
   if (event.step === 'post') return l.cal.post[event.platform as 'instagram' | 'tiktok' | 'x' | 'linkedin'] ?? l.cal.platforms[event.platform];
-  if (event.step === 'youtube' && kind === 'meme') return l.cal.steps['youtube-short'];
+  // A meme's and a short episode's one video is its Short and its Reel; everywhere else the Reel step is the main video's (ADR 0057).
+  const oneVideo = shape === 'meme' || shape === 'short-episode';
+  if (event.step === 'youtube' && oneVideo) return l.cal.steps['youtube-short'];
+  if (event.step === 'reel' && !oneVideo) return l.cal.steps['main-reel'];
   if (event.step === 'youtube' && premiere) return l.cal.steps.premiere;
   return l.cal.steps[event.step as keyof Labels['cal']['steps']] ?? event.step;
 }
@@ -718,7 +752,7 @@ function planText(input: ReleaseTextInput, l: Labels): string {
   for (const event of calendar.events) {
     const when = calendarWhen(event.at, input.language);
     const offset = Math.round((Date.parse(`${event.at.slice(0, 10)}T12:00:00Z`) - Date.parse(`${calendar.release_date}T12:00:00Z`)) / 86_400_000);
-    lines.push(`| ${offset > 0 ? `+${offset}` : offset} | ${when.weekday} ${when.date} | ${when.time} | ${calendarEventLabel(event, l, input.premiere ?? true, input.kind)} |`);
+    lines.push(`| ${offset > 0 ? `+${offset}` : offset} | ${when.weekday} ${when.date} | ${when.time} | ${calendarEventLabel(event, l, input.premiere ?? true, input.shape ?? input.kind)} |`);
   }
   lines.push('', `_${l.plan.ics}_`);
   return `${lines.join('\n')}\n`;
@@ -747,10 +781,11 @@ function xText(plan: ReleasePlan, input: ReleaseTextInput, l: Labels): string {
   if (announcement) lines.push(`## ${l.announce.heading}`, '', announceImageLine(input, l), '', ...block(display(announcement, l)), '');
   const post = postOf(plan, 'x');
   if (post?.texts.post) {
-    const media = mediaFile(input, input.data?.x?.media ?? input.files.shorts[0]?.name);
+    const media = post.media;
     lines.push(`## ${l.x.post} (${counter(post.texts.post, l, input.limits.x.post)})`, '');
     if (media) lines.push(l.x.media(media), '');
-    lines.push(...block(display(post.texts.post.value, l)), '', `### ${l.x.reply}`, '', ...block(display(post.texts.reply?.value ?? '', l)), '', `_${l.x.replyNote}_`, '');
+    lines.push(...block(display(post.texts.post.value, l)), '');
+    if (post.texts.reply) lines.push(`### ${l.x.reply}`, '', ...block(display(post.texts.reply.value, l)), '', `_${l.x.replyNote}_`, '');
   } else lines.push(l.todo('x in review/upload.yaml'), '');
   for (const short of postsOf(plan, 'x')) {
     const name = shortNameOf(short.id);
@@ -781,41 +816,55 @@ function linkedinText(plan: ReleasePlan, input: ReleaseTextInput, l: Labels): st
   return `${lines.join('\n')}\n`;
 }
 
-/** The meme video's file in the folder: its one 9:16 render, or the master when the format list names it. */
+/** The one video's file in the folder (a meme or a short episode): its master, else its 9:16 render. */
 function memeFile(input: ReleaseTextInput, l: Labels): string {
-  return input.files.master ?? input.files.videos?.['9x16'] ?? l.todo('renders/9x16.mp4');
+  return input.files.master ?? input.files.videos?.['9x16'] ?? l.todo(`renders/${input.masterFormat ?? '9x16'}.mp4`);
 }
 
+/** The YouTube Short of a meme or a short episode; a short episode's also carries its hashtags and announcement. */
 function memeYoutubeText(plan: ReleasePlan, input: ReleaseTextInput, l: Labels): string {
   const post = postOf(plan, 'youtube');
   const title = post?.texts.title;
   const description = post?.texts.description;
   const tags = post?.texts.tags;
+  const hashtags = post?.texts.hashtags;
   const lines = [`# ${l.meme.youtube}`, '', `**${l.file}:** \`${memeFile(input, l)}\``];
   if (input.files.cover) lines.push(l.meme.cover(input.files.cover));
   lines.push('', `## ${l.title} (${counter(title, l, input.limits.youtube.title)})`, '', ...block(title?.value ?? l.todo('main.title')));
   lines.push('', `## ${l.description} (${counter(description, l, input.limits.youtube.description_bytes)})`, '', ...block(description?.value ?? l.todo('main.description')));
+  if (hashtags?.value) lines.push('', `## ${l.hashtagsComma}`, '', ...block(hashtags.value));
   lines.push('', `## ${l.tags} (${counter(tags, l, input.limits.youtube.tags)})`, '', ...block(tags?.value ?? l.todo('main.tags')));
+  const announcement = valueOf(plan, 'announce:youtube', 'text');
+  if (announcement) lines.push('', `## ${l.announce.heading}`, '', announceImageLine(input, l), '', ...block(display(announcement, l)));
   lines.push('', `## ${l.checklist}`, '', checkbox(l.meme.visibility), checkbox(l.yt.synthetic(post?.syntheticMedia ?? plan.settings.youtubeSynthetic)), checkbox(l.yt.kids(post?.madeForKids ?? false)));
   return `${lines.join('\n')}\n`;
 }
 
-function memeTiktokText(plan: ReleasePlan, input: ReleaseTextInput, l: Labels): string {
+/** The TikTok post of a meme or a short episode; a short episode has its own text and TikTok cover. */
+function memeTiktokText(plan: ReleasePlan, input: ReleaseTextInput, l: Labels, missing = 'main.description'): string {
   const caption = postOf(plan, 'tiktok')?.texts.caption;
   const lines = [`# ${l.meme.tiktok}`, '', `**${l.file}:** \`${memeFile(input, l)}\``];
-  if (input.files.cover) lines.push(l.tt.coverUpload(input.files.cover));
-  lines.push('', `### ${l.description} (${counter(caption, l, input.limits.tiktok.caption)})`, '', ...block(caption?.value ?? l.todo('main.description')));
+  const cover = input.files.tiktokCover ?? input.files.cover;
+  if (cover) lines.push(l.tt.coverUpload(cover));
+  lines.push('', `### ${l.description} (${counter(caption, l, input.limits.tiktok.caption)})`, '', ...block(caption?.value ?? l.todo(missing)));
   lines.push('', `### ${l.tt.settings}`, '', checkbox(l.tt.visibility));
   if (plan.settings.tiktokAiLabel) lines.push(checkbox(l.tt.aiLabel));
   return `${lines.join('\n')}\n`;
 }
 
-function memeInstagramText(plan: ReleasePlan, input: ReleaseTextInput, l: Labels): string {
+/** The Reel of a meme or a short episode; a short episode has its own text and, optionally, the announcement story. */
+function memeInstagramText(plan: ReleasePlan, input: ReleaseTextInput, l: Labels, missing = 'main.description'): string {
   const caption = postOf(plan, 'instagram')?.texts.caption;
   const lines = [`# ${l.meme.instagram}`, '', `**${l.file}:** \`${memeFile(input, l)}\``];
   if (input.files.cover) lines.push(l.meme.cover(input.files.cover));
+  const announcement = postOf(plan, 'announce:instagram');
+  if (announcement) {
+    const story = announcement.texts.caption;
+    lines.push('', `## ${l.announce.heading} (${l.ig.story})`, '', announceImageLine(input, l));
+    if (story) lines.push('', `### ${l.ig.storyCaption} (${counter(story, l, input.limits.instagram.story_caption)})`, '', ...block(display(story.value, l)));
+  }
   const note = hashtagNote(caption, l);
-  lines.push('', `### ${l.ig.caption} (${counter(caption, l, input.limits.instagram.caption)}${note ? `, ${note}` : ''})`, '', ...block(caption?.value ?? l.todo('main.description')));
+  lines.push('', `### ${l.ig.caption} (${counter(caption, l, input.limits.instagram.caption)}${note ? `, ${note}` : ''})`, '', ...block(caption?.value ?? l.todo(missing)));
   lines.push('', `### ${l.checklist}`, '', checkbox(l.ig.cover(undefined)));
   if (plan.settings.instagramAiLabel) lines.push(checkbox(l.ig.aiLabel));
   return `${lines.join('\n')}\n`;
@@ -824,12 +873,13 @@ function memeInstagramText(plan: ReleasePlan, input: ReleaseTextInput, l: Labels
 /** The README of the release folder: what lies where, the order, and the open TODOs. */
 export function readmeText(input: ReleaseTextInput, todos: string[]): string {
   const l = releaseLabels(input.language);
+  const oneVideo = input.kind === 'meme' || input.shape === 'short-episode';
   const folders = (
-    input.kind === 'meme'
+    oneVideo
       ? (['video', 'cover', 'texts'] as const)
       : (['video', 'thumbnails', 'shorts', ...(input.kind === 'music-video' ? (['audio', 'streaming'] as const) : []), 'texts'] as const)
   ).map((folder) => `- \`${folder}/\` — ${l.readme.folders[folder]}`);
-  const steps = input.kind === 'meme' ? l.readme.memeSteps : input.kind === 'music-video' ? l.readme.steps : l.readme.steps.slice(1);
+  const steps = input.kind === 'meme' ? l.readme.memeSteps : input.shape === 'short-episode' ? l.readme.shortEpisodeSteps : input.kind === 'music-video' ? l.readme.steps : l.readme.steps.slice(1);
   const lines = [
     `# ${l.readme.heading} — ${input.artist ? `${input.artist} – ` : ''}${input.title}`,
     '',
@@ -856,6 +906,16 @@ export function releaseTexts(plan: ReleasePlan, input: ReleaseTextInput): Record
       'youtube.md': memeYoutubeText(plan, input, l),
       'tiktok.md': memeTiktokText(plan, input, l),
       'instagram.md': memeInstagramText(plan, input, l),
+      'release-plan.md': planText(input, l),
+    };
+  }
+  // A short episode is one video on five platforms: YouTube Shorts, TikTok, Instagram Reels, X and the microsite (ADR 0057).
+  if (input.shape === 'short-episode') {
+    return {
+      'youtube.md': memeYoutubeText(plan, input, l),
+      'tiktok.md': memeTiktokText(plan, input, l, 'tiktok in review/upload.yaml'),
+      'instagram.md': memeInstagramText(plan, input, l, 'instagram in review/upload.yaml'),
+      'x.md': xText(plan, input, l),
       'release-plan.md': planText(input, l),
     };
   }

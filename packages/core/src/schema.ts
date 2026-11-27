@@ -900,13 +900,14 @@ export const UploadShortSchema = z.object({
   /** The video this Short points to; YouTube's "related video" is set by hand. */
   related: z.literal('main').default('main'),
   platforms: z.array(PublishPlatformSchema).min(1).default(['youtube', 'tiktok']),
-  /** The Short as an Instagram Reel: its own caption, at most five hashtags, the cover frame, and a story text. */
+  /** The Short as an Instagram Reel: its own caption, at most five hashtags, the cover frame, and the caption of the release-day story when it shows this Short. */
   instagram: z
     .object({
       caption: z.string().min(1),
       hashtags: z.array(HashtagSchema).default([]),
       /** Second of the Short shown as the Reel cover. */
       cover_frame: z.number().nonnegative().optional(),
+      /** The caption of the release-day story when it shows this Short's video (the first Short); at most 120 characters, optional. */
       story: z.string().min(1).optional(),
     })
     .optional(),
@@ -924,13 +925,16 @@ export const UploadShortSchema = z.object({
   summary_en: EnglishSummarySchema.optional(),
 });
 
-/** The release announcement on X: the post with a native video, and the reply that holds the YouTube link. */
+/** A platform post of a short episode's one video: its own caption and hashtags (ADR 0057). */
+export const UploadPlatformTextSchema = z.object({ caption: z.string().min(1), hashtags: z.array(HashtagSchema).default([]) });
+
+/** The release post on X: the post with a native video, and an optional reply that holds the YouTube link. */
 export const UploadXSchema = z.object({
   post: z.string().min(1),
   hashtags: z.array(HashtagSchema).default([]),
-  /** The reply under the post; the YouTube link is appended to it. */
+  /** The optional reply under the post; the YouTube link is appended to it. Without it the post carries no link. */
   reply: z.string().min(1).optional(),
-  /** The Short attached to the post; the first Short when omitted. */
+  /** The video attached to the post: `main` (the main video, also when omitted) or a Short's name. */
   media: z.string().min(1).optional(),
 });
 
@@ -973,8 +977,12 @@ export const UploadDataSchema = z
     language: z.string().min(2),
     main: UploadMainSchema,
     shorts: z.array(UploadShortSchema).default([]),
-    /** The Instagram feed post of the release: the main video in the feed format (4:5 or 1:1 render), or the cover without one. */
+    /** The main video's Instagram Reel (`instagram-post`): its best vertical render; only for a main video of at most 180 s (ADR 0057). */
     instagram_post: z.object({ caption: z.string().min(1), hashtags: z.array(HashtagSchema).default([]) }).optional(),
+    /** A short episode's TikTok post of its one video; `main` is its YouTube Short (ADR 0057). Other shapes ignore it. */
+    tiktok: UploadPlatformTextSchema.optional(),
+    /** A short episode's Instagram Reel of its one video; its caption differs from the TikTok one (ADR 0057). Other shapes ignore it. */
+    instagram: UploadPlatformTextSchema.optional(),
     /** Spotify for Artists: the Artist Pick message and the editorial pitch. */
     spotify: z.object({ artist_pick: z.string().min(1).optional(), pitch: z.string().min(1).optional() }).optional(),
     /** The announcement a week before the release: an Instagram story with the cover, a YouTube post, and an X post. */
@@ -1252,8 +1260,12 @@ export const PublishLogSchema = z.object({
  */
 export const PLATFORM_LIMITS = {
   youtube: { title: 100, description_bytes: 5000, tags: 500, hashtags: 15 },
-  /** Instagram allows five hashtags per post and Reel since December 2025. */
-  instagram: { caption: 2200, hashtags: 5 },
+  /**
+   * Instagram allows five hashtags per post and Reel since December 2025. A
+   * story has no text field; the caption added to a story's video takes 120
+   * characters in the app (HS-267).
+   */
+  instagram: { caption: 2200, hashtags: 5, story_caption: 120 },
   /** TikTok's caption limit for an upload through its API; the app allows more. */
   tiktok: { caption: 2200, hashtags: 10 },
   /** Spotify for Artists: the editorial pitch. */
@@ -1367,7 +1379,7 @@ export const ReleaseFileKindSchema = z.enum([
   'announcement',
   /** The release-day story image. */
   'story',
-  /** The 4:5 Instagram feed image, when the project has no feed-format render. */
+  /** The 4:5 Instagram feed image of older release folders; `release` no longer composes it (ADR 0057). */
   'feed-image',
 ]);
 
@@ -1469,6 +1481,13 @@ export const ReleasePlanPostSchema = z.object({
 });
 
 /**
+ * Which posts and files a release has (ADR 0057): a music video, a meme, an
+ * episode, or a short episode – an episode whose master is at least as tall as
+ * wide and whose episode track lasts at most 180 s.
+ */
+export const ReleaseShapeSchema = z.enum(['music-video', 'meme', 'episode', 'short-episode']);
+
+/**
  * One release plan: every post's exact text, files, sources and limits, and
  * what is still missing. `release` writes it into `manifest.json`; the folder
  * texts, QA, the board, the autopilot and `publish` all read it.
@@ -1476,6 +1495,8 @@ export const ReleasePlanPostSchema = z.object({
 export const ReleasePlanSchema = z.object({
   version: z.literal(1),
   kind: z.enum(['music-video', 'episode', 'meme']),
+  /** The release shape the plan was built for; a plan without it reads as its kind. */
+  shape: ReleaseShapeSchema.optional(),
   language: z.string().min(1),
   slug: z.string().min(1),
   artist: z.string().optional(),
@@ -1502,6 +1523,8 @@ export const ReleasePlanSchema = z.object({
 export const ReleaseManifestSchema = z.object({
   version: z.literal(1),
   project: z.string().min(1),
+  /** The release shape this run derived; a manifest without it reads as its project kind (`manifestShape`). */
+  shape: ReleaseShapeSchema.optional(),
   generated_at: z.string().min(1),
   files: z.array(ReleaseFileSchema).default([]),
   plan: ReleasePlanSchema.optional(),
@@ -1836,3 +1859,4 @@ export type ReleasePlan = z.infer<typeof ReleasePlanSchema>;
 export type ReleaseFile = z.infer<typeof ReleaseFileSchema>;
 export type ReleaseFileKind = z.infer<typeof ReleaseFileKindSchema>;
 export type ReleaseManifest = z.infer<typeof ReleaseManifestSchema>;
+export type ReleaseShape = z.infer<typeof ReleaseShapeSchema>;

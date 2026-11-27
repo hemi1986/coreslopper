@@ -10,12 +10,14 @@ import {
   ValidationError,
   buildReleasePlan,
   loadChannel,
+  loadProject,
   memeCaption,
   memeDescription,
   platformLimits,
   projectPaths,
   readJsonFile,
   readYamlFile,
+  releaseShape,
   repoRoot,
   soundLicenceTodos,
   type PlatformLimits,
@@ -24,6 +26,7 @@ import {
   type PublishLog,
   type PublishPlatform,
   type ReleasePlan,
+  type ReleaseShape,
   type UploadData,
   type UploadMain,
   type UploadShort,
@@ -483,6 +486,17 @@ async function uploadSounds(projectDir: string, root: string): Promise<{ config:
 }
 
 /**
+ * The release shape of a project without a release folder, derived as `release`
+ * derives it (ADR 0057). A project that does not load has no known length, so an
+ * episode stays an episode.
+ */
+async function fallbackShape(projectDir: string, config: ProjectConfig): Promise<ReleaseShape> {
+  const loaded = config.kind === 'episode' ? await loadProject(projectDir).catch(() => undefined) : undefined;
+  const timing = loaded?.effectiveTiming ?? loaded?.timing;
+  return releaseShape({ kind: config.kind, master: config.formats.master, durationSeconds: timing?.audio.duration });
+}
+
+/**
  * Upload the release package: validate, plan, check quota, then upload each
  * item that is not in the publish log with the same file hash. Every upload
  * is private or a draft. The log is written after each item.
@@ -505,6 +519,7 @@ export async function publishProject(options: PublishOptions): Promise<PublishSu
     storedPlan ??
     buildReleasePlan({
       kind: config.kind,
+      shape: await fallbackShape(projectDir, config),
       language: data.language,
       slug: config.slug,
       title: config.title,
