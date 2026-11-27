@@ -81,6 +81,8 @@ Pointers to YouTube: bio link, pinned comment, a text line in the caption or on 
 | Stories | 9:16, up to 60 s per segment; link sticker for all accounts | [Instagram](https://about.instagram.com/blog/announcements/expanding-sharing-links-in-stories-to-everyone) |
 | Scheduling | Native for professional accounts, up to 75 days ahead | [Instagram help](https://help.instagram.com/iphone-app/439971288310029) |
 
+A story has no text field; a story that shows a video takes a caption of at most 120 characters in the app (`limits.instagram.story_caption`), an image story none.
+
 Pointers to YouTube: a story link sticker on release day, a bio link, a pinned comment; caption links are not clickable.
 
 ## Spotify for Artists
