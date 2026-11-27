@@ -161,8 +161,8 @@ announcement:                      # a week before: Instagram story, YouTube pos
 x:
   post: "<at most 280 characters with the hashtags>"
   hashtags: ['#topic']             # one or two
-  reply: "<'Full video:' in the project's language>"
-  media: Z1-intro                  # the Short uploaded with the post
+  reply: "<'Full video:' in the project's language>"  # optional; release appends the YouTube link
+  media: main                      # main (the whole main video, the default) or a Short name
 linkedin:
   decision: post                   # post | skip
   reason: "<one sentence: why the song does or does not suit LinkedIn>"

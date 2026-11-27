@@ -225,7 +225,7 @@ const EN: Labels = {
       links: 'Add the Spotify link to the YouTube description and the pinned comment',
     },
     announce: { instagram: 'Announcement: Instagram story', youtube: 'Announcement: YouTube post', x: 'Announcement on X' },
-    post: { instagram: 'Instagram feed post', tiktok: 'Post the video on TikTok (texts/tiktok.md)', x: 'Post on X with the video; YouTube link in the reply', linkedin: 'LinkedIn post' },
+    post: { instagram: 'Instagram feed post', tiktok: 'Post the video on TikTok (texts/tiktok.md)', x: 'Post on X with the video (texts/x.md)', linkedin: 'LinkedIn post' },
     short: (name, platform) => `${name} on ${platform}`,
     platforms: { distributor: 'Distributor', spotify: 'Spotify', youtube: 'YouTube', shorts: 'YouTube Shorts', tiktok: 'TikTok', instagram: 'Instagram', x: 'X', linkedin: 'LinkedIn', microsite: 'Microsite' },
   },
@@ -405,7 +405,7 @@ const DE: Labels = {
       links: 'Spotify-Link in YouTube-Beschreibung und angepinnten Kommentar eintragen',
     },
     announce: { instagram: 'Ankündigung: Instagram-Story', youtube: 'Ankündigung: YouTube-Post', x: 'Ankündigung auf X' },
-    post: { instagram: 'Instagram-Feed-Post', tiktok: 'Das Video auf TikTok posten (texts/tiktok.md)', x: 'Post auf X mit Video; YouTube-Link als Antwort', linkedin: 'LinkedIn-Beitrag' },
+    post: { instagram: 'Instagram-Feed-Post', tiktok: 'Das Video auf TikTok posten (texts/tiktok.md)', x: 'Post auf X mit Video (texts/x.md)', linkedin: 'LinkedIn-Beitrag' },
     short: (name, platform) => `${name} auf ${platform}`,
     platforms: { distributor: 'Distributor', spotify: 'Spotify', youtube: 'YouTube', shorts: 'YouTube Shorts', tiktok: 'TikTok', instagram: 'Instagram', x: 'X', linkedin: 'LinkedIn', microsite: 'Microsite' },
   },
@@ -758,10 +758,11 @@ function xText(plan: ReleasePlan, input: ReleaseTextInput, l: Labels): string {
   if (announcement) lines.push(`## ${l.announce.heading}`, '', announceImageLine(input, l), '', ...block(display(announcement, l)), '');
   const post = postOf(plan, 'x');
   if (post?.texts.post) {
-    const media = mediaFile(input, input.data?.x?.media ?? input.files.shorts[0]?.name);
+    const media = post.media;
     lines.push(`## ${l.x.post} (${counter(post.texts.post, l, input.limits.x.post)})`, '');
     if (media) lines.push(l.x.media(media), '');
-    lines.push(...block(display(post.texts.post.value, l)), '', `### ${l.x.reply}`, '', ...block(display(post.texts.reply?.value ?? '', l)), '', `_${l.x.replyNote}_`, '');
+    lines.push(...block(display(post.texts.post.value, l)), '');
+    if (post.texts.reply) lines.push(`### ${l.x.reply}`, '', ...block(display(post.texts.reply.value, l)), '', `_${l.x.replyNote}_`, '');
   } else lines.push(l.todo('x in review/upload.yaml'), '');
   for (const short of postsOf(plan, 'x')) {
     const name = shortNameOf(short.id);

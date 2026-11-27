@@ -925,13 +925,13 @@ export const UploadShortSchema = z.object({
   summary_en: EnglishSummarySchema.optional(),
 });
 
-/** The release announcement on X: the post with a native video, and the reply that holds the YouTube link. */
+/** The release post on X: the post with a native video, and an optional reply that holds the YouTube link. */
 export const UploadXSchema = z.object({
   post: z.string().min(1),
   hashtags: z.array(HashtagSchema).default([]),
-  /** The reply under the post; the YouTube link is appended to it. */
+  /** The optional reply under the post; the YouTube link is appended to it. Without it the post carries no link. */
   reply: z.string().min(1).optional(),
-  /** The Short attached to the post; the first Short when omitted. */
+  /** The video attached to the post: `main` (the main video, also when omitted) or a Short's name. */
   media: z.string().min(1).optional(),
 });
 

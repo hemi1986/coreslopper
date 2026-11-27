@@ -11,6 +11,7 @@ import {
   type AutopilotPlatform,
   type CalendarEvent,
   type ReleaseStatus,
+  X_FREE_VIDEO_SECONDS,
 } from '@coreslopper/core';
 import { checklistKey, loadAutopilotLog } from './release-records.js';
 import { micrositeSong, type MicrositeSong } from './release-microsite.js';
@@ -247,6 +248,7 @@ const BOARD = {
     distributorCheck: 'Formular in dieser Reihenfolge ausfüllen; KI-Angaben setzen',
     xVideo: 'Video direkt hochladen',
     xReply: 'Antwort direkt nach dem Post setzen',
+    xPremium: 'Über 140 s nur mit X Premium',
     liVideo: 'Video direkt hochladen',
     pageCheck: 'Song-Seite aus microsite/<slug>.json veröffentlichen',
     youtubePointer: 'Hauptvideo auf YouTube',
@@ -311,6 +313,7 @@ const BOARD = {
     distributorCheck: 'Fill in the form in this order; set the AI credits',
     xVideo: 'Upload the video natively',
     xReply: 'Reply right after posting',
+    xPremium: 'Over 140 s only with X Premium',
     liVideo: 'Upload the video natively',
     pageCheck: 'Publish the song page from microsite/<slug>.json',
     youtubePointer: 'Main video on YouTube',
@@ -434,15 +437,17 @@ export async function boardProject(projectRoot: string, root: string, options: {
     xPosts.push({ id: 'announce:x', heading: heading('announce:x', l.announce.heading), at: at('announce:x'), files: files.teaser ? file(b.teaserFile, files.teaser) : files.announcePost ? file(b.announcePost, files.announcePost) : file(b.cover, files.cover), fields: field(b.post, display(planValue('announce:x', 'post')), limitOf('announce:x', 'post')), checklist: [], url: true });
   }
   const xPost = planText('x', 'post');
+  // The main video on X: over 140 s only an account with Premium can post it (F9).
+  const xPremium = Boolean(files.master) && planPost('x')?.media === files.master && (plan.durationSeconds ?? 0) > X_FREE_VIDEO_SECONDS;
   if (!meme && xPost) {
     xPosts.push({
       id: 'x',
       heading: heading('x', l.x.post),
       at: at('x'),
-      files: file(b.video, mediaFile(input, data?.x?.media ?? files.shorts[0]?.name)),
-      fields: [...field(b.post, display(xPost.value), limitOf('x', 'post')), ...field(b.reply, display(planValue('x', 'reply')), limitOf('x', 'reply'))],
-      checklist: checklist('x', [b.xVideo, b.xReply]),
-      pointer: videoUrl,
+      files: file(b.video, planPost('x')?.media),
+      fields: [...field(b.post, display(xPost.value), { ...limitOf('x', 'post'), ...(xPremium ? { note: b.xPremium } : {}) }), ...field(b.reply, display(planValue('x', 'reply')), limitOf('x', 'reply'))],
+      checklist: checklist('x', planText('x', 'reply') ? [b.xVideo, b.xReply] : [b.xVideo]),
+      ...(planText('x', 'reply') ? { pointer: videoUrl } : {}),
       url: true,
     });
   }
@@ -653,7 +658,7 @@ export async function autopilotView(facts: ReleaseFacts, options: { now?: Date; 
   if (!facts.calendar) blockers.push('no release calendar yet: run release');
   const log = await loadAutopilotLog(facts.project.paths.root);
   const plans = facts.calendar
-    ? planAutopilot({ calendar: facts.calendar, status: facts.status, log, settings, now, ready, premiere: facts.input.premiere })
+    ? planAutopilot({ calendar: facts.calendar, status: facts.status, log, settings, now, ready, premiere: facts.input.premiere, plan: facts.plan })
     : [];
   const events: Record<string, BoardAutopilotEvent> = {};
   for (const plan of plans) {
