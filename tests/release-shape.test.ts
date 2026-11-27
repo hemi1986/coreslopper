@@ -225,4 +225,22 @@ describe('the release shape once the release has started', () => {
 
     expect(await manifestOnDisk(dir)).toBe('episode');
   });
+
+  it('an older manifest without a shape keeps its project kind once the release started', async () => {
+    const { dir, root } = await episode('9:16', 190);
+    await buildRelease({ projectDir: dir, root, deps: fakeDeps(), render: false });
+    const manifestPath = join(dir, 'renders', 'release', 'manifest.json');
+    const old = JSON.parse(await readFile(manifestPath, 'utf8')) as { shape?: string };
+    delete old.shape;
+    await writeFile(manifestPath, JSON.stringify(old));
+    await setStatus(dir, { youtube: { done: true } });
+
+    await setTrack(dir, 170);
+    await expect(buildRelease({ projectDir: dir, root, deps: fakeDeps(), render: false })).rejects.toThrow('the release started as episode');
+    expect(await manifestOnDisk(dir)).toBeUndefined();
+
+    await setTrack(dir, 190);
+    await buildRelease({ projectDir: dir, root, deps: fakeDeps(), render: false });
+    expect(await manifestOnDisk(dir)).toBe('episode');
+  });
 });
