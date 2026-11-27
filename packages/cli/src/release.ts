@@ -27,7 +27,10 @@ import {
   releaseIdentity,
   releaseTodos,
   releasedPublicly,
+  keptShapeProblem,
+  manifestShape,
   releaseShape,
+  releaseStart,
   loadDefaults,
   repoRoot,
   resolveAnchor,
@@ -63,7 +66,7 @@ import {
 } from './release-media.js';
 import { readmeText, releaseLabels, releaseTexts, calendarEventLabel, type ReleaseTextInput } from './release-texts.js';
 import { calendarInput, planCalendar } from './release-calendar.js';
-import { loadStatus } from './release-records.js';
+import { loadStatus, withReleaseLock } from './release-records.js';
 import { micrositeSong } from './release-microsite.js';
 import { TIKTOK_COVER_SOURCE, VERTICAL_COVER_SOURCE, listThumbnails } from './thumbnail-files.js';
 import { readRecipe, recipePath } from './thumbnail-recipe.js';
@@ -282,6 +285,12 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
   const dir = releaseDir(project.paths.root);
   const manifestPath = join(dir, 'manifest.json');
   const previous = existsSync(manifestPath) ? await readJsonFile(manifestPath, ReleaseManifestSchema).catch(() => undefined) : undefined;
+  // Once a post went out, the shape is kept: a run with another shape fails before it writes anything (HS-268).
+  if (previous) {
+    const status = await withReleaseLock(project.paths.root, () => loadStatus(project.paths.root));
+    const problem = keptShapeProblem({ recorded: manifestShape(previous, kind), derived: shape, start: releaseStart(status) });
+    if (problem) throw new ValidationError(`${project.config.slug}: ${problem}`);
+  }
   const writer = new ReleaseWriter(dir, project.paths.root, new Map((previous?.files ?? []).map((file) => [file.path, file])));
   const channel = await loadChannel(root);
   const limits = platformLimits(channel);

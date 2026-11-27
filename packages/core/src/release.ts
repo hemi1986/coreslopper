@@ -13,6 +13,7 @@ import {
   type ReleaseManifest,
   type ReleaseMetadata,
   type ReleaseShape,
+  type ReleaseStatus,
   type Timing,
   type UploadData,
 } from './schema.js';
@@ -49,6 +50,28 @@ export function releaseShape(input: {
 /** The shape a manifest recorded; a manifest written before shapes existed reads as its project kind. */
 export function manifestShape(manifest: Pick<ReleaseManifest, 'shape'>, kind: ProjectKind): ReleaseShape {
   return manifest.shape ?? kind;
+}
+
+/**
+ * What started the release: the first done mark or live URL in the release
+ * status, in the status's own order. Until there is one, the release shape
+ * follows the project; after it, the shape is kept (HS-268).
+ */
+export function releaseStart(status: Pick<ReleaseStatus, 'items'>): string | undefined {
+  for (const [id, item] of Object.entries(status.items)) {
+    if (item.done) return `the done mark ${id}`;
+    if (item.url) return `the live URL of ${id}`;
+  }
+  return undefined;
+}
+
+/**
+ * Why a run may not build its shape: the release started with another shape
+ * (HS-268). Undefined when the shape is the manifest's or nothing was posted yet.
+ */
+export function keptShapeProblem(input: { recorded: ReleaseShape | undefined; derived: ReleaseShape; start: string | undefined }): string | undefined {
+  if (!input.recorded || !input.start || input.recorded === input.derived) return undefined;
+  return `the release started as ${input.recorded} (${input.start}), and this run's shape is ${input.derived}: release changes nothing. Remove the done marks and live URLs first to release it as ${input.derived}.`;
 }
 
 /** A project with `distribution: internal` is never released publicly: no release package, no release calendar. */
