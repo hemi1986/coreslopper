@@ -42,6 +42,15 @@ export function reelVideo(files: Pick<ReleasePlanFiles, 'videos' | 'master'>): s
   return files.videos?.['9x16'] ?? files.videos?.['4x5'] ?? files.videos?.['1x1'] ?? files.master;
 }
 
+/** The longest video an X account without Premium may post, in seconds (F9 in docs/research/platform-video-formats.md). */
+export const X_FREE_VIDEO_SECONDS = 140;
+
+/** The video of the X release post: the main video (the master) for `main` or no media, else the named Short. */
+export function xVideo(files: Pick<ReleasePlanFiles, 'master' | 'shorts'>, media: string | undefined): string | undefined {
+  if (!media || media === 'main') return files.master;
+  return files.shorts.find((short) => short.name === media)?.video;
+}
+
 /** Everything a release plan is made from. */
 export interface ReleasePlanInput {
   kind: 'music-video' | 'episode' | 'meme';
@@ -469,23 +478,22 @@ export function buildReleasePlan(input: ReleasePlanInput): ReleasePlan {
     });
   }
 
-  // X: the release post and its reply.
+  // X: the release post with the main video, or a Short it names, and its optional reply.
   const x = data?.x;
-  const xMedia = x?.media ?? files.shorts[0]?.name;
-  const xMediaPath = xMedia ? files.shorts.find((short) => short.name === xMedia)?.video : undefined;
+  const xMediaPath = xVideo(files, x?.media);
   posts.push({
     id: 'x',
     platform: 'x',
     files: xMediaPath ? [{ role: 'video', path: xMediaPath }] : [],
     texts: texts(
       ['post', text(x ? [x.post.trim(), x.hashtags.join(' ')].filter(Boolean).join('\n\n') : undefined, { max: limits.x.post, counting: 'x', label: 'x', field: 'post' })],
-      ['reply', text(x ? [x.reply?.trim(), '{youtube}'].filter(Boolean).join(' ') : undefined, { max: limits.x.post, counting: 'x', extra: 24, strip: ['{youtube}'], label: 'x', field: 'reply with the link' })],
+      ['reply', text(x?.reply ? [x.reply.trim(), '{youtube}'].join(' ') : undefined, { max: limits.x.post, counting: 'x', extra: 24, strip: ['{youtube}'], label: 'x', field: 'reply with the link' })],
     ),
     media: xMediaPath,
-    needsYoutube: true,
-    pointer: 'youtube',
+    // Only the reply carries the YouTube link: a post without one waits for nothing.
+    ...(x?.reply ? { needsYoutube: true, pointer: 'youtube' as const } : {}),
     url: true,
-    errors: x?.media && !files.shorts.some((short) => short.name === x.media) && !(data?.shorts ?? []).some((short) => short.name === x.media) ? [`x: media ${x.media} is not a Short in upload.yaml`] : [],
+    errors: x?.media && x.media !== 'main' && !files.shorts.some((short) => short.name === x.media) && !(data?.shorts ?? []).some((short) => short.name === x.media) ? [`x: media ${x.media} is not a Short in upload.yaml`] : [],
     missing: [...(!x ? ['x'] : [])],
   });
 

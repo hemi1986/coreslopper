@@ -758,10 +758,11 @@ function xText(plan: ReleasePlan, input: ReleaseTextInput, l: Labels): string {
   if (announcement) lines.push(`## ${l.announce.heading}`, '', announceImageLine(input, l), '', ...block(display(announcement, l)), '');
   const post = postOf(plan, 'x');
   if (post?.texts.post) {
-    const media = mediaFile(input, input.data?.x?.media ?? input.files.shorts[0]?.name);
+    const media = post.media;
     lines.push(`## ${l.x.post} (${counter(post.texts.post, l, input.limits.x.post)})`, '');
     if (media) lines.push(l.x.media(media), '');
-    lines.push(...block(display(post.texts.post.value, l)), '', `### ${l.x.reply}`, '', ...block(display(post.texts.reply?.value ?? '', l)), '', `_${l.x.replyNote}_`, '');
+    lines.push(...block(display(post.texts.post.value, l)), '');
+    if (post.texts.reply) lines.push(`### ${l.x.reply}`, '', ...block(display(post.texts.reply.value, l)), '', `_${l.x.replyNote}_`, '');
   } else lines.push(l.todo('x in review/upload.yaml'), '');
   for (const short of postsOf(plan, 'x')) {
     const name = shortNameOf(short.id);

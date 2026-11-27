@@ -931,7 +931,7 @@ export const UploadXSchema = z.object({
   hashtags: z.array(HashtagSchema).default([]),
   /** The reply under the post; the YouTube link is appended to it. */
   reply: z.string().min(1).optional(),
-  /** The Short attached to the post; the first Short when omitted. */
+  /** The video attached to the post: `main` (the main video, also when omitted) or a Short's name. */
   media: z.string().min(1).optional(),
 });
 
