@@ -128,7 +128,7 @@ npm run cli -- release-run --dry-run    # what is due now; posts nothing
 | Main video, Shorts on YouTube | Uploaded `youtube_ahead_hours` (24) before their time: private, or scheduled once `youtube_audited: true`. When the main video is public, its pinned comment is posted. | Without the audit: switch it public in Studio at its time. A Premiere is always set in Studio. Pin the comment; set the related video of each Short. |
 | Shorts on TikTok | A draft in the inbox at its time; a public post with `tiktok_direct` after the audit. | Post the draft from the app (cover, sound). |
 | Instagram Reels, feed post, announcement story | Posted at their time with caption, cover frame, and the AI info label. | The release-day story (it needs the link sticker). |
-| X: announcement, release post, Shorts | Posted with the teaser, Short, or image; the release post's reply carries the YouTube link. | — |
+| X: announcement, release post, Shorts | Posted with the teaser, the main video, a Short, or an image; the release post's reply, when it has one, carries the YouTube link. | — |
 | LinkedIn | Posted with the video and the YouTube link. | — |
 | The day after: links | The Spotify link appended to the YouTube description. | Enter the Spotify link on the board (Spotify tab, "Song"); add it to the pinned comment if you want it there. |
 | Microsite | `microsite/<slug>.json` and its images copied into `autopilot.microsite.dir`, then `autopilot.microsite.command` runs there (e.g. commit and push). | — |
