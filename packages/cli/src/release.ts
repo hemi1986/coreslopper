@@ -27,9 +27,12 @@ import {
   releaseIdentity,
   releaseTodos,
   releasedPublicly,
+  keptShapeProblem,
+  manifestShape,
   releaseShape,
   postsVerticalVersion,
   SHORT_FORM_MAX_SECONDS,
+  releaseStart,
   loadDefaults,
   repoRoot,
   resolveAnchor,
@@ -66,7 +69,7 @@ import {
 } from './release-media.js';
 import { readmeText, releaseLabels, releaseTexts, calendarEventLabel, type ReleaseTextInput } from './release-texts.js';
 import { calendarInput, planCalendar } from './release-calendar.js';
-import { loadStatus } from './release-records.js';
+import { loadStatus, withReleaseLock } from './release-records.js';
 import { micrositeSong } from './release-microsite.js';
 import { TIKTOK_COVER_SOURCE, VERTICAL_COVER_SOURCE, listThumbnails } from './thumbnail-files.js';
 import { readRecipe, recipePath } from './thumbnail-recipe.js';
@@ -336,7 +339,19 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
   const credits = usedSounds.map((sound) => sound.credit).filter((credit): credit is string => Boolean(credit));
   const dir = releaseDir(project.paths.root);
   const manifestPath = join(dir, 'manifest.json');
-  const previous = existsSync(manifestPath) ? await readJsonFile(manifestPath, ReleaseManifestSchema).catch(() => undefined) : undefined;
+  const manifestOnDisk = existsSync(manifestPath);
+  const previous = manifestOnDisk ? await readJsonFile(manifestPath, ReleaseManifestSchema).catch(() => undefined) : undefined;
+  // Once a post went out, the shape is kept: a run with another shape fails before it writes anything (HS-268).
+  if (manifestOnDisk) {
+    const status = await withReleaseLock(project.paths.root, () => loadStatus(project.paths.root));
+    const start = releaseStart(status);
+    // A started release whose manifest cannot be read has lost the shape it must keep: refuse rather than guess.
+    if (!previous && start) {
+      throw new ValidationError(`${project.config.slug}: ${relative(project.paths.root, manifestPath)} cannot be read, and the release started (${start}): release changes nothing until the manifest is repaired.`);
+    }
+    const problem = previous && keptShapeProblem({ recorded: manifestShape(previous, kind), derived: shape, start });
+    if (problem) throw new ValidationError(`${project.config.slug}: ${problem}`);
+  }
   const writer = new ReleaseWriter(dir, project.paths.root, new Map((previous?.files ?? []).map((file) => [file.path, file])));
   const channel = await loadChannel(root);
   const limits = platformLimits(channel);
