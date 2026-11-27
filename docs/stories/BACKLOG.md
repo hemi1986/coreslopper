@@ -2,17 +2,11 @@
 
 > Generated from `docs/stories/ST-*.md` – **do not edit manually**. Change the story files instead.
 
-**Progress: 30 of 31 domain stories done** · scenarios 104 of 108
+**Progress: 31 of 31 domain stories done** · scenarios 108 of 108
 
-**59 stories** · In Progress: 1 · Ready: 8 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 50 · Superseded: 0
+**59 stories** · In Progress: 0 · Ready: 8 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 51 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
-
-## In Progress
-
-| ID | Title | Type | Context | Priority | Size | Risk | Depends on |
-|---|---|---|---|---|---|---|---|
-| [ST-049](ST-049-a-short-horizontal-episode-posts-its-vertical-version.md) | A horizontal episode of up to 3 minutes posts its vertical version as its one Short | domain | Release | should | – | – | ST-047 |
 
 ## Ready
 
@@ -79,5 +73,6 @@ Within each section: by priority, then by story ID, with dependencies pulled in 
 | [ST-040](ST-040-an-internal-calendar-books-no-slots.md) | An internal project's calendar books no slots | domain | Release | should | – | – | ST-036 |
 | [ST-041](ST-041-the-autopilot-leaves-an-internal-project-alone.md) | The autopilot leaves an internal project alone | domain | Publishing | should | – | – | ST-036 |
 | [ST-042](ST-042-an-internal-project-cannot-be-approved.md) | An internal project cannot be approved | domain | Release | should | – | – | ST-036 |
+| [ST-049](ST-049-a-short-horizontal-episode-posts-its-vertical-version.md) | A horizontal episode of up to 3 minutes posts its vertical version as its one Short | domain | Release | should | – | – | ST-047 |
 | [ST-018](ST-018-the-boards-sounds-view.md) | The board's Sounds view | task | – | could | – | – | ST-001, ST-002, ST-003, ST-006 |
 | [ST-019](ST-019-spike-tiktok-trending-audio.md) | Spike: can a meme use TikTok's trending audio? | spike | – | could | – | – | – |

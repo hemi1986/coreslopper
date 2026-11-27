@@ -49,8 +49,8 @@
       "role": "layer",
       "roleReasons": [
         "generic package name (@coreslopper/core)",
-        "21 concept stems in this package",
-        "12 shared with other packages"
+        "23 concept stems in this package",
+        "13 shared with other packages"
       ]
     },
     {
@@ -138,7 +138,7 @@
       "path": "packages/cli",
       "score": 0.61,
       "reasons": [
-        "472 changed files in recent history",
+        "456 changed files in recent history",
         "shared library",
         "shared infrastructure – not a domain slice"
       ]
@@ -170,7 +170,7 @@
       "path": "packages/core",
       "score": 0.03,
       "reasons": [
-        "124 changed files in recent history",
+        "122 changed files in recent history",
         "shared library",
         "layer package – hosts many concepts, not a domain slice"
       ]
@@ -179,7 +179,7 @@
       "path": "packages/providers",
       "score": 0.01,
       "reasons": [
-        "29 changed files in recent history",
+        "28 changed files in recent history",
         "shared library",
         "layer package – hosts many concepts, not a domain slice"
       ]
@@ -315,7 +315,9 @@
         "short",
         "story",
         "text",
-        "timer"
+        "timer",
+        "version",
+        "vertical"
       ],
       "tables": [],
       "files": [
@@ -354,6 +356,7 @@
         "tests/release-shape.test.ts",
         "tests/release-short-episode.test.ts",
         "tests/release-story-caption.test.ts",
+        "tests/release-vertical-version.test.ts",
         "tests/release-x-main.test.ts",
         "tests/release.test.ts"
       ],
@@ -371,7 +374,7 @@
       "reasons": [
         "3 layers: cli, core, tests",
         "3 packages",
-        "37 files"
+        "38 files"
       ],
       "adopted": true,
       "adoptedAt": "2026-11-22"
@@ -551,6 +554,35 @@
       ],
       "adopted": true,
       "adoptedAt": "2026-11-22"
+    },
+    {
+      "name": "short",
+      "terms": [
+        "form",
+        "short"
+      ],
+      "tables": [],
+      "files": [
+        "packages/cli/src/short.ts",
+        "packages/core/src/short-form.ts",
+        "tests/short-form.test.ts"
+      ],
+      "packages": [
+        "?",
+        "packages/cli",
+        "packages/core"
+      ],
+      "layers": [
+        "cli",
+        "core",
+        "tests"
+      ],
+      "score": 15,
+      "reasons": [
+        "3 layers: cli, core, tests",
+        "3 packages",
+        "3 files"
+      ]
     },
     {
       "name": "board",
