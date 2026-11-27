@@ -321,12 +321,18 @@ The workspace's local page (`board`; `release-board` is only an old alias of the
 _Avoid_: dashboard, studio, release board (one view of it)
 
 **Board View**:
-One view of the board, chosen by the address after `#`: the production view (the overview, a project, a series), a project's review and release views, the release calendar, the character library, the wizard, and the guide (the board guide and the other top-level pages of the workspace's `docs/`). A project's views are its tabs. The release view speaks the project's language, every other view the browser's.
+One view of the board, chosen by the address after `#`: the production view (the overview, a project, a series), the **Project List**, a project's review and release views, the release calendar, the character, set and sound libraries, the wizard, and the guide (the board guide and the other top-level pages of the workspace's `docs/`). A project's views are its tabs. The release view speaks the project's language, every other view the browser's.
 _Avoid_: page, screen, tab (only the switch between a project's views)
 
 **Board Navigation**:
-The board's left column: production, the release calendar, characters, **+ New**, the guide, then every project with its production phase and current stage (once done, its release day and done marks; a released one folds into **Released**) and every series with its episodes. A project whose files do not load shows its error instead of disappearing.
+The bar across the top of the board with its fixed entries in two groups – work (production, the **Project List**, the release calendar) and library (characters, sets, sounds) – and **+ New**, the guide and the refresh set apart. It lists no project and no series; those are in the project list.
 _Avoid_: sidebar, menu
+
+**Project List**:
+The board view that lists every music video, meme, episode and series, newest activity first, to find one and open it: searchable by title and slug, filterable by kind, state and series, and groupable by series, where a series shows its episodes with the planned ones. A project whose files do not load shows its error instead of disappearing.
+_UI (de)_: Projekte
+_UI (en)_: Projects
+_Avoid_: catalogue, overview (the production view), project browser
 
 **Write Guard**:
 The board's check on every request that is not a read: the board's loopback address, the board's own page as origin, and a JSON body (an upload: a raw file body that names its origin). It keeps any other web page in the browser from approving a release or changing a project.

@@ -2406,8 +2406,9 @@ commands:
     description: "A click in the board navigation or on a project's tab, or a link to #/…; the view loads its own data (app.js:60-73; lib.js:112-121)"
     rules:
       - The release view speaks the project's language, every other view the browser's; a text missing in German falls back to English (the code does this, lib.js:3-17; the user keeps it, 2026-11-22)
-      - The navigation lists every project and series, an unreadable one with its error instead of hiding it (the code does this, app.js:32-50; ADR 0030)
-      - Once the list grows, finished and released projects can be folded away without leaving the board (user, 2026-11-22, HS-245; the list is flat – gap register)
+      - The navigation lists no project and no series; its entries are fixed, in two groups – work (Production, Projects, Release calendar) and library (Characters, Sets, Sounds) – with New, Guide and Refresh set apart (user, 2026-11-27, feature board-redesign; replaces the project list of HS-245)
+      - The Projects view lists every project and series, an unreadable one with its error instead of hiding it (ADR 0030; moved from the navigation, user, 2026-11-27)
+      - The board is built for a desktop browser – a 1440 px wide window is the design size, and nothing needs horizontal scrolling down to 1280 px (user, 2026-11-27)
   - id: CMD-RefreshBoard
     name: Refresh the board
     actor: ACT-User
@@ -2668,10 +2669,10 @@ read_models:
     description: "storyboard.md, derived from storyboard.yaml (skill step 6); the board lists it as a production document"
   - id: RM-ContactSheet
     name: Contact sheet
-    fed_by: [EVT-ContactSheetWritten]
+    fed_by: [EVT-ContactSheetWritten, EVT-StoryboardValidated, EVT-AttemptFiled]
     used_by: [ACT-User]
     fields: [Shot, Source, Section, Start, End, Description, Text, Keyframe]
-    description: "review/contact-sheet.svg, embedded in the board's production view; the keyframe field is missing today (HS-71)"
+    description: "Target: a tab of the board's project page that builds the grid from the resolved storyboard and the keyframes in assets/keyframes/, so a keyframe shows as soon as it is filed; a shot without one shows its source instead (user, 2026-11-27, G-70). As-is: review/contact-sheet.svg of text cards, embedded in the production view, with no keyframe (HS-71)"
   - id: RM-Manifest
     name: Manifest
     fed_by: [EVT-GenerationCompleted, EVT-GenerationReused, EVT-GenerationFailed, EVT-ClipRestored]
@@ -2832,8 +2833,14 @@ read_models:
     name: Board navigation
     fed_by: [EVT-ProjectCreated, EVT-StageStarted, EVT-StageCompleted, EVT-StageFailed, EVT-ReleaseCalendarPlanned, EVT-CalendarEventMarkedDone, EVT-BoardRefreshed]
     used_by: [ACT-User]
-    fields: [Production, Release calendar, Characters, New, Project, Production phase, Current stage, Release day, Done of total, Series, Created of planned episodes, Error, Motto]
-    description: "The board's left column: the fixed entries, then every project with its production phase and current stage – or, once done, its release day and done marks – and every series with its created and planned episodes; the channel's motto at the top right (app.js:24-58,76-79; release-board.ts:412-433)"
+    fields: [Production, Projects, Release calendar, Characters, Sets, Sounds, New, Guide, Refresh, Motto]
+    description: "Target (user, 2026-11-27, feature board-redesign): a bar across the top with the fixed entries in two groups – work and library – and New, Guide and Refresh set apart; no project and no series. As-is the left column lists every project and series below the entries (app.js:24-58,76-79; release-board.ts:412-433)"
+  - id: RM-ProjectCatalogue
+    name: Project list
+    fed_by: [EVT-ProjectCreated, EVT-SeriesCreated, EVT-EpisodeCreated, EVT-StageStarted, EVT-StageCompleted, EVT-StageFailed, EVT-ReleaseCalendarPlanned, EVT-CalendarEventMarkedDone, EVT-BoardRefreshed]
+    used_by: [ACT-User]
+    fields: [Project, Kind, Series, Episode number, Planned episode, Production phase, Current stage, Next action, Release day, Done of total, Last activity, Error]
+    description: "The board's Projects view (#/projects): every music video, meme, episode and series as one row of a table, newest activity first; searchable by title and slug, filterable by kind, state and series, optionally grouped by series with the planned episodes; the search, the filters and the grouping live in the address (user, 2026-11-27, feature board-redesign)"
   - id: RM-BoardActivity
     name: Board activity
     fed_by: [EVT-StageStarted, EVT-StageCompleted, EVT-StageFailed]
@@ -4261,3 +4268,6 @@ flows:
   - id: FLOW-ShortEpisodeRelease
     name: From a short episode's upload data to its one video on every platform
     sequence: [ACT-StageRunner, CMD-WriteUploadData, EVT-UploadDataWritten, CMD-BuildReleasePackage, EVT-ReleaseCalendarPlanned, EVT-ReleasePackageBuilt, CMD-CheckRelease, EVT-ReleaseChecked, RM-ReleaseBoard, ACT-User, CMD-MarkCalendarEventDone, EVT-CalendarEventMarkedDone, CMD-RecordLiveUrl, EVT-LiveUrlRecorded, RM-MicrositeSong]
+  - id: FLOW-ProjectCatalogue
+    name: From the navigation to a project
+    sequence: [ACT-User, CMD-OpenBoardView, EVT-BoardViewOpened, RM-BoardNavigation, RM-ProjectCatalogue, RM-ProductionView, RM-ContactSheet]

@@ -29,7 +29,9 @@
 
 ## Constraints
 
-- [OPEN] Devices, connectivity, languages, legal, budget, deadlines, existing systems.
+- Devices: the board is used in a desktop browser on the computer it runs on. A 1440 px wide window is the design
+  size, and nothing needs horizontal scrolling down to 1280 px. There is no mobile layout (user, 2026-11-27).
+- [OPEN] Connectivity, languages, legal, budget, deadlines, existing systems.
 
 ## Domain in one paragraph
 
