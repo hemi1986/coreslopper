@@ -140,7 +140,7 @@ shorts:
       caption: "<the Reel's own hook and one line of context; no #shorts>"
       hashtags: ['#topic']           # at most 5, counting those in the caption
       cover_frame: 1.5               # second of the Reel with the hook visible
-      story: "<one line for the story with the link sticker>"
+      story: "<optional: at most 120 characters>"  # the caption of the release-day story; only the first Short's is used, and only while the story shows its video
     tiktok:
       caption: "<short, spoken-sounding, a question or a dare>"
       hashtags: ['#topic']
@@ -155,7 +155,7 @@ spotify:
   artist_pick: "<one line pinned on the artist profile>"
   pitch: "<at most 500 characters: mood, genre, instruments, story>"
 announcement:                      # a week before: Instagram story, YouTube post, X with the teaser
-  text: "<the release day and one line that makes people curious>"
+  text: "<the release day and one line that makes people curious>"  # with its hashtags at most 120 characters: it is also the story's caption
   hashtags: ['#topic']             # at most 5
   # image: { still: assets/image/keyframe/<hash>-0.png, focus: "0.5,0.35" }   # only when the cover has no recipe
 x:

@@ -217,7 +217,7 @@ const BOARD = {
     pinned: 'Angepinnter Kommentar',
     text: 'Text',
     caption: 'Caption',
-    story: 'Story-Text',
+    storyCaption: 'Bildunterschrift',
     post: 'Post',
     reply: 'Antwort mit Link',
     pitch: 'Pitch',
@@ -286,7 +286,7 @@ const BOARD = {
     pinned: 'Pinned comment',
     text: 'Text',
     caption: 'Caption',
-    story: 'Story text',
+    storyCaption: 'Caption',
     post: 'Post',
     reply: 'Reply with the link',
     pitch: 'Pitch',
@@ -411,19 +411,19 @@ export async function boardProject(projectRoot: string, root: string, options: {
       heading: heading('announce:instagram', l.announce.heading),
       at: at('announce:instagram'),
       files: files.announceStory ? [...file(b.announceStory, files.announceStory), ...file(b.teaserFile, files.teaser)] : file(b.cover, files.cover),
-      fields: field(b.story, planValue('announce:instagram', 'story')),
+      fields: field(b.storyCaption, planValue('announce:instagram', 'caption'), limitOf('announce:instagram', 'caption')),
       checklist: [],
       url: false,
     });
   }
-  const firstStory = meme ? undefined : planValue('story', 'story');
+  const firstStory = meme ? undefined : planValue('story', 'caption');
   if (!meme) {
     instagramPosts.push({
       id: 'story',
       heading: heading('story', l.ig.story),
       at: at('story'),
       files: [...(files.story ? file(b.storyImage, files.story) : file(b.thumb, files.shorts[0]?.thumbnail)), ...file(b.video, files.shorts[0]?.video)],
-      fields: field(b.story, firstStory),
+      fields: field(b.storyCaption, firstStory, limitOf('story', 'caption')),
       checklist: checklist('story', [b.sticker]),
       pointer: videoUrl,
     });

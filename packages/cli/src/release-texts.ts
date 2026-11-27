@@ -59,6 +59,7 @@ interface Labels {
     cover: (seconds?: number) => string;
     aiLabel: string;
     story: string;
+    storyCaption: string;
     sticker: string;
     post: string;
     postImage: string;
@@ -144,6 +145,7 @@ const EN: Labels = {
     cover: (seconds) => (seconds !== undefined ? `Cover frame: ${seconds.toFixed(1)} s into the Reel` : 'Cover frame: pick one with the hook visible'),
     aiLabel: 'Turn on "AI info" (made with AI) under Advanced settings',
     story: 'Story',
+    storyCaption: 'Caption',
     sticker: 'Add a link sticker to the YouTube video (or the Spotify link after release)',
     post: 'Feed post for the release',
     postImage: 'Image: the streaming cover or thumbnail 1',
@@ -323,6 +325,7 @@ const DE: Labels = {
     cover: (seconds) => (seconds !== undefined ? `Titelbild: ${seconds.toFixed(1)} s ins Reel` : 'Titelbild: ein Frame mit sichtbarem Hook'),
     aiLabel: '„KI-Info“ (Mit KI erstellt) unter Erweiterte Einstellungen einschalten',
     story: 'Story',
+    storyCaption: 'Bildunterschrift',
     sticker: 'Link-Sticker zum YouTube-Video setzen (nach dem Release: Spotify-Link)',
     post: 'Feed-Post zum Release',
     postImage: 'Bild: das Streaming-Cover oder Thumbnail 1',
@@ -576,8 +579,16 @@ function shortsText(plan: ReleasePlan, input: ReleaseTextInput, l: Labels): stri
 function instagramText(plan: ReleasePlan, input: ReleaseTextInput, l: Labels): string {
   const lines = [`# ${l.ig.heading}`, ''];
   const youtube = channelLinkOf(input.channel, 'youtube', l);
-  const announcement = postOf(plan, 'announce:instagram')?.texts.story;
-  if (announcement) lines.push(`## ${l.announce.heading} (${l.ig.story})`, '', announceImageLine(input, l), '', ...block(display(announcement.value, l)), '');
+  const announcement = postOf(plan, 'announce:instagram');
+  if (announcement) {
+    const caption = announcement.texts.caption;
+    lines.push(`## ${l.announce.heading} (${l.ig.story})`, '', announceImageLine(input, l), '');
+    if (caption) lines.push(`### ${l.ig.storyCaption} (${counter(caption, l, input.limits.instagram.story_caption)})`, '', ...block(display(caption.value, l)), '');
+  }
+  const storyCaption = postOf(plan, 'story')?.texts.caption;
+  if (storyCaption) {
+    lines.push(`## ${l.ig.story}`, '', `### ${l.ig.storyCaption} (${counter(storyCaption, l, input.limits.instagram.story_caption)})`, '', ...block(display(storyCaption.value, l)), '');
+  }
   for (const post of postsOf(plan, 'instagram')) {
     const name = shortNameOf(post.id);
     if (!name) continue;
@@ -586,7 +597,6 @@ function instagramText(plan: ReleasePlan, input: ReleaseTextInput, l: Labels): s
     const caption = post.texts.caption;
     const note = hashtagNote(caption, l);
     lines.push(`### ${l.ig.caption} (${counter(caption, l, input.limits.instagram.caption)}${note ? `, ${note}` : ''})`, '', ...block(caption ? display(caption.value, l) : l.todo(`shorts.${name}.instagram in review/upload.yaml`)), '');
-    lines.push(`### ${l.ig.story}`, '', ...block(post.texts.story ? display(post.texts.story.value, l) : l.todo(`shorts.${name}.instagram.story`)), '');
     lines.push(`### ${l.checklist}`, '', checkbox(l.ig.cover(post.coverFrame)));
     if (plan.settings.instagramAiLabel) lines.push(checkbox(l.ig.aiLabel));
     lines.push(checkbox(youtube ? `${l.ig.sticker} — ${youtube}` : l.ig.sticker), '');

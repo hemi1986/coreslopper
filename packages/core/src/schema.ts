@@ -900,13 +900,14 @@ export const UploadShortSchema = z.object({
   /** The video this Short points to; YouTube's "related video" is set by hand. */
   related: z.literal('main').default('main'),
   platforms: z.array(PublishPlatformSchema).min(1).default(['youtube', 'tiktok']),
-  /** The Short as an Instagram Reel: its own caption, at most five hashtags, the cover frame, and a story text. */
+  /** The Short as an Instagram Reel: its own caption, at most five hashtags, the cover frame, and the caption of the release-day story when it shows this Short. */
   instagram: z
     .object({
       caption: z.string().min(1),
       hashtags: z.array(HashtagSchema).default([]),
       /** Second of the Short shown as the Reel cover. */
       cover_frame: z.number().nonnegative().optional(),
+      /** The caption of the release-day story when it shows this Short's video (the first Short); at most 120 characters, optional. */
       story: z.string().min(1).optional(),
     })
     .optional(),
@@ -1252,8 +1253,12 @@ export const PublishLogSchema = z.object({
  */
 export const PLATFORM_LIMITS = {
   youtube: { title: 100, description_bytes: 5000, tags: 500, hashtags: 15 },
-  /** Instagram allows five hashtags per post and Reel since December 2025. */
-  instagram: { caption: 2200, hashtags: 5 },
+  /**
+   * Instagram allows five hashtags per post and Reel since December 2025. A
+   * story has no text field; the caption added to a story's video takes 120
+   * characters in the app (HS-267).
+   */
+  instagram: { caption: 2200, hashtags: 5, story_caption: 120 },
   /** TikTok's caption limit for an upload through its API; the app allows more. */
   tiktok: { caption: 2200, hashtags: 10 },
   /** Spotify for Artists: the editorial pitch. */
