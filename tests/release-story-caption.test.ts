@@ -129,3 +129,23 @@ describe('an image story', () => {
     expect(post(moved, 'announce:instagram').texts.caption).toBeUndefined();
   });
 });
+
+describe('the caption on the board and in the folder', () => {
+  it('shows the caption as "Bildunterschrift" with its counter, and in texts/instagram.md', async () => {
+    const dir = await fixture();
+    const result = await buildRelease({ projectDir: dir, deps: fakeDeps() });
+
+    const board = await boardProject(dir, join(dir, '..', '..'));
+    const instagram = board.platforms.find((platform) => platform.id === 'instagram')!;
+    const story = instagram.posts.find((entry) => entry.id === 'story')!;
+    expect(story.fields).toEqual([{ label: 'Bildunterschrift', value: 'Neu: Teil 1', limit: 120, unit: 'chars' }]);
+    const announce = instagram.posts.find((entry) => entry.id === 'announce:instagram')!;
+    expect(announce.fields).toEqual([{ label: 'Bildunterschrift', value: 'Freitag: Neon Rain.\n\n#synthwave', limit: 120, unit: 'chars' }]);
+    const reel = instagram.posts.find((entry) => entry.id === 'short:Z1-intro:instagram')!;
+    expect(reel.fields.map((field) => field.label)).not.toContain('Bildunterschrift');
+
+    const text = await readFile(join(result.dir, 'texts', 'instagram.md'), 'utf8');
+    expect(text).toContain('### Bildunterschrift (11/120 Zeichen)\n\n```text\nNeu: Teil 1\n```');
+    expect(text).not.toContain('shorts.Z1-intro.instagram.story');
+  });
+});
