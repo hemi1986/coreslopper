@@ -658,7 +658,7 @@ export async function autopilotView(facts: ReleaseFacts, options: { now?: Date; 
   if (!facts.calendar) blockers.push('no release calendar yet: run release');
   const log = await loadAutopilotLog(facts.project.paths.root);
   const plans = facts.calendar
-    ? planAutopilot({ calendar: facts.calendar, status: facts.status, log, settings, now, ready, premiere: facts.input.premiere })
+    ? planAutopilot({ calendar: facts.calendar, status: facts.status, log, settings, now, ready, premiere: facts.input.premiere, plan: facts.plan })
     : [];
   const events: Record<string, BoardAutopilotEvent> = {};
   for (const plan of plans) {

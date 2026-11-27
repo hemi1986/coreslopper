@@ -99,6 +99,17 @@ describe('autopilot plan', () => {
     expect(plan(atRelease, live).get('x')!.state).toBe('due');
   });
 
+  it('posts an X release post without a reply without waiting for the main video', () => {
+    const atRelease = '2026-12-11T17:05:00Z';
+    const post = (needsYoutube?: boolean) => ({ id: 'x', platform: 'x' as const, task: false, texts: {}, files: [], errors: [], missing: [], ...(needsYoutube ? { needsYoutube } : {}) });
+    // Without a reply the plan's post carries no link: it is due, with no YouTube URL yet.
+    expect(plan(atRelease, approved, emptyLog, { plan: { posts: [post()] } }).get('x')!.state).toBe('due');
+    // With the reply it still waits; so does LinkedIn, which the plan here does not name.
+    expect(plan(atRelease, approved, emptyLog, { plan: { posts: [post(true)] } }).get('x')!).toMatchObject({ state: 'blocked', block: 'youtube' });
+    const linkedinAt = calendar.events.find((event) => event.id === 'linkedin')!.at;
+    expect(plan(new Date(Date.parse(linkedinAt) + 60_000).toISOString(), approved, emptyLog, { plan: { posts: [post()] } }).get('linkedin')!).toMatchObject({ state: 'blocked', block: 'youtube' });
+  });
+
   it('waits for the user on a private upload, a premiere, and a draft', () => {
     const log: AutopilotLog = {
       version: 1,
