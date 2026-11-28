@@ -4,6 +4,7 @@
 //                       its + New opens the character wizard (#/new/character, character-wizard.js)
 //   #/characters/<id>   one character: files, states, where it is used, use it
 import { addStrings, api, el, go, pending, post, setLang, showError, t, upload } from './lib.js';
+import { librarySelection } from './library-selection.js';
 import { allTags, anyLibraryFilter, defaultDir, libraryListHash, matchesLibraryItem, parseLibraryListState, queryOf, sortLibraryItems, toggleValue, writeListHash } from './list-state.js';
 
 addStrings({
@@ -188,16 +189,18 @@ function header() {
       setState(next, false);
     } }, [cols[col] + (on ? (view.state.dir === 'asc' ? ' ▲' : ' ▼') : '')]);
   };
-  return el('thead', {}, [el('tr', {}, [th(''), th('name', true), th('face'), th('tags'), th('images', true), th('voice'), th('used', true), th('origin', true)])]);
+  return el('thead', {}, [el('tr', {}, [view.selection.head(), th(''), th('name', true), th('face'), th('tags'), th('images', true), th('voice'), th('used', true), th('origin', true)])]);
 }
 
 function row(item) {
   if (item.error) return el('tr', { class: 'pl-error', 'data-id': item.id }, [
+    view.selection.cell(item),
     el('td', {}, [el('div', { class: 'lib-cover placeholder', text: '!' })]), el('td', {}, [el('b', { text: item.id })]),
     el('td', { colspan: '6', class: 'error', text: item.error })
   ]);
   const entry = item.entry;
   return el('tr', { class: 'link-row', 'data-id': item.id, onclick: function () { go(item.href); } }, [
+    view.selection.cell(item),
     el('td', {}, [cover(entry, 'lib-cover')]),
     el('td', {}, [el('b', { text: entry.name }), el('span', { class: 'sub', text: entry.id })]),
     el('td', { text: t('faces')[entry.face] || entry.face }),
@@ -216,11 +219,14 @@ function drawResults() {
   view.reset.innerHTML = '';
   if (anyLibraryFilter(view.state)) view.reset.appendChild(resetButton('small'));
   const rows = characterRows(view.list, view.state);
+  view.selection.keep(rows);
   if (!rows.length) {
     results.appendChild(el('div', { class: 'empty cl-nomatch' }, [el('p', { text: t('clNoMatch') }), resetButton('primary')]));
     return;
   }
   results.appendChild(el('p', { class: 'sub pl-count', text: t('clCount')(rows.length, view.list.items.length + view.list.errors.length) }));
+  const bar = view.selection.bar();
+  if (bar) results.appendChild(bar);
   results.appendChild(el('table', { class: 'list pl-table cl-table' }, [header(), el('tbody', {}, rows.map(row))]));
 }
 
@@ -243,9 +249,31 @@ function drawList() {
   }
 }
 
+/** Where a character is used, as the delete confirmation names it: the production's title, else its slug. */
+function usesOf(item) {
+  const targets = view.data.targets || [];
+  return item.entry.usedIn.map(function (use) {
+    const target = targets.filter(function (x) { return x.scope === use.scope && x.slug === use.slug; })[0];
+    return target ? target.title : use.slug;
+  });
+}
+
+/** Load the list again with its state and selection, after a delete of selected rows. */
+function reload() {
+  return load().then(function (data) {
+    view.data = data;
+    view.list = characterItems(data);
+    drawList();
+  });
+}
+
 function useData(data, state) {
   const list = characterItems(data);
-  view = { data: data, list: list, state: state, results: null, reset: null };
+  view = { data: data, list: list, state: state, results: null, reset: null, selection: null };
+  view.selection = librarySelection({
+    remove: function (id) { return post('/api/library/' + encodeURIComponent(id), { action: 'delete' }); },
+    uses: usesOf, keep: 'projects', reload: reload, redraw: function () { drawResults(); }
+  });
 }
 
 function gallery() {

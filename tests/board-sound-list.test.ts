@@ -137,15 +137,17 @@ const bodyRows = () => find((e) => e.tagName === 'TBODY')[0]?.children ?? [];
 const rowIds = () => bodyRows().map((r) => r.getAttribute('data-id'));
 const header = (text: string) => find((e) => e.tagName === 'TH' && e.text().startsWith(text))[0]!;
 const rowOf = (id: string) => bodyRows().find((r) => r.getAttribute('data-id') === id)!;
-const playButton = (id: string) => rowOf(id).children[0]!.children[0]!;
+// The first cell is the selection's checkbox (ST-063), the second the play button.
+const playButton = (id: string) => rowOf(id).children[1]!.children[0]!;
 const audio = () => find((e) => e.tagName === 'AUDIO')[0]!;
 
 describe('the Sounds list', () => {
   it('shows every library sound of a fixture workspace by title, with length, licence, tags and used-in count', async () => {
     await open('#/sounds');
     expect(rowIds()).toEqual(['clap-track', 'record-scratch', 'sting', 'vine-boom', 'broken']);
-    expect(find((e) => e.tagName === 'TH').map((e) => e.text())).toEqual(['', 'Title ▲', 'Use when', 'Length', 'Licence', 'Tags', 'Used in']);
-    const cells = (id: string) => rowOf(id).children;
+    expect(find((e) => e.tagName === 'TH').map((e) => e.text())).toEqual(['', '', 'Title ▲', 'Use when', 'Length', 'Licence', 'Tags', 'Used in']);
+    // The first cell of a row is the selection's checkbox (ST-063).
+    const cells = (id: string) => rowOf(id).children.slice(1);
     expect(cells('vine-boom').slice(1).map((c) => c.text())).toEqual(['Vine Boomvine-boom', 'a dramatic reveal', '1.4 s', 'unknown', '#reveal #impact', '1']);
     // The length is the trimmed one.
     expect(cells('clap-track').slice(3).map((c) => c.text())).toEqual(['2 s', 'CC0', '#crowd', '0']);

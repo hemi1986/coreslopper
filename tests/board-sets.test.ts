@@ -146,8 +146,9 @@ describe('the Sets list', () => {
   it('shows every library set of a fixture workspace by name, with cover, tags, reference/plate counts, used-in count and origin', async () => {
     await open('#/sets');
     expect(rowNames()).toEqual(['attic', 'forest-hut', 'neon-bar', 'rooftop', 'broken']);
-    expect(find((e) => e.tagName === 'TH').map((e) => e.text())).toEqual(['', 'Name ▲', 'Tags', 'References', 'Plates', 'Used in', 'Origin']);
-    const cells = (id: string) => bodyRows().find((r) => r.getAttribute('data-id') === id)!.children;
+    expect(find((e) => e.tagName === 'TH').map((e) => e.text())).toEqual(['', '', 'Name ▲', 'Tags', 'References', 'Plates', 'Used in', 'Origin']);
+    // The first cell of a row is the selection's checkbox (ST-063).
+    const cells = (id: string) => bodyRows().find((r) => r.getAttribute('data-id') === id)!.children.slice(1);
     // The cover is the first plate, else the first reference, else a placeholder.
     const bar = cells('neon-bar');
     expect(entry('neon-bar').cover).toBe('counter.png');
