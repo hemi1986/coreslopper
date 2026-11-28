@@ -35,7 +35,9 @@ export interface NextAction {
     | 'internal-done'
     | 'canon'
     | 'episode'
-    | 'series-done';
+    | 'series-done'
+    /** A demo production (`demo: true` in its own project.yaml or series.yaml): nothing to do. */
+    | 'demo';
   /** The stage the reason refers to. */
   stage?: string;
 }
@@ -86,6 +88,8 @@ export interface ProductionFacts {
   openRounds?: number;
   /** `distribution: internal`: never released publicly, so finished once every stage is done. */
   internal?: boolean;
+  /** `demo: true` in the project's own project.yaml: a demo production has no next action. */
+  demo?: boolean;
 }
 
 export function productionPhase(stages: StageView[]): ProductionPhase {
@@ -103,9 +107,11 @@ export function productionPhase(stages: StageView[]): ProductionPhase {
  * round first; a finished project goes to the release. A finished project
  * without a release folder is `/video-next` too: it resets qa-export, whose
  * output the folder is, and builds it again (HS-13). An internal project has
- * no release folder and ends there.
+ * no release folder and ends there. A demo production has no next action at
+ * all, before every other rule.
  */
 export function projectNextAction(facts: ProductionFacts): NextAction {
+  if (facts.demo) return { where: 'none', reason: 'demo' };
   const running = facts.stages.find((stage) => stage.status === 'running');
   if (running) return { where: 'none', reason: 'running', stage: running.id };
   const open = facts.stages.find((stage) => stage.status === 'pending' || stage.status === 'failed');
@@ -123,10 +129,13 @@ export interface SeriesFacts {
   canonReady: boolean;
   /** Planned episodes without a project, in plan order. */
   unplanned: number[];
+  /** `demo: true` in the series' own series.yaml: a demo production has no next action. */
+  demo?: boolean;
 }
 
 /** The next step of a series: finish the canon, then create the next planned episode. */
 export function seriesNextAction(facts: SeriesFacts): NextAction {
+  if (facts.demo) return { where: 'none', reason: 'demo' };
   if (!facts.canonReady) return { where: 'claude', command: `/new-series ${facts.slug}`, reason: 'canon' };
   if (facts.unplanned.length) return { where: 'claude', command: '/new-episode', reason: 'episode' };
   return { where: 'none', reason: 'series-done' };

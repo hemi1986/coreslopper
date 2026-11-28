@@ -15,7 +15,10 @@ afterEach(async () => {
   await Promise.all(temporary.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
 });
 
-/** A workspace with a copy of the demo project (timing, storyboard, style) and one placeholder render. */
+/**
+ * A workspace with a copy of the demo project (timing, storyboard, style) and one placeholder render. The copy is a
+ * real project: its `demo: true` is removed, since a demo production has no next action (ST-067).
+ */
 async function demo(): Promise<{ ws: string; dir: string }> {
   const ws = await mkdtemp(join(tmpdir(), 'coreslopper-review-'));
   temporary.push(ws);
@@ -26,6 +29,8 @@ async function demo(): Promise<{ ws: string; dir: string }> {
     recursive: true,
     filter: (source) => !/[/\\](renders|assets|audio|review)([/\\]|$)/.test(source.slice(join(root, 'projects', 'demo').length)),
   });
+  const config = join(dir, 'project.yaml');
+  await writeFile(config, (await readFile(config, 'utf8')).replace(/^demo: true\n/m, ''));
   await mkdir(join(dir, 'renders'), { recursive: true });
   await writeFile(join(dir, 'renders', '16x9.mp4'), 'video');
   return { ws, dir };

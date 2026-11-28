@@ -72,13 +72,17 @@ async function appendEvents(root: string, events: WatchEvent[]): Promise<void> {
   if (lines.length > 2 * KEEP_EVENTS) await writeTextAtomic(eventsPath(root), `${lines.slice(-KEEP_EVENTS).join('\n')}\n`);
 }
 
-/** One production round: a snapshot of every project, and the events since the last round. */
+/**
+ * One production round: a snapshot of every project, and the events since the last round. A demo production is
+ * left out of the snapshot, so it never produces an event or a stall warning.
+ */
 export async function scanProduction(options: { root: string; now?: Date; every?: number; watch?: Partial<WatchOptions> }): Promise<{ snapshot: WatchSnapshot; events: WatchEvent[] }> {
   const now = options.now ?? new Date();
   const watch = { ...DEFAULT_WATCH_OPTIONS, ...options.watch };
   const projects: Record<string, ProjectPulse> = {};
   for (const dir of await projectDirs(options.root)) {
     const project = await productionProject(dir);
+    if (!('error' in project) && project.demo) continue;
     projects[project.slug] =
       'error' in project
         ? { phase: 'failed', failed: [], renders: {}, progress: [], needsFix: 0, spentShare: 0, stalled: false, error: project.error }
