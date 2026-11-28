@@ -40,8 +40,13 @@ Navigation is a bar across the top with fixed entries only, in two groups: work 
 
 ## Patterns
 
+## G10 – Everything that creates something starts at + New
+Every new item – a music video, series, episode, meme, or a library character, set or sound – is created through a wizard reached from + New (`#/new`), whose chooser groups Production (video, series, episode, meme) and Library (character, set, sound). A list has a "+ Neu" button that opens its wizard directly, never an inline creation form. Importing characters or sets from a production is a path inside the character/set wizard. Wizards create the item in their first step and stay resumable by address (`#/new/<kind>/<id>`); the last step leads to the new item. (2026-11-28 – one place and one pattern for creating anything; feature `asset-library`)
+
 ## G4 – Many records are a dense, sortable table
 A list of many records (the project list) is a dense table, sortable by clicking its column headers, newest activity first by default; cards are used only where the item is visual (e.g. contact sheet shots). (2026-11-27 – a table scans and compares faster than cards; prototype verdict list A)
+
+Amended 2026-11-28 (feature `asset-library`): the library lists (Characters, Sets, Sounds) are dense, sortable tables too, like the project list. For visual items (characters, sets) the row carries a small cover thumbnail (about 48 px) instead of switching to cards. Cards stay only for items whose image is the content being judged (e.g. contact-sheet shots). (2026-11-28 – one list pattern across the board is easier to learn; a thumbnail is enough to recognise a character or set; the detail page shows the large images)
 
 ## G5 – List state lives in the address hash
 A list's search, filters and grouping live in the address hash (e.g. `#/projects?series=x&group=series`), so refresh, back and links keep them. (2026-11-27 – the view survives refresh and can be shared; prototype `prototype/board-redesign`)

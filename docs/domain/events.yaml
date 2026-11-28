@@ -2713,13 +2713,13 @@ read_models:
     fed_by: [EVT-LibraryCharacterCreated, EVT-LibraryCharacterExtended, EVT-LibraryCharacterUpdated, EVT-LibraryFileAdded, EVT-LibraryFileRemoved, EVT-LibraryCharacterDeleted, EVT-LibraryCharacterUsed]
     used_by: [ACT-User, ACT-SetupSkill, ACT-StageRunner]
     fields: [Library character, Name, Cover, Character sheet, References, Reference voice, Character states, Tags, Origin, History, Used in, Targets]
-    description: "character list and the board's Characters view (packages/cli/src/character-library.ts:69-112,538-547; packages/cli/src/board/characters.js); used in lists the productions whose characters.yaml names the entry in library"
+    description: "character list and the board's Characters view (packages/cli/src/character-library.ts:69-112,538-547; packages/cli/src/board/characters.js); used in lists the productions whose characters.yaml names the entry in library. The board's Characters view (#/characters) is a table like the project list: a cover per row, searchable by name, description and tags, filterable by tag, unused and origin, sortable by its column headers, name first by default; search, filters and sort live in the address (user, 2026-11-28, feature asset-library)"
   - id: RM-SetLibrary
     name: Set library
     fed_by: [EVT-LibrarySetCreated, EVT-LibrarySetExtended, EVT-LibrarySetUpdated, EVT-LibrarySetFileAdded, EVT-LibrarySetFileRemoved, EVT-LibrarySetDeleted, EVT-LibrarySetUsed]
     used_by: [ACT-User, ACT-SetupSkill, ACT-StageRunner]
     fields: [Library set, Name, Cover, Description, Prompt, References, Plates, Tags, Origin, History, Used in, Targets]
-    description: "set list and the board's Sets view; the cover is the first plate, else the first reference; used in lists the productions whose sets.yaml names the entry in library"
+    description: "set list and the board's Sets view; the cover is the first plate, else the first reference; used in lists the productions whose sets.yaml names the entry in library. The board's Sets view (#/sets) is a table like the project list: a cover per row, searchable by name, description and tags, filterable by tag, unused and origin, sortable by its column headers, name first by default; search, filters and sort live in the address (user, 2026-11-28, feature asset-library)"
   - id: RM-UserReferences
     name: User references
     fed_by: [EVT-UserReferenceAdded, EVT-UserReferenceUpdated, EVT-UserReferenceRemoved]
@@ -2852,7 +2852,7 @@ read_models:
     fed_by: [EVT-LibrarySoundAdded, EVT-LibrarySoundUpdated, EVT-LibrarySoundRemeasured, EVT-LibrarySoundRemoved]
     used_by: [ACT-User, ACT-SetupSkill]
     fields: [Library sound, Title, Use when, Tags, Length, Loudness, Sound cue, Trim, Licence, Used in]
-    description: "sound list [--tag] [--json]; the new-meme skill reads it to propose one to three candidates per moment of the script; used in lists the memes whose takes came from the sound"
+    description: "sound list [--tag] [--json]; the new-meme skill reads it to propose one to three candidates per moment of the script; used in lists the memes whose takes came from the sound. The board's Sounds view (#/sounds) is a table like the project list with a play button per row, searchable by title, use-when and tags, filterable by tag, unused and licence, sortable by its column headers, title first by default; search, filters and sort live in the address (user, 2026-11-28, feature asset-library)"
 
 hotspots:
   - id: HS-1
@@ -4271,3 +4271,7 @@ flows:
   - id: FLOW-ProjectCatalogue
     name: From the navigation to a project
     sequence: [ACT-User, CMD-OpenBoardView, EVT-BoardViewOpened, RM-BoardNavigation, RM-ProjectCatalogue, RM-ProductionView, RM-ContactSheet]
+  - id: FLOW-LibraryManagement
+    name: From + New or a library list to a library character, set or sound, and back out again
+    description: "The board's library wizards (#/new/character, #/new/set, #/new/sound) create the entry in their first step and add its files in the next ones; the character and set wizards can import from a production instead. The library lists find, filter and delete several entries at once; each deletion is the existing single delete, one after the other, after one confirmation that names where each entry is used (user, 2026-11-28, feature asset-library)"
+    sequence: [ACT-User, CMD-OpenBoardView, EVT-BoardViewOpened, CMD-AddLibraryCharacter, EVT-LibraryCharacterCreated, CMD-AddLibraryFile, EVT-LibraryFileAdded, CMD-ImportCharacters, CMD-AddLibrarySet, EVT-LibrarySetCreated, CMD-AddLibrarySetFile, EVT-LibrarySetFileAdded, CMD-ImportSets, CMD-AddLibrarySound, EVT-LibrarySoundAdded, CMD-UpdateLibrarySound, EVT-LibrarySoundUpdated, RM-CharacterLibrary, RM-SetLibrary, RM-SoundLibrary, CMD-DeleteLibraryCharacter, EVT-LibraryCharacterDeleted, CMD-DeleteLibrarySet, EVT-LibrarySetDeleted, CMD-RemoveLibrarySound, EVT-LibrarySoundRemoved]
