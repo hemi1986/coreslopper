@@ -138,7 +138,7 @@
       "path": "packages/cli",
       "score": 0.61,
       "reasons": [
-        "360 changed files in recent history",
+        "359 changed files in recent history",
         "shared library",
         "shared infrastructure – not a domain slice"
       ]
@@ -170,7 +170,7 @@
       "path": "packages/core",
       "score": 0.03,
       "reasons": [
-        "96 changed files in recent history",
+        "94 changed files in recent history",
         "shared library",
         "layer package – hosts many concepts, not a domain slice"
       ]
@@ -661,6 +661,7 @@
         "tests/board-review.test.ts",
         "tests/board-sets.test.ts",
         "tests/board-shell-characterization.test.ts",
+        "tests/board-sound-list.test.ts",
         "tests/board-sounds.test.ts",
         "tests/board-watch.test.ts",
         "tests/board-wizard.test.ts"
@@ -677,7 +678,7 @@
       "reasons": [
         "2 layers: cli, tests",
         "2 packages",
-        "19 files"
+        "20 files"
       ],
       "adopted": true,
       "adoptedAt": "2026-11-22"
