@@ -16,7 +16,7 @@ addStrings({
     plEpisode: function (n, series) { return 'Folge ' + n + (series ? ' · ' + series : ''); },
     plEpisodes: function (made, all) { return made + '/' + all + ' Folgen angelegt'; },
     plCount: function (n, all) { return n + ' von ' + all; },
-    plNext: { release: 'Release freigeben', released: 'Der Autopilot postet', running: 'Läuft – nichts zu tun', 'internal-done': 'Fertig – nicht öffentlich', 'series-done': 'Alle Folgen angelegt' }
+    plNext: { release: 'Release freigeben', released: 'Der Autopilot postet', running: 'Läuft – nichts zu tun', 'internal-done': 'Fertig – nicht öffentlich', 'series-done': 'Alle Folgen angelegt', demo: 'Demo – nichts zu tun' }
   },
   en: {
     plTitle: 'Projects', plEmpty: 'No projects yet', plNew: '+ New', plNoMatch: 'No project matches these filters', plReset: 'Reset filters',
@@ -29,7 +29,7 @@ addStrings({
     plEpisode: function (n, series) { return 'Episode ' + n + (series ? ' · ' + series : ''); },
     plEpisodes: function (made, all) { return made + '/' + all + ' episodes created'; },
     plCount: function (n, all) { return n + ' of ' + all; },
-    plNext: { release: 'Approve the release', released: 'The autopilot posts', running: 'Running – nothing to do', 'internal-done': 'Done – not released publicly', 'series-done': 'Every planned episode exists' }
+    plNext: { release: 'Approve the release', released: 'The autopilot posts', running: 'Running – nothing to do', 'internal-done': 'Done – not released publicly', 'series-done': 'Every planned episode exists', demo: 'Demo – nothing to do' }
   }
 });
 

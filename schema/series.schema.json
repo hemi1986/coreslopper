@@ -18,6 +18,9 @@
     "description": {
       "type": "string"
     },
+    "demo": {
+      "type": "boolean"
+    },
     "formats": {
       "type": "object",
       "properties": {

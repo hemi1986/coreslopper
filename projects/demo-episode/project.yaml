@@ -4,6 +4,7 @@ kind: episode
 series: demo-series
 episode: 1
 title: After Midnight
+demo: true
 created: "2026-11-10T12:00:00.000Z"
 workflow:
   version: 0.5.0

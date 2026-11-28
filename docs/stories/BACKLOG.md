@@ -4,15 +4,20 @@
 
 **Progress: 31 of 32 domain stories done** · scenarios 108 of 112
 
-**69 stories** · In Progress: 0 · Ready: 3 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 66 · Superseded: 0
+**69 stories** · In Progress: 1 · Ready: 2 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 66 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
+
+## In Progress
+
+| ID | Title | Type | Context | Priority | Size | Risk | Depends on |
+|---|---|---|---|---|---|---|---|
+| [ST-067](ST-067-demo-productions-make-no-work.md) | Demo productions are marked and make no work | task | – | should | – | – | – |
 
 ## Ready
 
 | ID | Title | Type | Context | Priority | Size | Risk | Depends on |
 |---|---|---|---|---|---|---|---|
-| [ST-067](ST-067-demo-productions-make-no-work.md) | Demo productions are marked and make no work | task | – | should | – | – | – |
 | [ST-068](ST-068-a-demo-production-is-not-released.md) | A demo production is not released | domain | Release | should | – | – | ST-067 |
 | [ST-069](ST-069-the-board-hides-demo-productions.md) | The board hides demo productions unless Show demos is on | task | – | should | – | – | ST-067 |
 

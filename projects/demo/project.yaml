@@ -1,6 +1,7 @@
 version: 1
 slug: demo
 title: Neon Rain
+demo: true
 created: "2026-11-08T12:00:00.000Z"
 workflow:
   version: 0.1.0
