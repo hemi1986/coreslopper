@@ -554,7 +554,8 @@ song, the effective timing, the `release:` block of `project.yaml`, `config/chan
 
 **Not part of it**: errors and warnings of a run (printed, not stored). **Derived**: `review/upload.md`
 (EVT-UploadTextRendered), the release checks in `review/report.md` (EVT-ReleaseChecked), the microsite data
-(RM-MicrositeSong, no schema yet – HS-178).
+(RM-MicrositeSong, `MicrositeSongSchema` version 1 in core, `schema/microsite-song.schema.json`; an optional
+`aspect`, the master's – HS-178, ST-054).
 
 ### AGG-ReleaseCalendar – Release calendar (as-is)
 

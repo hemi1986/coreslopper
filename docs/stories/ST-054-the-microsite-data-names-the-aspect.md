@@ -10,7 +10,7 @@ depends_on: [ST-048]
 labels: [feature:platform-formats]
 feature: platform-formats
 sources: [docs/research/platform-video-formats.md]
-status: ready
+status: in-progress
 ---
 
 ## Task
@@ -22,6 +22,6 @@ a published language with a versioned schema, ADR 0045) gives no format. Decided
 - Its image is the short episode's cover instead of the first thumbnail.
 
 ## Acceptance Criteria
-- [ ] A short episode's microsite data has `aspect: "9:16"` and the cover as its image (test)
-- [ ] A music video's microsite data has `aspect: "16:9"` (test)
-- [ ] Microsite data without `aspect` still validates (test)
+- [x] A short episode's microsite data has `aspect: "9:16"` and the cover as its image (test)
+- [x] A music video's microsite data has `aspect: "16:9"` (test)
+- [x] Microsite data without `aspect` still validates (test)
