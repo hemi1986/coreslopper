@@ -46,13 +46,13 @@ Files that share a concept stem or a table across layers. These are suggestions 
 | media | cli, remotion, tests | 4 | – | 3 layers: cli, remotion, tests; 3 packages; 4 files | yes |
 | state | cli, core, tests | 4 | – | 3 layers: cli, core, tests; 3 packages; 4 files | – |
 | short | cli, core, tests | 3 | – | 3 layers: cli, core, tests; 3 packages; 3 files | – |
-| board | cli, tests | 22 | – | 2 layers: cli, tests; 2 packages; 22 files | yes |
+| board | cli, tests | 23 | – | 2 layers: cli, tests; 2 packages; 23 files | yes |
 | publish | cli, tests | 11 | – | 2 layers: cli, tests; 2 packages; 11 files | yes |
 | character | cli, tests | 5 | – | 2 layers: cli, tests; 2 packages; 5 files | yes |
 | sery | cli, tests | 5 | – | 2 layers: cli, tests; 2 packages; 5 files | – |
+| sound | cli, tests | 5 | – | 2 layers: cli, tests; 2 packages; 5 files | – |
 | clip | cli, tests | 4 | – | 2 layers: cli, tests; 2 packages; 4 files | – |
 | lipsync | cli, tests | 4 | – | 2 layers: cli, tests; 2 packages; 4 files | – |
-| sound | cli, tests | 4 | – | 2 layers: cli, tests; 2 packages; 4 files | – |
 | contact | cli, tests | 3 | – | 2 layers: cli, tests; 2 packages; 3 files | – |
 | init | cli, tests | 3 | – | 2 layers: cli, tests; 2 packages; 3 files | – |
 | render | cli, tests | 3 | – | 2 layers: cli, tests; 2 packages; 3 files | yes |
@@ -81,7 +81,7 @@ node .claude/skills/adopt/scripts/repo-map.ts --adopt-slice <name>
 
 | # | Package | Score | Why |
 |---|---|---|---|
-| 1 | `packages/cli` (@coreslopper/cli) | 0.61 | 363 changed files in recent history; shared library; shared infrastructure – not a domain slice |
+| 1 | `packages/cli` (@coreslopper/cli) | 0.61 | 366 changed files in recent history; shared library; shared infrastructure – not a domain slice |
 | 2 | `scripts/pose` (coreslopper-pose) | 0.16 | 6 changed files in recent history |
 | 3 | `scripts/audio-analysis` (coreslopper-audio-analysis) | 0.15 | 2 changed files in recent history |
 | 4 | `packages/remotion` (@coreslopper/remotion) | 0.07 | 4 changed files in recent history; shared library; shared infrastructure – not a domain slice |
