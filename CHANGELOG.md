@@ -1,5 +1,81 @@
 # Changelog
 
+## [0.13.0](https://github.com/hemi1986/coreslopper/compare/v0.12.0...v0.13.0) (2026-11-28)
+
+
+### Features
+
+* **board-redesign:** the board has a top navigation and uses the full width (ST-056) ([efd730c](https://github.com/hemi1986/coreslopper/commit/efd730cca49e1f1f935775746ba17dde83d675cc))
+* **board-redesign:** the board's "Werkstatt" look (ST-059) ([036713c](https://github.com/hemi1986/coreslopper/commit/036713ccc0075450f6e568134fe5548ed68e7263))
+* **board-redesign:** the board's project list with search, filters and series grouping (ST-057) ([e1e82c8](https://github.com/hemi1986/coreslopper/commit/e1e82c8385dd0f41f41d3d6df3849b5c2e4132f5))
+* **platform-formats:** a caption over 120 characters breaks a rule (ST-044) ([6d6f7b5](https://github.com/hemi1986/coreslopper/commit/6d6f7b5e93ebeecb71b121180956b4b6192858d7))
+* **platform-formats:** a missing TikTok text is a TODO (ST-048) ([872fdb3](https://github.com/hemi1986/coreslopper/commit/872fdb38629a97bd8898d2236d0b683e3f64cbf5))
+* **platform-formats:** a short episode is planned on five platforms on the release day (ST-048) ([a8cb9ae](https://github.com/hemi1986/coreslopper/commit/a8cb9ae919c6c82854ceb51c4fffa7504f2d280e))
+* **platform-formats:** a short episode's folder holds one video and its covers (ST-048) ([2d28451](https://github.com/hemi1986/coreslopper/commit/2d284516a321b318774748f650fada9032d528e1))
+* **platform-formats:** a short episode's teaser is cut from its master (ST-048) ([a9bb1c4](https://github.com/hemi1986/coreslopper/commit/a9bb1c48d0ea017de34f1e34268f456a796c03b8))
+* **platform-formats:** a short episode's YouTube post asks for the series playlist (ST-053) ([66b6e8f](https://github.com/hemi1986/coreslopper/commit/66b6e8f0ecd807639e6a4e8db1ec6e59a18dedd2))
+* **platform-formats:** a story with a video carries its caption (ST-044) ([ba124e8](https://github.com/hemi1986/coreslopper/commit/ba124e8279769549aad0cd27ab75c792927bf707))
+* **platform-formats:** a story with only an image has no caption (ST-044) ([1e4e841](https://github.com/hemi1986/coreslopper/commit/1e4e84163d340610b2308d3da94b859e78cf2b2d))
+* **platform-formats:** a story without a caption is complete (ST-044) ([03e549d](https://github.com/hemi1986/coreslopper/commit/03e549d7ffee303d25ed9464e33e130f3ac8273d))
+* **platform-formats:** one up-to-3-minutes rule for the release shape, the Reel and publish (ST-049) ([145d047](https://github.com/hemi1986/coreslopper/commit/145d04712b3bb521ff11b9761f743efbab60febf))
+* **platform-formats:** QA expects the thumbnails and covers of the release shape (ST-050) ([f0ccd64](https://github.com/hemi1986/coreslopper/commit/f0ccd64efe910b31bfc11f29299b842469a12797))
+* **platform-formats:** the board lists YouTube hashtags comma-separated without "#" (ST-043) ([96d3584](https://github.com/hemi1986/coreslopper/commit/96d358412a1c788795ceaa775f4ba6d8b28fc3e2))
+* **platform-formats:** the main video goes to Instagram as a Reel only up to 3 minutes (ST-045) ([b87c732](https://github.com/hemi1986/coreslopper/commit/b87c7324454686f4281d647b282c0c5dcfea1c3d))
+* **platform-formats:** the microsite data names the video's aspect (ST-054) ([99d0660](https://github.com/hemi1986/coreslopper/commit/99d06608c985c88554e99efc6ef127cefdcf449d))
+* **platform-formats:** the release board names the release shape and shows only its platforms (ST-052) ([dffbc21](https://github.com/hemi1986/coreslopper/commit/dffbc21e9321879704fa6711f162c482ccc0e6dc))
+* **platform-formats:** the release package records whether an episode is a short episode (ST-047) ([a68769b](https://github.com/hemi1986/coreslopper/commit/a68769bbf2c5b40a44501601e7f4aa6eedcfdc8e))
+* **platform-formats:** the release shape is kept once the release has started (ST-051) ([9102fa1](https://github.com/hemi1986/coreslopper/commit/9102fa1b8fdb02d60b63f7ba2532024c9eb211a4))
+* **platform-formats:** the story caption on the board and in the folder texts (ST-044) ([c6cc182](https://github.com/hemi1986/coreslopper/commit/c6cc182d8bb07c75a31252c6db3dc604f889624e))
+* **platform-formats:** the vertical version is the one Short (ST-049) ([c64d93e](https://github.com/hemi1986/coreslopper/commit/c64d93e6d453e02e51636bdc486b45226526183d))
+* **platform-formats:** the X post carries the main video by default (ST-046) ([b4586fb](https://github.com/hemi1986/coreslopper/commit/b4586fb44b0a01ebb2a6984e9141c7f0d8fc1eac))
+
+
+### Bug Fixes
+
+* **board-redesign:** a malformed percent sequence in the address is a 400 (ST-058) ([8fd1619](https://github.com/hemi1986/coreslopper/commit/8fd1619292246f40dc57b84c5548ccd90faee9e1))
+* **board-redesign:** a pasted list address with a stray % opens, reset and count follow the search (ST-057) ([6acf488](https://github.com/hemi1986/coreslopper/commit/6acf488d0cff39e8d0d53ead52eb5e4aec5507ea))
+* **board-redesign:** an address that is no URL is a 400 (ST-058) ([d6d9641](https://github.com/hemi1986/coreslopper/commit/d6d964100c4c05996d11833e36049b733c54946d))
+* **board-redesign:** the board's contact sheet shows each shot's keyframe (ST-058) ([03b921b](https://github.com/hemi1986/coreslopper/commit/03b921b1e876d0a47b09ff8f53a0a7265513c002))
+* **board-redesign:** the contact sheet names the project, not the storyboard, when the project is invalid (ST-058) ([e384fde](https://github.com/hemi1986/coreslopper/commit/e384fde114087ccaa4da413afdf27d5974ceeaae))
+* **episode:** keep text_en on pause lines and subtitle it ([8301813](https://github.com/hemi1986/coreslopper/commit/8301813671acc9224d43d413f9603975e37e9e0f))
+* **episode:** keep text_en on pause lines and subtitle it ([037d544](https://github.com/hemi1986/coreslopper/commit/037d5440b628eab98aa7ec71f6d8270cb15acd92))
+* **platform-formats:** a board checklist tick is no done mark (ST-051) ([0aa5712](https://github.com/hemi1986/coreslopper/commit/0aa5712090f58d7895599cc8c944e98e6b80c46d))
+* **platform-formats:** a series playlist takes only an http(s) URL and a one-line title (ST-053) ([9d29d69](https://github.com/hemi1986/coreslopper/commit/9d29d692830f5adfdb6a0c95f684884d3be0dde2))
+* **platform-formats:** a short episode's texts name its missing master render (ST-048) ([bb8f01e](https://github.com/hemi1986/coreslopper/commit/bb8f01ed394a05e21745e8316324b657d2e057a6))
+* **platform-formats:** a started release with an unreadable manifest changes nothing (ST-051) ([b046520](https://github.com/hemi1986/coreslopper/commit/b0465209927624c02e0e087a72ad4094e65535de))
+* **platform-formats:** an X release post without a reply waits for no YouTube URL in the autopilot (ST-046) ([c50963d](https://github.com/hemi1986/coreslopper/commit/c50963d285e59d7e3e2cea8ba3b5fe9ea23e5e46))
+* **platform-formats:** announcement story caption, unused-text warnings, short-episode publish (ST-055) ([78ab006](https://github.com/hemi1986/coreslopper/commit/78ab0063d78edb29499e60ffe355717fe9da8f24))
+* **platform-formats:** one release form plans the vertical version alike in release, the calendar, the plan and publish (ST-049) ([2863a13](https://github.com/hemi1986/coreslopper/commit/2863a13947099355668ccc1afbbbc38055455f46))
+* **platform-formats:** QA checks the vertical version up to 3 minutes as the one Short (ST-049) ([0549870](https://github.com/hemi1986/coreslopper/commit/0549870ec709497a4112bb449150b4408dd3be14))
+* **platform-formats:** the board and the thumbnail help name no Instagram feed post (ST-055) ([da1b2e0](https://github.com/hemi1986/coreslopper/commit/da1b2e035a1d51d3cc6e1c9f1d2006b1b8cd4175))
+* **platform-formats:** the board links a playlist URL whatever the case of its scheme (ST-053) ([496e681](https://github.com/hemi1986/coreslopper/commit/496e681d22f2b861363ec0cadd4942a36971da50))
+* **platform-formats:** the release plan, the calendar and the text checks require the release shape (ST-048) ([2cdb591](https://github.com/hemi1986/coreslopper/commit/2cdb5913431515f446ce7cf8e35e2bda8dc5a54f))
+* **platform-formats:** the X release post's calendar label fits a post without a reply (ST-046) ([cf90589](https://github.com/hemi1986/coreslopper/commit/cf905895f5607f2111982abe8f981d10f5222cf5))
+* **subtitles:** wrap burned-in cues once, balanced ([90db59e](https://github.com/hemi1986/coreslopper/commit/90db59ee1bdf479adfcf2607dd4a4b9c15d28005))
+* **subtitles:** wrap burned-in cues once, balanced ([0883a32](https://github.com/hemi1986/coreslopper/commit/0883a32562500e6cb5a82bbf21c90ade5e762554))
+
+
+### Documentation
+
+* **adr:** accept the proposed ADRs 0037–0048, 0051 and 0053 ([3c425b7](https://github.com/hemi1986/coreslopper/commit/3c425b79aa36d19ec861f1a5a3c60f6d60e84a9d))
+* **adr:** accept the proposed ADRs 0037–0048, 0051 and 0053 ([89a2c29](https://github.com/hemi1986/coreslopper/commit/89a2c29eabc49136e70ebc226cb0d5eb2d0e0542))
+* **adr:** record each ADR's status in frontmatter ([91d9336](https://github.com/hemi1986/coreslopper/commit/91d93366339126b5699d4bf377d38c7721499c68))
+* **adr:** record each ADR's status in frontmatter ([17c2905](https://github.com/hemi1986/coreslopper/commit/17c2905d779975fb7d633ea44df73128283b66d5))
+* **board-redesign:** the board page seam in the catalog, one German term for the release-day column (ST-057) ([1ba82d3](https://github.com/hemi1986/coreslopper/commit/1ba82d38e4c48a081751fbe01a234b16b54cc853))
+* **board-redesign:** the contact sheet's read model, conventions and G-70 (ST-058) ([4ebdcd5](https://github.com/hemi1986/coreslopper/commit/4ebdcd5367f433b84d0399a89b52a4436cb324de))
+* **board:** plan the board redesign ([a041a92](https://github.com/hemi1986/coreslopper/commit/a041a92bdb7c3383e68ac85eed02cfdd6feb4fb8))
+* **board:** plan the board redesign – top navigation, project list, contact sheet keyframes ([da3cdb3](https://github.com/hemi1986/coreslopper/commit/da3cdb3fe2d04ef327961eeacf3848d3a6499410))
+* **platform-formats:** the release checks list the unused-texts row (ST-055) ([b7f8a66](https://github.com/hemi1986/coreslopper/commit/b7f8a66c897fb77114467e744db49b8b298d0238))
+* **platform-formats:** the release skill and the platform docs follow the release shapes (ST-055) ([07b4685](https://github.com/hemi1986/coreslopper/commit/07b46853bdefe3a081c5c86776726fb28f04ec9c))
+* **platform-formats:** the story caption in the release skill and the platform notes (ST-044) ([01a41f0](https://github.com/hemi1986/coreslopper/commit/01a41f089042a1b374c8689af7fabebcca5d9cee))
+* **platform-formats:** the video-qa completion criterion follows the release shape (ST-055) ([f3164ff](https://github.com/hemi1986/coreslopper/commit/f3164ff0440350f7ff3a52558c04f8b6058b312a))
+* **platform-formats:** the X post's main video and optional reply in the release skill and the platform notes (ST-046) ([ddb3ced](https://github.com/hemi1986/coreslopper/commit/ddb3ced26a13409931127663266f834244c782fd))
+* **platform-formats:** the X upload data's reply is optional in its schema comment (ST-046) ([8a5f410](https://github.com/hemi1986/coreslopper/commit/8a5f41093e5ce6acaf7f88b2db9d4cc0dc504766))
+* **release:** plan release shapes and short episodes ([e967590](https://github.com/hemi1986/coreslopper/commit/e967590fddea2e8973710c8ff6fc56fbd41a4066))
+* **release:** plan release shapes and short episodes ([c1e9554](https://github.com/hemi1986/coreslopper/commit/c1e955402f7a553cd4c96029360727a24e7b2472))
+* **stories:** fold the marathon 2026-11-27-2 review leftovers into open stories ([843098f](https://github.com/hemi1986/coreslopper/commit/843098fdfc244bc677b95dbabc877a01a587ae8b))
+* **stories:** fold the marathon 2026-11-27-2 review leftovers into open stories ([743d8d1](https://github.com/hemi1986/coreslopper/commit/743d8d18f5014da8421600c2b0374aaa48ed7565))
+
 ## [0.12.0](https://github.com/hemi1986/coreslopper/compare/v0.11.0...v0.12.0) (2026-11-26)
 
 
