@@ -259,8 +259,14 @@ describe('the character wizard', () => {
     expect(FakeXhr.sent).toEqual([]);
   });
 
-  it('refuses an empty or taken name with its reason and keeps the other fields', async () => {
+  it('marks name and description as required, refuses an empty or taken name with its reason and keeps the other fields', async () => {
+    await create('Taken Name', 'The first one.');
+    main = new FakeElement('main');
+    hash = '';
     await startCreate();
+    expect(byField('name').getAttribute('aria-required')).toBe('true');
+    expect(byField('description').getAttribute('aria-required')).toBe('true');
+    expect(find((e) => e.has('cw-required')).length).toBe(2);
     byField('name').value = '';
     byField('description').value = 'Somebody.';
     byField('tags').value = 'lead';
@@ -269,10 +275,11 @@ describe('the character wizard', () => {
     expect(byField('description').value).toBe('Somebody.');
     expect(byField('tags').value).toBe('lead');
     expect(hash).toBe('');
-    byField('name').value = 'Nova Lee';
+    byField('name').value = 'Taken Name';
     await one((e) => e.tagName === 'FORM').fire('submit');
-    expect(one((e) => e.has('cw-error')).text()).toMatch(/nova-lee/);
-    expect(byField('name').value).toBe('Nova Lee');
+    expect(one((e) => e.has('cw-error')).text()).toMatch(/taken-name/);
+    expect(byField('name').value).toBe('Taken Name');
+    expect(hash).toBe('');
   });
 
   it('imports the characters of a fixture project into the library and lists them with links', async () => {

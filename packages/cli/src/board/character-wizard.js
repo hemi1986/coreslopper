@@ -11,7 +11,7 @@ import { step } from './wizard.js';
 addStrings({
   de: {
     cwTitle: 'Neue Figur', cwChip: 'Figur', cwCreate: 'Neu anlegen', cwImport: 'Aus Projekt oder Serie übernehmen',
-    cwStepData: 'Figur', cwStepImages: 'Character Sheet und weitere Bilder', cwStepVoice: 'Referenzstimme (optional)', cwStepDone: 'Fertig',
+    cwRequired: 'Pflichtfeld', cwStepData: 'Figur', cwStepImages: 'Character Sheet und weitere Bilder', cwStepVoice: 'Referenzstimme (optional)', cwStepDone: 'Fertig',
     cwImagesHelp: 'PNG, JPG oder WebP. Jedes Bild erscheint hier, sobald es hochgeladen ist.',
     cwVoiceHelp: 'Eine WAV-Aufnahme der Stimme und ihr exakter Text. Optional.',
     cwUpload: 'Hochladen', cwToCharacter: 'Zur Figur →', cwUnknown: function (id) { return 'Keine Figur „' + id + '“ in der Bibliothek.'; },
@@ -21,7 +21,7 @@ addStrings({
   },
   en: {
     cwTitle: 'New character', cwChip: 'Character', cwCreate: 'Create new', cwImport: 'Import from a project or series',
-    cwStepData: 'Character', cwStepImages: 'Character sheet and more images', cwStepVoice: 'Reference voice (optional)', cwStepDone: 'Done',
+    cwRequired: 'required', cwStepData: 'Character', cwStepImages: 'Character sheet and more images', cwStepVoice: 'Reference voice (optional)', cwStepDone: 'Done',
     cwImagesHelp: 'PNG, JPG, or WebP. Each image shows here once it is uploaded.',
     cwVoiceHelp: 'A WAV recording of the voice and its exact words. Optional.',
     cwUpload: 'Upload', cwToCharacter: 'To the character →', cwUnknown: function (id) { return 'No character "' + id + '" in the library.'; },
@@ -36,6 +36,11 @@ const FACES = ['full', 'silhouette', 'screen-only', 'voice-only'];
 function main() { const node = document.getElementById('main'); node.innerHTML = ''; return node; }
 function input(attrs) { return el('input', Object.assign({ class: 'text' }, attrs)); }
 function field(label, control) { return el('label', { class: 'form-field' }, [el('span', { text: label }), control]); }
+/** A field the library requires: its label carries the visible marker, its control `aria-required`. */
+function requiredField(label, control) {
+  control.setAttribute('aria-required', 'true');
+  return el('label', { class: 'form-field' }, [el('span', {}, [label + ' ', el('span', { class: 'sub cw-required', text: '(' + t('cwRequired') + ')' })]), control]);
+}
 function targetLabel(target) { return (target.scope === 'series' ? t('series') : t('project')) + ': ' + target.title; }
 function characterHref(id) { return '#/characters/' + id; }
 
@@ -63,15 +68,15 @@ function choice() {
 /** Step 1: the entry's words. A refusal names its reason beside the step and keeps what was typed. */
 function createStep() {
   // No `required` attribute: the library's refusal names the reason in the step, as for every other refusal.
-  const name = input({ 'aria-required': 'true', 'data-field': 'name' });
+  const name = input({ 'data-field': 'name' });
   const face = el('select', { class: 'text', 'data-field': 'face' }, FACES.map(function (f) { return el('option', { value: f, text: t('faces')[f] }); }));
   face.value = FACES[0];
-  const description = el('textarea', { class: 'note-input', rows: 3, 'aria-required': 'true', 'data-field': 'description' });
+  const description = el('textarea', { class: 'note-input', rows: 3, 'data-field': 'description' });
   const prompt = input({ 'data-field': 'prompt' }), tags = input({ 'data-field': 'tags' });
   const error = el('p', { class: 'error cw-error' });
   const form = el('form', { class: 'form' }, [
-    el('div', { class: 'form-row' }, [field(t('name'), name), field(t('face'), face), field(t('tags'), tags)]),
-    el('div', { class: 'form-row' }, [field(t('description'), description)]),
+    el('div', { class: 'form-row' }, [requiredField(t('name'), name), field(t('face'), face), field(t('tags'), tags)]),
+    el('div', { class: 'form-row' }, [requiredField(t('description'), description)]),
     el('div', { class: 'form-row' }, [field(t('prompt'), prompt)]),
     error, el('button', { class: 'primary', type: 'submit', text: t('createChar') })
   ]);
