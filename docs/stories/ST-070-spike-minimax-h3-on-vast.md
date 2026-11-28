@@ -10,7 +10,7 @@ depends_on: []
 labels: [feature:vast-gpu]
 feature: vast-gpu
 sources: [docs/research/vast-gpu-rental.md]
-status: ready
+status: in-progress
 ---
 
 ## Question

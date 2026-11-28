@@ -4,15 +4,20 @@
 
 **Progress: 32 of 37 domain stories done** · scenarios 112 of 128
 
-**78 stories** · In Progress: 0 · Ready: 9 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 69 · Superseded: 0
+**78 stories** · In Progress: 1 · Ready: 8 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 69 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
+
+## In Progress
+
+| ID | Title | Type | Context | Priority | Size | Risk | Depends on |
+|---|---|---|---|---|---|---|---|
+| [ST-070](ST-070-spike-minimax-h3-on-vast.md) | Spike: MiniMax H3 on a rented vast.ai GPU – access, workflows, lip-sync | spike | – | must | – | – | – |
 
 ## Ready
 
 | ID | Title | Type | Context | Priority | Size | Risk | Depends on |
 |---|---|---|---|---|---|---|---|
-| [ST-070](ST-070-spike-minimax-h3-on-vast.md) | Spike: MiniMax H3 on a rented vast.ai GPU – access, workflows, lip-sync | spike | – | must | – | – | – |
 | [ST-071](ST-071-rent-a-gpu-on-vast.md) | Rent a GPU on vast.ai for MiniMax H3 | domain | Generation | must | – | – | ST-070 |
 | [ST-072](ST-072-shut-down-the-gpu.md) | Shut down the rented GPU and record its cost | domain | Generation | must | – | – | ST-071 |
 | [ST-073](ST-073-shut-down-an-idle-gpu.md) | The watchdog shuts down an idle or overdue GPU rental | domain | Generation | must | – | – | ST-072 |
