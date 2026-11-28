@@ -50,6 +50,7 @@ import {
   type ReleaseManifest,
   type ReleaseCalendar,
   type ReleasePlan,
+  type ReleaseShape,
   type UploadData,
   type UsedSound,
 } from '@coreslopper/core';
@@ -67,7 +68,7 @@ import {
   type FfmpegRunner,
   type Prober,
 } from './release-media.js';
-import { readmeText, releaseLabels, releaseTexts, calendarEventLabel, type ReleaseTextInput } from './release-texts.js';
+import { readmeText, releaseLabels, releaseTexts, calendarEventLabel, type ReleaseTextInput, type SeriesPlaylist } from './release-texts.js';
 import { calendarInput, planCalendar } from './release-calendar.js';
 import { loadStatus, withReleaseLock } from './release-records.js';
 import { micrositeSong } from './release-microsite.js';
@@ -281,6 +282,19 @@ export async function songJson(project: LoadedProject): Promise<Record<string, u
 export function projectFormats(project: Pick<LoadedProject, 'config'>): { id: string; width: number; height: number; fps: number }[] {
   const { master, derivatives } = project.config.formats;
   return [master, ...derivatives].map((format) => ({ id: formatId(format.aspect), width: format.width, height: format.height, fps: master.fps }));
+}
+
+/**
+ * The series playlist of a short episode, with the release TODO while its URL
+ * is missing (never a failure); undefined for any other shape or an episode
+ * without a series.
+ */
+export function seriesPlaylist(project: Pick<LoadedProject, 'series'>, shape: ReleaseShape | undefined): { playlist: SeriesPlaylist; todo?: string } | undefined {
+  const series = project.series;
+  if (shape !== 'short-episode' || !series) return undefined;
+  const { title, url } = series.youtube_playlist ?? {};
+  const playlist: SeriesPlaylist = { title: title ?? series.title, ...(url ? { url } : {}) };
+  return url ? { playlist } : { playlist, todo: `YouTube playlist of the series: set youtube_playlist.url in projects/${series.slug}/series.yaml` };
 }
 
 /**
@@ -555,6 +569,7 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
     const problems = timing ? chapterProblems(chapters, timing.audio.duration) : [];
     errors.push(...problems.map((problem) => `youtube chapters: ${problem}`));
   } else if (timing) chapters = chaptersFromSections(timing);
+  const playlist = seriesPlaylist(project, shape);
   const input: ReleaseTextInput = {
     kind,
     shape,
@@ -572,7 +587,9 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
     credits,
     files,
     durationSeconds: timing?.audio.duration,
+    playlist: playlist?.playlist,
   };
+  if (playlist?.todo) todos.push(playlist.todo);
   // The calendar: the next free slots under config/release-schedule.yaml; kept times stay.
   const schedule = await loadReleaseSchedule(root);
   // A meme and a short episode are Shorts, never a Premiere.

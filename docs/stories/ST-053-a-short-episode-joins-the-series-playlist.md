@@ -10,7 +10,7 @@ depends_on: [ST-048]
 labels: [feature:platform-formats]
 feature: platform-formats
 sources: [docs/research/platform-video-formats.md]
-status: ready
+status: in-progress
 ---
 
 ## Task
@@ -26,7 +26,7 @@ a show needs 16:9 artwork and a Shorts-only playlist cannot be reordered (F13 in
 - The show feature and its artwork are out of scope.
 
 ## Acceptance Criteria
-- [ ] `series.yaml` with `youtube_playlist` validates; without it as well (test)
-- [ ] A short episode's YouTube post has the checklist line with the playlist title (test)
-- [ ] A series without a playlist URL gives the short episode the TODO "YouTube playlist of the series" (test)
-- [ ] A music video's YouTube post has no playlist line
+- [x] `series.yaml` with `youtube_playlist` validates; without it as well (test)
+- [x] A short episode's YouTube post has the checklist line with the playlist title (test)
+- [x] A series without a playlist URL gives the short episode the TODO "YouTube playlist of the series" (test)
+- [x] A music video's YouTube post has no playlist line

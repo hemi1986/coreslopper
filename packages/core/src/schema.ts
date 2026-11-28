@@ -626,6 +626,28 @@ export const SeriesSchema = z.object({
       }),
     )
     .default([]),
+  /**
+   * The YouTube playlist the series' short episodes join: a plain playlist,
+   * not a show. Without a title it is named after the series' title; a missing
+   * URL is a release TODO, never a failure.
+   */
+  youtube_playlist: z
+    .object({
+      /** One line, trimmed. */
+      title: z
+        .string()
+        .trim()
+        .min(1)
+        .regex(/^[^\r\n]+$/, { message: 'must be one line' })
+        .optional(),
+      /** An http(s) link to the playlist. */
+      url: z
+        .string()
+        .url()
+        .regex(/^https?:\/\//i, { message: 'must be an http or https URL' })
+        .optional(),
+    })
+    .optional(),
   /** Optional creative limits. Without an entry nothing is checked. */
   limits: z
     .object({

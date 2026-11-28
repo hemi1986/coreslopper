@@ -173,7 +173,8 @@ function renderPost(entry) {
     // The key is the line's record key from the server: a line appearing or going leaves the other ticks (G-163).
     const box = el('input', { type: 'checkbox', checked: (view.data.status.items[item.key] || {}).done ? true : undefined });
     box.onchange = function () { setStatus(item.key, { done: box.checked }); };
-    return el('li', {}, [el('label', {}, [box, ' ', item.label])]);
+    const link = item.href && /^https?:/i.test(item.href) ? el('a', { href: item.href, target: '_blank', rel: 'noopener', text: item.href }) : null;
+    return el('li', {}, [el('label', {}, [box, ' ', item.label]), link ? ' — ' : null, link]);
   })) : null;
   const pointer = entry.pointer ? el('div', { class: 'pointer' }, [t('points') + ': ', /^https?:/.test(entry.pointer) ? el('a', { href: entry.pointer, target: '_blank', text: entry.pointer }) : entry.pointer]) : null;
   return el('section', { class: 'card' + (status.done ? ' done' : ''), id: 'post-' + entry.id }, [
