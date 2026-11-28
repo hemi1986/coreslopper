@@ -9,7 +9,9 @@ Meme-Skill wählt beim Schreiben eines Scripts daraus aus ([ADR 0051](adr/0051-m
 
 Diese Seite beschreibt, wie du die Bibliothek von Hand pflegst. Die [Sounds-Ansicht](board.md#sounds) des Boards
 macht dasselbe über dieselben Befehle; ihre Liste spielt jeden Sound in seiner Zeile und filtert nach Schlagwort,
-**unbenutzt** und Lizenz, sodass `licence=unknown` zeigt, was der Release-Check anmerken wird.
+**unbenutzt** und Lizenz, sodass `licence=unknown` zeigt, was der Release-Check anmerken wird. Ein neuer Sound beginnt
+im Sound-Assistenten des Boards (**+ Neu** → **Sound**, `#/new/sound`): Datei, Titel, Wofür und Schlagworte
+(`sound add`), dann Cue und Trim beim Abspielen, dann Lizenz, Quelle und Credit (`sound edit`).
 
 ## Wo die Bibliothek liegt
 
@@ -67,8 +69,9 @@ Ein bis zwei Sätze zu dem Moment, den er punktiert, reichen; die Schlagworte gr
 ### Den Cue finden
 
 Der Cue ist der Moment, in dem der Sound landet – der Hit –, in Sekunden ab dem **Trim-Anfang**, nicht ab dem
-Dateianfang. Spiele den Sound ab, halte beim Hit an und lies die Position ab; **Cue aus Abspielposition** in der
-Sounds-Ansicht des Boards macht genau das.
+Dateianfang. Spiele den Sound ab, halte beim Hit an und lies die Position ab; **Cue aus Abspielposition** auf der
+Seite eines Sounds im Board und **Cue hier setzen** im zweiten Schritt des Sound-Assistenten machen genau das.
+**Trim-Anfang hier** und **Trim-Ende hier** im Assistenten setzen den Trim ebenso aus der Abspielposition.
 
 Bei `trim: { start: 0.20, end: 1.40 }` und dem Hit 0.55 s in der Datei ist der Cue `0.35`. Der Cue muss im
 getrimmten Sound liegen (hier höchstens `1.20`). Nur ein Shot eines Memes, der auf dem `cue` der Zeile verankert ist,
@@ -228,6 +231,6 @@ Einen Sound, den die Bibliothek nicht mehr hält, schlägt das Skill einem neuen
 
 ## Siehe auch
 
-- [Das Board: Sounds](board.md#sounds) – die Bibliothek im Browser, mit Upload, Abspielen und Bearbeiten
+- [Das Board: Sounds](board.md#sounds) – die Bibliothek im Browser, mit dem Sound-Assistenten, Abspielen und Bearbeiten
 - [ADR 0051](adr/0051-memes-and-the-sound-library.md) – die Entscheidung hinter der Bibliothek
 - `sound --help` – jeder Befehl und jede Option

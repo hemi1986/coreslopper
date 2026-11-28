@@ -281,9 +281,11 @@ describe('the Sounds list', () => {
     expect(find((e) => e.has('pl-search'))[0]!.value).toBe('');
   });
 
-  it('shows "No sounds yet" for an empty library', async () => {
+  it('shows "No sounds yet" for an empty library, with + New to the sound wizard', async () => {
     await open('#/sounds', empty);
-    expect(find((e) => e.has('sd-empty'))[0]!.text()).toBe('No sounds yet');
+    const box = find((e) => e.has('sd-empty'))[0]!;
+    expect(box.children[0]!.text()).toBe('No sounds yet');
+    expect(box.all().find((e) => e.has('sd-empty-new'))!.getAttribute('href')).toBe('#/new/sound');
     expect(find((e) => e.tagName === 'TABLE')).toEqual([]);
   });
 });
