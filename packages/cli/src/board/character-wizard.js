@@ -130,10 +130,13 @@ function voiceTile(box, entry) {
 
 /**
  * Upload the files one after the other into the entry; `show(entry)` draws the entry after each file, so every file
- * appears as it lands. A refusal stops the chain and names its reason in `status`; the inputs keep their files, so
- * the button retries.
+ * appears as it lands. `sent` holds the files that landed already: they are left out, and each file joins it once its
+ * upload succeeds, so a retry sends only what failed or was not sent yet. A refusal stops the chain and names its
+ * reason in `status`; the inputs keep their files, so the button retries. After a full success `done()` clears them.
  */
-function sendFiles(id, items, status, show) {
+function sendFiles(id, chosen, sent, status, show, done) {
+  const items = chosen.filter(function (item) { return !sent.has(item.file); });
+  if (!items.length) return;
   let chain = Promise.resolve();
   status.className = 'sub cw-status';
   items.forEach(function (item, index) {
@@ -142,12 +145,13 @@ function sendFiles(id, items, status, show) {
       return upload('/api/upload/library/' + encodeURIComponent(id) + query, item.file, function (share) {
         status.textContent = t('uploading') + ' ' + (index + 1) + '/' + items.length + ' · ' + Math.round(share * 100) + '%';
       }).then(function (listing) {
+        sent.add(item.file);
         const entry = (listing.characters || []).filter(function (c) { return c.id === id; })[0];
         if (entry) show(entry);
       });
     });
   });
-  return chain.then(function () { status.textContent = ''; }).catch(function (e) { status.textContent = e.message; status.className = 'error cw-status'; });
+  return chain.then(function () { status.textContent = ''; done(); }).catch(function (e) { status.textContent = e.message; status.className = 'error cw-status'; });
 }
 
 function entrySteps(id) {
@@ -169,6 +173,7 @@ function entrySteps(id) {
     const sheet = el('input', { type: 'file', accept: '.png,.jpg,.jpeg,.webp', 'data-field': 'sheet' });
     const refs = el('input', { type: 'file', multiple: true, accept: '.png,.jpg,.jpeg,.webp', 'data-field': 'images' });
     const imageStatus = el('span', { class: 'sub cw-status' });
+    const imagesSent = new Set();
     const imageStep = step(2, t('cwStepImages'), Boolean(entry.sheet || entry.refs.length), [
       el('p', { class: 'meta', text: t('cwImagesHelp') }),
       el('div', { class: 'form-row' }, [field(t('sheet'), sheet), field(t('images'), refs)]),
@@ -176,8 +181,7 @@ function entrySteps(id) {
         const items = [];
         if (sheet.files[0]) items.push({ file: sheet.files[0], role: 'sheet' });
         Array.prototype.forEach.call(refs.files, function (file) { items.push({ file: file, role: 'ref' }); });
-        if (!items.length) return;
-        return sendFiles(id, items, imageStatus, function (e) { imageTiles(images, e); });
+        return sendFiles(id, items, imagesSent, imageStatus, function (e) { imageTiles(images, e); }, function () { sheet.value = ''; refs.value = ''; });
       }, { spinner: false }) }), imageStatus]),
       images
     ]);
@@ -189,12 +193,13 @@ function entrySteps(id) {
     const voice = el('input', { type: 'file', accept: '.wav', 'data-field': 'voice' });
     const transcript = input({ 'data-field': 'transcript', style: 'min-width:320px' });
     const voiceStatus = el('span', { class: 'sub cw-status' });
+    const voiceSent = new Set();
     node.appendChild(step(3, t('cwStepVoice'), Boolean(entry.voice), [
       el('p', { class: 'meta', text: t('cwVoiceHelp') }),
       el('div', { class: 'form-row' }, [field(t('voice'), voice), field(t('transcript'), transcript)]),
       el('div', { class: 'form-row' }, [el('button', { class: 'small', 'data-upload': 'voice', text: t('cwUpload'), onclick: pending(function () {
         if (!voice.files[0]) return;
-        return sendFiles(id, [{ file: voice.files[0], role: 'voice', transcript: transcript.value }], voiceStatus, function (e) { voiceTile(voiceBox, e); });
+        return sendFiles(id, [{ file: voice.files[0], role: 'voice', transcript: transcript.value }], voiceSent, voiceStatus, function (e) { voiceTile(voiceBox, e); }, function () { voice.value = ''; });
       }, { spinner: false }) }), voiceStatus]),
       voiceBox
     ]));

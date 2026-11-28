@@ -85,8 +85,13 @@ function call(method: string, url: string, body?: string, contentType = 'applica
   });
 }
 
-/** XMLHttpRequest as `upload` in lib.js uses it, answered by the board handler. */
+/**
+ * XMLHttpRequest as `upload` in lib.js uses it, answered by the board handler. `sent` logs the file name of every
+ * upload; a name in `failOnce` is a lost connection once.
+ */
 class FakeXhr {
+  static sent: string[] = [];
+  static failOnce = new Set<string>();
   method = ''; url = ''; status = 0; statusText = ''; responseText = '';
   upload: { onprogress?: (e: unknown) => void } = {};
   onload: (() => void) | null = null;
@@ -94,6 +99,9 @@ class FakeXhr {
   open(method: string, url: string) { this.method = method; this.url = url; }
   setRequestHeader() {}
   send(file: { data: string }) {
+    const name = new URL(this.url, 'http://board').searchParams.get('name') ?? '';
+    FakeXhr.sent.push(name);
+    if (FakeXhr.failOnce.delete(name)) { queueMicrotask(() => this.onerror?.()); return; }
     void call(this.method, this.url, file.data, 'application/octet-stream').then((r) => {
       this.status = r.status; this.responseText = r.body; this.statusText = String(r.status);
       this.onload?.();
@@ -222,6 +230,33 @@ describe('the character wizard', () => {
     await one((e) => e.getAttribute('data-upload') === 'images').fire('click');
     expect(fileNames('cw-images')).toEqual(['rook.png']);
     expect(status.has('error')).toBe(false);
+  });
+
+  it('retries a multi-file batch with only the files that did not land, and a second click sends nothing', async () => {
+    await create('Wren', 'A mechanic.');
+    main = new FakeElement('main');
+    await characterWizard.showCharacterWizard('wren');
+    byField('sheet').files = [{ name: 'wren-sheet.png', data: 'sheet' }];
+    byField('images').files = [{ name: 'wren-a.png', data: 'a' }, { name: 'wren-b.png', data: 'b' }, { name: 'wren-c.png', data: 'c' }];
+    FakeXhr.sent = [];
+    FakeXhr.failOnce.add('wren-b.png');
+    const send = one((e) => e.getAttribute('data-upload') === 'images');
+    await send.fire('click');
+    expect(FakeXhr.sent).toEqual(['wren-sheet.png', 'wren-a.png', 'wren-b.png']);
+    expect(one((e) => e.has('cw-status')).has('error')).toBe(true);
+    expect(fileNames('cw-images')).toEqual(['wren-sheet.png', 'wren-a.png']);
+
+    FakeXhr.sent = [];
+    await send.fire('click');
+    expect(FakeXhr.sent).toEqual(['wren-b.png', 'wren-c.png']);
+    const entry = await loadLibraryCharacter(ws, 'wren');
+    expect(entry.sheet).toBe('wren-sheet.png');
+    expect(entry.refs.filter((name) => name !== entry.sheet).sort()).toEqual(['wren-a.png', 'wren-b.png', 'wren-c.png']);
+    expect(fileNames('cw-images')).toEqual(['wren-sheet.png', 'wren-a.png', 'wren-b.png', 'wren-c.png']);
+
+    FakeXhr.sent = [];
+    await send.fire('click');
+    expect(FakeXhr.sent).toEqual([]);
   });
 
   it('refuses an empty or taken name with its reason and keeps the other fields', async () => {
