@@ -42,7 +42,10 @@ interface List {
   listItems(production: Production, releases: unknown[], today: string): { items: unknown[]; planned: unknown };
   listRows(list: unknown, state: ListState): Row[];
   showProjects(): Promise<void>;
+  PROJECTS_ROUTE: RegExp;
 }
+
+let lib: { decodedHash(raw: string): string };
 
 let list: List;
 let main: FakeElement;
@@ -63,6 +66,8 @@ beforeAll(async () => {
   vi.stubGlobal('fetch', async (path: string) => ({ ok: true, statusText: 'OK', json: async () => responses[path] }));
   // @ts-expect-error the board's page modules are plain JS without type declarations
   list = (await import('../packages/cli/src/board/projects.js')) as List;
+  // @ts-expect-error the board's page modules are plain JS without type declarations
+  lib = (await import('../packages/cli/src/board/lib.js')) as typeof lib;
 });
 
 beforeEach(() => { main = new FakeElement('main'); replaced.length = 0; });
@@ -219,6 +224,54 @@ describe('the project list', () => {
     expect(state('kind=film,meme&status=late&series=nope&group=yes&sort=size&dir=up')).toEqual({ q: '', kind: ['meme'], status: [], series: '', group: false, sort: 'activity', dir: 'desc' });
     const all = { q: 'a&b c', kind: ['video', 'meme'], status: ['done'], series: 'drift', group: true, sort: 'title', dir: 'desc' };
     expect(state(list.listHash(all).split('?')[1])).toEqual(all);
+  });
+
+  it('opens a pasted address with a stray % or a line break in the search instead of failing', async () => {
+    for (const address of ['#/projects?q=100%', '#/projects?q=a%0Ab']) {
+      const decoded = lib.decodedHash(address);
+      expect(list.PROJECTS_ROUTE.test(decoded), address).toBe(true);
+    }
+    expect(lib.decodedHash('#/projects?q=100%')).toBe('#/projects?q=100%');
+    expect(lib.decodedHash('#/p/neon%2Drain')).toBe('#/p/neon-rain');
+    await open('#/projects?q=100%');
+    expect(find((e) => e.tagName === 'INPUT' && e.getAttribute('type') === 'search')[0]!.value).toBe('100%');
+    expect(main.text()).toContain('No project matches these filters');
+    await open('#/projects?q=nacht%0A');
+    expect(find((e) => e.tagName === 'INPUT' && e.getAttribute('type') === 'search')[0]!.value).toBe('nacht\n');
+  });
+
+  it('offers Reset filters in the bar as soon as a search is typed, and counts only matching rows', async () => {
+    await open('#/projects');
+    const reset = () => find((e) => e.has('pl-reset'))[0]!.all().filter((e) => e.tagName === 'BUTTON');
+    expect(reset()).toEqual([]);
+    const search = find((e) => e.tagName === 'INPUT' && e.getAttribute('type') === 'search')[0]!;
+    search.value = 'e0';
+    search.fire('input');
+    expect(reset().map((b) => b.text())).toEqual(['Reset filters']);
+    expect(find((e) => e.has('pl-count'))[0]!.text()).toBe('4 of 11');
+    find((e) => e.has('pl-group'))[0]!.checked = true;
+    find((e) => e.has('pl-group'))[0]!.fire('change');
+    // The series rows drift and fog are shown for their episodes, but do not match the search themselves.
+    expect(find((e) => e.has('pl-count'))[0]!.text()).toBe('4 of 11');
+  });
+
+  it('counts as released a done project whose release day has passed, and a done internal one', () => {
+    const data: Production = {
+      projects: [
+        project('past', { ...done, next: { where: 'board', reason: 'release' } }),
+        project('future', { ...done, next: { where: 'board', reason: 'release' } }),
+        project('teaser', { ...done, next: { where: 'none', reason: 'internal-done' } }),
+        project('unfinished', { releaseDate: '2026-11-01' }),
+      ],
+      series: [],
+    };
+    const dates = [
+      { slug: 'past', releaseDate: '2026-11-27', total: 3, done: 0 },
+      { slug: 'future', releaseDate: '2026-11-28', total: 3, done: 0 },
+      { slug: 'unfinished', releaseDate: '2026-11-01', total: 3, done: 0 },
+    ];
+    const released = list.listRows(list.listItems(data, dates, '2026-11-28'), state('status=released')).map((r) => r.item!.slug);
+    expect(released.sort()).toEqual(['past', 'teaser']);
   });
 
   it('says when no project matches, and Reset filters clears search, filters and grouping', async () => {

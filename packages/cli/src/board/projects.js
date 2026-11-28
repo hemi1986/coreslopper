@@ -33,6 +33,9 @@ addStrings({
   }
 });
 
+/** The list's route; its query may hold any character, a decoded line break too. */
+export const PROJECTS_ROUTE = /^#\/projects(?:\?[\s\S]*)?$/;
+
 export const KINDS = ['video', 'episode', 'meme', 'series'];
 export const STATES = ['yours', 'running', 'done', 'released'];
 const SORTS = ['activity', 'title', 'release'];
@@ -159,7 +162,8 @@ function sorted(items, state) {
 function anyFilter(state) { return Boolean(state.q || state.kind.length || state.status.length || state.series || state.group); }
 
 /**
- * The rows to show: `{ item, indent, head }`. Off, one flat list; grouped, every series row with its episodes below
+ * The rows to show: `{ item, indent, head, match }` (`match`: whether a series row matches itself, not only through
+ * its episodes). Off, one flat list; grouped, every series row with its episodes below
  * it, the planned episodes after them while no search and no state filter is active, then the projects in no series.
  */
 export function listRows(list, state) {
@@ -173,8 +177,9 @@ export function listRows(list, state) {
     if (state.series && head.slug !== state.series) return;
     const episodes = sorted(hit.filter(function (i) { return i.kind === 'episode' && i.series === head.slug; }), state);
     const planned = showPlanned ? list.planned[head.slug] || [] : [];
-    if (!matches(head, state) && !episodes.length && !planned.length) return;
-    rows.push({ item: head, head: true });
+    const match = matches(head, state);
+    if (!match && !episodes.length && !planned.length) return;
+    rows.push({ item: head, head: true, match: match });
     episodes.concat(planned).forEach(function (item) { rows.push({ item: item, indent: true }); });
   });
   const rest = sorted(hit.filter(function (i) { return !(i.kind === 'series' && !i.error) && !(i.kind === 'episode' && known.indexOf(i.series) >= 0); }), state);
@@ -185,7 +190,7 @@ export function listRows(list, state) {
 
 // ---- drawing ----
 
-let view = null; // { list, releases, state, results }
+let view = null; // { list, state, results, reset }
 
 function setState(state, full) {
   view.state = state;
@@ -218,6 +223,7 @@ function resetButton(className) {
 
 function filterBar() {
   const state = view.state;
+  view.reset = el('span', { class: 'pl-reset' });
   const search = el('input', { type: 'search', class: 'pl-search', placeholder: t('plSearch'), 'aria-label': t('plSearch'), value: state.q, oninput: function (event) {
     // The search is in the address, so a refresh need not keep the view for it (app.js marks other input as edited).
     quiet(event);
@@ -241,7 +247,7 @@ function filterBar() {
     chips('plStatus', 'status', STATES, 'plStates'),
     el('label', { class: 'pl-filter' }, [el('span', { class: 'pl-label', text: t('plSeries') }), select]),
     el('label', { class: 'pl-filter pl-switch' }, [group, ' ' + t('plGroup')]),
-    anyFilter(state) ? resetButton('small') : null
+    view.reset
   ]);
 }
 
@@ -299,12 +305,15 @@ function row(entry) {
 function drawResults() {
   const results = view.results;
   results.innerHTML = '';
+  // The search redraws only the results, so the reset button of the bar is drawn here too.
+  view.reset.innerHTML = '';
+  if (anyFilter(view.state)) view.reset.appendChild(resetButton('small'));
   const rows = listRows(view.list, view.state);
   if (!rows.length) {
     results.appendChild(el('div', { class: 'empty pl-nomatch' }, [el('p', { text: t('plNoMatch') }), resetButton('primary')]));
     return;
   }
-  const shown = rows.filter(function (r) { return r.item && !r.item.planned; }).length;
+  const shown = rows.filter(function (r) { return r.item && !r.item.planned && (!r.head || r.match); }).length;
   results.appendChild(el('p', { class: 'sub pl-count', text: t('plCount')(shown, view.list.items.length) }));
   results.appendChild(el('table', { class: 'list pl-table' }, [header(), el('tbody', {}, rows.map(row))]));
 }
@@ -331,7 +340,7 @@ export function showProjects() {
   return Promise.all([api('/api/production'), api('/api/projects')]).then(function (both) {
     const list = listItems(both[0], both[1], localToday());
     const slugs = list.items.filter(function (i) { return i.kind === 'series' && !i.error; }).map(function (i) { return i.slug; });
-    view = { list: list, state: parseListState(query, slugs), results: null };
+    view = { list: list, state: parseListState(query, slugs), results: null, reset: null };
     draw();
   }).catch(showError);
 }

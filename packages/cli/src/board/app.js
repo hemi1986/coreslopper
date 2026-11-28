@@ -9,9 +9,9 @@
 //   #/sets[/<id>]                           the set library
 //   #/sounds[/<id>]                         the sound library
 //   #/guide[/<doc>]                          the board guide, or another page of docs/
-import { api, go, loading } from './lib.js';
+import { api, decodedHash, go, loading } from './lib.js';
 import { renderNav, viewBusy } from './nav.js';
-import { showProjects } from './projects.js';
+import { PROJECTS_ROUTE, showProjects } from './projects.js';
 import { showDocument, showProduction } from './production.js';
 import { onReleaseChange, showCalendar, showRelease } from './release.js';
 import { showReview } from './review.js';
@@ -32,10 +32,10 @@ function loadNav() {
 
 function route() {
   kept = false;
-  const hash = decodeURIComponent(location.hash || '#/');
+  const hash = decodedHash(location.hash || '#/');
   let match, view;
   if ((match = /^#\/new(?:\/(video|series|episode|meme)(?:\/([a-z0-9-]+))?)?\/?$/.exec(hash))) { active = 'new'; view = showWizard(match[1], match[2]); }
-  else if (/^#\/projects(?:\?.*)?$/.test(hash)) { active = 'projects'; view = showProjects(); }
+  else if (PROJECTS_ROUTE.test(hash)) { active = 'projects'; view = showProjects(); }
   else if (hash === '#/calendar') { active = 'calendar'; view = showCalendar(); }
   else if ((match = /^#\/guide(?:\/([a-z][a-z0-9-]*(?:\.de)?))?\/?$/.exec(hash))) { active = 'guide'; view = showGuide(match[1]); }
   else if ((match = /^#\/characters(?:\/([a-z0-9][a-z0-9_-]*))?\/?$/.exec(hash))) { active = 'characters'; view = showCharacters(match[1]); }

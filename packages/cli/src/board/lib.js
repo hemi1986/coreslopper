@@ -96,6 +96,10 @@ export function upload(url, file, onProgress) {
   });
 }
 
+/** The address after `#`, decoded; a pasted or hand-edited one with a stray `%` (`#/projects?q=100%`) stays raw. */
+export function decodedHash(raw) {
+  try { return decodeURIComponent(raw); } catch (error) { return raw; }
+}
 export function go(hash) { if (location.hash !== hash) location.hash = hash; }
 
 export function showError(error) {
