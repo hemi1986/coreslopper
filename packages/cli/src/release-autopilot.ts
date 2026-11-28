@@ -72,7 +72,7 @@ export async function approveRelease(projectRoot: string, options: { root: strin
   // the other readers of a project's distribution, so the check adds no other precondition to the approval.
   const config = await readYamlFile(join(projectRoot, 'project.yaml'), ProjectConfigSchema);
   if (!releasedPublicly(config)) {
-    throw new ValidationError(`${notReleasedPublicly(config.slug)}: it is never approved.`);
+    throw new ValidationError(`${notReleasedPublicly(config)}: it is never approved.`);
   }
   const { loadCalendar } = await import('./release-calendar.js');
   const calendar = await loadCalendar(projectRoot);
@@ -231,7 +231,7 @@ async function runProject(dir: string, slug: string, options: AutopilotOptions, 
   const facts = await deps.loadFacts(dir, options.root);
   // A project that is no longer released publicly is left alone, also with an approval from before (ST-041).
   if (!releasedPublicly(facts.project.config)) {
-    deps.log(`${notReleasedPublicly(slug)}; nothing to post`);
+    deps.log(`${notReleasedPublicly(facts.project.config)}; nothing to post`);
     return { slug, approved: Boolean(facts.calendar && approvalHolds(facts.status, facts.calendar)), acted, attention: [] };
   }
   const settings = facts.schedule.autopilot;
@@ -504,7 +504,7 @@ export async function autopilotOverview(root: string, options: { now?: Date; env
     if (!facts.calendar) continue;
     // A project that is no longer released publicly has no plan, even with an earlier calendar on disk (ST-041).
     if (!releasedPublicly(facts.project.config)) {
-      log(`${notReleasedPublicly(facts.input.slug)}; nothing to plan`);
+      log(`${notReleasedPublicly(facts.project.config)}; nothing to plan`);
       continue;
     }
     const settings = facts.schedule.autopilot;

@@ -12,7 +12,7 @@ import {
   loadProject,
   projectAudioPath,
   releaseForm,
-  releasedPublicly,
+  getsReleasePackage,
   repoRoot,
   scriptLines,
   writeTextAtomic,
@@ -470,7 +470,7 @@ export async function runQa(options: QaOptions): Promise<string> {
 
   // An internal project is never released publicly: no thumbnails, Shorts,
   // upload text, or release package to check, so READY rests on the renders.
-  const release = releasedPublicly(project.config)
+  const release = getsReleasePackage(project.config)
     ? await releasePackageChecks(project.paths, {
         ...releaseForm({
           kind: project.config.kind,

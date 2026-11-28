@@ -120,6 +120,15 @@ export async function setDistribution(projectDir: string, distribution: string |
   await writeFile(path, stringify(config));
 }
 
+/** `demo: true` (or, with `false`, no demo flag) in a fixture's project.yaml: a demo production. */
+export async function setDemo(projectDir: string, demo: boolean): Promise<void> {
+  const path = join(projectDir, 'project.yaml');
+  const config = parse(await readFile(path, 'utf8')) as Record<string, unknown>;
+  if (demo) config.demo = true;
+  else delete config.demo;
+  await writeFile(path, stringify(config));
+}
+
 /**
  * `release.release_date` (or, with `undefined`, no release day, so the calendar proposes one) in a fixture's
  * project.yaml. Call it before `buildRelease`.
@@ -136,13 +145,15 @@ export async function setReleaseDay(projectDir: string, date: string | undefined
 export async function siblingCalendar(
   projectDir: string,
   slug: string,
-  calendar: { release_date: string; distribution?: string; shortDay?: string },
+  calendar: { release_date: string; distribution?: string; shortDay?: string; demo?: boolean },
 ): Promise<{ path: string; text: string }> {
   const dir = join(dirname(projectDir), slug);
   await mkdir(join(dir, 'review'), { recursive: true });
   const config = parse(await readFile(join(projectDir, 'project.yaml'), 'utf8')) as Record<string, unknown>;
   delete config.release;
   config.slug = slug;
+  if (calendar.demo) config.demo = true;
+  else delete config.demo;
   if (calendar.distribution) config.distribution = calendar.distribution;
   else delete config.distribution;
   await writeFile(join(dir, 'project.yaml'), stringify(config));
@@ -166,6 +177,8 @@ export async function fixture(options: { release?: boolean; upload?: boolean } =
   }
   const config = parse(await readFile(join(demo, 'project.yaml'), 'utf8')) as Record<string, unknown>;
   config.slug = 'neon';
+  // The shipped demo is a demo production; the fixture is a real public project.
+  delete config.demo;
   if (options.release !== false) config.release = RELEASE;
   await writeFile(join(dir, 'project.yaml'), stringify(config));
   const state = JSON.parse(await readFile(join(dir, 'state.json'), 'utf8'));
@@ -326,6 +339,8 @@ export async function episodeFixture(options: { seconds?: number; horizontal?: b
   await rm(join(dir, 'timing.effective.json'), { force: true });
   await mkdir(join(dir, 'renders'), { recursive: true });
   await writeFile(join(dir, 'renders', '9x16.mp4'), 'render 9x16');
+  // The shipped demo episode is a demo production; the fixture is a real public episode.
+  await setDemo(dir, false);
   if (options.horizontal) {
     const projectPath = join(dir, 'project.yaml');
     const config = parse(await readFile(projectPath, 'utf8')) as { formats: Record<string, unknown> };

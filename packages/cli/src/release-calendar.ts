@@ -45,8 +45,8 @@ export async function siblingProjects(projectRoot: string): Promise<string[]> {
 
 /**
  * The calendars of every other publicly released project in the workspace, read for the plan of one project. A
- * project with distribution internal is no other release: its calendar books no release day and no slot for another
- * project's plan, even when it stays on disk (CMD-PlanReleaseCalendar). An unreadable calendar is skipped; a project
+ * project with distribution internal or a demo production is no other release: its calendar books no release day and
+ * no slot for another project's plan, even when it stays on disk (CMD-PlanReleaseCalendar; ST-040, ST-068). An unreadable calendar is skipped; a project
  * whose `project.yaml` cannot be read counts as public, so a broken file keeps its booking rather than silently
  * freeing a day or a slot.
  */
@@ -143,12 +143,13 @@ export async function runCalendar(options: {
   now?: Date;
   log?: (line: string) => void;
 }): Promise<ReleaseCalendar> {
-  const { loadProject, releaseIdentity, releasedPublicly, releaseForm } = await import('@coreslopper/core');
+  const { loadProject, releaseIdentity, getsReleasePackage, releaseForm } = await import('@coreslopper/core');
   const { listShorts, shortName } = await import('./release-files.js');
   const { loadUploadData, uploadPaths } = await import('./upload-text.js');
   const { songJson } = await import('./release.js');
   const project = await loadProject(options.projectDir);
-  if (!releasedPublicly(project.config)) {
+  // A demo production still plans its own calendar; it only books nothing for another project's plan (ST-068).
+  if (!getsReleasePackage(project.config)) {
     throw new ValidationError(`${project.config.slug} is not released publicly (distribution: internal): it gets no release calendar.`);
   }
   const data = existsSync(uploadPaths(project.paths.root).data) ? await loadUploadData(project.paths.root) : undefined;

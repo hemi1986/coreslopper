@@ -9,7 +9,7 @@ import {
   projectNextAction,
   projectTemplate,
   queueCounts,
-  releasedPublicly,
+  getsReleasePackage,
   seriesNextAction,
   stageViews,
   type NextAction,
@@ -260,7 +260,7 @@ async function collect(projectDir: string, detail: boolean): Promise<ProductionD
   const project = await loadProject(projectDir);
   const { config, state, paths } = project;
   const stages = stageViews(state);
-  const internal = !releasedPublicly(config);
+  const internal = !getsReleasePackage(config);
   const demo = config.demo === true;
   const hasRelease = !internal && existsSync(join(paths.renders, 'release', 'manifest.json'));
   const status = await loadStatus(projectDir).catch(() => undefined);
