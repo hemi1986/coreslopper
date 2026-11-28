@@ -1,0 +1,3 @@
+{"version":1,"target":"ST-059","entries":[
+{"key":"claude-code|08f727ca-790b-46fd-bfaf-0149925942bd|a74b208fb6a064688|ST-059|kontext|2026-11-28T00:55:05.207Z|claude-code|08f727ca-790b-46fd-bfaf-0149925942bd|a74b208fb6a064688|/","target":"ST-059","phase":"kontext","harness":"claude-code","run":"08f727ca-790b-46fd-bfaf-0149925942bd","session":"08f727ca-790b-46fd-bfaf-0149925942bd","agent":"a74b208fb6a064688","agentType":"story-worker","model":null,"provider":null,"start":"2026-11-28T00:55:05.207Z","end":"2026-11-28T00:55:07.336Z","messages":0,"tokens":{"input":0,"output":0,"reasoning":0,"cacheRead":0,"cacheWrite":0,"cacheWrite1h":0},"harnessCostUsd":null,"agentMs":2129,"userWaitMs":0,"recorded":"2026-11-28T00:55:07.518Z"}
+]}
