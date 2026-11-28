@@ -131,6 +131,14 @@ describe('the contact sheet read model', () => {
     expect(answer.status).toBe(400);
     expect(JSON.parse(answer.body)).toEqual({ error: 'malformed address' });
   });
+
+  it('answers an address that is no URL with a 400, not a server error', async () => {
+    const { ws } = await workspace();
+    const handler = boardHandler({ root: ws, refresh: async () => undefined });
+    const answer = await request(handler, '//[');
+    expect(answer.status).toBe(400);
+    expect(JSON.parse(answer.body)).toEqual({ error: 'malformed address' });
+  });
 });
 
 // ---- the tab's module ----

@@ -443,12 +443,13 @@ export function boardHandler(options: BoardOptions = {}) {
 
   return async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     try {
-      const url = new URL(req.url ?? '/', 'http://localhost');
+      let url: URL;
       let path: string;
       try {
+        url = new URL(req.url ?? '/', 'http://localhost');
         path = decodeURIComponent(url.pathname);
       } catch {
-        // A malformed percent sequence (`%E0`) is a bad address, not a server error.
+        // An address that is no URL (`//[`) or holds a malformed percent sequence (`%E0`) is a bad address, not a server error.
         return json(res, { error: 'malformed address' }, 400);
       }
       if (req.method !== 'GET') {
