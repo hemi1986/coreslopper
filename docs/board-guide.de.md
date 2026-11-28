@@ -102,7 +102,7 @@ Wenn ein Projekt fertig ist, enthält der Tab **Release** alles für die Veröff
 
 ![Die Figuren-Bibliothek](assets/board/de/characters.webp)
 
-**Figuren** ist deine Figuren-Bibliothek. Die Figuren eines Projekts kommen von selbst hinein, sobald seine Character-Bible fertig ist. **Aus Projekt oder Serie übernehmen** importiert vorhandene Figuren, **Neue Figur anlegen** fügt eigene hinzu. In der Ansicht einer Figur kopiert **Übernehmen in** sie in ein Musikvideo oder den Canon einer Serie.
+**Figuren** ist deine Figuren-Bibliothek, eine Tabelle mit einer Zeile pro Figur: Vorschaubild, Schlagworte, Bilder und Zustände, Stimme, in wie vielen Produktionen sie steckt und woher sie kommt. Suche nach Name, Beschreibung oder Schlagwort, filtere nach Schlagwort, **unbenutzt** oder **Herkunft** und sortiere per Klick auf einen Spaltenkopf; die Adresse behält alles, sodass Zurück und Aktualisieren zur selben Liste führen. Ein Klick auf eine Zeile öffnet die Figur. Die Figuren eines Projekts kommen von selbst hinein, sobald seine Character-Bible fertig ist. **Aus Projekt oder Serie übernehmen** importiert vorhandene Figuren, **Neue Figur anlegen** fügt eigene hinzu. In der Ansicht einer Figur kopiert **Übernehmen in** sie in ein Musikvideo oder den Canon einer Serie.
 
 ## Serien
 

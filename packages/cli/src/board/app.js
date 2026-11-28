@@ -6,7 +6,7 @@
 //   #/p/<slug>/contact-sheet                 the contact sheet
 //   #/p/<slug>/doc/<path>                    a project document (brief, treatment, …)
 //   #/s/<slug>       a series                #/new[/video|series|episode|meme[/<slug>]]  the wizard
-//   #/characters[/<id>]                     the character library
+//   #/characters[?…]  the character list     #/characters/<id>  one library character
 //   #/sets[/<id>]                           the set library
 //   #/sounds[/<id>]                         the sound library
 //   #/guide[/<doc>]                          the board guide, or another page of docs/
@@ -18,7 +18,7 @@ import { onReleaseChange, showCalendar, showRelease } from './release.js';
 import { showReview } from './review.js';
 import { showContactSheet } from './contact-sheet.js';
 import { showWizard } from './wizard.js';
-import { showCharacters } from './characters.js';
+import { CHARACTERS_ROUTE, showCharacters } from './characters.js';
 import { showSets } from './sets.js';
 import { showSounds } from './sounds.js';
 import { showGuide } from './guide.js';
@@ -40,7 +40,8 @@ function route() {
   else if (PROJECTS_ROUTE.test(hash)) { active = 'projects'; view = showProjects(); }
   else if (hash === '#/calendar') { active = 'calendar'; view = showCalendar(); }
   else if ((match = /^#\/guide(?:\/([a-z][a-z0-9-]*(?:\.de)?))?\/?$/.exec(hash))) { active = 'guide'; view = showGuide(match[1]); }
-  else if ((match = /^#\/characters(?:\/([a-z0-9][a-z0-9_-]*))?\/?$/.exec(hash))) { active = 'characters'; view = showCharacters(match[1]); }
+  else if (CHARACTERS_ROUTE.test(hash)) { active = 'characters'; view = showCharacters(); }
+  else if ((match = /^#\/characters\/([a-z0-9][a-z0-9_-]*)\/?$/.exec(hash))) { active = 'characters'; view = showCharacters(match[1]); }
   else if ((match = /^#\/sets(?:\/([a-z0-9][a-z0-9_-]*))?\/?$/.exec(hash))) { active = 'sets'; view = showSets(match[1]); }
   else if ((match = /^#\/sounds(?:\/([a-z0-9][a-z0-9_-]*))?\/?$/.exec(hash))) { active = 'sounds'; view = showSounds(match[1]); }
   else if ((match = /^#\/p\/([a-z0-9-]+)\/release(?:\/([a-z]+))?(?:\/(.+))?$/.exec(hash))) { active = 'release:' + match[1]; view = showRelease(match[1], match[2], match[3]); }

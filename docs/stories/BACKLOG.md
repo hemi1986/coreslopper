@@ -4,15 +4,20 @@
 
 **Progress: 31 of 31 domain stories done** · scenarios 108 of 108
 
-**66 stories** · In Progress: 0 · Ready: 7 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 59 · Superseded: 0
+**66 stories** · In Progress: 1 · Ready: 6 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 59 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
+
+## In Progress
+
+| ID | Title | Type | Context | Priority | Size | Risk | Depends on |
+|---|---|---|---|---|---|---|---|
+| [ST-060](ST-060-the-boards-character-list.md) | The board's Characters view is a searchable, filterable table | task | – | must | – | – | – |
 
 ## Ready
 
 | ID | Title | Type | Context | Priority | Size | Risk | Depends on |
 |---|---|---|---|---|---|---|---|
-| [ST-060](ST-060-the-boards-character-list.md) | The board's Characters view is a searchable, filterable table | task | – | must | – | – | – |
 | [ST-061](ST-061-the-boards-set-list.md) | The board's Sets view is a searchable, filterable table | task | – | must | – | – | – |
 | [ST-062](ST-062-the-boards-sound-list.md) | The board's Sounds view is a searchable, filterable table with playback | task | – | must | – | – | – |
 | [ST-064](ST-064-the-new-character-wizard.md) | The New chooser offers the library, and a wizard creates or imports characters | task | – | must | – | – | – |
