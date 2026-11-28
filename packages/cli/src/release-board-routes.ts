@@ -5,7 +5,7 @@ import {
   ValidationError,
   calendarIcs,
   loadProject,
-  releasedPublicly,
+  getsReleasePackage,
   type ReleaseCalendar,
 } from '@coreslopper/core';
 import { body, json, send, serveMedia } from './board-http.js';
@@ -40,7 +40,7 @@ export interface ReleaseRoutes {
 
 /** The quick refresh after a live URL arrives: texts and microsite data, no renders, no new stills; an internal project has none. */
 async function quickRelease(projectDir: string, root: string): Promise<void> {
-  if (!releasedPublicly((await loadProject(projectDir)).config)) return;
+  if (!getsReleasePackage((await loadProject(projectDir)).config)) return;
   const { buildRelease } = await import('./release.js');
   await buildRelease({ projectDir, root, render: false, stills: false, deps: { log: () => undefined } });
 }

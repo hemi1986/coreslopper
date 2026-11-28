@@ -143,12 +143,13 @@ export async function runCalendar(options: {
   now?: Date;
   log?: (line: string) => void;
 }): Promise<ReleaseCalendar> {
-  const { loadProject, releaseIdentity, releasedPublicly, releaseForm } = await import('@coreslopper/core');
+  const { loadProject, releaseIdentity, getsReleasePackage, releaseForm } = await import('@coreslopper/core');
   const { listShorts, shortName } = await import('./release-files.js');
   const { loadUploadData, uploadPaths } = await import('./upload-text.js');
   const { songJson } = await import('./release.js');
   const project = await loadProject(options.projectDir);
-  if (!releasedPublicly(project.config)) {
+  // A demo production still plans its own calendar; it only books nothing for another project's plan (ST-068).
+  if (!getsReleasePackage(project.config)) {
     throw new ValidationError(`${project.config.slug} is not released publicly (distribution: internal): it gets no release calendar.`);
   }
   const data = existsSync(uploadPaths(project.paths.root).data) ? await loadUploadData(project.paths.root) : undefined;

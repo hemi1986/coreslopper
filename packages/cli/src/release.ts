@@ -26,7 +26,7 @@ import {
   readJsonFile,
   releaseIdentity,
   releaseTodos,
-  releasedPublicly,
+  getsReleasePackage,
   keptShapeProblem,
   manifestShape,
   provisionalShapeTodo,
@@ -334,8 +334,8 @@ export async function usedSoundCredits(project: Pick<LoadedProject, 'takes' | 'p
 export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResult> {
   const deps = { ...(await defaultDeps()), ...options.deps };
   const project = await loadProject(options.projectDir);
-  if (!releasedPublicly(project.config)) {
-    throw new ValidationError(`${notReleasedPublicly(project.config.slug)}: it gets no release package.`);
+  if (!getsReleasePackage(project.config)) {
+    throw new ValidationError(`${notReleasedPublicly(project.config)}: it gets no release package.`);
   }
   const root = options.root ?? repoRoot();
   const kind = project.config.kind;
@@ -783,8 +783,8 @@ function resolveCanvasStart(value: string, timing: NonNullable<LoadedProject['ef
 export async function runRelease(options: ReleaseOptions): Promise<ReleaseResult | undefined> {
   const log = options.deps?.log ?? ((line: string) => console.log(line));
   const { config } = await loadProject(options.projectDir);
-  if (!releasedPublicly(config)) {
-    log(`${notReleasedPublicly(config.slug)}: no release folder, no release calendar.`);
+  if (!getsReleasePackage(config)) {
+    log(`${notReleasedPublicly(config)}: no release folder, no release calendar.`);
     return undefined;
   }
   const result = await buildRelease(options);
