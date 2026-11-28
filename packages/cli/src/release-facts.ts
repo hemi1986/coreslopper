@@ -159,7 +159,7 @@ export async function loadReleaseFacts(projectRoot: string, root: string): Promi
     // A meme and a short episode are Shorts, never a Premiere.
     premiere: !oneVideo && schedule.release.premiere,
     durationSeconds: timing?.audio.duration,
-    playlist: seriesPlaylist(project, shape),
+    playlist: seriesPlaylist(project, shape)?.playlist,
   };
   const handle = channel?.links.youtube?.handle;
   const planBase = buildReleasePlan({

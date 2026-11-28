@@ -24,7 +24,7 @@ import {
 } from '@coreslopper/core';
 import { shortProblems, verticalVersionProblems } from './release-files.js';
 import { canvasProblems, probeMedia, videoFacts, videoProblems, wavProblems, type Prober } from './release-media.js';
-import { projectFormats, releaseDir, seriesPlaylist, seriesPlaylistTodo, usedLibrarySounds } from './release.js';
+import { projectFormats, releaseDir, seriesPlaylist, usedLibrarySounds } from './release.js';
 import { releaseLabels } from './release-texts.js';
 import { jpegInfo, thumbnailProblems } from './thumbnail-files.js';
 import { loadUploadData, uploadPaths } from './upload-text.js';
@@ -282,8 +282,7 @@ export async function releaseChecks(projectDir: string, probe: Prober = probeMed
   // A short episode joins its series' YouTube playlist; a missing URL is a TODO, never a failure.
   const shape = plan?.shape ?? form.shape;
   const playlist = seriesPlaylist(project, shape);
-  const playlistTodo = seriesPlaylistTodo(project, shape);
-  if (playlist) checks.push(playlistTodo ? check('Release playlist', 'TODO', playlistTodo) : check('Release playlist', 'PASS', `"${playlist.title}": ${playlist.url}`));
+  if (playlist) checks.push(playlist.todo ? check('Release playlist', 'TODO', playlist.todo) : check('Release playlist', 'PASS', `"${playlist.playlist.title}": ${playlist.playlist.url}`));
 
   if (music) {
     const meta = await song(project);
