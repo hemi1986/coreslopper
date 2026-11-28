@@ -1200,6 +1200,55 @@ export const ReleaseStatusSchema = z.object({
     .default({}),
 });
 
+/** The video's aspect on the microsite page: the master's, one of the release formats (ADR 0057). */
+export const MicrositeAspectSchema = z.enum(['16:9', '9:16', '4:5', '1:1']);
+
+/**
+ * `renders/release/microsite/<slug>.json`: the song page of the artist microsite, a published language
+ * read by a site built elsewhere (ADR 0045). `release` is its one producer. New fields are optional, so
+ * the version stays and older data stays valid.
+ */
+export const MicrositeSongSchema = z.object({
+  version: z.literal(1),
+  slug: z.string().min(1),
+  artist: z.string().optional(),
+  title: z.string(),
+  language: z.string(),
+  release_date: DaySchema.optional(),
+  teaser: z.string().optional(),
+  text: z.string().optional(),
+  quote: z.string().optional(),
+  /** Plain lyrics, stanzas separated by blank lines. */
+  lyrics: z.string().optional(),
+  /** Files of the release folder, relative to it. `thumbnail` is the image the page shows beside the video. */
+  images: z.object({ cover: z.string().optional(), thumbnail: z.string().optional(), shorts: z.array(z.string()) }),
+  /** The master's aspect; absent in data written before it existed. */
+  aspect: MicrositeAspectSchema.optional(),
+  /** Live URLs, filled in as the user posts. */
+  links: z.object({
+    youtube: z.string().optional(),
+    spotify: z.string().optional(),
+    tiktok: z.string().optional(),
+    instagram: z.string().optional(),
+    x: z.string().optional(),
+    linkedin: z.string().optional(),
+  }),
+  shorts: z.array(
+    z.object({
+      name: z.string(),
+      title: z.string().optional(),
+      links: z.object({ youtube: z.string().optional(), tiktok: z.string().optional(), instagram: z.string().optional(), x: z.string().optional() }),
+    }),
+  ),
+  /** The channel's profile links, for the page footer. */
+  profiles: z.record(z.string(), z.string()),
+  /** The AI disclosure line (EU AI Act Art. 50) and the credits. */
+  disclosure: z.string(),
+  credits: z.array(z.string()),
+});
+export type MicrositeAspect = z.infer<typeof MicrositeAspectSchema>;
+export type MicrositeSong = z.infer<typeof MicrositeSongSchema>;
+
 export const AutopilotEntryStatusSchema = z.enum([
   /** An attempt started; a crash leaves it standing, and the post then waits for the user. */
   'running',
