@@ -9,7 +9,7 @@ risk: null
 depends_on: []
 labels: [feature:demo-projects]
 feature: demo-projects
-status: ready
+status: in-progress
 ---
 
 ## Context
