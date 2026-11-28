@@ -1,8 +1,11 @@
 // The project list (#/projects, ADR 0058): every music video, meme, episode and series as one row of a table, newest
 // activity first. Search, filters, sort and the series grouping live in the address hash
 // (`#/projects?q=…&kind=…&status=…&series=…&group=series&sort=title&dir=asc`), so a refresh, Back and a link keep
-// them. It reads /api/production and /api/projects and writes nothing.
+// them. It reads /api/production and /api/projects and writes nothing. Demo productions are hidden unless the
+// board's switch Show demos is on (demos.js, kept in the browser, not in the address); then, and in a workspace with
+// nothing else, they follow the other rows in a group Demos.
 import { addStrings, ago, api, el, go, local, setLang, showError, t } from './lib.js';
+import { demoChip, demoSwitch, demosShown, onlyDemos } from './demos.js';
 
 addStrings({
   de: {
@@ -119,7 +122,7 @@ export function listItems(production, releases, today) {
       kind: kind, slug: p.slug, title: p.title, artist: p.artist, series: series, seriesTitle: series ? seriesTitle[series] || series : undefined, episode: p.episode,
       state: projectState(p, release, today), phase: p.phase, stage: p.phase !== 'done' && current ? current.label : undefined, next: p.next,
       releaseDate: (release && release.releaseDate) || p.releaseDate, releaseDone: release && release.total ? release.done : undefined, releaseTotal: release && release.total ? release.total : undefined,
-      lastActivity: p.lastActivity, href: '#/p/' + p.slug
+      lastActivity: p.lastActivity, href: '#/p/' + p.slug, demo: p.demo === true
     };
   });
   const planned = {};
@@ -130,7 +133,7 @@ export function listItems(production, releases, today) {
     items.push({
       kind: 'series', slug: s.slug, title: s.title, state: s.next.where !== 'none' ? 'yours' : 'done', next: s.next,
       created: s.episodes.filter(function (e) { return e.slug; }).length, total: s.episodes.length,
-      lastActivity: newest || undefined, href: '#/s/' + s.slug
+      lastActivity: newest || undefined, href: '#/s/' + s.slug, demo: s.demo === true
     });
     planned[s.slug] = s.episodes.filter(function (e) { return !e.slug; }).map(function (e) {
       return { kind: 'episode', planned: true, slug: '', title: e.title, episode: e.episode, series: s.slug, seriesTitle: s.title, state: null };
@@ -161,12 +164,33 @@ function sorted(items, state) {
 
 function anyFilter(state) { return Boolean(state.q || state.kind.length || state.status.length || state.series || state.group); }
 
+/** Whether the list has a demo production, and whether it has nothing else (then the demos show without the switch). */
+export function listDemos(list) {
+  return { any: list.items.some(function (i) { return i.demo; }), only: onlyDemos(list.items) };
+}
+
+/** The items the list shows: without the demo productions unless `showDemos`. */
+export function visibleItems(list, showDemos) {
+  return showDemos ? list.items : list.items.filter(function (i) { return !i.demo; });
+}
+
 /**
  * The rows to show: `{ item, indent, head, match }` (`match`: whether a series row matches itself, not only through
  * its episodes). Off, one flat list; grouped, every series row with its episodes below
  * it, the planned episodes after them while no search and no state filter is active, then the projects in no series.
+ * The demo productions are left out; with `showDemos` the matching ones follow everything else under a divider
+ * Demos (`{ divider: 'demos' }`), sorted, without the grouping.
  */
-export function listRows(list, state) {
+export function listRows(list, state, showDemos) {
+  const rows = realRows({ items: list.items.filter(function (i) { return !i.demo; }), planned: list.planned }, state);
+  if (!showDemos) return rows;
+  const demos = sorted(list.items.filter(function (i) { return i.demo && matches(i, state); }), state);
+  if (demos.length) rows.push({ divider: 'demos' });
+  demos.forEach(function (item) { rows.push({ item: item }); });
+  return rows;
+}
+
+function realRows(list, state) {
   const hit = list.items.filter(function (i) { return matches(i, state); });
   if (!state.group) return sorted(hit, state).map(function (item) { return { item: item }; });
   const heads = list.items.filter(function (i) { return i.kind === 'series' && !i.error; });
@@ -230,7 +254,8 @@ function filterBar() {
     setState(Object.assign({}, view.state, { q: event.target.value }), false);
   } });
   search.value = state.q;
-  const series = view.list.items.filter(function (i) { return i.kind === 'series' && !i.error; });
+  const demos = listDemos(view.list);
+  const series = visibleItems(view.list, demosShown(demos.only)).filter(function (i) { return i.kind === 'series' && !i.error; });
   const select = el('select', { class: 'pl-select', 'aria-label': t('plSeries'), oninput: quiet, onchange: function (event) {
     setState(Object.assign({}, view.state, { series: event.target.value }), true);
   } }, [el('option', { value: '', text: t('plAll') })].concat(series.map(function (s) {
@@ -247,6 +272,7 @@ function filterBar() {
     chips('plStatus', 'status', STATES, 'plStates'),
     el('label', { class: 'pl-filter' }, [el('span', { class: 'pl-label', text: t('plSeries') }), select]),
     el('label', { class: 'pl-filter pl-switch' }, [group, ' ' + t('plGroup')]),
+    demos.any && !demos.only ? demoSwitch(draw) : null,
     view.reset
   ]);
 }
@@ -278,7 +304,7 @@ function nextCell(item) {
 }
 
 function row(entry) {
-  if (entry.divider) return el('tr', { class: 'pl-divider' }, [el('td', { colspan: '7', text: t('plNoSeries') })]);
+  if (entry.divider) return el('tr', { class: 'pl-divider' }, [el('td', { colspan: '7', text: entry.divider === 'demos' ? t('groupDemos') : t('plNoSeries') })]);
   const item = entry.item;
   const cls = (entry.indent ? 'pl-indent ' : '') + (entry.head ? 'pl-head ' : '');
   if (item.error) return el('tr', { class: cls + 'pl-error' }, [
@@ -292,7 +318,7 @@ function row(entry) {
   const phase = item.kind === 'series' ? t('plEpisodes')(item.created, item.total) : item.stage || t('plPhases')[item.phase] || '';
   const release = item.releaseDate ? item.releaseDate + (item.releaseTotal ? ' · ' + item.releaseDone + '/' + item.releaseTotal : '') : '—';
   return el('tr', { class: cls + 'link-row', 'data-slug': item.slug, onclick: function () { go(item.href); } }, [
-    el('td', {}, [el('b', { text: (item.artist ? item.artist + ' – ' : '') + item.title }), el('span', { class: 'sub', text: item.slug })]),
+    el('td', {}, [el('b', { text: (item.artist ? item.artist + ' – ' : '') + item.title }), item.demo ? demoChip() : null, el('span', { class: 'sub', text: item.slug })]),
     el('td', { text: kindText(item) }),
     el('td', {}, [el('span', { class: 'pill pl-' + item.state, text: t('plStates')[item.state] })]),
     el('td', { text: phase }),
@@ -308,13 +334,14 @@ function drawResults() {
   // The search redraws only the results, so the reset button of the bar is drawn here too.
   view.reset.innerHTML = '';
   if (anyFilter(view.state)) view.reset.appendChild(resetButton('small'));
-  const rows = listRows(view.list, view.state);
+  const shown = demosShown(listDemos(view.list).only);
+  const rows = listRows(view.list, view.state, shown);
   if (!rows.length) {
     results.appendChild(el('div', { class: 'empty pl-nomatch' }, [el('p', { text: t('plNoMatch') }), resetButton('primary')]));
     return;
   }
-  const shown = rows.filter(function (r) { return r.item && !r.item.planned && (!r.head || r.match); }).length;
-  results.appendChild(el('p', { class: 'sub pl-count', text: t('plCount')(shown, view.list.items.length) }));
+  const counted = rows.filter(function (r) { return r.item && !r.item.planned && (!r.head || r.match); }).length;
+  results.appendChild(el('p', { class: 'sub pl-count', text: t('plCount')(counted, visibleItems(view.list, shown).length) }));
   results.appendChild(el('table', { class: 'list pl-table' }, [header(), el('tbody', {}, rows.map(row))]));
 }
 

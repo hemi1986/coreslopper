@@ -230,6 +230,8 @@ export const entryDir = kind.entryDir;
 export interface LibraryUse {
   scope: 'project' | 'series';
   slug: string;
+  /** True when the production is a demo production; absent otherwise. */
+  demo?: true;
   /** The character's id there (usually the library id). */
   character: string;
 }

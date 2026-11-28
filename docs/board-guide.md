@@ -32,6 +32,8 @@ The board does not refresh by itself. Press **↻ Refresh** at the right of the 
 
 The navigation lists no project: **Projects** opens the list of every project and series, released ones included.
 
+The three demo productions every workspace ships are hidden once you have a project of your own. Switch on **Show demos**, here or in **Projects**, to see them in a group **Demos** at the end; the board remembers the switch in this browser. In a fresh workspace with nothing else, the demos show in **Demos** without the switch.
+
 ## Projects: find a project
 
 **Projects** is a table of every music video, meme, episode, and series, the newest activity first. Each row shows the kind, the state, the current stage, the next step, the release day with how many release events are done, and when something last changed. Click a row to open it.
@@ -96,7 +98,7 @@ When a project is done, the **Release** tab holds everything for publishing it.
 
 ![The release calendar, week by week](assets/board/en/calendar.webp)
 
-**Release calendar** shows what goes online when, across all projects, week by week. **open only** hides what is done. **Calendar as .ics** exports it for your calendar app.
+**Release calendar** shows what goes online when, across all projects, week by week. **open only** hides what is done. **Calendar as .ics** exports it for your calendar app. A demo production's events are never on it.
 
 ## Characters
 
@@ -108,7 +110,7 @@ When a project is done, the **Release** tab holds everything for publishing it.
 
 **Sounds** is the sound library of your memes, the same kind of table: one row per sound with a play button, its use when, its length after the trim, its licence, tags, and how many memes took it. ▶ plays the sound right in the row, a second click stops it, and another row's ▶ stops the first. Search by title, use when, or tag, filter by tag, **unused**, or **Licence** (`unknown` finds what the release check will flag), and sort by the column headers; the address keeps it all. A click elsewhere on the row opens the sound. **+ New** in the head of the list opens the sound wizard, as **+ New** → **Sound** does. Choose the audio file, fill in the title and use when (all three required) and tags, and click **Upload**. In the next step the sound plays: pause where it hits and click **Set cue here**, and use **Trim start here** and **Trim end here** to cut it; **Next** keeps what is set, and skipping it is fine. Last, enter the licence, source, and credit if you know them and click **Save**; without a licence it stays `unknown`, which the release check flags. **To the sound** opens its page, and a reload goes on where you were. A refused entry (a missing file or title, a file that is not audio, a cue outside the sound) shows its reason in the step and keeps what you typed.
 
-To delete several entries at once, tick their rows in Characters, Sets, or Sounds; the checkbox in the header ticks every row the search and filters show (filter **unused** first to clear out what nothing uses). The bar above the table counts them and offers **Delete** and **Clear selection**. **Delete** asks once and names where the selected entries are used; those productions and memes keep their copies, and **Cancel** changes nothing. If the library refuses an entry, the bar names it with the reason and it stays ticked; the others are gone.
+To delete several entries at once, tick their rows in Characters, Sets, or Sounds; the checkbox in the header ticks every row the search and filters show (filter **unused** first to clear out what nothing uses). The bar above the table counts them and offers **Delete** and **Clear selection**. **Delete** asks once and names where the selected entries are used; those productions and memes keep their copies, and **Cancel** changes nothing. If the library refuses an entry, the bar names it with the reason and it stays ticked; the others are gone. While the demos are hidden, a use in a demo does not count as a use, so **unused** finds what only the demos use; the entry's page still lists it, marked "(Demo)".
 
 ## Series
 

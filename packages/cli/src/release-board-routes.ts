@@ -152,7 +152,8 @@ export function releaseRoutes(options: ReleaseRoutesOptions): ReleaseRoutes {
         return answer(res, await boardProject(dir, root, { now: now() }));
       }
       if (req.method === 'GET' && path === '/api/calendar') {
-        const projects = (await allProjects()).filter((project): project is BoardProject => !('error' in project));
+        // A demo production is not released (ST-068): its calendar stays off the workspace's calendar.
+        const projects = (await allProjects()).filter((project): project is BoardProject => !('error' in project) && !project.demo);
         return answer(
           res,
           projects
@@ -163,7 +164,8 @@ export function releaseRoutes(options: ReleaseRoutesOptions): ReleaseRoutes {
         );
       }
       if (req.method === 'GET' && path === '/calendar.ics') {
-        const projects = (await allProjects()).filter((project): project is BoardProject => !('error' in project));
+        // A demo production is not released (ST-068): its calendar stays off the workspace's calendar.
+        const projects = (await allProjects()).filter((project): project is BoardProject => !('error' in project) && !project.demo);
         const calendars: { calendar: ReleaseCalendar; labels: Map<string, string> }[] = [];
         for (const project of projects) {
           const calendar = await loadCalendar(join(root, 'projects', project.slug));
