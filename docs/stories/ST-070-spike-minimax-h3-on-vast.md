@@ -25,12 +25,18 @@ Half a day and at most $5 of rental, one RTX PRO 6000 S rented with the user's `
 instance is destroyed at the end even when a question stays open. Run by the user with `/implement ST-070`.
 
 ## Acceptance Criteria
-- [ ] The `template_hash_id` to rent with, the image tag, the disk the template needs, and the hourly price paid
-- [ ] Where ComfyUI listens, and that a request with `WEB_PASSWORD` as `Authorization: Bearer` gets an answer while one without it gets 401 (F8)
-- [ ] How a client finds the ComfyUI URL of a new rental through the REST API (tunnel URL or mapped port), or that it cannot (HS-270)
-- [ ] Time from renting to the first answer of ComfyUI, and whether the models are in the image or downloaded at boot (HS-271)
-- [ ] The MiniMax H3 workflow templates the install ships (names), exported with Export (API) into `docs/research/vast-minimax-h3/` with their model file names
-- [ ] One clip each for text-, image-, first/last-frame- and reference-to-video, with time per clip and a note on the prompt form that worked
-- [ ] Lip-sync: the template's reference-to-video graph plus `LoadAudio`, `TrimAudioDuration` and `MiniMaxH3AddGuide` at frame 0 (as in ADR 0027, without the Pika LoRA) on a lead-only segment of a real shot; the user's verdict on mouth sync and identity (HS-269)
-- [ ] The instance was destroyed, and the total cost of the spike
-- [ ] A recommendation per open hotspot, recorded in `docs/research/vast-gpu-rental.md`
+- [x] The `template_hash_id` to rent with, the image tag, the disk the template needs, and the hourly price paid
+- [x] Where ComfyUI listens, and that a request with `WEB_PASSWORD` as `Authorization: Bearer` gets an answer while one without it gets 401 (F8)
+- [x] How a client finds the ComfyUI URL of a new rental through the REST API (tunnel URL or mapped port), or that it cannot (HS-270)
+- [x] Time from renting to the first answer of ComfyUI, and whether the models are in the image or downloaded at boot (HS-271)
+- [x] The MiniMax H3 workflow templates the install ships (names), exported with Export (API) into `docs/research/vast-minimax-h3/` with their model file names
+- [x] One clip each for text-, image-, first/last-frame- and reference-to-video, with time per clip and a note on the prompt form that worked
+- [x] Lip-sync: the template's reference-to-video graph plus `LoadAudio`, `TrimAudioDuration` and `MiniMaxH3AddGuide` at frame 0 (as in ADR 0027, without the Pika LoRA) on a lead-only segment of a real shot; the user's verdict on mouth sync and identity (HS-269)
+- [x] The instance was destroyed, and the total cost of the spike
+- [x] A recommendation per open hotspot, recorded in `docs/research/vast-gpu-rental.md`
+
+## Results
+Answered 2026-11-28 in `docs/research/vast-gpu-rental.md` (F10–F16, *Recommendations (ST-070)*), exports in
+`docs/research/vast-minimax-h3/`. Rented an RTX PRO 6000 WS (no S below $1.47/h) at $1.42/h for 39.5 min; total
+cost about $1.03; the instance was destroyed. The user judged the four operations good (first/last frame showed a
+cross-fade into the last frame) and plain H3 lip-sync usable for speech, shouting and singing.
