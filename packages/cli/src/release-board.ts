@@ -444,7 +444,13 @@ export function boardHandler(options: BoardOptions = {}) {
   return async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     try {
       const url = new URL(req.url ?? '/', 'http://localhost');
-      const path = decodeURIComponent(url.pathname);
+      let path: string;
+      try {
+        path = decodeURIComponent(url.pathname);
+      } catch {
+        // A malformed percent sequence (`%E0`) is a bad address, not a server error.
+        return json(res, { error: 'malformed address' }, 400);
+      }
       if (req.method !== 'GET') {
         const refused = trustedWrite(req, path.startsWith('/api/upload/'));
         if (refused) return json(res, { error: refused }, 403);
