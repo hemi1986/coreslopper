@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.14.1](https://github.com/hemi1986/coreslopper/compare/v0.14.0...v0.14.1) (2026-11-28)
+
+
+### Documentation
+
+* **vast-gpu:** discover a rented GPU on vast (ST-070..ST-078) ([4a1827b](https://github.com/hemi1986/coreslopper/commit/4a1827b4fa1267c0cf33a19384c270dbf8dd6ad0))
+* **vast-gpu:** lip-sync on vast in ST-076, resolve HS-269..HS-271 (ST-070) ([65b1b91](https://github.com/hemi1986/coreslopper/commit/65b1b91a6ce1166456d8e1789c8bbb716e5788b6))
+* **vast-gpu:** spike MiniMax H3 on a rented vast.ai GPU – access, workflows, lip-sync (ST-070) ([decd1e2](https://github.com/hemi1986/coreslopper/commit/decd1e21dd35bdaa6cd2d8a714b49b02e8630e76))
+* **vast-gpu:** Spike: MiniMax H3 on a rented vast.ai GPU – access, workflows, lip-sync (ST-070) ([a695a57](https://github.com/hemi1986/coreslopper/commit/a695a57ab6bda3e25b555f243e8488f07d27aa31))
+
 ## [0.14.0](https://github.com/hemi1986/coreslopper/compare/v0.13.0...v0.14.0) (2026-11-28)
 
 
