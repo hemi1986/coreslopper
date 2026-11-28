@@ -16,11 +16,13 @@ npm run cli -- board          # http://127.0.0.1:4848
 
 Oder im Board-Container, der auch den Watchdog ausführt: `docker compose up -d` (siehe [board.md](board.md#start-it)). Öffne http://127.0.0.1:4848 im Browser.
 
-Das Board aktualisiert sich nicht von selbst. Klicke oben in der Navigation auf **↻ Aktualisieren**, nachdem Claude Code gearbeitet hat. Ein laufendes Video oder eine Notiz, die du gerade schreibst, bleiben erhalten.
+Die Navigation ist die Leiste oben. **Arbeit** enthält Produktion, Projekte und Release-Kalender; **Bibliothek** enthält Figuren, Sets und Sounds. **+ Neu** legt etwas Neues an, **Anleitung** und **↻ Aktualisieren** stehen abgesetzt rechts. Der Eintrag der Ansicht, auf der du bist, ist markiert; die Tabs eines Projekts und eine Serie markieren **Projekte**.
+
+Das Board aktualisiert sich nicht von selbst. Klicke rechts in der Navigation auf **↻ Aktualisieren**, nachdem Claude Code gearbeitet hat. Ein laufendes Video oder eine Notiz, die du gerade schreibst, bleiben erhalten.
 
 ## Produktion: wo du dran bist
 
-![Die Produktionsansicht mit drei Projekten und einer Serie](assets/board/de/production.webp)
+![Die Produktionsansicht mit drei Projekten und einer Serie, unter der Navigationsleiste](assets/board/de/production.webp)
 
 **Produktion** ist die Startansicht. Jede Karte ist ein Projekt oder eine Serie:
 
@@ -28,7 +30,17 @@ Das Board aktualisiert sich nicht von selbst. Klicke oben in der Navigation auf 
 - **Läuft**: Claude Code oder ein Render arbeitet daran.
 - Der farbige Streifen zeigt die Stages. Darunter stehen die aktuelle Stage und das Budget.
 
-Die Navigation links listet alle Projekte und Serien. Ein fertiges Projekt klappt am Ende in **Fertig** ein: ein veröffentlichtes, und ein internes Projekt (**Fertig – nicht öffentlich**), sobald alle Stages fertig sind.
+Die Navigation listet kein Projekt: **Projekte** öffnet die Liste aller Projekte und Serien, die veröffentlichten eingeschlossen.
+
+## Projekte: ein Projekt finden
+
+**Projekte** ist eine Tabelle aller Musikvideos, Memes, Folgen und Serien, die neueste Aktivität zuerst. Jede Zeile zeigt die Art, den Status, die aktuelle Stage, den nächsten Schritt, die Veröffentlichung mit der Zahl der erledigten Release-Termine und wann sich zuletzt etwas geändert hat. Ein Klick auf eine Zeile öffnet sie.
+
+- Tippe ins Suchfeld, um ein Projekt über Titel oder Slug zu finden.
+- Klicke auf **Art**, **Status** oder wähle eine **Serie**, um die Liste einzugrenzen. **Veröffentlicht** zeigt die Projekte, die draußen sind.
+- Klicke auf einen Spaltenkopf, um nach Titel, Veröffentlichung oder letzter Aktivität zu sortieren; ein zweiter Klick dreht die Reihenfolge um.
+- Schalte **Nach Serie gruppieren** ein, um jede Folge unter ihrer Serie zu sehen, mit den geplanten Folgen, die noch kein Projekt haben.
+- **Filter zurücksetzen** leert alles. Die Adresse behält Suche und Filter, sodass **↻ Aktualisieren**, Zurück und ein Lesezeichen dieselbe Liste wiederherstellen.
 
 ## Ein Musikvideo anlegen
 
@@ -48,7 +60,7 @@ Danach lädst du den Song (den Mix) hoch und, falls vorhanden, den Vocal-Stem. M
 
 ## Ein Projekt verfolgen
 
-Klicke in der Navigation auf ein Projekt.
+Klicke auf **Produktion** auf die Karte eines Projekts, oder öffne **Projekte** und klicke auf seine Zeile.
 
 ![Der Produktions-Tab eines fertigen Projekts](assets/board/de/project.webp)
 

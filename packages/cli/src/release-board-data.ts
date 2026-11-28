@@ -7,15 +7,18 @@ import {
   planAutopilot,
   releasedPublicly,
   scheduleZoneWarning,
+  upToThreeMinutes,
   type AutopilotEventPlan,
   type AutopilotPlatform,
   type CalendarEvent,
+  type ReleaseShape,
+  type ShortsSource,
   type ReleaseStatus,
   X_FREE_VIDEO_SECONDS,
 } from '@coreslopper/core';
 import { checklistKey, loadAutopilotLog } from './release-records.js';
 import { micrositeSong, type MicrositeSong } from './release-microsite.js';
-import { calendarEventLabel, distributorRows, mediaFile } from './release-texts.js';
+import { calendarEventLabel, distributorRows, mediaFile, type SeriesPlaylist } from './release-texts.js';
 import { autopilotReadiness, lastRun } from './autopilot-state.js';
 import { loadReleaseFacts, type ReleaseFacts } from './release-facts.js';
 
@@ -45,6 +48,8 @@ export interface BoardChecklistItem {
   /** The release-record key of the line: the post and the line's name, never its position (G-163). */
   key: string;
   label: string;
+  /** Where the line points, e.g. the series playlist; the board links it. */
+  href?: string;
 }
 
 export interface BoardPost {
@@ -116,6 +121,10 @@ export interface BoardProject {
   artist?: string;
   language: string;
   kind: 'music-video' | 'episode' | 'meme';
+  /** The release shape (ADR 0057). */
+  shape: ReleaseShape;
+  /** An episode's shape and why, shown above the platform tabs: "Short episode · 9:16 · 2:41". Absent for a music video and a meme. */
+  shapeLine?: string;
   releaseDate?: string;
   proposed: boolean;
   hasRelease: boolean;
@@ -255,6 +264,8 @@ const BOARD = {
     noRelease: 'Noch kein Release-Paket: `npm run cli -- release projects/<slug>` ausführen.',
     skipLinkedin: 'Kein LinkedIn-Beitrag',
     noLinkedin: 'Noch keine Entscheidung: linkedin in review/upload.yaml',
+    short: 'Short',
+    shape: { 'short-episode': 'Short-Folge', episode: 'Folge', long: 'länger als 3 min', verticalVersion: 'Hochkant-Fassung als Short' },
   },
   en: {
     announceStory: 'Story image with the date',
@@ -320,6 +331,8 @@ const BOARD = {
     noRelease: 'No release package yet: run `npm run cli -- release projects/<slug>`.',
     skipLinkedin: 'No LinkedIn post',
     noLinkedin: 'No decision yet: linkedin in review/upload.yaml',
+    short: 'Short',
+    shape: { 'short-episode': 'Short episode', episode: 'Episode', long: 'over 3 min', verticalVersion: 'vertical version as its Short' },
   },
 };
 
@@ -328,6 +341,31 @@ const kindOf = (path: string): BoardFile['kind'] =>
 const file = (label: string, path: string | undefined): BoardFile[] => (path ? [{ label, path, kind: kindOf(path) }] : []);
 const field = (label: string, value: string | undefined, extra: Partial<BoardField> = {}): BoardField[] => (value?.trim() ? [{ label, value, ...extra }] : []);
 const checklist = (id: string, lines: string[]): BoardChecklistItem[] => lines.map((label) => ({ key: checklistKey(id, label), label }));
+/** The YouTube post's line for a short episode's series playlist, linked when the series names its URL. */
+const playlistLine = (playlist: SeriesPlaylist, label: string): BoardChecklistItem => ({ key: checklistKey('youtube', label), label, ...(playlist.url ? { href: playlist.url } : {}) });
+
+/** A length as m:ss. */
+const minutes = (seconds: number): string => {
+  const whole = Math.round(seconds);
+  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
+};
+
+/**
+ * The release shape and why, for an episode: its format, its length, and what
+ * made it the shape (ADR 0057). A music video and a meme have no line.
+ */
+export function shapeLine(input: { shape: ReleaseShape; shortsSource: ShortsSource; aspect: string; durationSeconds: number | undefined }, b: Pick<(typeof BOARD)['en'], 'shape'>): string | undefined {
+  if (input.shape !== 'episode' && input.shape !== 'short-episode') return undefined;
+  const reason =
+    input.shape === 'short-episode' || input.durationSeconds === undefined
+      ? undefined
+      : !upToThreeMinutes(input.durationSeconds)
+        ? b.shape.long
+        : input.shortsSource === 'vertical-version'
+          ? b.shape.verticalVersion
+          : undefined;
+  return [b.shape[input.shape], input.aspect, ...(input.durationSeconds !== undefined ? [minutes(input.durationSeconds)] : []), ...(reason ? [reason] : [])].join(' · ');
+}
 
 /** Build the board view of one project. */
 export async function boardProject(projectRoot: string, root: string, options: { now?: Date } = {}): Promise<BoardProject> {
@@ -356,6 +394,9 @@ export async function boardProject(projectRoot: string, root: string, options: {
   const videoUrl = status.items.youtube?.url ?? `[${l.videoLink}]`;
   const profile = (platform: string) => channel?.links[platform]?.url ?? channel?.links[platform]?.handle;
   const meme = input.kind === 'meme';
+  // A short episode is one video, as a meme is (ADR 0057).
+  const shortEpisode = input.shape === 'short-episode';
+  const oneVideo = meme || shortEpisode;
   const thumbs = files.thumbnails.map((path, index) => ({ label: index === 0 ? b.upload : b.alt(index + 1), path, kind: 'image' as const }));
   const announcement = meme ? undefined : planValue('announce:youtube', 'text');
   const description = planValue('youtube', 'description');
@@ -367,20 +408,24 @@ export async function boardProject(projectRoot: string, root: string, options: {
   }
   youtube.push({
     id: 'youtube',
-    heading: heading('youtube', b.master),
+    heading: shortEpisode ? b.short : heading('youtube', b.master),
     at: at('youtube'),
-    files: [...file(b.master, files.master), ...(meme ? file(b.cover, files.cover) : []), ...thumbs, ...file(b.subtitles, files.subtitles)],
+    files: [...file(shortEpisode ? b.video : b.master, files.master), ...(oneVideo ? file(b.cover, files.cover) : []), ...thumbs, ...file(b.subtitles, files.subtitles)],
     fields: [
       ...field(b.title, planValue('youtube', 'title'), limitOf('youtube', 'title')),
       ...field(b.description, display(description), { ...limitOf('youtube', 'description'), unit: 'bytes' }),
       ...field(b.hashtags, planValue('youtube', 'hashtags')),
       ...field(b.tags, planValue('youtube', 'tags'), limitOf('youtube', 'tags')),
-      ...field(b.pinned, meme ? undefined : planValue('youtube', 'pinned')),
+      ...field(b.pinned, oneVideo ? undefined : planValue('youtube', 'pinned')),
     ],
-    checklist: checklist('youtube', meme ? [b.publish, b.synthetic, b.kids] : [input.premiere ? b.premiere : b.publish, b.synthetic, b.kids, b.category, b.endscreen]),
+    checklist: [
+      ...checklist('youtube', oneVideo ? [b.publish, b.synthetic, b.kids] : [input.premiere ? b.premiere : b.publish, b.synthetic, b.kids, b.category, b.endscreen]),
+      // A short episode joins its series' playlist; the line's key stays when the URL is added later.
+      ...(input.playlist ? [playlistLine(input.playlist, l.meme.playlist(input.playlist.title))] : []),
+    ],
     url: true,
   });
-  if (!meme && planValue('youtube', 'community')) youtube.push({ id: 'community', heading: heading('community', l.community), at: at('community'), files: file(b.upload, files.thumbnails[0]), fields: field(b.text, planValue('youtube', 'community')), checklist: [], url: true });
+  if (!oneVideo && planValue('youtube', 'community')) youtube.push({ id: 'community', heading: heading('community', l.community), at: at('community'), files: file(b.upload, files.thumbnails[0]), fields: field(b.text, planValue('youtube', 'community')), checklist: [], url: true });
   if (music) {
     youtube.push({
       id: 'links',
@@ -410,7 +455,8 @@ export async function boardProject(projectRoot: string, root: string, options: {
     });
   }
   const firstStory = meme ? undefined : planValue('story', 'caption');
-  if (!meme) {
+  // Only a story the plan has: a short episode has none (ST-048).
+  if (!meme && planPost('story')) {
     instagramPosts.push({
       id: 'story',
       heading: heading('story', l.ig.story),
@@ -507,14 +553,14 @@ export async function boardProject(projectRoot: string, root: string, options: {
       });
     }
   }
-  if (meme) {
-    // One video, three posts: the same caption with its credits on TikTok and Instagram Reels.
+  if (oneVideo) {
+    // One video, three posts: a meme's caption with its credits, a short episode's caption per platform, on TikTok and Instagram Reels.
     const tiktokCaption = planText('tiktok', 'caption');
     tiktokPosts.push({
       id: 'tiktok',
       heading: heading('tiktok', l.meme.tiktok),
       at: at('tiktok'),
-      files: [...file(b.video, files.master), ...file(b.cover, files.cover)],
+      files: [...file(b.video, files.master), ...(shortEpisode && files.tiktokCover ? file(b.tiktokCover, files.tiktokCover) : file(b.cover, files.cover))],
       fields: field(b.description, tiktokCaption ? display(tiktokCaption.value) : undefined, limitOf('tiktok', 'caption')),
       checklist: checklist('tiktok', [b.ttCover, b.ttAi, b.publish]),
       url: true,
@@ -603,11 +649,18 @@ export async function boardProject(projectRoot: string, root: string, options: {
       ]
     : [];
 
-  const platforms: BoardPlatform[] = meme
+  const platforms: BoardPlatform[] = oneVideo
     ? [
         { id: 'youtube', label: 'YouTube', profile: profile('youtube'), notes: notes.youtube, posts: order(youtube) },
         { id: 'tiktok', label: 'TikTok', profile: profile('tiktok'), notes: [...notes.tiktok, notes.legal], posts: order(tiktokPosts) },
         { id: 'instagram', label: 'Instagram', profile: profile('instagram'), notes: [...notes.instagram, notes.legal], posts: order(instagramPosts) },
+        // A short episode also posts on X and the microsite; it has no Shorts, Spotify, or LinkedIn.
+        ...(shortEpisode
+          ? [
+              { id: 'x' as const, label: 'X', profile: profile('x'), notes: notes.x, posts: order(xPosts) },
+              { id: 'microsite' as const, label: 'Microsite', notes: notes.microsite, posts: micrositePosts },
+            ]
+          : []),
       ]
     : [
         { id: 'youtube', label: 'YouTube', profile: profile('youtube'), notes: notes.youtube, posts: order(youtube) },
@@ -627,6 +680,7 @@ export async function boardProject(projectRoot: string, root: string, options: {
         { id: 'microsite', label: 'Microsite', notes: notes.microsite, posts: micrositePosts },
       ];
   const autopilot = await autopilotView(facts, { now: options.now });
+  const line = shapeLine({ shape: input.shape ?? input.kind, shortsSource: input.shortsSource ?? 'cut', aspect: project.config.formats.master.aspect, durationSeconds: input.durationSeconds }, b);
   return {
     autopilot,
     slug: project.config.slug,
@@ -634,6 +688,8 @@ export async function boardProject(projectRoot: string, root: string, options: {
     artist: identity.artist,
     language,
     kind: input.kind,
+    shape: input.shape ?? input.kind,
+    ...(line ? { shapeLine: line } : {}),
     releaseDate: calendar?.release_date ?? project.config.release?.release_date,
     proposed: calendar?.proposed ?? !project.config.release?.release_date,
     hasRelease: Boolean(manifest) && releasedPublicly(project.config),

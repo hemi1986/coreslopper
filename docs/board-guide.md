@@ -16,11 +16,13 @@ npm run cli -- board          # http://127.0.0.1:4848
 
 Or in the board container, which also runs the watchdog: `docker compose up -d` (see [board.md](board.md#start-it)). Open http://127.0.0.1:4848 in your browser.
 
-The board does not refresh by itself. Press **↻ Refresh** at the top of the navigation after Claude Code has worked. A playing video or a note you are typing stays as it is.
+The navigation is the bar across the top. **Work** holds Production, Projects, and Release calendar; **Library** holds Characters, Sets, and Sounds. **+ New** starts something new, and **Guide** and **↻ Refresh** sit apart at the right. The entry of the view you are on is marked; a project's tabs and a series mark **Projects**.
+
+The board does not refresh by itself. Press **↻ Refresh** at the right of the navigation after Claude Code has worked. A playing video or a note you are typing stays as it is.
 
 ## Production: what is your turn
 
-![The production view with three projects and a series](assets/board/en/production.webp)
+![The production view with three projects and a series, below the navigation bar](assets/board/en/production.webp)
 
 **Production** is the start view. Each card is a project or a series:
 
@@ -28,7 +30,17 @@ The board does not refresh by itself. Press **↻ Refresh** at the top of the na
 - **Running**: Claude Code or a render is working on it.
 - The coloured strip shows the stages. Below it are the current stage and the budget.
 
-The navigation on the left lists every project and series. A finished project folds into **Finished** at the end: a released one, and an internal project (**Done – not released publicly**) once every stage is done.
+The navigation lists no project: **Projects** opens the list of every project and series, released ones included.
+
+## Projects: find a project
+
+**Projects** is a table of every music video, meme, episode, and series, the newest activity first. Each row shows the kind, the state, the current stage, the next step, the release day with how many release events are done, and when something last changed. Click a row to open it.
+
+- Type in the search field to find a project by its title or slug.
+- Click **Kind**, **Status**, or pick a **Series** to narrow the list. **Released** shows the projects that are out.
+- Click a column header to sort by title, release day, or last activity; click it again to reverse the order.
+- Switch on **Group by series** to see every episode under its series, with the planned episodes that have no project yet.
+- **Reset filters** clears everything. The address keeps your search and filters, so **↻ Refresh**, Back, and a bookmark bring the same list back.
 
 ## Start a music video
 
@@ -48,7 +60,7 @@ Next, upload the song (the mix) and, if you have it, the vocal stem. MP3, FLAC, 
 
 ## Follow a project
 
-Click a project in the navigation.
+Click a project's card on **Production**, or open **Projects** and click its row.
 
 ![A finished project's production tab](assets/board/en/project.webp)
 

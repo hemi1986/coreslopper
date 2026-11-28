@@ -1704,7 +1704,7 @@ commands:
     produces: [EVT-ContactSheetWritten]
     description: "contact-sheet in the storyboard stage (skill step 5); validates first"
     rules:
-      - The contact sheet belongs in the board's project view and shows each shot's keyframe once it exists (user, 2026-11-21, HS-71; today an SVG of text cards nobody opens – gap register)
+      - The contact sheet belongs in the board's project view and shows each shot's keyframe once it exists (user, 2026-11-21, HS-71; built as the board's Contact sheet tab, ST-058); the SVG this command writes is the storyboard stage's output only
   - id: CMD-RunGenerationBatch
     name: Run a generation batch
     actor: ACT-QueueRun
@@ -2672,7 +2672,7 @@ read_models:
     fed_by: [EVT-ContactSheetWritten, EVT-StoryboardValidated, EVT-AttemptFiled]
     used_by: [ACT-User]
     fields: [Shot, Source, Section, Start, End, Description, Text, Keyframe]
-    description: "Target: a tab of the board's project page that builds the grid from the resolved storyboard and the keyframes in assets/keyframes/, so a keyframe shows as soon as it is filed; a shot without one shows its source instead (user, 2026-11-27, G-70). As-is: review/contact-sheet.svg of text cards, embedded in the production view, with no keyframe (HS-71)"
+    description: "Target: a tab of the board's project page that builds the grid from the resolved storyboard and the keyframes in assets/keyframes/, so a keyframe shows as soon as it is filed; a shot without one shows its source instead (user, 2026-11-27, G-70). As-is (ST-058): built on every read by contactSheet() (packages/cli/src/board-contact-sheet.ts) from validateProject's resolved storyboard and shown in the project's Contact sheet tab; review/contact-sheet.svg stays the storyboard stage's output and is embedded nowhere (HS-71)"
   - id: RM-Manifest
     name: Manifest
     fed_by: [EVT-GenerationCompleted, EVT-GenerationReused, EVT-GenerationFailed, EVT-ClipRestored]
@@ -2760,7 +2760,7 @@ read_models:
     name: Release checks
     fed_by: [EVT-ReleasePackageBuilt, EVT-ReleaseChecked]
     used_by: [ACT-StageRunner, ACT-User]
-    fields: [Release package, Release files, Release formats, Release thumbnails, Release Shorts, Release audio, Release cover, Release canvas, Release lyrics, Release texts, Release metadata, Upload text, Upload data]
+    fields: [Release package, Release files, Release formats, Release thumbnails, Release Shorts, Release audio, Release cover, Release canvas, Release lyrics, Release texts, Release unused texts, Release metadata, Upload text, Upload data]
     description: "The release rows of review/report.md; only FAIL blocks READY (release-qa.ts:56-231; qa.ts:419-421)"
   - id: RM-UploadText
     name: Upload text

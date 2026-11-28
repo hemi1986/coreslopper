@@ -12,10 +12,18 @@ import {
 // plan: the plan holds every exact platform text and its limit, this module only
 // adds the folder's headings, counters, checklists, and the language's labels.
 
+/** The YouTube playlist a short episode joins: its series' playlist, named after the series without a title. */
+export interface SeriesPlaylist {
+  title: string;
+  url?: string;
+}
+
 /** The plan's input: what `buildReleasePlan` turns into the plan. */
 export type ReleaseTextInput = ReleasePlanInput & {
   /** The master's format id (`9x16`, `4x5`, ...), for the TODO of a missing master render. */
   masterFormat?: string;
+  /** A short episode's series playlist: its YouTube post asks to add the video to it. */
+  playlist?: SeriesPlaylist;
 };
 
 const postOf = (plan: ReleasePlan, id: string) => plan.posts.find((post) => post.id === id);
@@ -105,7 +113,7 @@ interface Labels {
     platforms: Record<'distributor' | 'spotify' | 'youtube' | 'shorts' | 'tiktok' | 'instagram' | 'x' | 'linkedin' | 'microsite', string>;
   };
   announce: { heading: string; image: string; files: (story?: string, post?: string, teaser?: string) => string };
-  meme: { youtube: string; tiktok: string; instagram: string; cover: (file: string) => string; visibility: string };
+  meme: { youtube: string; tiktok: string; instagram: string; cover: (file: string) => string; visibility: string; playlist: (title: string) => string };
   videoLink: string;
   x: { heading: string; post: string; reply: string; media: (file: string) => string; replyNote: string; short: string };
   li: { heading: string; skipped: (reason: string) => string; reason: string; post: string; hook: (n: number, limit: number) => string; media: (file: string) => string; noLinkNote: string };
@@ -239,7 +247,7 @@ const EN: Labels = {
       links: 'Add the Spotify link to the YouTube description and the pinned comment',
     },
     announce: { instagram: 'Announcement: Instagram story', youtube: 'Announcement: YouTube post', x: 'Announcement on X' },
-    post: { instagram: 'Instagram feed post', tiktok: 'Post the video on TikTok (texts/tiktok.md)', x: 'Post on X with the video (texts/x.md)', linkedin: 'LinkedIn post' },
+    post: { instagram: 'Reel: main video', tiktok: 'Post the video on TikTok (texts/tiktok.md)', x: 'Post on X with the video (texts/x.md)', linkedin: 'LinkedIn post' },
     short: (name, platform) => `${name} on ${platform}`,
     platforms: { distributor: 'Distributor', spotify: 'Spotify', youtube: 'YouTube', shorts: 'YouTube Shorts', tiktok: 'TikTok', instagram: 'Instagram', x: 'X', linkedin: 'LinkedIn', microsite: 'Microsite' },
   },
@@ -256,6 +264,7 @@ const EN: Labels = {
     instagram: 'Instagram Reels',
     cover: (file) => `Cover: \`${file}\` (the video's cover on the platform)`,
     visibility: 'Public: upload the video as a Short',
+    playlist: (title) => `Add to the playlist "${title}"`,
   },
   x: {
     heading: 'X',
@@ -423,7 +432,7 @@ const DE: Labels = {
       links: 'Spotify-Link in YouTube-Beschreibung und angepinnten Kommentar eintragen',
     },
     announce: { instagram: 'Ankündigung: Instagram-Story', youtube: 'Ankündigung: YouTube-Post', x: 'Ankündigung auf X' },
-    post: { instagram: 'Instagram-Feed-Post', tiktok: 'Das Video auf TikTok posten (texts/tiktok.md)', x: 'Post auf X mit Video (texts/x.md)', linkedin: 'LinkedIn-Beitrag' },
+    post: { instagram: 'Reel: Hauptvideo', tiktok: 'Das Video auf TikTok posten (texts/tiktok.md)', x: 'Post auf X mit Video (texts/x.md)', linkedin: 'LinkedIn-Beitrag' },
     short: (name, platform) => `${name} auf ${platform}`,
     platforms: { distributor: 'Distributor', spotify: 'Spotify', youtube: 'YouTube', shorts: 'YouTube Shorts', tiktok: 'TikTok', instagram: 'Instagram', x: 'X', linkedin: 'LinkedIn', microsite: 'Microsite' },
   },
@@ -440,6 +449,7 @@ const DE: Labels = {
     instagram: 'Instagram Reels',
     cover: (file) => `Cover: \`${file}\` (das Cover des Videos auf der Plattform)`,
     visibility: 'Öffentlich: das Video als Short hochladen',
+    playlist: (title) => `In die Playlist „${title}“ aufnehmen`,
   },
   x: {
     heading: 'X',
@@ -837,6 +847,9 @@ function memeYoutubeText(plan: ReleasePlan, input: ReleaseTextInput, l: Labels):
   const announcement = valueOf(plan, 'announce:youtube', 'text');
   if (announcement) lines.push('', `## ${l.announce.heading}`, '', announceImageLine(input, l), '', ...block(display(announcement, l)));
   lines.push('', `## ${l.checklist}`, '', checkbox(l.meme.visibility), checkbox(l.yt.synthetic(post?.syntheticMedia ?? plan.settings.youtubeSynthetic)), checkbox(l.yt.kids(post?.madeForKids ?? false)));
+  // A short episode joins its series' playlist, linked once the series names its URL.
+  const playlist = input.playlist;
+  if (playlist) lines.push(checkbox(playlist.url ? `${l.meme.playlist(playlist.title)} — ${playlist.url}` : l.meme.playlist(playlist.title)));
   return `${lines.join('\n')}\n`;
 }
 

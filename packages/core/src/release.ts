@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { srtTime } from './episode.js';
 import { readYamlFile } from './project.js';
 import { buildReleasePlan } from './release-plan.js';
+import { SHORT_FORM_MAX_SECONDS, upToThreeMinutes } from './short-form.js';
 import {
   ChannelConfigSchema,
   PLATFORM_LIMITS,
@@ -13,6 +14,7 @@ import {
   type ReleaseManifest,
   type ReleaseMetadata,
   type ReleaseShape,
+  type ReleaseStatus,
   type Timing,
   type UploadData,
 } from './schema.js';
@@ -26,8 +28,8 @@ export async function loadChannel(root: string): Promise<ChannelConfig | undefin
   return existsSync(path) ? readYamlFile(path, ChannelConfigSchema) : undefined;
 }
 
-/** The longest episode track a short episode may have, in seconds; 180 s still counts (ADR 0057, HS-266). */
-export const SHORT_EPISODE_MAX_SECONDS = 180;
+/** The longest episode track a short episode may have, in seconds; 180 s still counts, within `upToThreeMinutes`'s tolerance (ADR 0057, HS-266). */
+export const SHORT_EPISODE_MAX_SECONDS = SHORT_FORM_MAX_SECONDS;
 
 /**
  * The release shape of a project (ADR 0057): a music video and a meme take
@@ -42,13 +44,95 @@ export function releaseShape(input: {
 }): ReleaseShape {
   if (input.kind !== 'episode') return input.kind;
   const upright = input.master.height >= input.master.width;
-  const short = input.durationSeconds !== undefined && input.durationSeconds <= SHORT_EPISODE_MAX_SECONDS;
+  const short = input.durationSeconds !== undefined && upToThreeMinutes(input.durationSeconds);
   return upright && short ? 'short-episode' : 'episode';
+}
+
+/**
+ * The TODO of an episode whose release shape is provisional: without a built
+ * episode track (`timing.json`) its length is unknown, so it releases as an
+ * episode until `episode-track` ran (ADR 0057). Undefined for every other project.
+ */
+export function provisionalShapeTodo(input: { kind: ProjectKind; durationSeconds: number | undefined }): string | undefined {
+  if (input.kind !== 'episode' || input.durationSeconds !== undefined) return undefined;
+  return 'timing.json is missing: the release shape (episode) is provisional until episode-track builds the episode track; run release again after it';
+}
+
+/**
+ * Whether a project posts its **Vertical Version** – the 9:16 render of the
+ * whole episode – as its one Short instead of cut Shorts: a horizontal episode
+ * whose episode track lasts at most 3 minutes (ADR 0057, HS-266). An episode
+ * without a built track cuts its Shorts.
+ */
+export function postsVerticalVersion(input: {
+  kind: ProjectKind;
+  master: { width: number; height: number };
+  durationSeconds: number | undefined;
+}): boolean {
+  if (input.kind !== 'episode') return false;
+  return input.master.width > input.master.height && input.durationSeconds !== undefined && upToThreeMinutes(input.durationSeconds);
+}
+
+/**
+ * Where a release's Shorts come from: cut from the video (`cut`), the
+ * horizontal episode's **Vertical Version** as its one Short
+ * (`vertical-version`), or none – a meme and a short episode are one video
+ * (ADR 0057).
+ */
+export type ShortsSource = 'cut' | 'vertical-version' | 'none';
+
+/** The Shorts source of a release of this shape; `project` decides only an episode's (`postsVerticalVersion`). */
+export function shortsSourceOf(
+  shape: ReleaseShape,
+  project: { kind: ProjectKind; master: { width: number; height: number }; durationSeconds: number | undefined },
+): ShortsSource {
+  if (shape === 'meme' || shape === 'short-episode') return 'none';
+  if (shape === 'episode' && postsVerticalVersion(project)) return 'vertical-version';
+  return 'cut';
+}
+
+/**
+ * The release form of a project: its release shape and where its Shorts come
+ * from. `release`, the calendar, QA, the board and `publish` read the one
+ * answer (ADR 0057).
+ */
+export function releaseForm(input: {
+  kind: ProjectKind;
+  master: { width: number; height: number };
+  durationSeconds: number | undefined;
+}): { shape: ReleaseShape; shorts: ShortsSource } {
+  const shape = releaseShape(input);
+  return { shape, shorts: shortsSourceOf(shape, input) };
 }
 
 /** The shape a manifest recorded; a manifest written before shapes existed reads as its project kind. */
 export function manifestShape(manifest: Pick<ReleaseManifest, 'shape'>, kind: ProjectKind): ReleaseShape {
   return manifest.shape ?? kind;
+}
+
+/**
+ * What started the release: the first done mark or live URL in the release
+ * status, first in the status file's key order. Until there is one, the
+ * release shape follows the project; after it, the shape is kept (HS-268).
+ * A board checklist tick (`<event>#<line>`) is a preparation step, not a done
+ * mark: nothing went online with it.
+ */
+export function releaseStart(status: Pick<ReleaseStatus, 'items'>): string | undefined {
+  for (const [id, item] of Object.entries(status.items)) {
+    if (id.includes('#')) continue;
+    if (item.done) return `the done mark ${id}`;
+    if (item.url) return `the live URL of ${id}`;
+  }
+  return undefined;
+}
+
+/**
+ * Why a run may not build its shape: the release started with another shape
+ * (HS-268). Undefined when the shape is the manifest's or nothing was posted yet.
+ */
+export function keptShapeProblem(input: { recorded: ReleaseShape | undefined; derived: ReleaseShape; start: string | undefined }): string | undefined {
+  if (!input.recorded || !input.start || input.recorded === input.derived) return undefined;
+  return `the release started as ${input.recorded} (${input.start}), and this run's shape is ${input.derived}: release changes nothing. Remove the done marks and live URLs first to release it as ${input.derived}.`;
 }
 
 /** A project with `distribution: internal` is never released publicly: no release package, no release calendar. */
@@ -364,13 +448,14 @@ export function platformTextProblems(
   data: UploadData,
   limits: PlatformLimits,
   /** `shape` is the release shape (`releaseShape`); the project kind follows from it. */
-  options: { shape: ReleaseShape; credits?: string[]; tiktokPointer?: string; durationSeconds?: number },
+  options: { shape: ReleaseShape; shorts?: ShortsSource; slug?: string; credits?: string[]; tiktokPointer?: string; durationSeconds?: number },
 ): { errors: string[]; missing: string[] } {
   const plan = buildReleasePlan({
     kind: options.shape === 'short-episode' ? 'episode' : options.shape,
     shape: options.shape,
+    shortsSource: options.shorts,
     language: data.language,
-    slug: 'release',
+    slug: options.slug ?? 'release',
     title: '',
     data,
     limits,
@@ -378,7 +463,8 @@ export function platformTextProblems(
     credits: options.credits,
     tiktokPointer: options.tiktokPointer,
     durationSeconds: options.durationSeconds,
-    files: { thumbnails: [], shorts: [] },
+    // The vertical version's texts are checked as its one Short, named by the slug.
+    files: { thumbnails: [], shorts: options.shorts === 'vertical-version' && options.slug ? [{ name: options.slug, video: `shorts/${options.slug}-9x16.mp4` }] : [] },
   });
   return plan.problems;
 }

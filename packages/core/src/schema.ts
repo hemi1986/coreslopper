@@ -626,6 +626,28 @@ export const SeriesSchema = z.object({
       }),
     )
     .default([]),
+  /**
+   * The YouTube playlist the series' short episodes join: a plain playlist,
+   * not a show. Without a title it is named after the series' title; a missing
+   * URL is a release TODO, never a failure.
+   */
+  youtube_playlist: z
+    .object({
+      /** One line, trimmed. */
+      title: z
+        .string()
+        .trim()
+        .min(1)
+        .regex(/^[^\r\n]+$/, { message: 'must be one line' })
+        .optional(),
+      /** An http(s) link to the playlist. */
+      url: z
+        .string()
+        .url()
+        .regex(/^https?:\/\//i, { message: 'must be an http or https URL' })
+        .optional(),
+    })
+    .optional(),
   /** Optional creative limits. Without an entry nothing is checked. */
   limits: z
     .object({
@@ -990,6 +1012,8 @@ export const UploadDataSchema = z
       .object({
         text: z.string().min(1),
         hashtags: z.array(HashtagSchema).default([]),
+        /** The caption of the announcement story while it shows the teaser; at most 120 characters, optional. The text and its hashtags are not counted against it. */
+        story: z.string().min(1).optional(),
         /** The still the announcement and story images are composed from; without it, the still of the cover's recipe. */
         image: z.object({ still: z.string().min(1), focus: z.string().regex(/^\d*\.?\d+,\d*\.?\d+$/, 'use x,y fractions such as 0.5,0.35').optional() }).optional(),
       })
@@ -999,9 +1023,12 @@ export const UploadDataSchema = z
     microsite: UploadMicrositeSchema.optional(),
   })
   .superRefine((data, ctx) => {
-    const seen = new Set<string>(['main']);
+    const seen = new Set<string>();
     data.shorts.forEach((short, index) => {
-      if (seen.has(short.name)) {
+      // `main` names the main video (`x.media: main`, `--only main`): a Short of that name would be ambiguous.
+      if (short.name === 'main') {
+        ctx.addIssue({ code: 'custom', path: ['shorts', index, 'name'], message: 'a Short may not be named "main": main is the main video' });
+      } else if (seen.has(short.name)) {
         ctx.addIssue({ code: 'custom', path: ['shorts', index, 'name'], message: `duplicate item name "${short.name}"` });
       }
       seen.add(short.name);
@@ -1172,6 +1199,55 @@ export const ReleaseStatusSchema = z.object({
     )
     .default({}),
 });
+
+/** The video's aspect on the microsite page: the master's, one of the release formats (ADR 0057). */
+export const MicrositeAspectSchema = z.enum(['16:9', '9:16', '4:5', '1:1']);
+
+/**
+ * `renders/release/microsite/<slug>.json`: the song page of the artist microsite, a published language
+ * read by a site built elsewhere (ADR 0045). `release` is its one producer. New fields are optional, so
+ * the version stays and older data stays valid.
+ */
+export const MicrositeSongSchema = z.object({
+  version: z.literal(1),
+  slug: z.string().min(1),
+  artist: z.string().optional(),
+  title: z.string(),
+  language: z.string(),
+  release_date: DaySchema.optional(),
+  teaser: z.string().optional(),
+  text: z.string().optional(),
+  quote: z.string().optional(),
+  /** Plain lyrics, stanzas separated by blank lines. */
+  lyrics: z.string().optional(),
+  /** Files of the release folder, relative to it. `thumbnail` is the image the page shows beside the video. */
+  images: z.object({ cover: z.string().optional(), thumbnail: z.string().optional(), shorts: z.array(z.string()) }),
+  /** The master's aspect; absent in data written before it existed. */
+  aspect: MicrositeAspectSchema.optional(),
+  /** Live URLs, filled in as the user posts. */
+  links: z.object({
+    youtube: z.string().optional(),
+    spotify: z.string().optional(),
+    tiktok: z.string().optional(),
+    instagram: z.string().optional(),
+    x: z.string().optional(),
+    linkedin: z.string().optional(),
+  }),
+  shorts: z.array(
+    z.object({
+      name: z.string(),
+      title: z.string().optional(),
+      links: z.object({ youtube: z.string().optional(), tiktok: z.string().optional(), instagram: z.string().optional(), x: z.string().optional() }),
+    }),
+  ),
+  /** The channel's profile links, for the page footer. */
+  profiles: z.record(z.string(), z.string()),
+  /** The AI disclosure line (EU AI Act Art. 50) and the credits. */
+  disclosure: z.string(),
+  credits: z.array(z.string()),
+});
+export type MicrositeAspect = z.infer<typeof MicrositeAspectSchema>;
+export type MicrositeSong = z.infer<typeof MicrositeSongSchema>;
 
 export const AutopilotEntryStatusSchema = z.enum([
   /** An attempt started; a crash leaves it standing, and the post then waits for the user. */

@@ -167,7 +167,7 @@ renders/release/
   streaming/           cover-3000x3000.jpg, canvas-9x16.mp4 (3–8 s, silent loop), lyrics.txt, lyrics.lrc
   texts/               youtube.md, shorts.md, instagram.md, tiktok.md, spotify.md, x.md, linkedin.md, release-plan.md
   calendar.ics         the release calendar for a calendar app
-  microsite/           <slug>.json: the song page data for the artist microsite
+  microsite/           <slug>.json: the song page data for the artist microsite (schema/microsite-song.schema.json)
 ```
 
 The release calendar `review/calendar.yaml` takes the next free release day and Short slots under the workspace's `config/release-schedule.yaml` (default: Friday, the song at 00:00 and the video at 18:00 as a Premiere, distributor T−21, pitch T−14, announcement T−7, Shorts Mo/We/Fr with songs interleaved, no releases on Christmas and New Year; time zone of the computer unless set), so no two projects collide. `release.release_date` in `project.yaml` wins; without it the date is a proposal. Times already planned stay; `calendar --replan` plans again.

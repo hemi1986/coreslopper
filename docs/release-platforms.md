@@ -1,6 +1,6 @@
 # Release platforms: fields, limits, and links
 
-What each platform takes for a release, as researched on 2026-11-21 from official help pages where they exist. **(unverified)** marks a figure only third parties state. Platforms change these often: `PLATFORM_LIMITS` in `packages/core/src/schema.ts` holds the enforced numbers, and `config/channel.yaml` can override them.
+What each platform takes for a release, as researched on 2026-11-21 from official help pages where they exist, and checked again on 2026-11-27 for formats, lengths, and texts ([platform video formats](research/platform-video-formats.md); `F<n>` cites its findings). **(unverified)** marks a figure only third parties state. Platforms change these often: `PLATFORM_LIMITS` in `packages/core/src/schema.ts` holds the enforced numbers, and `config/channel.yaml` can override them.
 
 ## Which file goes where
 
@@ -9,11 +9,14 @@ The release board assigns each file of the release folder to its posts:
 | File | Goes to |
 |---|---|
 | `video/<slug>-16x9.mp4` (master) | YouTube main video; X release post (default); Spotify music video (beta, 16:9 only) |
-| `video/<slug>-4x5.mp4` or `-1x1.mp4` (feed format) | Instagram feed post of the release; LinkedIn post |
+| `video/<slug>-9x16.mp4`, `-4x5.mp4` or `-1x1.mp4` | The main video's Instagram Reel, only for a main video of at most 3 minutes; LinkedIn post |
 | `shorts/<name>-9x16.mp4` | YouTube Shorts, TikTok, Instagram Reels, X posts of a Short, Instagram story |
-| `thumbnails/thumb-1.jpg` (2, 3) | YouTube thumbnail (Test & compare); YouTube post |
+| `shorts/<slug>-9x16.mp4` (vertical version) | The one Short of a horizontal episode of at most 3 minutes, on the same platforms |
+| `video/<slug>-<master>.mp4` of a short episode or a meme | The one video: YouTube Shorts, TikTok, Instagram Reels, X, the microsite |
+| `thumbnails/thumb-1.jpg` (2, 3) | YouTube thumbnail (Test & compare); YouTube post; a vertical episode over 3 minutes has only `thumb-1.jpg` |
 | `shorts/<name>-thumb.jpg` / `-tiktok.jpg` | Shorts and Reel cover / TikTok cover (3:4) |
-| `streaming/cover-3000x3000.jpg` | Distributor; announcement; Instagram feed post cover |
+| `cover/<slug>-1080x1920.jpg` / `-1080x1440.jpg` | The cover / TikTok cover of a short episode or a meme |
+| `streaming/cover-3000x3000.jpg` | Distributor; announcement; the main video's Reel cover |
 | `streaming/canvas-9x16.mp4` | Spotify Canvas |
 
 ## YouTube (long-form)
@@ -40,21 +43,23 @@ The release board assigns each file of the release folder to its posts:
 
 | Field | Rule | Source |
 |---|---|---|
-| Duration | Square or vertical, up to 3 minutes | [15424877](https://support.google.com/youtube/answer/15424877) |
+| Duration | Square or vertical, up to 3 minutes; a 16:9 video stays long-form, also under 3 minutes | [15424877](https://support.google.com/youtube/answer/15424877), [F12](research/platform-video-formats.md) |
 | Texts | Same fields and limits as long-form | 57404 |
-| Thumbnail | Custom thumbnail from Studio on desktop; 9:16, 2160×3840 recommended | 72431 |
+| Thumbnail | Custom thumbnail from Studio on desktop; 9:16, 2160×3840 recommended; a vertical video with a 16:9 thumbnail shows an auto-generated 4:5 one | 72431, [F14](research/platform-video-formats.md) |
 | Links | Not clickable in description or comments since 2023-08-31 | 13748639 |
 | Related video | One clickable link to an own video; Studio → Content → Short → Related video | [14075157](https://support.google.com/youtube/answer/14075157) |
 | Scheduling | Yes; no Premiere | 9080341 |
+| Playlists and shows | A Short fits any playlist; a playlist of only Shorts (vertical or square, ≤ 180 s) can become a show ("Shorts series") in Studio, with a 16:9 banner and backdrop; a video belongs to one series playlist | [57792](https://support.google.com/youtube/answer/57792), [F13](research/platform-video-formats.md) |
 
-The related video is the only clickable pointer from a Short to the main video.
+The related video is the only clickable pointer from a Short to the main video. A short episode's YouTube checklist asks to add the Short to the series' playlist: `youtube_playlist: { title, url }` in `series.yaml`, named after the series without a title and linked once it has its URL. A missing URL is a TODO in `README.md` and the release checks ("YouTube playlist of the series"). Adding the Short stays a step in Studio; the series stays a plain playlist, not a show.
 
 ## TikTok
 
 | Field | Rule | Source |
 |---|---|---|
-| Length | 10 min recorded; uploads up to 60 min (unverified as general) | [TechCrunch](https://techcrunch.com/2024/05/16/tiktok-upload-60-minute-videos) |
-| Caption | 4,000 characters in the app (unverified); 2,200 through the Content Posting API | [onlinemarketing.de](https://onlinemarketing.de/social-media-marketing/tiktok-captions-limit-4000-zeichen) |
+| Length | Up to 10 min through the Content Posting API (per creator); the support pages say up to 30 min in the app (unverified) | [Media transfer guide](https://developers.tiktok.com/doc/content-posting-api-media-transfer-guide), [F18](research/platform-video-formats.md) |
+| Caption | 2,200 characters; no primary source for a larger limit in the app | [Direct Post](https://developers.tiktok.com/doc/content-posting-api-reference-direct-post), [F18](research/platform-video-formats.md) |
+| Cover | The API picks a frame (`video_cover_timestamp_ms`); a cover image is uploaded in the app | [F19](research/platform-video-formats.md) |
 | Hashtags | No official cap; 3–5 relevant ones (unverified) | — |
 | AI label | Required for realistic AI image, audio, or video: "AI-generated" toggle | [TikTok support](https://support.tiktok.com/en/using-tiktok/creating-videos/ai-generated-content) |
 | Own song as sound | Delivered by the distributor; claim the artist profile in TikTok for Artists | [MBW](https://musicbusinessworldwide.com/tiktok-just-launched-its-own-music-distribution-platform-soundon) |
@@ -69,19 +74,20 @@ Pointers to YouTube: bio link, pinned comment, a text line in the caption or on 
 
 | Field | Rule | Source |
 |---|---|---|
-| Reels | Up to 3 min; 9:16, 1080×1920 | [Social Media Today](https://www.socialmediatoday.com/news/instagram-officially-expands-reels-length-to-3-minutes/737766/) |
+| Reels | Up to 20 min to record and edit, 15 min through the API; only Reels up to 3 min are recommended to non-followers; 9:16, 1080×1920 | [Instagram help](https://help.instagram.com/1038071743007909), [F2, F8](research/platform-video-formats.md) |
+| Feed video | None: new video posts are shared as Reels, and the API knows only Reels, stories and carousels | [F1, F8](research/platform-video-formats.md) |
 | Reel cover | 420×654 (1:1.55) recommended; not editable after upload; keep text in the centre 3:4 | [Instagram help](https://help.instagram.com/1038071743007909) |
 | Profile grid | 3:4 tiles since January 2025 | [Business Today](https://www.businesstoday.in/technology/news/story/instagram-head-announces-big-changes-3-minute-reels-and-new-look-for-profile-grid-461527-2025-01-21) |
-| Feed / carousel | Up to 20 slides; all take the first slide's ratio; 1080×1350 (4:5) standard | [Storrito](https://storrito.com/resources/how-instagrams-20-slide-carousels-work-and-what-the-new-limits-are/) |
+| Carousel | Up to 20 slides; all take the first slide's ratio; 1080×1350 (4:5) standard | [Storrito](https://storrito.com/resources/how-instagrams-20-slide-carousels-work-and-what-the-new-limits-are/) |
 | Caption | 2,200 characters; ~125 show before "more" (unverified) | [Meta API](https://developers.secure.facebook.com/docs/instagram-api/reference/ig-user/media) |
 | Hashtags | 5 per post or Reel since December 2025 | [Business Today](https://www.businesstoday.in/technology/news/story/no-more-hashtag-stuffing-instagram-limits-hashtag-usage-to-just-5-per-reel-and-post-507444-2025-12-19) |
 | Collab posts | Up to 5 collaborators; cannot be scheduled | [Buffer](https://buffer.com/resources/instagram-collab-post/) |
 | AI info | May be required for realistic video or AI vocals | [Meta](https://www.meta.com/help/artificial-intelligence/1783222608822690/) |
 | Bio links | Up to 5 | [Meta](https://www.meta.com/help/subscriptions/29142271265407659/) |
-| Stories | 9:16, up to 60 s per segment; link sticker for all accounts | [Instagram](https://about.instagram.com/blog/announcements/expanding-sharing-links-in-stories-to-everyone) |
+| Stories | 9:16, up to 60 s per segment (3–60 s through the API); link sticker for all accounts, not through the API | [Instagram](https://about.instagram.com/blog/announcements/expanding-sharing-links-in-stories-to-everyone), [F6](research/platform-video-formats.md) |
 | Scheduling | Native for professional accounts, up to 75 days ahead | [Instagram help](https://help.instagram.com/iphone-app/439971288310029) |
 
-A story has no text field; a story that shows a video takes a caption of at most 120 characters in the app (`limits.instagram.story_caption`), an image story none.
+A story has no text field ([F7](research/platform-video-formats.md)); a story that shows a video takes a caption of at most 120 characters in the app (`limits.instagram.story_caption`), an image story none. The 120 characters are the user's observation in the app, not a primary source (HS-267). The release's Instagram posts are Reels only: the main video gets its Reel only when it lasts at most 3 minutes.
 
 Pointers to YouTube: a story link sticker on release day, a bio link, a pinned comment; caption links are not clickable.
 
@@ -108,7 +114,7 @@ Spotify has no link out to YouTube; the equivalent is the music video on Spotify
 | Field | Rule | Source |
 |---|---|---|
 | Post | 280 characters free; 25,000 with Premium | [X help](https://help.x.com/en/using-x/x-premium) |
-| Video | 140 s free; up to 4 h with Premium | [X help](https://help.x.com/en/using-x/premium-longer-videos) |
+| Video | In the app 140 s free, up to 4 h with Premium; through the API up to 20 min, 125 min for Premium or verified accounts; ratio 1:3 to 3:1 | [X help](https://help.x.com/en/using-x/premium-longer-videos), [media upload](https://docs.x.com/x-api/media/quickstart/media-upload-chunked), [F9, F10](research/platform-video-formats.md) |
 | Images | Up to 4 per post, 5 MB each | [X help](https://help.x.com/en/using-x/x-videos) |
 | Alt text | 1,000 characters | [X help](https://help.x.com/en/using-x/picture-descriptions) |
 | Links | X says it dropped the link penalty in July 2026; data still shows weak reach for link posts | [ppc.land](https://ppc.land/x-drops-year-old-link-penalty-musk-tells-zuckerberg-on-platform/) |
@@ -136,7 +142,7 @@ What each platform lets the release autopilot do ([ADR 0029](adr/0029-release-au
 |---|---|---|---|
 | YouTube | Upload, thumbnail, `publishAt`, status, description, comments | Public or scheduled from an unaudited API project (stays private); Premiere; community posts; related video; pinning | [Videos](https://developers.google.com/youtube/v3/docs/videos), [audit](https://support.google.com/youtube/contact/yt_api_form), [quota](https://developers.google.com/youtube/v3/determine_quota_cost) |
 | TikTok | Inbox draft; direct post with caption and `is_aigc` after the audit | Public direct post before the audit (private only); cover; pinned comment; scheduling | [Direct Post](https://developers.tiktok.com/docs/en/content-posting-api-reference-direct-post), [guidelines](https://developers.tiktok.com/docs/en/content-sharing-guidelines) |
-| Instagram | Reels, feed images and videos, stories (own professional account, no App Review), `is_ai_generated` | Uploads (media from a public URL only); story stickers; changing the cover later; scheduling | [Content publishing](https://developers.facebook.com/documentation/instagram-platform/content-publishing.md), [changelog](https://developers.facebook.com/documentation/instagram-platform/changelog.md) |
+| Instagram | Reels, carousels, stories (own professional account, no App Review), `is_ai_generated`; no plain feed video ([F8](research/platform-video-formats.md)) | Uploads (media from a public URL only); story stickers; changing the cover later; scheduling | [Content publishing](https://developers.facebook.com/documentation/instagram-platform/content-publishing.md), [changelog](https://developers.facebook.com/documentation/instagram-platform/changelog.md) |
 | X | Posts with video or images, replies; pay-per-use (~$0.015 a post, $0.20 with a URL) | Scheduling | [Pricing](https://docs.x.com/x-api/getting-started/pricing), [media upload](https://docs.x.com/x-api/media/quickstart/media-upload-chunked) |
 | LinkedIn | Member posts with video or image (self-serve "Share on LinkedIn"); token 60 days; a refresh token only for approved partners, which the autopilot uses when LinkedIn grants one | Scheduling; refresh tokens for self-serve apps | [Posts API](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/posts-api), [Videos API](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/videos-api) |
 | Spotify for Artists, distributors | — | Pitch, canvas, artist pick, delivery | — |

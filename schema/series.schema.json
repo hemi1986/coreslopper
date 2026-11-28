@@ -176,6 +176,20 @@
         ]
       }
     },
+    "youtube_playlist": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[^\\r\\n]+$"
+        },
+        "url": {
+          "type": "string",
+          "pattern": "^https?:\\/\\/"
+        }
+      }
+    },
     "limits": {
       "default": {},
       "type": "object",

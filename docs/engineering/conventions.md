@@ -166,6 +166,10 @@ state in memory), one core transition (`setStageRunning`, `setStageDone`, `setSt
   `serveMedia` from a whitelist. A `ValidationError` becomes a 400. New view routes go into a `<view>Route`
   function in the view's module, as the wizard and the library do (HS-251, G-214). The page is static ES
   modules in `packages/cli/src/board/` without a build step; each view registers its strings with `addStrings`.
+  The board navigation (`nav.js`, ADR 0058) is a bar across the top with fixed entries only – no project and no
+  series; `app.js` maps each route to a view key and `activeEntry` marks its entry (a project's tabs and a series
+  mark Projects). `main` uses the full window width; running text (`.markdown`, the wizard's `.step`) is capped at
+  about 80 characters, and no view may scroll sideways down to a 1280 px window (`tests/board-nav.test.ts`).
 - User-owned files (`timing.overrides.json`, `lyrics.txt`, imported stems, `project.yaml`) are never replaced by
   a tool; a command that would do so is a hard stop. The one exception: fixing a proposed release day writes
   `release.release_date` into `project.yaml`, keeping every comment (`setReleaseDate`,
@@ -175,17 +179,19 @@ state in memory), one core transition (`setStageRunning`, `setStageDone`, `setSt
 
 Pure functions over loaded files: `stageViews`, `productionPhase`, `projectNextAction`, `seriesNextAction`
 (`packages/core/src/production.ts`); `status` (`packages/cli/src/status.ts`); the board's production view
-(`packages/cli/src/board-production.ts`), which reads files and never writes. The page does not poll:
+(`packages/cli/src/board-production.ts`), which reads files and never writes; the contact sheet tab's `contactSheet`
+(`packages/cli/src/board-contact-sheet.ts`), built on every read from `validateProject(…, { write: false })` and the
+keyframes in `assets/keyframes/`, so a filed keyframe shows after a refresh (ST-058). The page does not poll:
 the user refreshes with the button in the navigation, which keeps a view with a playing video or an edited field
-(ADR 0049).
+(ADR 0049, `viewBusy` in `nav.js`).
 The release board's view is `boardProject` (`packages/cli/src/release-board-data.ts`), a pure read of the release
 folder's manifest, `upload.yaml`, the calendar and the status; whether an approval holds is `approvalHolds`
 (`packages/core/src/autopilot.ts`) wherever it is read (G-159).
 
 The resolved storyboard (shots in seconds and frames) is made on demand and never stored; render passes it to
-Remotion unchanged as props, apart from public asset paths (`render.ts:98-111`). Derived documents of the
-storyboard (`storyboard.md`, `review/contact-sheet.svg`) are written once and go stale when the YAML changes
-(G-70, G-81). Lists that core and Remotion both need (motion components) are kept twice today (G-75).
+Remotion unchanged as props, apart from public asset paths (`render.ts:98-111`). `storyboard.md`, a derived
+document of the storyboard, is written once and goes stale when the YAML changes (G-81); `review/contact-sheet.svg`
+is only the storyboard stage's output, and no view reads it. Lists that core and Remotion both need (motion components) are kept twice today (G-75).
 
 Timing lookups (`sectionAt`, `energyAt`, `beatIndexAt`) and anchor resolution (`resolveAnchor`) are pure
 functions over the effective timing in `packages/core/src/timing.ts`; Remotion has its own copies today (G-59).
@@ -225,6 +231,7 @@ directory. `tests/helpers/release-fixture.ts` builds release projects.
 | Command | the CLI command or the function it calls, on a project in a temp directory | integration | `tests/episode.test.ts` |
 | Read model | the read-model function on a project in a temp directory | integration | `tests/board-production.test.ts` |
 | Page, form, flow | the board's HTTP API | integration | `tests/board-review.test.ts` |
+| Board page view (a module of `packages/cli/src/board/`) | its exported pure functions, then the module with a fake `document`, `location`, `history` and `fetch` stubbed through `vi.stubGlobal` (no DOM library is installed) | unit | `tests/board-nav.test.ts`, `tests/board-projects.test.ts` |
 | Queue run | `runQueue(dir, { deps })` with injected `generate`, `review`, `restart`, `log` (`QueueDeps`) | integration | `tests/queue.test.ts` |
 | Headless agent | `reviewImage(dir, { runner })` with a fake runner returning the JSON | unit | `tests/review-image.test.ts` |
 | Python helper | the helper's functions | unit (pytest, `npm run python:test`) | `scripts/audio-analysis/tests/test_timing_core.py` |

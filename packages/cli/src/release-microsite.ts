@@ -1,32 +1,16 @@
-import type { ReleaseCalendar, ReleaseStatus } from '@coreslopper/core';
+import { MicrositeAspectSchema, type MicrositeAspect, type MicrositeSong, type ReleaseCalendar, type ReleaseStatus } from '@coreslopper/core';
 import { footerLines, releaseLabels, type ReleaseTextInput } from './release-texts.js';
 
 // The song page of the artist microsite as data: `release` writes it to
 // renders/release/microsite/<slug>.json, and the microsite builds its page from
 // it. Live URLs come from the release board's status once the user has posted.
 
-export interface MicrositeSong {
-  version: 1;
-  slug: string;
-  artist?: string;
-  title: string;
-  language: string;
-  release_date?: string;
-  teaser?: string;
-  text?: string;
-  quote?: string;
-  /** Plain lyrics, stanzas separated by blank lines. */
-  lyrics?: string;
-  /** Files of the release folder, relative to it. */
-  images: { cover?: string; thumbnail?: string; shorts: string[] };
-  /** Live URLs, filled in as the user posts. */
-  links: Partial<Record<'youtube' | 'spotify' | 'tiktok' | 'instagram' | 'x' | 'linkedin', string>>;
-  shorts: { name: string; title?: string; links: Partial<Record<'youtube' | 'tiktok' | 'instagram' | 'x', string>> }[];
-  /** The channel's profile links, for the page footer. */
-  profiles: Record<string, string>;
-  /** The AI disclosure line (EU AI Act Art. 50) and the credits. */
-  disclosure: string;
-  credits: string[];
+export type { MicrositeSong } from '@coreslopper/core';
+
+/** The master's aspect (`9x16` → `9:16`); none for a master outside the release formats. */
+function micrositeAspect(masterFormat: string | undefined): MicrositeAspect | undefined {
+  const parsed = MicrositeAspectSchema.safeParse(masterFormat?.replace('x', ':'));
+  return parsed.success ? parsed.data : undefined;
 }
 
 const DISCLOSURE = {
@@ -62,7 +46,13 @@ export function micrositeSong(input: ReleaseTextInput, options: { status: Releas
     text: site?.text,
     quote: site?.quote,
     lyrics: options.lyrics?.trim() || undefined,
-    images: { cover: input.files.cover, thumbnail: input.files.thumbnails[0], shorts: input.files.shorts.flatMap((short) => (short.thumbnail ? [short.thumbnail] : [])) },
+    // A short episode has no thumbnails: its page shows the episode's cover (ST-054).
+    images: {
+      cover: input.files.cover,
+      thumbnail: input.shape === 'short-episode' ? input.files.cover : input.files.thumbnails[0],
+      shorts: input.files.shorts.flatMap((short) => (short.thumbnail ? [short.thumbnail] : [])),
+    },
+    aspect: micrositeAspect(input.masterFormat),
     links: Object.fromEntries(Object.entries(links).filter(([, value]) => value)) as MicrositeSong['links'],
     shorts: input.files.shorts.map((short) => {
       const upload = input.data?.shorts.find((entry) => entry.name === short.name);

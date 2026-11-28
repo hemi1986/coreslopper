@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { readdir } from 'node:fs/promises';
 import { basename, join } from 'node:path';
+import { SHORT_FORM_MAX_SECONDS, upToThreeMinutes } from '@coreslopper/core';
 
 // Release-package file checks without the renderer or ffmpeg, so status (also
 // in the npx bundle) can list them and tests can run them on plain data.
@@ -63,6 +64,16 @@ export function shortProblems(probe: ShortProbe): string[] {
     problems.push(`${probe.width}x${probe.height}, expected 9:16`);
   }
   if (probe.duration > SHORT_MAX_SECONDS + 0.05) problems.push(`${probe.duration.toFixed(1)} s, limit ${SHORT_MAX_SECONDS} s`);
+  return problems;
+}
+
+/** Problems of a horizontal episode's vertical version: not 9:16, or longer than 3 minutes (`upToThreeMinutes`). Empty when it is fine. */
+export function verticalVersionProblems(probe: ShortProbe): string[] {
+  const problems: string[] = [];
+  if (probe.width <= 0 || probe.height <= 0 || Math.abs(probe.width / probe.height - 9 / 16) > 0.01) {
+    problems.push(`${probe.width}x${probe.height}, expected 9:16`);
+  }
+  if (!upToThreeMinutes(probe.duration)) problems.push(`${probe.duration.toFixed(1)} s, limit ${SHORT_FORM_MAX_SECONDS} s`);
   return problems;
 }
 

@@ -173,7 +173,8 @@ function renderPost(entry) {
     // The key is the line's record key from the server: a line appearing or going leaves the other ticks (G-163).
     const box = el('input', { type: 'checkbox', checked: (view.data.status.items[item.key] || {}).done ? true : undefined });
     box.onchange = function () { setStatus(item.key, { done: box.checked }); };
-    return el('li', {}, [el('label', {}, [box, ' ', item.label])]);
+    const link = item.href && /^https?:/i.test(item.href) ? el('a', { href: item.href, target: '_blank', rel: 'noopener', text: item.href }) : null;
+    return el('li', {}, [el('label', {}, [box, ' ', item.label]), link ? ' — ' : null, link]);
   })) : null;
   const pointer = entry.pointer ? el('div', { class: 'pointer' }, [t('points') + ': ', /^https?:/.test(entry.pointer) ? el('a', { href: entry.pointer, target: '_blank', text: entry.pointer }) : entry.pointer]) : null;
   return el('section', { class: 'card' + (status.done ? ' done' : ''), id: 'post-' + entry.id }, [
@@ -198,6 +199,8 @@ function renderProject() {
   if (data.todos.length) {
     main.appendChild(el('details', { class: 'todos' }, [el('summary', { text: t('todos') + ' (' + data.todos.length + ')' }), el('ul', {}, data.todos.map(function (todo) { return el('li', { text: todo }); }))]));
   }
+  // The release shape and why, above the platform tabs (ADR 0057); a music video and a meme have none.
+  if (data.shapeLine) main.appendChild(el('p', { class: 'shape', text: data.shapeLine }));
   const tabs = el('nav', { class: 'tabs' });
   data.platforms.forEach(function (platform) {
     const open = platform.posts.filter(function (p) { return !(data.status.items[p.id] || {}).done; }).length;

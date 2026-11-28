@@ -99,8 +99,6 @@ export interface ProductionQueueItem {
 
 export interface ProductionDetail extends ProductionProject {
   documents: ProductionDocument[];
-  /** `review/contact-sheet.svg`, relative to the project. */
-  contactSheet?: string;
   queueItems: ProductionQueueItem[];
   verdicts: ProductionVerdict[];
   durationSeconds?: number;
@@ -303,7 +301,6 @@ async function collect(projectDir: string, detail: boolean): Promise<ProductionD
   for (const [label, file] of DOCUMENTS) {
     if (await written(projectDir, file, config)) summary.documents.push({ label, path: file });
   }
-  if (existsSync(paths.contactSheet)) summary.contactSheet = 'review/contact-sheet.svg';
   summary.queueItems = queueItems;
   // Failed first, then the newest.
   summary.verdicts = verdicts.sort((a, b) => (a.verdict === b.verdict ? (b.reviewedAt ?? '').localeCompare(a.reviewedAt ?? '') : a.verdict === 'fail' ? -1 : 1));
@@ -314,7 +311,7 @@ async function collect(projectDir: string, detail: boolean): Promise<ProductionD
 /** A project's summary for the overview, or the reason it cannot be read. */
 export async function productionProject(projectDir: string): Promise<ProductionProject | ProductionError> {
   try {
-    const { documents: _d, queueItems: _q, verdicts: _v, errors: _e, durationSeconds: _s, contactSheet: _c, ...summary } = await collect(projectDir, false);
+    const { documents: _d, queueItems: _q, verdicts: _v, errors: _e, durationSeconds: _s, ...summary } = await collect(projectDir, false);
     return summary;
   } catch (error) {
     return { slug: projectDir.split(sep).at(-1)!, error: (error as Error).message };

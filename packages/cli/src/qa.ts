@@ -11,12 +11,13 @@ import {
   isSubtitledLine,
   loadProject,
   projectAudioPath,
-  releaseShape,
+  releaseForm,
   releasedPublicly,
   repoRoot,
   scriptLines,
   writeTextAtomic,
   type ReleaseShape,
+  type ShortsSource,
 } from '@coreslopper/core';
 import { validateProject } from './validate.js';
 import { buildVideoProps, bundleFor, masterFormatId, renderLimits } from './render.js';
@@ -159,7 +160,7 @@ export async function checkCover(projectDir: string): Promise<{ check: Check; fi
  */
 export async function checkReleaseAssets(
   paths: { root: string; renders: string },
-  release: { shape: ReleaseShape; master: { width: number; height: number } },
+  release: { shape: ReleaseShape; master: { width: number; height: number }; shorts?: ShortsSource },
   probe?: (path: string) => Omit<ShortProbe, 'name'>,
 ): Promise<{ checks: Check[]; thumbnails: string[]; covers: string[]; shorts: string[]; shortNames: string[] }> {
   if (release.shape === 'short-episode') {
@@ -180,6 +181,17 @@ export async function checkReleaseAssets(
   }
   const vertical = release.shape === 'episode' && release.master.height >= release.master.width;
   const thumbnails = await checkThumbnails(paths.renders, paths.root, vertical ? 1 : 3);
+  if (release.shorts === 'vertical-version') {
+    // No Shorts to cut: the vertical version is placed by release and checked in the release folder (ADR 0057).
+    const none = 'the vertical version is this episode\'s one Short; release places it from renders/9x16.mp4 (ADR 0057)';
+    return {
+      checks: [thumbnails.check, { name: 'Shorts', result: 'N/A', evidence: none }, { name: 'Short thumbnails', result: 'N/A', evidence: none }],
+      thumbnails: thumbnails.files,
+      covers: [],
+      shorts: [],
+      shortNames: [],
+    };
+  }
   const shorts = await checkShorts(paths.renders, paths.root, probe);
   return { checks: [thumbnails.check, ...shorts.checks], thumbnails: thumbnails.files, covers: [], shorts: shorts.files, shortNames: shorts.names };
 }
@@ -398,7 +410,7 @@ function episodeChecks(project: Awaited<ReturnType<typeof loadProject>>, duratio
 /** The checks of a public release: the assets of its shape, upload text and data, and the release package. */
 async function releasePackageChecks(
   paths: { root: string; renders: string; review: string },
-  release: { shape: ReleaseShape; master: { width: number; height: number } },
+  release: { shape: ReleaseShape; master: { width: number; height: number }; shorts: ShortsSource },
 ): Promise<{ checks: Check[]; thumbnails: string[]; covers: string[]; shorts: string[] }> {
   const assets = await checkReleaseAssets(paths, release);
   return {
@@ -460,7 +472,7 @@ export async function runQa(options: QaOptions): Promise<string> {
   // upload text, or release package to check, so READY rests on the renders.
   const release = releasedPublicly(project.config)
     ? await releasePackageChecks(project.paths, {
-        shape: releaseShape({
+        ...releaseForm({
           kind: project.config.kind,
           master: project.config.formats.master,
           durationSeconds: (project.effectiveTiming ?? project.timing)?.audio.duration,

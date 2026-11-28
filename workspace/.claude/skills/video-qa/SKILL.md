@@ -52,7 +52,7 @@ license: MIT
 - Every check has a pass/fail result and evidence.
 - Sync, readability, determinism, coverage, and budget reconciliation pass, or the exceptions are documented.
 - All configured formats are rendered.
-- A public project's release package is complete (an internal project has none): `qa` reports no FAIL, `Release texts` is PASS, the remaining TODOs are facts only the user can give, and the six thumbnails and the cover passed the art director.
+- A public project's release package is complete (an internal project has none): `qa` reports no FAIL, `Release texts` is PASS, the remaining TODOs are facts only the user can give, and the images [release.md](release.md) names for the release shape passed the art director (a short episode: its cover and TikTok cover, no 16:9 thumbnails; a vertical episode over 3 minutes: one main-video thumbnail).
 - `review/report.md` is current.
 - No secrets, copyrighted media, or generated assets are staged for commit.
 

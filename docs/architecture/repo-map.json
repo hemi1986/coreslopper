@@ -49,8 +49,8 @@
       "role": "layer",
       "roleReasons": [
         "generic package name (@coreslopper/core)",
-        "21 concept stems in this package",
-        "12 shared with other packages"
+        "23 concept stems in this package",
+        "13 shared with other packages"
       ]
     },
     {
@@ -138,16 +138,9 @@
       "path": "packages/cli",
       "score": 0.61,
       "reasons": [
-        "486 changed files in recent history",
+        "363 changed files in recent history",
         "shared library",
         "shared infrastructure – not a domain slice"
-      ]
-    },
-    {
-      "path": "scripts/audio-analysis",
-      "score": 0.16,
-      "reasons": [
-        "11 changed files in recent history"
       ]
     },
     {
@@ -158,10 +151,17 @@
       ]
     },
     {
+      "path": "scripts/audio-analysis",
+      "score": 0.15,
+      "reasons": [
+        "2 changed files in recent history"
+      ]
+    },
+    {
       "path": "packages/remotion",
       "score": 0.07,
       "reasons": [
-        "8 changed files in recent history",
+        "4 changed files in recent history",
         "shared library",
         "shared infrastructure – not a domain slice"
       ]
@@ -170,16 +170,16 @@
       "path": "packages/core",
       "score": 0.03,
       "reasons": [
-        "131 changed files in recent history",
+        "96 changed files in recent history",
         "shared library",
         "layer package – hosts many concepts, not a domain slice"
       ]
     },
     {
       "path": "packages/providers",
-      "score": 0.02,
+      "score": 0.01,
       "reasons": [
-        "36 changed files in recent history",
+        "12 changed files in recent history",
         "shared library",
         "layer package – hosts many concepts, not a domain slice"
       ]
@@ -302,20 +302,25 @@
         "episode",
         "fact",
         "file",
+        "fixe",
         "folder",
         "image",
         "internal",
         "media",
         "microsite",
         "plan",
+        "playlist",
         "record",
         "reel",
         "release",
+        "sery",
         "shape",
         "short",
         "story",
         "text",
-        "timer"
+        "timer",
+        "version",
+        "vertical"
       ],
       "tables": [],
       "files": [
@@ -341,19 +346,24 @@
         "tests/qa-release-shape.test.ts",
         "tests/release-autopilot-plan.test.ts",
         "tests/release-autopilot.test.ts",
+        "tests/release-board-shape.test.ts",
         "tests/release-calendar.test.ts",
         "tests/release-characterization.test.ts",
         "tests/release-facts.test.ts",
         "tests/release-folder.test.ts",
         "tests/release-images.test.ts",
         "tests/release-internal.test.ts",
+        "tests/release-microsite.test.ts",
         "tests/release-plan.test.ts",
         "tests/release-records.test.ts",
         "tests/release-reel.test.ts",
         "tests/release-routes.test.ts",
+        "tests/release-series-playlist.test.ts",
+        "tests/release-shape-fixes.test.ts",
         "tests/release-shape.test.ts",
         "tests/release-short-episode.test.ts",
         "tests/release-story-caption.test.ts",
+        "tests/release-vertical-version.test.ts",
         "tests/release-x-main.test.ts",
         "tests/release.test.ts"
       ],
@@ -371,7 +381,7 @@
       "reasons": [
         "3 layers: cli, core, tests",
         "3 packages",
-        "37 files"
+        "42 files"
       ],
       "adopted": true,
       "adoptedAt": "2026-11-22"
@@ -553,15 +563,49 @@
       "adoptedAt": "2026-11-22"
     },
     {
+      "name": "short",
+      "terms": [
+        "form",
+        "short"
+      ],
+      "tables": [],
+      "files": [
+        "packages/cli/src/short.ts",
+        "packages/core/src/short-form.ts",
+        "tests/short-form.test.ts"
+      ],
+      "packages": [
+        "?",
+        "packages/cli",
+        "packages/core"
+      ],
+      "layers": [
+        "cli",
+        "core",
+        "tests"
+      ],
+      "score": 15,
+      "reasons": [
+        "3 layers: cli, core, tests",
+        "3 packages",
+        "3 files"
+      ]
+    },
+    {
       "name": "board",
       "terms": [
         "board",
         "characterization",
+        "contact",
         "feedback",
         "http",
+        "look",
+        "nav",
         "production",
+        "project",
         "release",
         "review",
+        "sheet",
         "shell",
         "sound",
         "watch",
@@ -569,12 +613,17 @@
       ],
       "tables": [],
       "files": [
+        "packages/cli/src/board-contact-sheet.ts",
         "packages/cli/src/board-http.ts",
         "packages/cli/src/board-production.ts",
         "packages/cli/src/board-review.ts",
         "packages/cli/src/board-wizard.ts",
+        "tests/board-contact-sheet.test.ts",
         "tests/board-feedback.test.ts",
+        "tests/board-look.test.ts",
+        "tests/board-nav.test.ts",
         "tests/board-production.test.ts",
+        "tests/board-projects.test.ts",
         "tests/board-release.test.ts",
         "tests/board-review.test.ts",
         "tests/board-shell-characterization.test.ts",
@@ -594,7 +643,7 @@
       "reasons": [
         "2 layers: cli, tests",
         "2 packages",
-        "12 files"
+        "17 files"
       ],
       "adopted": true,
       "adoptedAt": "2026-11-22"
@@ -792,6 +841,33 @@
       ]
     },
     {
+      "name": "contact",
+      "terms": [
+        "contact",
+        "sheet"
+      ],
+      "tables": [],
+      "files": [
+        "packages/cli/src/board/contact-sheet.js",
+        "packages/cli/src/contact-sheet.ts",
+        "tests/contact-sheet.test.ts"
+      ],
+      "packages": [
+        "?",
+        "packages/cli"
+      ],
+      "layers": [
+        "cli",
+        "tests"
+      ],
+      "score": 11,
+      "reasons": [
+        "2 layers: cli, tests",
+        "2 packages",
+        "3 files"
+      ]
+    },
+    {
       "name": "init",
       "terms": [
         "command",
@@ -841,33 +917,6 @@
       "score": 11,
       "reasons": [
         "2 layers: cli, core",
-        "2 packages",
-        "3 files"
-      ]
-    },
-    {
-      "name": "queue",
-      "terms": [
-        "characterization",
-        "queue"
-      ],
-      "tables": [],
-      "files": [
-        "packages/cli/src/queue.ts",
-        "tests/queue-characterization.test.ts",
-        "tests/queue.test.ts"
-      ],
-      "packages": [
-        "?",
-        "packages/cli"
-      ],
-      "layers": [
-        "cli",
-        "tests"
-      ],
-      "score": 11,
-      "reasons": [
-        "2 layers: cli, tests",
         "2 packages",
         "3 files"
       ]

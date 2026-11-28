@@ -2,26 +2,11 @@
 
 > Generated from `docs/stories/ST-*.md` – **do not edit manually**. Change the story files instead.
 
-**Progress: 29 of 31 domain stories done** · scenarios 100 of 108
+**Progress: 31 of 31 domain stories done** · scenarios 108 of 108
 
-**59 stories** · In Progress: 0 · Ready: 10 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 49 · Superseded: 0
+**59 stories** · In Progress: 0 · Ready: 0 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 59 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
-
-## Ready
-
-| ID | Title | Type | Context | Priority | Size | Risk | Depends on |
-|---|---|---|---|---|---|---|---|
-| [ST-051](ST-051-the-release-shape-is-kept-once-posted.md) | The release shape is kept once the release has started | domain | Release | must | – | – | ST-047 |
-| [ST-049](ST-049-a-short-horizontal-episode-posts-its-vertical-version.md) | A horizontal episode of up to 3 minutes posts its vertical version as its one Short | domain | Release | should | – | – | ST-047 |
-| [ST-055](ST-055-skills-and-docs-for-platform-formats.md) | The release skill and the platform docs follow the release shapes | task | – | must | – | – | ST-044, ST-045, ST-046, ST-048, ST-049 |
-| [ST-056](ST-056-the-board-has-a-top-navigation-and-full-width.md) | The board has a top navigation and uses the full width | task | – | must | – | – | – |
-| [ST-057](ST-057-the-boards-project-list.md) | The board's project list with search, filters and series grouping | task | – | must | – | – | ST-056 |
-| [ST-052](ST-052-the-board-shows-the-release-shape.md) | The release board names the release shape and shows only its platforms | task | – | should | – | – | ST-047, ST-048 |
-| [ST-053](ST-053-a-short-episode-joins-the-series-playlist.md) | A short episode's YouTube post asks for the series playlist | task | – | should | – | – | ST-048 |
-| [ST-058](ST-058-the-contact-sheet-shows-the-keyframes.md) | The board's contact sheet shows each shot's keyframe | chore | – | should | – | – | – |
-| [ST-059](ST-059-the-boards-werkstatt-look.md) | The board's "Werkstatt" look | chore | – | should | – | – | ST-056 |
-| [ST-054](ST-054-the-microsite-data-names-the-aspect.md) | The microsite data names the video's aspect | task | – | could | – | – | ST-048 |
 
 ## Done
 
@@ -55,6 +40,11 @@ Within each section: by priority, then by story ID, with dependencies pulled in 
 | [ST-047](ST-047-the-release-shape-of-an-episode.md) | The release package records whether an episode is a short episode | domain | Release | must | – | – | – |
 | [ST-048](ST-048-a-short-episodes-release.md) | A short episode is released as one video on every platform | domain | Release | must | – | – | ST-047 |
 | [ST-050](ST-050-qa-expects-the-assets-of-the-release-shape.md) | QA expects the thumbnails and covers of the release shape | task | – | must | – | – | ST-047 |
+| [ST-051](ST-051-the-release-shape-is-kept-once-posted.md) | The release shape is kept once the release has started | domain | Release | must | – | – | ST-047 |
+| [ST-049](ST-049-a-short-horizontal-episode-posts-its-vertical-version.md) | A horizontal episode of up to 3 minutes posts its vertical version as its one Short | domain | Release | should | – | – | ST-047 |
+| [ST-055](ST-055-skills-and-docs-for-platform-formats.md) | The release skill and the platform docs follow the release shapes | task | – | must | – | – | ST-044, ST-045, ST-046, ST-048, ST-049 |
+| [ST-056](ST-056-the-board-has-a-top-navigation-and-full-width.md) | The board has a top navigation and uses the full width | task | – | must | – | – | – |
+| [ST-057](ST-057-the-boards-project-list.md) | The board's project list with search, filters and series grouping | task | – | must | – | – | ST-056 |
 | [ST-012](ST-012-a-shot-lands-on-the-sound-cue.md) | A shot lands on a sound's cue | domain | Storyboard | should | – | – | ST-011 |
 | [ST-014](ST-014-burned-in-subtitles-for-a-meme.md) | A meme's render carries German subtitles | domain | Render | should | – | – | ST-007 |
 | [ST-020](ST-020-episode-announcement-says-new-episode.md) | An episode's announcement images say "new episode", not "new song" | chore | – | should | – | – | – |
@@ -74,5 +64,10 @@ Within each section: by priority, then by story ID, with dependencies pulled in 
 | [ST-040](ST-040-an-internal-calendar-books-no-slots.md) | An internal project's calendar books no slots | domain | Release | should | – | – | ST-036 |
 | [ST-041](ST-041-the-autopilot-leaves-an-internal-project-alone.md) | The autopilot leaves an internal project alone | domain | Publishing | should | – | – | ST-036 |
 | [ST-042](ST-042-an-internal-project-cannot-be-approved.md) | An internal project cannot be approved | domain | Release | should | – | – | ST-036 |
+| [ST-052](ST-052-the-board-shows-the-release-shape.md) | The release board names the release shape and shows only its platforms | task | – | should | – | – | ST-047, ST-048 |
+| [ST-053](ST-053-a-short-episode-joins-the-series-playlist.md) | A short episode's YouTube post asks for the series playlist | task | – | should | – | – | ST-048 |
+| [ST-058](ST-058-the-contact-sheet-shows-the-keyframes.md) | The board's contact sheet shows each shot's keyframe | chore | – | should | – | – | – |
+| [ST-059](ST-059-the-boards-werkstatt-look.md) | The board's "Werkstatt" look | chore | – | should | – | – | ST-056 |
 | [ST-018](ST-018-the-boards-sounds-view.md) | The board's Sounds view | task | – | could | – | – | ST-001, ST-002, ST-003, ST-006 |
 | [ST-019](ST-019-spike-tiktok-trending-audio.md) | Spike: can a meme use TikTok's trending audio? | spike | – | could | – | – | – |
+| [ST-054](ST-054-the-microsite-data-names-the-aspect.md) | The microsite data names the video's aspect | task | – | could | – | – | ST-048 |

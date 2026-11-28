@@ -14,6 +14,7 @@ import {
   manifestShape,
   releaseIdentity,
   releaseShape,
+  shortsSourceOf,
   withReleaseDefaults,
   withUrls,
   type LoadedProject,
@@ -28,7 +29,7 @@ import { loadStatus } from './release-records.js';
 import { DERIVED_PATHS, isTeaserPath } from './release-images.js';
 import { releaseLabels, type ReleaseTextInput } from './release-texts.js';
 import { loadUploadData, uploadPaths } from './upload-text.js';
-import { releaseDir, songJson, usedSoundCredits } from './release.js';
+import { releaseDir, seriesPlaylist, songJson, usedSoundCredits } from './release.js';
 
 // The facts of one project's release: what the release folder, the board and
 // the autopilot are made from. The board builds its posts on them, and one
@@ -135,11 +136,13 @@ export async function loadReleaseFacts(projectRoot: string, root: string): Promi
   const timing = project.effectiveTiming ?? project.timing;
   const meme = kind === 'meme';
   // The shape the release folder was built with; before the first release, the project's (ADR 0057).
-  const shape = manifest ? manifestShape(manifest, kind) : releaseShape({ kind, master: project.config.formats.master, durationSeconds: timing?.audio.duration });
+  const projectForm = { kind, master: project.config.formats.master, durationSeconds: timing?.audio.duration };
+  const shape = manifest ? manifestShape(manifest, kind) : releaseShape(projectForm);
   const oneVideo = meme || shape === 'short-episode';
   const input: ReleaseTextInput = {
     kind,
     shape,
+    shortsSource: shortsSourceOf(shape, projectForm),
     masterFormat: formatId(project.config.formats.master.aspect),
     language,
     slug: project.config.slug,
@@ -156,6 +159,7 @@ export async function loadReleaseFacts(projectRoot: string, root: string): Promi
     // A meme and a short episode are Shorts, never a Premiere.
     premiere: !oneVideo && schedule.release.premiere,
     durationSeconds: timing?.audio.duration,
+    playlist: seriesPlaylist(project, shape)?.playlist,
   };
   const handle = channel?.links.youtube?.handle;
   const planBase = buildReleasePlan({
