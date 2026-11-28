@@ -564,6 +564,25 @@ describe('approving a release', () => {
 });
 
 describe('a demo production and the release', () => {
+  it('ST-068: The autopilot leaves a demo alone', async () => {
+    const t = await setup();
+    const now = new Date(t.at('distributor'));
+    // The approval is from before the project was marked a demo: a demo itself is never approved.
+    await approveRelease(t.dir, { root: t.root, now });
+    await setDemo(t.dir, true);
+    t.moveTo('announce:x');
+
+    const result = await t.run();
+
+    expect((await loadAutopilotLog(t.dir)).entries).toEqual([]);
+    expect(result.projects[0]).toMatchObject({ slug: 'neon', acted: [] });
+    expect(t.social.get('x')!.calls).toEqual([]);
+    expect(t.lines.filter((line) => line.includes('demo production'))).toEqual(['neon is not released (demo production); nothing to post']);
+    const plan: string[] = [];
+    await autopilotOverview(t.root, { now: t.clock.now, env: ENV, log: (line) => void plan.push(line) });
+    expect(plan).toEqual(['neon is not released (demo production); nothing to plan']);
+  });
+
   it('ST-068: A demo cannot be approved', async () => {
     // The calendar proposes 2026-12-04: the first release Friday 21 days after 2026-11-13. A demo still gets its
     // release package and its own calendar.
