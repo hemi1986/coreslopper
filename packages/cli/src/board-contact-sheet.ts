@@ -1,8 +1,8 @@
 import { existsSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { join } from 'node:path';
-import { ValidationError, type ResolvedShot } from '@coreslopper/core';
-import { validateProject } from './validate.js';
+import { ValidationError, projectPaths, type ResolvedShot } from '@coreslopper/core';
+import { StoryboardValidationError, validateProject } from './validate.js';
 
 // The board's contact sheet (RM-ContactSheet, G-70): one card per shot of the
 // resolved storyboard, in playing order, with the shot's keyframe from
@@ -24,7 +24,8 @@ export interface ContactSheetCard {
 
 export type ContactSheet =
   | { status: 'none' }
-  | { status: 'invalid'; error: string; details: string[] }
+  /** `scope`: whether the storyboard itself failed, or the project around it (project.yaml, timing, bibles, config). */
+  | { status: 'invalid'; scope: 'storyboard' | 'project'; error: string; details: string[] }
   | { status: 'ok'; durationSeconds: number; cards: ContactSheetCard[] };
 
 /** The keyframe a shot's card shows: `assets/keyframes/<shot>.png`, when it is a file. */
@@ -35,7 +36,8 @@ async function keyframe(projectDir: string, shot: string): Promise<ContactSheetC
 }
 
 export async function contactSheet(projectDir: string): Promise<ContactSheet> {
-  if (!existsSync(join(projectDir, 'storyboard.yaml'))) return { status: 'none' };
+  const storyboardPath = projectPaths(projectDir).storyboard;
+  if (!existsSync(storyboardPath)) return { status: 'none' };
   let shots: ResolvedShot[];
   let durationSeconds: number;
   try {
@@ -44,7 +46,10 @@ export async function contactSheet(projectDir: string): Promise<ContactSheet> {
     durationSeconds = resolved.durationSeconds;
   } catch (error) {
     const details = error instanceof ValidationError ? error.details : [];
-    return { status: 'invalid', error: (error as Error).message, details };
+    const message = (error as Error).message;
+    // The storyboard's own checks, or storyboard.yaml that does not parse; anything else is the project around it.
+    const scope = error instanceof StoryboardValidationError || message.includes(storyboardPath) ? 'storyboard' : 'project';
+    return { status: 'invalid', scope, error: message, details };
   }
   const cards = await Promise.all(
     shots.map(async (shot): Promise<ContactSheetCard> => {

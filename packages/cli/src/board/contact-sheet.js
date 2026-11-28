@@ -5,12 +5,12 @@ import { addStrings, api, el, projectFile, setLang, showError, t, viewTabs } fro
 
 addStrings({
   de: {
-    sheetNone: 'Noch kein Storyboard.', sheetInvalid: 'Das Storyboard ist nicht gültig:', sheetEmpty: 'Das Storyboard hat keine Shots.',
+    sheetNone: 'Noch kein Storyboard.', sheetInvalid: 'Das Storyboard ist nicht gültig:', sheetUnchecked: 'Das Storyboard lässt sich nicht prüfen, weil das Projekt nicht gültig ist:', sheetEmpty: 'Das Storyboard hat keine Shots.',
     sheetShots: function (n) { return n + ' Shots'; }, sheetNoKeyframe: 'noch kein Keyframe',
     sources: { motion: 'Motion', 'ai-clip': 'AI-Clip', footage: 'Footage', mixed: 'Gemischt' }
   },
   en: {
-    sheetNone: 'No storyboard yet.', sheetInvalid: 'The storyboard is not valid:', sheetEmpty: 'The storyboard has no shots.',
+    sheetNone: 'No storyboard yet.', sheetInvalid: 'The storyboard is not valid:', sheetUnchecked: 'The storyboard cannot be checked because the project is not valid:', sheetEmpty: 'The storyboard has no shots.',
     sheetShots: function (n) { return n + ' shots'; }, sheetNoKeyframe: 'no keyframe yet',
     sources: { motion: 'Motion', 'ai-clip': 'AI clip', footage: 'Footage', mixed: 'Mixed' }
   }
@@ -46,7 +46,7 @@ export function sheetBody(slug, sheet) {
   if (sheet.status === 'none') return [el('p', { class: 'empty', text: t('sheetNone') })];
   if (sheet.status === 'invalid') {
     return [el('div', { class: 'card sheet-invalid' }, [
-      el('p', { class: 'error', text: t('sheetInvalid') + ' ' + sheet.error }),
+      el('p', { class: 'error', text: (sheet.scope === 'storyboard' ? t('sheetInvalid') : t('sheetUnchecked')) + ' ' + sheet.error }),
       sheet.details.length ? el('ul', {}, sheet.details.map(function (line) { return el('li', { class: 'error', text: line }); })) : null
     ])];
   }

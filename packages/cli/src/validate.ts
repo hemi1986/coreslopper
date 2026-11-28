@@ -46,6 +46,9 @@ function validateEpisode(project: LoadedProject, lipsyncMaxDuration?: number): E
   return { script, sets, lipsyncMaxDuration, lipsyncSecondsMax: series?.limits.lipsync_seconds_max };
 }
 
+/** A failure of the storyboard's own checks (`resolveStoryboard`), as opposed to the project around it. */
+export class StoryboardValidationError extends ValidationError {}
+
 export interface ValidatedProject {
   project: LoadedProject;
   resolved: ResolvedStoryboard;
@@ -113,15 +116,21 @@ export async function validateProject(projectDir: string, options: { write?: boo
     throw error;
   }
 
-  const resolved = resolveStoryboard(
-    storyboard,
-    effectiveTiming,
-    style,
-    characters,
-    config.formats.master.fps,
-    1,
-    { episode: episodeContext, sets: project.sets, cues },
-  );
+  let resolved: ResolvedStoryboard;
+  try {
+    resolved = resolveStoryboard(
+      storyboard,
+      effectiveTiming,
+      style,
+      characters,
+      config.formats.master.fps,
+      1,
+      { episode: episodeContext, sets: project.sets, cues },
+    );
+  } catch (error) {
+    if (error instanceof ValidationError) throw new StoryboardValidationError(error.message, error.details);
+    throw error;
+  }
 
   if (options.write !== false) {
     await writeEffectiveTiming(project);
