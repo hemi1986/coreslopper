@@ -234,9 +234,10 @@ describe('the Characters list', () => {
     expect(find((e) => e.has('pl-search'))[0]!.value).toBe('');
   });
 
-  it('shows "No characters yet" for an empty library', async () => {
+  it('shows "No characters yet" for an empty library, with + New to the character wizard', async () => {
     await open('#/characters', empty);
-    expect(find((e) => e.has('cl-empty'))[0]!.text()).toBe('No characters yet');
+    expect(find((e) => e.has('cl-empty'))[0]!.text()).toBe('No characters yet+ New');
+    expect(find((e) => e.has('cl-empty-new'))[0]!.getAttribute('href')).toBe('#/new/character');
     expect(find((e) => e.tagName === 'TABLE')).toEqual([]);
   });
 });

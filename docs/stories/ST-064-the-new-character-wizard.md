@@ -44,12 +44,12 @@ project in its first step and stays resumable by address; ST-021 (the last step 
 - `docs/board.md` and both board guides describe the wizard and the chooser.
 
 ## Acceptance Criteria
-- [ ] `#/new` shows the groups Production and Library, and Library has a Character card (test)
-- [ ] Step 1 with a name creates the library character and the address becomes `#/new/character/<id>` (test with a
+- [x] `#/new` shows the groups Production and Library, and Library has a Character card (test)
+- [x] Step 1 with a name creates the library character and the address becomes `#/new/character/<id>` (test with a
       fixture workspace)
-- [ ] A sheet and two images uploaded in step 2 appear in the entry; a voice with transcript in step 3 is its
+- [x] A sheet and two images uploaded in step 2 appear in the entry; a voice with transcript in step 3 is its
       reference voice (test)
-- [ ] Reloading `#/new/character/<id>` resumes at the entry with its files
-- [ ] The import path takes the characters of a fixture project into the library and lists them with links (test)
-- [ ] An empty name is refused with its reason and the other fields keep their text
-- [ ] The Characters view has no inline creation or import form, and its **+ Neu** opens `#/new/character`
+- [x] Reloading `#/new/character/<id>` resumes at the entry with its files
+- [x] The import path takes the characters of a fixture project into the library and lists them with links (test)
+- [x] An empty name is refused with its reason and the other fields keep their text
+- [x] The Characters view has no inline creation or import form, and its **+ Neu** opens `#/new/character`

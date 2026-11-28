@@ -6,6 +6,7 @@
 //   #/p/<slug>/contact-sheet                 the contact sheet
 //   #/p/<slug>/doc/<path>                    a project document (brief, treatment, …)
 //   #/s/<slug>       a series                #/new[/video|series|episode|meme[/<slug>]]  the wizard
+//   #/new/character[/<id>]                   the wizard for a library character
 //   #/characters[?…]  the character list     #/characters/<id>  one library character
 //   #/sets[?…]        the set list           #/sets/<id>        one library set
 //   #/sounds[?…]      the sound list         #/sounds/<id>      one library sound
@@ -18,6 +19,7 @@ import { onReleaseChange, showCalendar, showRelease } from './release.js';
 import { showReview } from './review.js';
 import { showContactSheet } from './contact-sheet.js';
 import { showWizard } from './wizard.js';
+import { showCharacterWizard } from './character-wizard.js';
 import { CHARACTERS_ROUTE, showCharacters } from './characters.js';
 import { SETS_ROUTE, showSets } from './sets.js';
 import { SOUNDS_ROUTE, showSounds } from './sounds.js';
@@ -36,7 +38,8 @@ function route() {
   kept = false;
   const hash = decodedHash(location.hash || '#/');
   let match, view;
-  if ((match = /^#\/new(?:\/(video|series|episode|meme)(?:\/([a-z0-9-]+))?)?\/?$/.exec(hash))) { active = 'new'; view = showWizard(match[1], match[2]); }
+  if ((match = /^#\/new\/character(?:\/([a-z0-9][a-z0-9_-]*))?\/?$/.exec(hash))) { active = 'new'; view = showCharacterWizard(match[1]); }
+  else if ((match = /^#\/new(?:\/(video|series|episode|meme)(?:\/([a-z0-9-]+))?)?\/?$/.exec(hash))) { active = 'new'; view = showWizard(match[1], match[2]); }
   else if (PROJECTS_ROUTE.test(hash)) { active = 'projects'; view = showProjects(); }
   else if (hash === '#/calendar') { active = 'calendar'; view = showCalendar(); }
   else if ((match = /^#\/guide(?:\/([a-z][a-z0-9-]*(?:\.de)?))?\/?$/.exec(hash))) { active = 'guide'; view = showGuide(match[1]); }

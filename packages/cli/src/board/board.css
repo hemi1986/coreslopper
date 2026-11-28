@@ -130,6 +130,9 @@ button.primary:disabled { opacity: .45; cursor: not-allowed; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 14px; margin-bottom: 22px; }
 .grid .card { margin: 0; cursor: pointer; }
 .grid .card:hover { border-color: var(--accent); }
+.list-head { display: flex; align-items: center; gap: 12px; margin: 0 0 6px; }
+.list-head h2 { margin: 0; font-size: 20px; }
+.new-group + .new-group { margin-top: 8px; }
 .section-title { font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 8px 0 10px; }
 .phase { border-radius: var(--radius-pill); padding: 1px 9px; font-size: var(--fs-xs); font-weight: 600; background: var(--chip); color: var(--muted); }
 .phase.running { background: var(--tint-accent); color: var(--accent); } .phase.failed { background: var(--tint-bad); color: var(--bad); }

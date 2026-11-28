@@ -44,7 +44,7 @@ Die Navigation listet kein Projekt: **Projekte** öffnet die Liste aller Projekt
 
 ## Ein Musikvideo anlegen
 
-Klicke auf **+ Neu** und wähle **Musikvideo**.
+Klicke auf **+ Neu** und wähle **Musikvideo**. Die Auswahl hat zwei Gruppen: **Produktion** (Musikvideo, Serie, Episode, Meme) und **Bibliothek** (Figur).
 
 ![Auswahl, was angelegt wird](assets/board/de/new.webp)
 
@@ -102,7 +102,7 @@ Wenn ein Projekt fertig ist, enthält der Tab **Release** alles für die Veröff
 
 ![Die Figuren-Bibliothek](assets/board/de/characters.webp)
 
-**Figuren** ist deine Figuren-Bibliothek, eine Tabelle mit einer Zeile pro Figur: Vorschaubild, Schlagworte, Bilder und Zustände, Stimme, in wie vielen Produktionen sie steckt und woher sie kommt. Suche nach Name, Beschreibung oder Schlagwort, filtere nach Schlagwort, **unbenutzt** oder **Herkunft** und sortiere per Klick auf einen Spaltenkopf; die Adresse behält alles, sodass Zurück und Aktualisieren zur selben Liste führen. Ein Klick auf eine Zeile öffnet die Figur. Die Figuren eines Projekts kommen von selbst hinein, sobald seine Character-Bible fertig ist. **Aus Projekt oder Serie übernehmen** importiert vorhandene Figuren, **Neue Figur anlegen** fügt eigene hinzu. In der Ansicht einer Figur kopiert **Übernehmen in** sie in ein Musikvideo oder den Canon einer Serie.
+**Figuren** ist deine Figuren-Bibliothek, eine Tabelle mit einer Zeile pro Figur: Vorschaubild, Schlagworte, Bilder und Zustände, Stimme, in wie vielen Produktionen sie steckt und woher sie kommt. Suche nach Name, Beschreibung oder Schlagwort, filtere nach Schlagwort, **unbenutzt** oder **Herkunft** und sortiere per Klick auf einen Spaltenkopf; die Adresse behält alles, sodass Zurück und Aktualisieren zur selben Liste führen. Ein Klick auf eine Zeile öffnet die Figur. Die Figuren eines Projekts kommen von selbst hinein, sobald seine Character-Bible fertig ist. **+ Neu** im Kopf der Liste öffnet den Figuren-Assistenten, wie **+ Neu** → **Figur**. Er fragt zuerst: **Neu anlegen** oder **Aus Projekt oder Serie übernehmen**. Zum Anlegen füllst du Name, Darstellung, Beschreibung, Prompt-Satz und Schlagworte aus und klickst **Anlegen**; dann lädst du das Character Sheet und weitere Bilder hoch (jedes erscheint, sobald es oben ist) und, falls vorhanden, ein WAV der Stimme mit ihrem exakten Text. **Zur Figur** öffnet ihre Seite. Die Adresse des Assistenten behält die Figur, sodass ein Neuladen dort weitermacht, wo du warst. Zum Übernehmen wählst du das Projekt oder die Serie und klickst **Importieren**: Der Assistent listet die übernommenen Figuren, jede mit einem Link auf ihre Seite. Ein abgelehnter Eintrag (ein leerer oder vergebener Name, eine Datei der falschen Art) zeigt seinen Grund im Schritt und behält, was du eingegeben hast. In der Ansicht einer Figur kopiert **Übernehmen in** sie in ein Musikvideo oder den Canon einer Serie.
 
 **Sets** ist deine Set-Bibliothek, die gleiche Art Tabelle: eine Zeile pro Set mit Vorschaubild (die erste Platte, sonst die erste Referenz), Schlagworten, der Zahl der Referenzen und Platten, in wie vielen Produktionen es steckt und woher es kommt. Suche, die Filter **unbenutzt** und **Herkunft**, die Schlagwort-Chips und die Spaltenköpfe funktionieren wie bei den Figuren, und die Adresse behält auch sie. Ein Klick auf eine Zeile öffnet das Set.
 
