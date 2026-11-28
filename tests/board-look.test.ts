@@ -23,7 +23,7 @@ function block(text: string, open: number): string {
 
 function tokens(body: string): Map<string, string> {
   const map = new Map<string, string>();
-  for (const m of body.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)) map.set(m[1], m[2].trim());
+  for (const m of body.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)) map.set(m[1] ?? '', (m[2] ?? '').trim());
   return map;
 }
 
@@ -37,10 +37,11 @@ function luminance(hex: string): number {
   const n = Number.parseInt(hex.slice(1), 16);
   return [n >> 16, (n >> 8) & 255, n & 255]
     .map((v) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; })
-    .reduce((sum, c, i) => sum + c * [0.2126, 0.7152, 0.0722][i], 0);
+    .reduce((sum, c, i) => sum + c * ([0.2126, 0.7152, 0.0722][i] ?? 0), 0);
 }
 function contrast(a: string, b: string): number {
-  const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p);
+  const x = Math.max(luminance(a), luminance(b));
+  const y = Math.min(luminance(a), luminance(b));
   return (x + 0.05) / (y + 0.05);
 }
 
