@@ -291,6 +291,12 @@ table.list tr.link-row:hover td { background: var(--chip); }
 .pl-select { padding: 4px 8px; border: var(--border); border-radius: var(--radius); background: var(--panel); color: var(--ink); font: inherit; }
 .pl-switch { cursor: pointer; }
 .pl-count { margin: 0 0 6px; }
+/* The selection of a library list (ST-063): a checkbox column and the bar above the table. */
+table.pl-table th.ls-check, table.pl-table td.ls-check { width: 28px; padding-right: 0; }
+.ls-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 8px; padding: 8px 14px; background: var(--panel); border: var(--border); border-radius: var(--radius); }
+.ls-count { font-weight: 600; }
+.ls-refused { flex-basis: 100%; }
+.ls-refused ul { margin: 4px 0 0; padding-left: 18px; }
 table.pl-table th.pl-sort { cursor: pointer; white-space: nowrap; }
 table.pl-table th.pl-sort.on { color: var(--ink); }
 table.pl-table code { font: 12px var(--mono); background: var(--chip); padding: 1px 5px; border-radius: var(--radius-sm); }

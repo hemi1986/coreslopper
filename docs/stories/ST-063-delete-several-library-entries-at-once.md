@@ -9,7 +9,7 @@ risk: null
 depends_on: [ST-060, ST-061, ST-062]
 labels: [feature:asset-library]
 feature: asset-library
-status: ready
+status: done
 ---
 
 ## Context
@@ -38,10 +38,10 @@ copies; takes already copied into memes stay. Guidelines G4, G6.
 - `docs/board.md` and both board guides describe it.
 
 ## Acceptance Criteria
-- [ ] Selecting two characters and confirming deletes both and the list no longer shows them (test with a fixture
+- [x] Selecting two characters and confirming deletes both and the list no longer shows them (test with a fixture
       workspace)
-- [ ] The confirmation names the productions that use a selected set (test)
-- [ ] **Cancel** in the confirmation deletes nothing (test)
-- [ ] When one of three deletes is refused, the other two are gone and the refused one is named with its reason and
+- [x] The confirmation names the productions that use a selected set (test)
+- [x] **Cancel** in the confirmation deletes nothing (test)
+- [x] When one of three deletes is refused, the other two are gone and the refused one is named with its reason and
       stays selected (test with a stubbed refusal)
-- [ ] The header checkbox selects only the rows the current filters show
+- [x] The header checkbox selects only the rows the current filters show

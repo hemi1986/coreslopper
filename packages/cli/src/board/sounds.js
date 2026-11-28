@@ -4,6 +4,7 @@
 //                   hash); its + New opens the sound wizard (#/new/sound, sound-wizard.js)
 //   #/sounds/<id>   one sound: play it, set its cue from the playback, edit, remove
 import { addStrings, api, el, go, pending, post, setLang, showError, t } from './lib.js';
+import { librarySelection } from './library-selection.js';
 import { allTags, anyLibraryFilter, defaultDir, libraryListHash, matchesLibraryItem, parseLibraryListState, queryOf, sortLibraryItems, toggleValue, writeListHash } from './list-state.js';
 
 addStrings({
@@ -214,11 +215,12 @@ function header() {
       setState(next, false);
     } }, [cols[col] + (on ? (view.state.dir === 'asc' ? ' ▲' : ' ▼') : '')]);
   };
-  return el('thead', {}, [el('tr', {}, [th(''), th('title', true), th('useWhen'), th('length', true), th('licence', true), th('tags'), th('used', true)])]);
+  return el('thead', {}, [el('tr', {}, [view.selection.head(), th(''), th('title', true), th('useWhen'), th('length', true), th('licence', true), th('tags'), th('used', true)])]);
 }
 
 function row(item) {
   if (item.error) return el('tr', { class: 'pl-error', 'data-id': item.id }, [
+    view.selection.cell(item),
     el('td', {}, [el('span', { class: 'sd-play placeholder', text: '!' })]), el('td', {}, [el('b', { text: item.id })]),
     el('td', { colspan: '5', class: 'error', text: item.error })
   ]);
@@ -232,6 +234,7 @@ function row(item) {
   if (on) playing.button = button;
   showPlaying(button, on);
   return el('tr', { class: 'link-row', 'data-id': item.id, onclick: function () { go(item.href); } }, [
+    view.selection.cell(item),
     el('td', {}, [button]),
     el('td', {}, [el('b', { text: entry.title }), el('span', { class: 'sub', text: entry.id })]),
     el('td', { class: 'sd-use', title: entry.use_when, text: entry.use_when }),
@@ -251,11 +254,14 @@ function drawResults() {
   const rows = soundRows(view.list, view.state);
   // A sound that is filtered out stops; one still in the list keeps playing.
   if (playing && !rows.some(function (item) { return item.id === playing.id; })) stopPlaying();
+  view.selection.keep(rows);
   if (!rows.length) {
     results.appendChild(el('div', { class: 'empty sd-nomatch' }, [el('p', { text: t('sdNoMatch') }), resetButton('primary')]));
     return;
   }
   results.appendChild(el('p', { class: 'sub pl-count', text: t('sdCount')(rows.length, view.list.items.length + view.list.errors.length) }));
+  const bar = view.selection.bar();
+  if (bar) results.appendChild(bar);
   results.appendChild(el('table', { class: 'list pl-table cl-table sd-table' }, [header(), el('tbody', {}, rows.map(row))]));
 }
 
@@ -280,13 +286,27 @@ function drawList() {
   }
 }
 
+/** Load the list again with its state, selection and player, after a delete of selected rows. */
+function reload() {
+  return load().then(function (data) {
+    view.data = data;
+    view.list = soundItems(data);
+    drawList();
+  });
+}
+
 function gallery() {
   const query = queryOf(location.hash);
   return load().then(function (data) {
     // A new list (a refresh, a return from a sound) starts silent.
     stopPlaying();
     const list = soundItems(data);
-    view = { data: data, list: list, state: parseSoundState(query, list), results: null, reset: null, audio: playerFor() };
+    view = { data: data, list: list, state: parseSoundState(query, list), results: null, reset: null, audio: playerFor(), selection: null };
+    view.selection = librarySelection({
+      remove: function (id) { return post('/api/sounds/' + encodeURIComponent(id), { action: 'delete' }); },
+      // A sound is used by memes; the listing names them by slug.
+      uses: function (item) { return item.entry.used_in; }, keep: 'memes', reload: reload, redraw: function () { drawResults(); }
+    });
     listAddress = soundHash(view.state);
     drawList();
   }).catch(showError);

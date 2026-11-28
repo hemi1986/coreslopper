@@ -137,8 +137,9 @@ describe('the Characters list', () => {
   it('shows every library character of a fixture workspace by name, with cover, tags, image/state count, used-in count and origin', async () => {
     await open('#/characters');
     expect(rowNames()).toEqual(['anna', 'bolt', 'mira', 'zed', 'broken']);
-    expect(find((e) => e.tagName === 'TH').map((e) => e.text())).toEqual(['', 'Name ▲', 'Display', 'Tags', 'Images', 'Voice', 'Used in', 'Origin']);
-    const cells = (id: string) => bodyRows().find((r) => r.getAttribute('data-id') === id)!.children;
+    expect(find((e) => e.tagName === 'TH').map((e) => e.text())).toEqual(['', '', 'Name ▲', 'Display', 'Tags', 'Images', 'Voice', 'Used in', 'Origin']);
+    // The first cell of a row is the selection's checkbox (ST-063).
+    const cells = (id: string) => bodyRows().find((r) => r.getAttribute('data-id') === id)!.children.slice(1);
     const mira = cells('mira');
     expect(mira[0]!.children[0]!.tagName).toBe('IMG');
     expect(mira[0]!.children[0]!.getAttribute('src')).toBe('/library-files/mira/' + (library as { characters: { id: string; cover: string }[] }).characters.find((c) => c.id === 'mira')!.cover);
