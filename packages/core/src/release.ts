@@ -135,14 +135,27 @@ export function keptShapeProblem(input: { recorded: ReleaseShape | undefined; de
   return `the release started as ${input.recorded} (${input.start}), and this run's shape is ${input.derived}: release changes nothing. Remove the done marks and live URLs first to release it as ${input.derived}.`;
 }
 
-/** A project with `distribution: internal` is never released publicly: no release package, no release calendar. */
-export function releasedPublicly(config: Pick<ProjectConfig, 'distribution'>): boolean {
+/**
+ * Released publicly: public and not a demo production. Only such a project is approved, books a release day or a
+ * slot in another project's calendar, and is posted by the autopilot (CMD-ApproveRelease, CMD-PlanReleaseCalendar,
+ * CMD-RunAutopilotRound; ST-040–ST-042, ST-068).
+ */
+export function releasedPublicly(config: Pick<ProjectConfig, 'distribution' | 'demo'>): boolean {
+  return getsReleasePackage(config) && config.demo !== true;
+}
+
+/**
+ * A project with `distribution: internal` gets no release package and no release calendar (ST-036). A demo
+ * production still gets both, so `release` and `npm run demo` show what a package looks like (ST-068).
+ */
+export function getsReleasePackage(config: Pick<ProjectConfig, 'distribution'>): boolean {
   return config.distribution !== 'internal';
 }
 
-/** The one wording for a project with `distribution: internal`, for every command that leaves it alone. */
-export function notReleasedPublicly(slug: string): string {
-  return `${slug} is not released publicly (distribution: internal)`;
+/** The one wording for a project that is not released publicly, for every command that leaves it alone. */
+export function notReleasedPublicly(config: Pick<ProjectConfig, 'slug' | 'distribution' | 'demo'>): string {
+  if (getsReleasePackage(config) && config.demo === true) return `${config.slug} is not released (demo production)`;
+  return `${config.slug} is not released publicly (distribution: internal)`;
 }
 
 /** A link value that still holds the `<ID>` placeholder. */

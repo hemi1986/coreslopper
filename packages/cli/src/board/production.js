@@ -2,6 +2,7 @@
 // with the next step to take in Claude Code.
 import { addStrings, ago, api, bytes, copyButton, el, go, local, projectFile, setLang, showError, t, usd, viewTabs } from './lib.js';
 import { renderMarkdown } from './markdown.js';
+import { demoChip, demoSwitch, demosShown, onlyDemos } from './demos.js';
 
 addStrings({
   de: {
@@ -20,7 +21,8 @@ addStrings({
       review: 'Review-Runde an den Agenten gesendet. Abarbeiten lassen:',
       running: function (s) { return s + ' läuft gerade. Nichts zu tun.'; },
       release: 'Fertig. Weiter im Release-Tab.', 'release-missing': 'Alle Stages fertig, aber der Release-Ordner fehlt. qa-export neu bauen lassen:', released: 'Release freigegeben: der Autopilot postet.', 'internal-done': 'Fertig – nicht öffentlich.',
-      canon: 'Canon fertigstellen:', episode: 'Nächste geplante Episode anlegen:', 'series-done': 'Alle geplanten Episoden sind angelegt.'
+      canon: 'Canon fertigstellen:', episode: 'Nächste geplante Episode anlegen:', 'series-done': 'Alle geplanten Episoden sind angelegt.',
+      demo: 'Demo-Produktion – nichts zu tun.'
     },
     drafts: function (n) { return n + ' Notiz(en) noch nicht an den Agenten gesendet'; }, wizard: 'oder im Assistenten',
     canon: 'Canon', characters: 'Figuren', sets: 'Sets', episodes: 'Episoden', notCreated: 'nicht angelegt', gaps: 'Lücken im Canon', format: 'Format',
@@ -55,7 +57,8 @@ addStrings({
       review: 'A review round is waiting for the agent. Let it work through it:',
       running: function (s) { return s + ' is running. Nothing to do.'; },
       release: 'Done. Continue in the release tab.', 'release-missing': 'Every stage is done, but the release folder is missing. Let qa-export build it again:', released: 'Release approved: the autopilot posts.', 'internal-done': 'Done – not released publicly.',
-      canon: 'Finish the canon:', episode: 'Create the next planned episode:', 'series-done': 'Every planned episode exists.'
+      canon: 'Finish the canon:', episode: 'Create the next planned episode:', 'series-done': 'Every planned episode exists.',
+      demo: 'Demo production – nothing to do.'
     },
     drafts: function (n) { return n + ' note(s) not sent to the agent yet'; }, wizard: 'or in the wizard',
     canon: 'Canon', characters: 'Characters', sets: 'Sets', episodes: 'Episodes', notCreated: 'not created', gaps: 'Gaps in the canon', format: 'Format',
@@ -154,6 +157,7 @@ function projectCard(project) {
   return el('section', { class: 'card', onclick: function () { go('#/p/' + project.slug); } }, [
     el('div', { class: 'card-head' }, [
       el('h3', { text: (project.artist ? project.artist + ' – ' : '') + project.title }),
+      project.demo ? demoChip() : null,
       el('span', { class: 'phase ' + project.phase, text: t('phases')[project.phase] })
     ]),
     el('div', { class: 'meta' }, [kindLabel(project), project.releaseDate ? ' · ' + t('release') + ' ' + project.releaseDate : null]),
@@ -174,7 +178,7 @@ function seriesCard(series) {
   if (series.error) return el('section', { class: 'card' }, [el('h3', { text: series.slug }), el('p', { class: 'error', text: series.error })]);
   const created = series.episodes.filter(function (e) { return e.slug; }).length;
   return el('section', { class: 'card', onclick: function () { go('#/s/' + series.slug); } }, [
-    el('div', { class: 'card-head' }, [el('h3', { text: series.title }), el('span', { class: 'chip', text: series.format })]),
+    el('div', { class: 'card-head' }, [el('h3', { text: series.title }), series.demo ? demoChip() : null, el('span', { class: 'chip', text: series.format })]),
     el('div', { class: 'meta' }, [t('characters') + ' ' + series.characters + ' · ' + t('sets') + ' ' + series.sets + ' · ' + t('episodes') + ' ' + created + '/' + series.episodes.length]),
     series.budget.totalUsd !== undefined ? budgetBar(series.budget.totalUsd, series.budget.canonSpentUsd + series.budget.episodeBudgetsUsd) : null,
     series.canonGaps.length ? el('div', { class: 'meta error', text: t('gaps') + ': ' + series.canonGaps.length }) : null,
@@ -190,18 +194,28 @@ function group(title, cards) {
 function renderOverview(data) {
   const main = document.getElementById('main');
   main.innerHTML = '';
-  main.appendChild(el('div', { class: 'toolbar' }, [el('h2', { text: t('production'), style: 'margin:0;font-size:20px' }), watchdogLine()]));
+  // Demo productions: hidden unless Show demos is on, or shown without the switch while there is nothing else.
+  const only = onlyDemos(data.projects.concat(data.series));
+  const shown = demosShown(only);
+  const hasDemos = data.projects.concat(data.series).some(function (p) { return p.demo === true; });
+  main.appendChild(el('div', { class: 'toolbar' }, [
+    el('h2', { text: t('production'), style: 'margin:0;font-size:20px' }), watchdogLine(),
+    hasDemos && !only ? demoSwitch(function () { renderOverview(data); }) : null
+  ]));
   if (!data.projects.length && !data.series.length) { main.appendChild(el('p', { class: 'empty', text: t('noWork') })); return; }
-  const ok = data.projects.filter(function (p) { return !p.error; });
+  const ok = data.projects.filter(function (p) { return !p.error && !p.demo; });
+  const series = data.series.filter(function (s) { return !s.demo; });
   const order = { failed: 0, setup: 1, ready: 2, done: 3, running: 4 };
   const yours = ok.filter(function (p) { return p.next.where !== 'none'; }).sort(function (a, b) { return order[a.phase] - order[b.phase]; });
+  const demos = shown ? data.projects.filter(function (p) { return p.demo; }).map(projectCard).concat(data.series.filter(function (s) { return s.demo; }).map(seriesCard)) : [];
   [
     group(t('groupYou'), yours.map(projectCard)),
     group(t('groupRunning'), ok.filter(function (p) { return p.next.reason === 'running'; }).map(projectCard)),
-    group(t('series'), data.series.map(seriesCard)),
+    group(t('series'), series.map(seriesCard)),
     group(t('groupReleased'), ok.filter(function (p) { return p.next.reason === 'released'; }).map(projectCard)),
     group(t('groupInternal'), ok.filter(function (p) { return p.next.reason === 'internal-done'; }).map(projectCard)),
-    group(t('groupBroken'), data.projects.filter(function (p) { return p.error; }).map(projectCard))
+    group(t('groupBroken'), data.projects.filter(function (p) { return p.error; }).map(projectCard)),
+    group(t('groupDemos'), demos)
   ].forEach(function (node) { if (node) main.appendChild(node); });
   if (activity.events.length) {
     main.appendChild(el('h3', { class: 'section-title', text: t('activity') }));

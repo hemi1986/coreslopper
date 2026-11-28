@@ -32,6 +32,8 @@ Das Board aktualisiert sich nicht von selbst. Klicke rechts in der Navigation au
 
 Die Navigation listet kein Projekt: **Projekte** öffnet die Liste aller Projekte und Serien, die veröffentlichten eingeschlossen.
 
+Die drei Demo-Produktionen, die jeder Workspace mitbringt, sind ausgeblendet, sobald du ein eigenes Projekt hast. Schalte **Demos zeigen** ein, hier oder in **Projekte**, um sie am Ende in einer Gruppe **Demos** zu sehen; das Board merkt sich den Schalter in diesem Browser. In einem frischen Workspace ohne anderes zeigt das Board die Demos in **Demos**, ohne Schalter.
+
 ## Projekte: ein Projekt finden
 
 **Projekte** ist eine Tabelle aller Musikvideos, Memes, Folgen und Serien, die neueste Aktivität zuerst. Jede Zeile zeigt die Art, den Status, die aktuelle Stage, den nächsten Schritt, die Veröffentlichung mit der Zahl der erledigten Release-Termine und wann sich zuletzt etwas geändert hat. Ein Klick auf eine Zeile öffnet sie.
@@ -96,7 +98,7 @@ Wenn ein Projekt fertig ist, enthält der Tab **Release** alles für die Veröff
 
 ![Der Release-Kalender, Woche für Woche](assets/board/de/calendar.webp)
 
-**Release-Kalender** zeigt Woche für Woche, was wann wo online geht, über alle Projekte hinweg. **nur offene** blendet Erledigtes aus. **Kalender als .ics** exportiert ihn für deine Kalender-App.
+**Release-Kalender** zeigt Woche für Woche, was wann wo online geht, über alle Projekte hinweg. **nur offene** blendet Erledigtes aus. **Kalender als .ics** exportiert ihn für deine Kalender-App. Die Termine einer Demo-Produktion stehen nie darin.
 
 ## Figuren
 
@@ -108,7 +110,7 @@ Wenn ein Projekt fertig ist, enthält der Tab **Release** alles für die Veröff
 
 **Sounds** ist die Sound-Bibliothek deiner Memes, die gleiche Art Tabelle: eine Zeile pro Sound mit Abspielknopf, wofür er gedacht ist, seiner Länge nach dem Trim, seiner Lizenz, Schlagworten und wie viele Memes ihn übernommen haben. ▶ spielt den Sound direkt in der Zeile, ein zweiter Klick stoppt ihn, und das ▶ einer anderen Zeile stoppt den ersten. Suche nach Titel, Wofür oder Schlagwort, filtere nach Schlagwort, **unbenutzt** oder **Lizenz** (`unknown` findet, was der Release-Check anmerken wird) und sortiere per Klick auf einen Spaltenkopf; die Adresse behält alles. Ein Klick an eine andere Stelle der Zeile öffnet den Sound. **+ Neu** im Kopf der Liste öffnet den Sound-Assistenten, wie **+ Neu** → **Sound**. Wähle die Audiodatei, fülle Titel und Wofür aus (alle drei Pflicht) und Schlagworte und klicke **Hochladen**. Im nächsten Schritt spielt der Sound: halte beim Hit an und klicke **Cue hier setzen**, und schneide ihn mit **Trim-Anfang hier** und **Trim-Ende hier** zu; **Weiter** behält, was gesetzt ist, und du kannst den Schritt auch überspringen. Zuletzt trägst du Lizenz, Quelle und Credit ein, wenn du sie kennst, und klickst **Speichern**; ohne Lizenz bleibt sie `unknown`, was der Release-Check anmerkt. **Zum Sound** öffnet seine Seite, und ein Neuladen macht dort weiter, wo du warst. Ein abgelehnter Eintrag (eine fehlende Datei oder ein fehlender Titel, eine Datei, die kein Audio ist, ein Cue außerhalb des Sounds) zeigt seinen Grund im Schritt und behält, was du eingegeben hast.
 
-Um mehrere Einträge auf einmal zu löschen, hakst du ihre Zeilen in Figuren, Sets oder Sounds an; das Kästchen im Tabellenkopf hakt jede Zeile an, die Suche und Filter zeigen (filtere zuerst **unbenutzt**, um auszuräumen, was nirgends steckt). Die Leiste über der Tabelle zählt sie und bietet **Löschen** und **Auswahl aufheben**. **Löschen** fragt einmal nach und nennt, wo die ausgewählten Einträge verwendet werden; diese Produktionen und Memes behalten ihre Kopien, und **Abbrechen** ändert nichts. Lehnt die Bibliothek einen Eintrag ab, nennt die Leiste ihn mit dem Grund und er bleibt angehakt; die anderen sind gelöscht.
+Um mehrere Einträge auf einmal zu löschen, hakst du ihre Zeilen in Figuren, Sets oder Sounds an; das Kästchen im Tabellenkopf hakt jede Zeile an, die Suche und Filter zeigen (filtere zuerst **unbenutzt**, um auszuräumen, was nirgends steckt). Die Leiste über der Tabelle zählt sie und bietet **Löschen** und **Auswahl aufheben**. **Löschen** fragt einmal nach und nennt, wo die ausgewählten Einträge verwendet werden; diese Produktionen und Memes behalten ihre Kopien, und **Abbrechen** ändert nichts. Lehnt die Bibliothek einen Eintrag ab, nennt die Leiste ihn mit dem Grund und er bleibt angehakt; die anderen sind gelöscht. Solange die Demos ausgeblendet sind, zählt eine Verwendung in einer Demo nicht, sodass **unbenutzt** findet, was nur die Demos verwenden; die Seite des Eintrags nennt sie weiter, markiert mit „(Demo)“.
 
 ## Serien
 

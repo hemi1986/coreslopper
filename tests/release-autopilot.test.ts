@@ -30,7 +30,7 @@ import { loadReleaseFacts } from '../packages/cli/src/release-facts.ts';
 import { appendAutopilotEntry } from '../packages/cli/src/release-records.ts';
 import { boardHandler } from '../packages/cli/src/release-board.ts';
 import { timerPlan } from '../packages/cli/src/release-timer.ts';
-import { cleanupFixtures, fakeDeps, fixture, memeFixture, setDistribution, setReleaseDay, siblingCalendar } from './helpers/release-fixture.ts';
+import { cleanupFixtures, fakeDeps, fixture, memeFixture, setDemo, setDistribution, setReleaseDay, siblingCalendar } from './helpers/release-fixture.ts';
 
 afterEach(async () => {
   vi.unstubAllEnvs();
@@ -553,6 +553,61 @@ describe('approving a release', () => {
     const dir = await fixture();
     const root = join(dir, '..', '..');
     await setReleaseDay(dir, undefined);
+    await buildRelease({ projectDir: dir, root, deps: fakeDeps({ now: () => new Date('2026-11-13T09:00:00Z') }) });
+    expect(await loadCalendar(dir)).toMatchObject({ release_date: '2026-12-04', proposed: true });
+
+    const status = await approveRelease(dir, { root, now: new Date('2026-11-13T10:00:00Z') });
+
+    expect(status.approval?.release_date).toBe('2026-12-04');
+    expect(await releaseDay(dir)).toBe('2026-12-04');
+  });
+});
+
+describe('a demo production and the release', () => {
+  it('ST-068: The autopilot leaves a demo alone', async () => {
+    const t = await setup();
+    const now = new Date(t.at('distributor'));
+    // The approval is from before the project was marked a demo: a demo itself is never approved.
+    await approveRelease(t.dir, { root: t.root, now });
+    await setDemo(t.dir, true);
+    t.moveTo('announce:x');
+
+    const result = await t.run();
+
+    expect((await loadAutopilotLog(t.dir)).entries).toEqual([]);
+    expect(result.projects[0]).toMatchObject({ slug: 'neon', acted: [] });
+    expect(t.social.get('x')!.calls).toEqual([]);
+    expect(t.lines.filter((line) => line.includes('demo production'))).toEqual(['neon is not released (demo production); nothing to post']);
+    const plan: string[] = [];
+    await autopilotOverview(t.root, { now: t.clock.now, env: ENV, log: (line) => void plan.push(line) });
+    expect(plan).toEqual(['neon is not released (demo production); nothing to plan']);
+  });
+
+  it('ST-068: A demo cannot be approved', async () => {
+    // The calendar proposes 2026-12-04: the first release Friday 21 days after 2026-11-13. A demo still gets its
+    // release package and its own calendar.
+    const dir = await fixture();
+    const root = join(dir, '..', '..');
+    await setReleaseDay(dir, undefined);
+    await setDemo(dir, true);
+    await buildRelease({ projectDir: dir, root, deps: fakeDeps({ now: () => new Date('2026-11-13T09:00:00Z') }) });
+    expect(await loadCalendar(dir)).toMatchObject({ release_date: '2026-12-04', proposed: true });
+    const projectYaml = await readFile(join(dir, 'project.yaml'), 'utf8');
+    const status = await readFile(join(dir, 'review', 'release-status.json'), 'utf8').catch(() => undefined);
+
+    await expect(approveRelease(dir, { root, now: new Date('2026-11-13T10:00:00Z') })).rejects.toThrow('demo production');
+
+    expect(await readFile(join(dir, 'project.yaml'), 'utf8')).toBe(projectYaml);
+    expect(await readFile(join(dir, 'review', 'release-status.json'), 'utf8').catch(() => undefined)).toBe(status);
+    expect((await loadStatus(dir)).approval).toBeUndefined();
+  });
+
+  it('ST-068: A public project is still approved and posted', async () => {
+    const dir = await fixture();
+    const root = join(dir, '..', '..');
+    await setReleaseDay(dir, undefined);
+    // A demo beside it does not change the public project's approval.
+    await siblingCalendar(dir, 'demo', { release_date: '2026-12-11', demo: true });
     await buildRelease({ projectDir: dir, root, deps: fakeDeps({ now: () => new Date('2026-11-13T09:00:00Z') }) });
     expect(await loadCalendar(dir)).toMatchObject({ release_date: '2026-12-04', proposed: true });
 

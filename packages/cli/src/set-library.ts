@@ -268,6 +268,8 @@ const saveLibrarySet = kind.save;
 export interface LibrarySetUse {
   scope: 'project' | 'series';
   slug: string;
+  /** True when the production is a demo production; absent otherwise. */
+  demo?: true;
   /** The set's id there (usually the library id). */
   set: string;
 }

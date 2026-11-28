@@ -9,7 +9,7 @@ risk: null
 depends_on: []
 labels: [feature:demo-projects]
 feature: demo-projects
-status: ready
+status: done
 ---
 
 ## Context
@@ -42,16 +42,16 @@ Rules (AGG-Project, AGG-Series, RM-NextAction, RM-BoardActivity):
 - `docs/onboarding.md` says the demos can be deleted and that `update` does not bring them back.
 
 ## Acceptance Criteria
-- [ ] `project.yaml` and `series.yaml` validate with `demo: true` and with no `demo`; `demo: "yes"` is refused with
+- [x] `project.yaml` and `series.yaml` validate with `demo: true` and with no `demo`; `demo: "yes"` is refused with
       the field named (test)
-- [ ] `projects/demo`, `projects/demo-episode` and `projects/demo-series` carry `demo: true`, and `schema/` is
+- [x] `projects/demo`, `projects/demo-episode` and `projects/demo-series` carry `demo: true`, and `schema/` is
       regenerated
-- [ ] A demo whose voice-track stage is pending has the next action `{ where: 'none', reason: 'demo' }` with no
+- [x] A demo whose voice-track stage is pending has the next action `{ where: 'none', reason: 'demo' }` with no
       command; an episode without `demo` in a demo series still gets `/video-next <slug>` (test)
-- [ ] A production scan over a workspace with a stalled demo and a stalled real project writes events and a stall
+- [x] A production scan over a workspace with a stalled demo and a stalled real project writes events and a stall
       warning for the real project only (test)
-- [ ] `update` after the user deleted `projects/demo-episode` leaves it deleted and reports it (test)
-- [ ] `docs/onboarding.md` names the three demos and says they can be deleted
+- [x] `update` after the user deleted `projects/demo-episode` leaves it deleted and reports it (test)
+- [x] `docs/onboarding.md` names the three demos and says they can be deleted
 
 ## Out of Scope
 - The board's filter and the **Show demos** switch (ST-069)

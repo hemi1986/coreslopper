@@ -15,6 +15,12 @@ The navigation is a bar across the top ([ADR 0058](adr/0058-navigation-without-p
 - The search, the filters, the sort and the grouping live in the address, e.g. `#/projects?q=nacht&kind=episode&status=yours&series=drift&group=series&sort=title&dir=asc`: a refresh, Back and a pasted link restore them, and unknown values are ignored.
 - With no project yet, the list says so and links **+ New**; with no match, **Reset filters** clears the search, the filters and the grouping. An unreadable project or series is a row with its error.
 
+### Demo productions
+
+Every workspace ships three demo productions (`demo`, `demo-episode`, `demo-series`, marked `demo: true`; see [onboarding](onboarding.md)). The board hides them by default: in **Production**, in **Projects**, and in the **Used in** count of the libraries. **Show demos**, a switch in Production and in the project list, shows them for the whole board; the board keeps it in the browser (`localStorage`), not in the address, so it holds across views, reloads, and links. Switched on, the demos follow the other groups in a group **Demos**, each card or row with a chip **Demo**; a demo has no next step. While the workspace has no other project or series (an internal one counts as one), the board shows the demos in the group **Demos** and no switch.
+
+While the demos are hidden, a use in a demo does not count for a character's or set's **Used in** column or for the **unused** filter, so the bulk delete below can clear out what only the demos use; the demos keep their copies. The entry's page still lists that use, marked "(Demo)". A demo's calendar is never on the release calendar or in `/calendar.ics`, whatever the switch says. You can delete the demos – remove their folders under `projects/` – once you no longer need them; `update` does not bring them back.
+
 New to the board? Start with the [board guide](board-guide.md), a tour with screenshots ([Deutsch](board-guide.de.md)). The board shows it too: **Guide** in the navigation opens it in your browser's language, read from the workspace's `docs/`.
 
 ## Start it

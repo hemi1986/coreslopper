@@ -5,7 +5,7 @@ import {
   ValidationError,
   calendarIcs,
   loadProject,
-  releasedPublicly,
+  getsReleasePackage,
   type ReleaseCalendar,
 } from '@coreslopper/core';
 import { body, json, send, serveMedia } from './board-http.js';
@@ -40,7 +40,7 @@ export interface ReleaseRoutes {
 
 /** The quick refresh after a live URL arrives: texts and microsite data, no renders, no new stills; an internal project has none. */
 async function quickRelease(projectDir: string, root: string): Promise<void> {
-  if (!releasedPublicly((await loadProject(projectDir)).config)) return;
+  if (!getsReleasePackage((await loadProject(projectDir)).config)) return;
   const { buildRelease } = await import('./release.js');
   await buildRelease({ projectDir, root, render: false, stills: false, deps: { log: () => undefined } });
 }
@@ -152,7 +152,8 @@ export function releaseRoutes(options: ReleaseRoutesOptions): ReleaseRoutes {
         return answer(res, await boardProject(dir, root, { now: now() }));
       }
       if (req.method === 'GET' && path === '/api/calendar') {
-        const projects = (await allProjects()).filter((project): project is BoardProject => !('error' in project));
+        // A demo production is not released (ST-068): its calendar stays off the workspace's calendar.
+        const projects = (await allProjects()).filter((project): project is BoardProject => !('error' in project) && !project.demo);
         return answer(
           res,
           projects
@@ -163,7 +164,8 @@ export function releaseRoutes(options: ReleaseRoutesOptions): ReleaseRoutes {
         );
       }
       if (req.method === 'GET' && path === '/calendar.ics') {
-        const projects = (await allProjects()).filter((project): project is BoardProject => !('error' in project));
+        // A demo production is not released (ST-068): its calendar stays off the workspace's calendar.
+        const projects = (await allProjects()).filter((project): project is BoardProject => !('error' in project) && !project.demo);
         const calendars: { calendar: ReleaseCalendar; labels: Map<string, string> }[] = [];
         for (const project of projects) {
           const calendar = await loadCalendar(join(root, 'projects', project.slug));

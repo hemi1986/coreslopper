@@ -9,7 +9,7 @@ import {
   projectNextAction,
   projectTemplate,
   queueCounts,
-  releasedPublicly,
+  getsReleasePackage,
   seriesNextAction,
   stageViews,
   type NextAction,
@@ -60,6 +60,8 @@ export interface ProductionProject {
   hasRelease: boolean;
   /** `distribution: internal`: not released publicly. */
   internal: boolean;
+  /** `demo: true` in its own project.yaml: a demo production, with no next action; the watchdog skips it. */
+  demo: boolean;
   approved: boolean;
   releaseDate?: string;
   /** When state.json last changed. */
@@ -119,6 +121,8 @@ export interface ProductionSeries {
   sets: number;
   /** Characters and sets without a reference, and speaking characters without their reference voice. */
   canonGaps: string[];
+  /** `demo: true` in its own series.yaml: a demo production, with no next action. */
+  demo: boolean;
   episodes: { episode: number; title: string; slug?: string; next?: string; status?: string }[];
   next: NextAction;
 }
@@ -256,7 +260,8 @@ async function collect(projectDir: string, detail: boolean): Promise<ProductionD
   const project = await loadProject(projectDir);
   const { config, state, paths } = project;
   const stages = stageViews(state);
-  const internal = !releasedPublicly(config);
+  const internal = !getsReleasePackage(config);
+  const demo = config.demo === true;
   const hasRelease = !internal && existsSync(join(paths.renders, 'release', 'manifest.json'));
   const status = await loadStatus(projectDir).catch(() => undefined);
   const calendar = await loadCalendar(projectDir).catch(() => undefined);
@@ -280,12 +285,13 @@ async function collect(projectDir: string, detail: boolean): Promise<ProductionD
     stages,
     ...((running ?? open) ? { current: (running ?? open)!.id } : {}),
     budget: { ...state.budget },
-    next: projectNextAction({ slug: config.slug, kind: config.kind, stages, hasRelease, approved, openRounds: review.open, internal }),
+    next: projectNextAction({ slug: config.slug, kind: config.kind, stages, hasRelease, approved, openRounds: review.open, internal, demo }),
     renders: await listRenders(projectDir),
     ...(hasQueue ? { queue: queueCounts(queueItems) } : {}),
     failedReviews: verdicts.filter((verdict) => verdict.verdict === 'fail').length,
     hasRelease,
     internal,
+    demo,
     approved,
     ...(config.release?.release_date ? { releaseDate: config.release.release_date } : {}),
     ...(stateInfo ? { updatedAt: stateInfo.mtime.toISOString() } : {}),
@@ -348,6 +354,7 @@ export async function productionSeries(seriesDir: string): Promise<ProductionSer
       characters: status.characters.length,
       sets: status.sets.length,
       canonGaps: gaps,
+      demo: status.series.demo === true,
       episodes: status.episodes.map((episode) => ({
         episode: episode.episode,
         title: episode.title,
@@ -357,6 +364,7 @@ export async function productionSeries(seriesDir: string): Promise<ProductionSer
       })),
       next: seriesNextAction({
         slug: status.series.slug,
+        demo: status.series.demo === true,
         canonReady: gaps.length === 0,
         unplanned: status.episodes.filter((episode) => !episode.slug).map((episode) => episode.episode),
       }),

@@ -142,6 +142,8 @@ export const ProjectConfigSchema = z
     distribution: DistributionSchema.optional(),
     /** The subtitle language; unset means `de` for a meme and `en` for an episode (HS-263). */
     subtitles: SubtitleLanguageSchema.optional(),
+    /** A demo production, shipped with every workspace: it has no next action and the watchdog skips it. Only a hand edit sets it; unset is `false`. */
+    demo: z.boolean().optional(),
   })
   .superRefine((config, ctx) => {
     if (config.kind === 'meme') {
@@ -602,6 +604,8 @@ export const SeriesSchema = z.object({
   slug: SlugSchema,
   title: z.string().min(1),
   description: z.string().optional(),
+  /** A demo production, shipped with every workspace: it has no next action. Its episodes do not inherit it. Only a hand edit sets it; unset is `false`. */
+  demo: z.boolean().optional(),
   /** Copied into each new episode's project.yaml; never inherited at run time. */
   formats: z.object({
     master: FormatSchema,

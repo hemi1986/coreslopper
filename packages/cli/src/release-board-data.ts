@@ -5,7 +5,7 @@ import {
   approvalHolds,
   plainLyrics,
   planAutopilot,
-  releasedPublicly,
+  getsReleasePackage,
   scheduleZoneWarning,
   upToThreeMinutes,
   type AutopilotEventPlan,
@@ -134,6 +134,8 @@ export interface BoardProject {
   status: ReleaseStatus;
   microsite?: MicrositeSong;
   autopilot: BoardAutopilot;
+  /** `demo: true` in its own project.yaml: its calendar is never on the board's calendar or in /calendar.ics. */
+  demo: boolean;
 }
 
 const NOTES = {
@@ -692,12 +694,13 @@ export async function boardProject(projectRoot: string, root: string, options: {
     ...(line ? { shapeLine: line } : {}),
     releaseDate: calendar?.release_date ?? project.config.release?.release_date,
     proposed: calendar?.proposed ?? !project.config.release?.release_date,
-    hasRelease: Boolean(manifest) && releasedPublicly(project.config),
+    hasRelease: Boolean(manifest) && getsReleasePackage(project.config),
     todos: manifest?.todos ?? [b.noRelease.replace('<slug>', project.config.slug)],
     platforms,
     calendar: (calendar?.events ?? []).map((event) => ({ ...event, label: calendarEventLabel(event, l, input.premiere, input.shape ?? input.kind) })),
     status,
     microsite,
+    demo: project.config.demo === true,
   };
 }
 

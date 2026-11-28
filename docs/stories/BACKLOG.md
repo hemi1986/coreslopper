@@ -2,19 +2,11 @@
 
 > Generated from `docs/stories/ST-*.md` – **do not edit manually**. Change the story files instead.
 
-**Progress: 31 of 32 domain stories done** · scenarios 108 of 112
+**Progress: 32 of 32 domain stories done** · scenarios 112 of 112
 
-**69 stories** · In Progress: 0 · Ready: 3 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 66 · Superseded: 0
+**69 stories** · In Progress: 0 · Ready: 0 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 69 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
-
-## Ready
-
-| ID | Title | Type | Context | Priority | Size | Risk | Depends on |
-|---|---|---|---|---|---|---|---|
-| [ST-067](ST-067-demo-productions-make-no-work.md) | Demo productions are marked and make no work | task | – | should | – | – | – |
-| [ST-068](ST-068-a-demo-production-is-not-released.md) | A demo production is not released | domain | Release | should | – | – | ST-067 |
-| [ST-069](ST-069-the-board-hides-demo-productions.md) | The board hides demo productions unless Show demos is on | task | – | should | – | – | ST-067 |
 
 ## Done
 
@@ -83,6 +75,9 @@ Within each section: by priority, then by story ID, with dependencies pulled in 
 | [ST-058](ST-058-the-contact-sheet-shows-the-keyframes.md) | The board's contact sheet shows each shot's keyframe | chore | – | should | – | – | – |
 | [ST-059](ST-059-the-boards-werkstatt-look.md) | The board's "Werkstatt" look | chore | – | should | – | – | ST-056 |
 | [ST-063](ST-063-delete-several-library-entries-at-once.md) | Select several library entries in a list and delete them at once | task | – | should | – | – | ST-060, ST-061, ST-062 |
+| [ST-067](ST-067-demo-productions-make-no-work.md) | Demo productions are marked and make no work | task | – | should | – | – | – |
+| [ST-068](ST-068-a-demo-production-is-not-released.md) | A demo production is not released | domain | Release | should | – | – | ST-067 |
+| [ST-069](ST-069-the-board-hides-demo-productions.md) | The board hides demo productions unless Show demos is on | task | – | should | – | – | ST-067 |
 | [ST-018](ST-018-the-boards-sounds-view.md) | The board's Sounds view | task | – | could | – | – | ST-001, ST-002, ST-003, ST-006 |
 | [ST-019](ST-019-spike-tiktok-trending-audio.md) | Spike: can a meme use TikTok's trending audio? | spike | – | could | – | – | – |
 | [ST-054](ST-054-the-microsite-data-names-the-aspect.md) | The microsite data names the video's aspect | task | – | could | – | – | ST-048 |

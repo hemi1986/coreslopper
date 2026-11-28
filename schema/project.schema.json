@@ -328,6 +328,9 @@
         "de",
         "off"
       ]
+    },
+    "demo": {
+      "type": "boolean"
     }
   },
   "required": [

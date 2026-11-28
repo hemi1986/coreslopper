@@ -85,7 +85,9 @@ my-video/
   docs/                    workflow documentation
   packages/                core, CLI, providers, Remotion composition
   projects/
-    demo/                  the license-safe motion demo
+    demo/                  demo production: the license-safe motion demo "Neon Rain"
+    demo-episode/          demo production: the episode "After Midnight"
+    demo-series/           demo production: the series "Night Desk"
     my-video/              your first project
   scripts/                 audio analysis and fixtures
   templates/project/       template for new projects
@@ -155,6 +157,12 @@ uv sync --extra asr --extra stems
 ```
 
 The base install is enough for the motion-only demo and for projects that import a song with existing timing.
+
+## Demo productions
+
+Every workspace ships three demo productions: `projects/demo` ("Neon Rain", a music video), `projects/demo-episode` ("After Midnight", an episode) and `projects/demo-series` ("Night Desk", its series). They are there for the docs, `npm run demo:*` and the tests. `demo: true` in their own `project.yaml` or `series.yaml` marks them: a demo has no next action on the board, and the watchdog reports nothing for it. A demo is not released either: `release` still builds its release package and its own calendar, but that calendar takes no release day or Short slot from your projects, the release autopilot and `release-run --plan` leave the demo alone, and an approval of it is refused. An episode does not inherit the flag from its series, and nothing but a hand edit sets it.
+
+You can delete the demos when you no longer need them. `update` does not bring a deleted demo back; a demo file that changed upstream shows up as `skipped (deleted locally)`.
 
 ## Updating a workspace
 

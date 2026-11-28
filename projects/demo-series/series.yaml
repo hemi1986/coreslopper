@@ -1,6 +1,7 @@
 version: 1
 slug: demo-series
 title: Night Desk
+demo: true
 description: >-
   A hand-written demo canon for episode projects. Short vertical episodes about
   a help-desk agent on the night shift and the messages that reach her after
