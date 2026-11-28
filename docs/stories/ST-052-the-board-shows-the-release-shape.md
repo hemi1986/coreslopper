@@ -10,7 +10,7 @@ depends_on: [ST-047, ST-048]
 labels: [feature:platform-formats]
 feature: platform-formats
 sources: [docs/research/platform-video-formats.md]
-status: in-progress
+status: done
 ---
 
 ## Task

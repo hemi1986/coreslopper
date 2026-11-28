@@ -138,7 +138,7 @@
       "path": "packages/cli",
       "score": 0.61,
       "reasons": [
-        "378 changed files in recent history",
+        "381 changed files in recent history",
         "shared library",
         "shared infrastructure – not a domain slice"
       ]
@@ -344,6 +344,7 @@
         "tests/qa-release-shape.test.ts",
         "tests/release-autopilot-plan.test.ts",
         "tests/release-autopilot.test.ts",
+        "tests/release-board-shape.test.ts",
         "tests/release-calendar.test.ts",
         "tests/release-characterization.test.ts",
         "tests/release-facts.test.ts",
@@ -376,7 +377,7 @@
       "reasons": [
         "3 layers: cli, core, tests",
         "3 packages",
-        "39 files"
+        "40 files"
       ],
       "adopted": true,
       "adoptedAt": "2026-11-22"
