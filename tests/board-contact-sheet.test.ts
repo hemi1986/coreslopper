@@ -1,6 +1,7 @@
 // The board's contact sheet (ST-058, RM-ContactSheet): the read model over a project in a temp workspace, its route,
 // and the tab's module with a small fake document, as in board-projects.test.ts.
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { existsSync } from 'node:fs';
 import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative, sep } from 'node:path';
@@ -95,8 +96,17 @@ describe('the contact sheet read model', () => {
     storyboard.shots[1]!.section = 'bridge_9';
     await writeFile(join(dir, 'storyboard.yaml'), stringify(storyboard));
     const sheet = await contactSheet(dir);
-    expect(sheet.status).toBe('invalid');
+    expect(sheet).toMatchObject({ status: 'invalid', scope: 'storyboard' });
     expect(JSON.stringify(sheet)).toContain('bridge_9');
+  });
+
+  it('names the project, not the storyboard, when the project around it is invalid', async () => {
+    const { dir } = await workspace();
+    const config = await readFile(join(dir, 'project.yaml'), 'utf8');
+    await writeFile(join(dir, 'project.yaml'), config.replace(/^budget_usd: .*$/m, 'budget_usd: 999'));
+    const sheet = await contactSheet(dir);
+    expect(sheet).toMatchObject({ status: 'invalid', scope: 'project' });
+    expect(JSON.stringify(sheet)).toContain('budget');
   });
 
   it('is served at the project route, and the production view no longer embeds the SVG', async () => {
@@ -109,8 +119,17 @@ describe('the contact sheet read model', () => {
     expect(sheet.cards).toHaveLength(3);
     expect((await request(handler, `/files/demo/${sheet.cards[1]!.keyframe!.path}`)).status).toBe(200);
     expect((await request(handler, '/api/production/projects/nope/contact-sheet')).status).toBe(400);
+    // The demo still has the storyboard stage's SVG; the production view used to embed it from this field.
+    expect(existsSync(join(dir, 'review', 'contact-sheet.svg'))).toBe(true);
     expect(await productionDetail(dir)).not.toHaveProperty('contactSheet');
-    expect(await readFile(join(root, 'packages/cli/src/board/production.js'), 'utf8')).not.toContain('contact-sheet.svg');
+  });
+
+  it('answers a malformed address with a 400, not a server error', async () => {
+    const { ws } = await workspace();
+    const handler = boardHandler({ root: ws, refresh: async () => undefined });
+    const answer = await request(handler, '/api/production/projects/%E0/contact-sheet');
+    expect(answer.status).toBe(400);
+    expect(JSON.parse(answer.body)).toEqual({ error: 'malformed address' });
   });
 });
 
@@ -181,9 +200,13 @@ describe('the contact sheet tab', () => {
 
   it('says there is no storyboard yet, or shows the validation error', () => {
     expect(nodes(view.sheetBody('demo', { status: 'none' })).map((node) => node.text()).join('')).toContain('No storyboard yet');
-    const invalid = nodes(view.sheetBody('demo', { status: 'invalid', error: 'storyboard is invalid', details: ['Unknown section "bridge_9"'] }));
+    const invalid = nodes(view.sheetBody('demo', { status: 'invalid', scope: 'storyboard', error: 'storyboard is invalid', details: ['Unknown section "bridge_9"'] }));
     expect(invalid.some((node) => node.className === 'sheet')).toBe(false);
+    expect(invalid[0]!.text()).toContain('The storyboard is not valid');
     expect(invalid[0]!.text()).toContain('Unknown section "bridge_9"');
+    const project = view.sheetBody('demo', { status: 'invalid', scope: 'project', error: 'state.json budget (20) does not match project.yaml budget_usd (999).', details: [] })[0]!;
+    expect(project.text()).not.toContain('The storyboard is not valid');
+    expect(project.text()).toContain('because the project is not valid: state.json budget');
   });
 
   it('opens as a tab of the project page', async () => {
