@@ -52,12 +52,12 @@ Prototype: prototype/board-redesign – Wie sieht das Board auf dem Desktop aus:
 - `docs/board.md` and both board guides describe the list.
 
 ## Acceptance Criteria
-- [ ] The list shows every project and series, newest activity first (test with a fixture workspace)
-- [ ] Searching "NACHT" finds a project titled "Nachtschicht" and one with slug `nachtschicht-e01` (test)
-- [ ] Filter Serie = a series with 3 episodes shows exactly those 3 (test)
-- [ ] Grouping on shows each episode under its series and the planned episodes as planned. With a search it hides
+- [x] The list shows every project and series, newest activity first (test with a fixture workspace)
+- [x] Searching "NACHT" finds a project titled "Nachtschicht" and one with slug `nachtschicht-e01` (test)
+- [x] Filter Serie = a series with 3 episodes shows exactly those 3 (test)
+- [x] Grouping on shows each episode under its series and the planned episodes as planned. With a search it hides
       the planned ones (test)
-- [ ] `#/projects?series=<slug>&group=series` restores the filter and grouping after a reload
-- [ ] A filter with no match shows the no-match text and **Reset filters** clears search, filters and grouping
-- [ ] A workspace without projects shows "No projects yet" with a link to the wizard
-- [ ] An unreadable project shows as a row with its error
+- [x] `#/projects?series=<slug>&group=series` restores the filter and grouping after a reload
+- [x] A filter with no match shows the no-match text and **Reset filters** clears search, filters and grouping
+- [x] A workspace without projects shows "No projects yet" with a link to the wizard
+- [x] An unreadable project shows as a row with its error

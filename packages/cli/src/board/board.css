@@ -250,3 +250,23 @@ button[aria-busy="true"], button.primary[aria-busy="true"] { cursor: progress; o
 @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2s; } }
 table.list tr.link-row { cursor: pointer; }
 table.list tr.link-row:hover td { background: var(--chip); }
+
+/* The project list (#/projects, ADR 0058) */
+.pl-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin: 0 0 12px; padding: 10px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+.pl-search { min-width: 260px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); font: inherit; }
+.pl-filter { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.pl-label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-right: 4px; }
+.pl-chip { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 999px; padding: 2px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+.pl-chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.pl-select { padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); font: inherit; }
+.pl-switch { cursor: pointer; }
+.pl-count { margin: 0 0 6px; }
+table.pl-table th.pl-sort { cursor: pointer; white-space: nowrap; }
+table.pl-table th.pl-sort.on { color: var(--ink); }
+table.pl-table code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--chip); padding: 1px 5px; border-radius: 5px; }
+table.pl-table tr.pl-head td { background: var(--bg); }
+table.pl-table tr.pl-indent td:first-child { padding-left: 28px; }
+table.pl-table tr.pl-planned td { color: var(--muted); font-style: italic; }
+table.pl-table tr.pl-divider td { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; padding-top: 14px; }
+.pill.pl-yours { color: var(--warn); font-weight: 600; } .pill.pl-running { color: var(--accent); } .pill.pl-done { color: var(--muted); } .pill.pl-released { color: var(--ok); }
+.pl-empty a, .pl-nomatch a { color: var(--accent); }
