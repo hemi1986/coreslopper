@@ -44,7 +44,7 @@ The navigation lists no project: **Projects** opens the list of every project an
 
 ## Start a music video
 
-Click **+ New** and choose **Music video**.
+Click **+ New** and choose **Music video**. The chooser has two groups: **Production** (Music video, Series, Episode, Meme) and **Library** (Character).
 
 ![Choosing what to create](assets/board/en/new.webp)
 
@@ -102,7 +102,7 @@ When a project is done, the **Release** tab holds everything for publishing it.
 
 ![The character library](assets/board/en/characters.webp)
 
-**Characters** is your character library, a table with one row per character: its cover, tags, images and states, voice, how many productions use it, and where it came from. Search by name, description, or tag, filter by tag, **unused**, or **Origin**, and click a column header to sort; the address keeps all of it, so Back and a refresh return to the same list. Click a row to open the character. A project's characters come in by themselves once its character bible is done. **Take from a project or series** imports existing ones, and **New character** adds your own. On a character's own view, **Use in** copies it into a music video or a series canon.
+**Characters** is your character library, a table with one row per character: its cover, tags, images and states, voice, how many productions use it, and where it came from. Search by name, description, or tag, filter by tag, **unused**, or **Origin**, and click a column header to sort; the address keeps all of it, so Back and a refresh return to the same list. Click a row to open the character. A project's characters come in by themselves once its character bible is done. **+ New** in the head of the list opens the character wizard, as **+ New** → **Character** does. It first asks: **Create new** or **Import from a project or series**. To create one, fill in the name, display, description, prompt sentence, and tags and click **Create**; then upload the character sheet and more images (each shows as it uploads), and, if you have it, a WAV of the voice with its exact words. **To the character** opens its page. The wizard's address keeps the character, so a reload goes on where you were. To import, choose the project or series and click **Import**: the wizard lists the characters it took in, each linked to its page. A refused entry (an empty or taken name, a file of the wrong kind) shows its reason in the step and keeps what you typed. On a character's own view, **Use in** copies it into a music video or a series canon.
 
 **Sets** is your set library, the same kind of table: one row per set with its cover (the first plate, else the first reference), tags, the number of references and plates, how many productions use it, and where it came from. Search, the filters **unused** and **Origin**, the tag chips, and the column headers work as in Characters, and the address keeps them too. Click a row to open the set.
 

@@ -1,16 +1,15 @@
 // The character library: every character of the workspace's videos and
 // series, to take into a new music video or series canon with one click.
-//   #/characters        the list (a table: search, tag/unused/origin filters, sort, all in the hash),
-//                       a new character, import from a project
+//   #/characters        the list (a table: search, tag/unused/origin filters, sort, all in the hash);
+//                       its + New opens the character wizard (#/new/character, character-wizard.js)
 //   #/characters/<id>   one character: files, states, where it is used, use it
 import { addStrings, api, el, go, pending, post, setLang, showError, t, upload } from './lib.js';
 import { allTags, anyLibraryFilter, defaultDir, libraryListHash, matchesLibraryItem, parseLibraryListState, queryOf, sortLibraryItems, toggleValue, writeListHash } from './list-state.js';
 
 addStrings({
   de: {
-    libTitle: 'Figuren', libHelp: 'Alle Figuren aus deinen Videos und Serien. Eine Figur kommt automatisch hinein, sobald style-character eines Projekts fertig ist; eigene kannst du hier anlegen. Beim Übernehmen landen ihre Dateien im Projekt unter characters/<id>/.',
-    libEmpty: 'Noch keine Figuren', libNew: 'Neue Figur anlegen', libImport: 'Aus Projekt oder Serie übernehmen', libImportHelp: 'Holt alle Figuren mit Bildern aus einem bestehenden Projekt oder einer Serie in die Bibliothek; bekannte Figuren bekommen nur ihre neuen Bilder und Zustände.',
-    libImportButton: 'Importieren', libImported: function (n) { return n + ' Figur(en) übernommen'; }, libNothing: 'Keine Figur mit Bildern gefunden.',
+    libTitle: 'Figuren', libHelp: 'Alle Figuren aus deinen Videos und Serien. Eine Figur kommt automatisch hinein, sobald style-character eines Projekts fertig ist; eigene legst du mit + Neu an oder übernimmst sie aus einem Projekt. Beim Übernehmen landen ihre Dateien im Projekt unter characters/<id>/.',
+    libEmpty: 'Noch keine Figuren', clNew: '+ Neu',
     name: 'Name', description: 'Beschreibung (Aussehen, Alter, Haare, Outfit)', prompt: 'Prompt-Satz für Keyframes', tags: 'Schlagworte, mit Komma', face: 'Darstellung',
     faces: { full: 'voll sichtbar', silhouette: 'nur Silhouette', 'screen-only': 'nur auf Bildschirmen', 'voice-only': 'nur Stimme' },
     sheet: 'Character Sheet', images: 'Weitere Bilder (Seed, Face, Outfits)', voice: 'Stimme (WAV)', transcript: 'Exakter Text der Aufnahme', createChar: 'Anlegen', uploading: 'lädt hoch …',
@@ -28,9 +27,8 @@ addStrings({
     clCount: function (n, all) { return n + ' von ' + all; }
   },
   en: {
-    libTitle: 'Characters', libHelp: 'Every character of your videos and series. A character comes in by itself once a project\'s style-character stage is done; add your own here. Using one copies its files into the project under characters/<id>/.',
-    libEmpty: 'No characters yet', libNew: 'New character', libImport: 'Take from a project or series', libImportHelp: 'Brings every character with images of an existing project or series into the library; known characters only gain their new images and states.',
-    libImportButton: 'Import', libImported: function (n) { return n + ' character(s) taken in'; }, libNothing: 'No character with images found.',
+    libTitle: 'Characters', libHelp: 'Every character of your videos and series. A character comes in by itself once a project\'s style-character stage is done; add your own or take them from a project with + New. Using one copies its files into the project under characters/<id>/.',
+    libEmpty: 'No characters yet', clNew: '+ New',
     name: 'Name', description: 'Description (look, age, hair, outfit)', prompt: 'Prompt sentence for keyframes', tags: 'Tags, comma-separated', face: 'Display',
     faces: { full: 'fully visible', silhouette: 'silhouette only', 'screen-only': 'on screens only', 'voice-only': 'voice only' },
     sheet: 'Character sheet', images: 'More images (seed, face, outfits)', voice: 'Voice (WAV)', transcript: 'Exact words of the recording', createChar: 'Create', uploading: 'uploading …',
@@ -79,59 +77,6 @@ function stateChecks(entry) {
 }
 
 // ------------------------------------------------------------------ gallery
-
-function newCharacterForm(onCreated) {
-  const name = input({ required: true }), description = el('textarea', { class: 'note-input', rows: 3 }), prompt = input({}), tags = input({});
-  const face = el('select', { class: 'text' }, ['full', 'silhouette', 'screen-only', 'voice-only'].map(function (f) { return el('option', { value: f, text: t('faces')[f] }); }));
-  const sheet = el('input', { type: 'file', accept: '.png,.jpg,.jpeg,.webp' });
-  const images = el('input', { type: 'file', multiple: true, accept: '.png,.jpg,.jpeg,.webp' });
-  const voice = el('input', { type: 'file', accept: '.wav' }), transcript = input({});
-  const progress = el('p', { class: 'meta' });
-  const form = el('form', { class: 'card form' }, [
-    el('h3', { text: t('libNew'), style: 'margin:0 0 10px' }),
-    el('div', { class: 'form-row' }, [field(t('name'), name), field(t('face'), face), field(t('tags'), tags)]),
-    el('div', { class: 'form-row' }, [field(t('description'), description)]),
-    el('div', { class: 'form-row' }, [field(t('prompt'), prompt)]),
-    el('div', { class: 'form-row' }, [field(t('sheet'), sheet), field(t('images'), images)]),
-    el('div', { class: 'form-row' }, [field(t('voice'), voice), field(t('transcript'), transcript)]),
-    progress, el('button', { class: 'primary', type: 'submit', text: t('createChar') })
-  ]);
-  form.onsubmit = pending(function () {
-    progress.className = 'meta';
-    return post('/api/library/new', { name: name.value, description: description.value, prompt: prompt.value, tags: tags.value, face: face.value }).then(function (created) {
-      const files = [];
-      if (sheet.files[0]) files.push({ file: sheet.files[0], role: 'sheet' });
-      Array.prototype.forEach.call(images.files, function (file) { files.push({ file: file, role: 'ref' }); });
-      if (voice.files[0]) files.push({ file: voice.files[0], role: 'voice', transcript: transcript.value });
-      let chain = Promise.resolve();
-      files.forEach(function (item, index) {
-        chain = chain.then(function () {
-          const query = '?name=' + encodeURIComponent(item.file.name) + '&role=' + item.role + (item.transcript ? '&transcript=' + encodeURIComponent(item.transcript) : '');
-          return upload('/api/upload/library/' + encodeURIComponent(created.id) + query, item.file, function (share) { progress.textContent = t('uploading') + ' ' + (index + 1) + '/' + files.length + ' · ' + Math.round(share * 100) + '%'; });
-        });
-      });
-      return chain.then(function () { onCreated(created.id); });
-    }).catch(function (error) { progress.textContent = error.message; progress.className = 'error'; });
-  });
-  return form;
-}
-
-function importForm(data, refresh) {
-  const target = el('select', { class: 'text' }, data.targets.map(function (x) { return el('option', { value: targetValue(x), text: targetLabel(x) }); }));
-  const result = el('p', { class: 'meta' });
-  const button = el('button', { class: 'small', text: t('libImportButton'), onclick: pending(function () {
-    const parts = target.value.split('/');
-    return post('/api/library/import', { scope: parts[0], slug: parts[1] }).then(function (r) {
-      result.className = 'meta';
-      result.textContent = r.results.length ? t('libImported')(r.results.length) + ': ' + r.results.map(function (x) { return x.character + ' → ' + x.id; }).join(', ') : t('libNothing');
-      refresh(r);
-    }).catch(function (error) { result.textContent = error.message; result.className = 'error'; });
-  }) });
-  return el('section', { class: 'card' }, [
-    el('h3', { text: t('libImport'), style: 'margin:0 0 6px' }), el('p', { class: 'meta', text: t('libImportHelp') }),
-    data.targets.length ? el('div', { class: 'form-row' }, [target, button]) : null, result
-  ]);
-}
 
 // --------------------------------------------------------------------- list
 
@@ -279,19 +224,23 @@ function drawResults() {
   results.appendChild(el('table', { class: 'list pl-table cl-table' }, [header(), el('tbody', {}, rows.map(row))]));
 }
 
+/** The character wizard: + New in the list's head and in its empty state (UX guidelines G6, G10). */
+export const NEW_CHARACTER = '#/new/character';
+
 function drawList() {
   const node = main();
-  node.appendChild(el('h2', { text: t('libTitle'), style: 'margin:0 0 6px;font-size:20px' }));
+  node.appendChild(el('div', { class: 'list-head' }, [
+    el('h2', { text: t('libTitle') }),
+    el('button', { class: 'primary cl-new', onclick: function () { go(NEW_CHARACTER); } }, [t('clNew')])
+  ]));
   node.appendChild(el('p', { class: 'meta', text: t('libHelp') }));
-  if (!view.list.items.length && !view.list.errors.length) node.appendChild(el('div', { class: 'empty cl-empty' }, [el('p', { text: t('libEmpty') })]));
+  if (!view.list.items.length && !view.list.errors.length) node.appendChild(el('div', { class: 'empty cl-empty' }, [el('p', { text: t('libEmpty') }), el('a', { href: NEW_CHARACTER, class: 'cl-empty-new', text: t('clNew') })]));
   else {
     node.appendChild(filterBar());
     view.results = el('div', { class: 'pl-results' });
     node.appendChild(view.results);
     drawResults();
   }
-  node.appendChild(importForm(view.data, function (data) { useData(data, view.state); drawList(); }));
-  node.appendChild(newCharacterForm(function (id) { go('#/characters/' + id); }));
 }
 
 function useData(data, state) {
