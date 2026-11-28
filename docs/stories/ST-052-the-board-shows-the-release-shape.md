@@ -10,7 +10,7 @@ depends_on: [ST-047, ST-048]
 labels: [feature:platform-formats]
 feature: platform-formats
 sources: [docs/research/platform-video-formats.md]
-status: ready
+status: in-progress
 ---
 
 ## Task
@@ -29,8 +29,8 @@ Read model `RM-ReleaseBoard` (`docs/domain/events.yaml`). Decided by the user on
 - The wording follows the glossary: `_UI (de)_: Short-Folge`, `_UI (en)_: Short episode`.
 
 ## Acceptance Criteria
-- [ ] A short episode's release view shows "Short episode · 9:16 · 2:41" for a 161 s 9:16 episode (test)
-- [ ] A vertical episode of 192 s shows "Episode · 9:16 · 3:12 · over 3 min" (test)
-- [ ] A short episode's board data has no Spotify and no LinkedIn tab (test)
-- [ ] A music video's release view shows no shape line
-- [ ] A short episode's TikTok and Instagram tabs show the plan's posts, and no Story card (test)
+- [x] A short episode's release view shows "Short episode · 9:16 · 2:41" for a 161 s 9:16 episode (test)
+- [x] A vertical episode of 192 s shows "Episode · 9:16 · 3:12 · over 3 min" (test)
+- [x] A short episode's board data has no Spotify and no LinkedIn tab (test)
+- [x] A music video's release view shows no shape line
+- [x] A short episode's TikTok and Instagram tabs show the plan's posts, and no Story card (test)

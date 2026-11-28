@@ -198,6 +198,8 @@ function renderProject() {
   if (data.todos.length) {
     main.appendChild(el('details', { class: 'todos' }, [el('summary', { text: t('todos') + ' (' + data.todos.length + ')' }), el('ul', {}, data.todos.map(function (todo) { return el('li', { text: todo }); }))]));
   }
+  // The release shape and why, above the platform tabs (ADR 0057); a music video and a meme have none.
+  if (data.shapeLine) main.appendChild(el('p', { class: 'shape', text: data.shapeLine }));
   const tabs = el('nav', { class: 'tabs' });
   data.platforms.forEach(function (platform) {
     const open = platform.posts.filter(function (p) { return !(data.status.items[p.id] || {}).done; }).length;
