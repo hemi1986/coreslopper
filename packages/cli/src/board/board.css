@@ -30,6 +30,7 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-size: 14px; lin
 main { padding: 20px 28px 60px; min-width: 0; }
 header.project { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 4px; }
 header.project h2 { margin: 0; font-size: 22px; }
+p.shape { margin: 8px 0 0; color: var(--muted); font-size: 14px; }
 .tabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--line); margin: 16px 0 18px; }
 .tab { border: 0; background: none; color: var(--muted); padding: 8px 12px; cursor: pointer; font: inherit; border-bottom: 2px solid transparent; }
 .tab.active { color: var(--ink); border-color: var(--accent); }
