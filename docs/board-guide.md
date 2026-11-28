@@ -104,6 +104,8 @@ When a project is done, the **Release** tab holds everything for publishing it.
 
 **Characters** is your character library, a table with one row per character: its cover, tags, images and states, voice, how many productions use it, and where it came from. Search by name, description, or tag, filter by tag, **unused**, or **Origin**, and click a column header to sort; the address keeps all of it, so Back and a refresh return to the same list. Click a row to open the character. A project's characters come in by themselves once its character bible is done. **Take from a project or series** imports existing ones, and **New character** adds your own. On a character's own view, **Use in** copies it into a music video or a series canon.
 
+**Sets** is your set library, the same kind of table: one row per set with its cover (the first plate, else the first reference), tags, the number of references and plates, how many productions use it, and where it came from. Search, the filters **unused** and **Origin**, the tag chips, and the column headers work as in Characters, and the address keeps them too. Click a row to open the set.
+
 ## Series
 
 ![A series with its canon gaps and episodes](assets/board/en/series.webp)
