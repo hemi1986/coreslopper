@@ -34,11 +34,11 @@ Die Navigation listet kein Projekt: **Projekte** öffnet die Liste aller Projekt
 
 ## Projekte: ein Projekt finden
 
-**Projekte** ist eine Tabelle aller Musikvideos, Memes, Folgen und Serien, die neueste Aktivität zuerst. Jede Zeile zeigt die Art, den Status, die aktuelle Stage, den nächsten Schritt, den Release-Tag mit der Zahl der erledigten Release-Termine und wann sich zuletzt etwas geändert hat. Ein Klick auf eine Zeile öffnet sie.
+**Projekte** ist eine Tabelle aller Musikvideos, Memes, Folgen und Serien, die neueste Aktivität zuerst. Jede Zeile zeigt die Art, den Status, die aktuelle Stage, den nächsten Schritt, die Veröffentlichung mit der Zahl der erledigten Release-Termine und wann sich zuletzt etwas geändert hat. Ein Klick auf eine Zeile öffnet sie.
 
 - Tippe ins Suchfeld, um ein Projekt über Titel oder Slug zu finden.
 - Klicke auf **Art**, **Status** oder wähle eine **Serie**, um die Liste einzugrenzen. **Veröffentlicht** zeigt die Projekte, die draußen sind.
-- Klicke auf einen Spaltenkopf, um nach Titel, Release-Tag oder letzter Aktivität zu sortieren; ein zweiter Klick dreht die Reihenfolge um.
+- Klicke auf einen Spaltenkopf, um nach Titel, Veröffentlichung oder letzter Aktivität zu sortieren; ein zweiter Klick dreht die Reihenfolge um.
 - Schalte **Nach Serie gruppieren** ein, um jede Folge unter ihrer Serie zu sehen, mit den geplanten Folgen, die noch kein Projekt haben.
 - **Filter zurücksetzen** leert alles. Die Adresse behält Suche und Filter, sodass **↻ Aktualisieren**, Zurück und ein Lesezeichen dieselbe Liste wiederherstellen.
 

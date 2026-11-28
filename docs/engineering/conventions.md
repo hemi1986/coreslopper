@@ -229,6 +229,7 @@ directory. `tests/helpers/release-fixture.ts` builds release projects.
 | Command | the CLI command or the function it calls, on a project in a temp directory | integration | `tests/episode.test.ts` |
 | Read model | the read-model function on a project in a temp directory | integration | `tests/board-production.test.ts` |
 | Page, form, flow | the board's HTTP API | integration | `tests/board-review.test.ts` |
+| Board page view (a module of `packages/cli/src/board/`) | its exported pure functions, then the module with a fake `document`, `location`, `history` and `fetch` stubbed through `vi.stubGlobal` (no DOM library is installed) | unit | `tests/board-nav.test.ts`, `tests/board-projects.test.ts` |
 | Queue run | `runQueue(dir, { deps })` with injected `generate`, `review`, `restart`, `log` (`QueueDeps`) | integration | `tests/queue.test.ts` |
 | Headless agent | `reviewImage(dir, { runner })` with a fake runner returning the JSON | unit | `tests/review-image.test.ts` |
 | Python helper | the helper's functions | unit (pytest, `npm run python:test`) | `scripts/audio-analysis/tests/test_timing_core.py` |
