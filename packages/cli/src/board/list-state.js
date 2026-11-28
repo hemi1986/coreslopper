@@ -1,6 +1,8 @@
 // The list state of the board's library lists (Characters, Sets, Sounds; UX guideline G5): a search, tag chips, the
 // unused switch and one origin, plus the sort column and its direction, all kept in the address hash
 // (`#/characters?q=…&tag=a,b&unused=1&origin=…&sort=used&dir=desc`). Pure functions only; each view draws itself.
+// The one-of filter is the origin for characters and sets; a sound has no origin, so its list names the same filter
+// `licence` in the address (`options.facet`) and keeps the licence in `state.origin` and `item.origin`.
 
 /** The query of a list's address: what follows `?`, or ''. */
 export function queryOf(hash) {
@@ -11,7 +13,7 @@ export function queryOf(hash) {
 /**
  * The list's state from its query. `options`: `sorts` (the sortable columns, the first is the default), `ascending`
  * (the columns that sort ascending by default; the others start descending), `tags` and `origins` (the values the
- * library has). Unknown values are ignored.
+ * library has), `facet` (the address's name of the one-of filter, `origin` by default). Unknown values are ignored.
  */
 export function parseLibraryListState(query, options) {
   const params = new URLSearchParams(query || '');
@@ -20,7 +22,7 @@ export function parseLibraryListState(query, options) {
   (params.get('tag') || '').split(',').forEach(function (value) { if (tags.indexOf(value) >= 0 && tag.indexOf(value) < 0) tag.push(value); });
   const sort = options.sorts.indexOf(params.get('sort')) >= 0 ? params.get('sort') : options.sorts[0];
   const dir = params.get('dir') === 'asc' || params.get('dir') === 'desc' ? params.get('dir') : defaultDir(sort, options);
-  const origin = params.get('origin') || '';
+  const origin = params.get(facetOf(options)) || '';
   return {
     q: params.get('q') || '',
     tag: tag,
@@ -31,6 +33,8 @@ export function parseLibraryListState(query, options) {
   };
 }
 
+function facetOf(options) { return options.facet || 'origin'; }
+
 /** The default direction of a sort column. */
 export function defaultDir(sort, options) { return (options.ascending || []).indexOf(sort) >= 0 ? 'asc' : 'desc'; }
 
@@ -40,7 +44,7 @@ export function libraryListHash(route, state, options) {
   if (state.q) parts.push('q=' + encodeURIComponent(state.q));
   if (state.tag.length) parts.push('tag=' + state.tag.map(encodeURIComponent).join(','));
   if (state.unused) parts.push('unused=1');
-  if (state.origin) parts.push('origin=' + encodeURIComponent(state.origin));
+  if (state.origin) parts.push(facetOf(options) + '=' + encodeURIComponent(state.origin));
   if (state.sort !== options.sorts[0]) parts.push('sort=' + state.sort);
   if (state.dir !== defaultDir(state.sort, options)) parts.push('dir=' + state.dir);
   return route + (parts.length ? '?' + parts.join('&') : '');

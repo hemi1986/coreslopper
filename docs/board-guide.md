@@ -106,6 +106,8 @@ When a project is done, the **Release** tab holds everything for publishing it.
 
 **Sets** is your set library, the same kind of table: one row per set with its cover (the first plate, else the first reference), tags, the number of references and plates, how many productions use it, and where it came from. Search, the filters **unused** and **Origin**, the tag chips, and the column headers work as in Characters, and the address keeps them too. Click a row to open the set.
 
+**Sounds** is the sound library of your memes, the same kind of table: one row per sound with a play button, its use when, its length after the trim, its licence, tags, and how many memes took it. ▶ plays the sound right in the row, a second click stops it, and another row's ▶ stops the first. Search by title, use when, or tag, filter by tag, **unused**, or **Licence** (`unknown` finds what the release check will flag), and sort by the column headers; the address keeps it all. A click elsewhere on the row opens the sound.
+
 ## Series
 
 ![A series with its canon gaps and episodes](assets/board/en/series.webp)

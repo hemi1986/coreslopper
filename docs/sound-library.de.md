@@ -8,7 +8,8 @@ Meme-Skill wählt beim Schreiben eines Scripts daraus aus ([ADR 0051](adr/0051-m
 `coreslopper init` und `coreslopper update` fassen sie nie an.
 
 Diese Seite beschreibt, wie du die Bibliothek von Hand pflegst. Die [Sounds-Ansicht](board.md#sounds) des Boards
-macht dasselbe über dieselben Befehle.
+macht dasselbe über dieselben Befehle; ihre Liste spielt jeden Sound in seiner Zeile und filtert nach Schlagwort,
+**unbenutzt** und Lizenz, sodass `licence=unknown` zeigt, was der Release-Check anmerken wird.
 
 ## Wo die Bibliothek liegt
 

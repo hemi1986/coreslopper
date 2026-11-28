@@ -8,7 +8,8 @@ when it writes a script ([ADR 0051](adr/0051-memes-and-the-sound-library.md)). `
 `coreslopper update` never touch it.
 
 This page is the reference for maintaining the library by hand. The board's [Sounds view](board.md#sounds) does the
-same through the same commands.
+same through the same commands; its list plays each sound in its row and filters by tag, **unused**, and licence, so
+`licence=unknown` shows what the release check will flag.
 
 ## Where the library lives
 
