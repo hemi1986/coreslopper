@@ -9,7 +9,7 @@ risk: null
 depends_on: [ST-056]
 labels: [feature:board-redesign]
 feature: board-redesign
-status: ready
+status: in-progress
 ---
 
 ## Context
@@ -30,7 +30,7 @@ The values are on the prototype branch: `git show prototype/board-redesign:docs/
 - Contrast of text on its background is at least 4.5:1 in both modes.
 
 ## Acceptance Criteria
-- [ ] `board.css` defines the tokens once for light and once for dark, and no view stylesheet rule uses a hard-coded
+- [x] `board.css` defines the tokens once for light and once for dark, and no view stylesheet rule uses a hard-coded
       colour outside the platform badges (grep check)
-- [ ] Every view looks right in light and dark at 1440 px (checked by hand in the sandbox, screenshots in the PR)
-- [ ] Body text and muted text reach 4.5:1 against their backgrounds in both modes
+- [x] Every view looks right in light and dark at 1440 px (checked by hand in the sandbox, screenshots in the PR)
+- [x] Body text and muted text reach 4.5:1 against their backgrounds in both modes
