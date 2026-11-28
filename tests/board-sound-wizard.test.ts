@@ -221,7 +221,7 @@ describe('the sound wizard', () => {
     byField('title').value = 'Notes';
     byField('use-when').value = 'nothing';
     await one((e) => e.tagName === 'FORM').fire('submit');
-    expect(one((e) => e.has('uw-error')).text()).not.toBe('');
+    expect(one((e) => e.has('uw-error')).text()).toMatch(/notes\.mp3 is not an audio file ffmpeg can read/);
     expect([byField('title').value, byField('use-when').value]).toEqual(['Notes', 'nothing']);
     expect(hash).toBe('');
   });
@@ -249,10 +249,70 @@ describe('the sound wizard', () => {
     expect(find((e) => e.has('done-step')).length).toBe(2);
   });
 
+  it('moves a stored cue with Trim start here, so it keeps its moment in the file', async () => {
+    // Stored cue 0.5 without a trim: the hit is 0.5 s into the file. A trim from 0.3 puts it 0.2 s after the start.
+    await hold('shift', { cue: 0.5 });
+    await soundWizard.showSoundWizard('shift');
+    player().currentTime = 0.3;
+    await byAttr('data-set', 'trim-start').fire('click');
+    player().currentTime = 1.8;
+    await byAttr('data-set', 'trim-end').fire('click');
+    expect(byField('cue').value).toBe('0.2');
+    await byAttr('data-next', 'cue').fire('click');
+    expect(byAttr('data-error', 'cue').text()).toBe('');
+    expect(await loadLibrarySound(ws, 'shift')).toMatchObject({ cue: 0.2, trim: { start: 0.3, end: 1.8 } });
+  });
+
+  it('leaves an untouched stored cue as it is when only the trim end moves', async () => {
+    await hold('untouched', { cue: 0.5, trim: { start: 0.1, end: 1.5 } });
+    await soundWizard.showSoundWizard('untouched');
+    player().currentTime = 1.2;
+    await byAttr('data-set', 'trim-end').fire('click');
+    await byAttr('data-next', 'cue').fire('click');
+    expect(await loadLibrarySound(ws, 'untouched')).toMatchObject({ cue: 0.5, trim: { start: 0.1, end: 1.2 } });
+  });
+
+  it('stores a cue set after Trim start here, even when its number equals the stored one', async () => {
+    // Stored cue 0.5, no trim. The trim starts at 0.3, then the cue is set at 0.8 of the file: 0.5 after the trim's
+    // start, the same number as before but another moment, so it must be sent and not shifted by the library.
+    await hold('again', { cue: 0.5 });
+    await soundWizard.showSoundWizard('again');
+    player().currentTime = 0.3;
+    await byAttr('data-set', 'trim-start').fire('click');
+    player().currentTime = 1.8;
+    await byAttr('data-set', 'trim-end').fire('click');
+    player().currentTime = 0.8;
+    await byAttr('data-set', 'cue').fire('click');
+    expect(byField('cue').value).toBe('0.5');
+    await byAttr('data-next', 'cue').fire('click');
+    expect(await loadLibrarySound(ws, 'again')).toMatchObject({ cue: 0.5, trim: { start: 0.3, end: 1.8 } });
+  });
+
+  it('keeps a staged cue at 0 when Trim start here passes it', async () => {
+    await hold('passed', { cue: 0.2 });
+    await soundWizard.showSoundWizard('passed');
+    player().currentTime = 0.5;
+    await byAttr('data-set', 'trim-start').fire('click');
+    expect(byField('cue').value).toBe('0');
+  });
+
+  it('refuses an entry that is not a number in step 2 with its reason, sends nothing and keeps the fields', async () => {
+    await hold('garbled', { cue: 0.4, trim: { start: 0.1, end: 1.5 } });
+    await soundWizard.showSoundWizard('garbled');
+    // A browser reads "0.1-1.2" in a number field as an empty value and flags it as bad input.
+    Object.assign(byField('trim-start'), { value: '', validity: { badInput: true } });
+    await byField('trim-start').fire('input');
+    await byAttr('data-next', 'cue').fire('click');
+    expect(byAttr('data-error', 'cue').text()).toBe('Not a number of seconds: Trim start in seconds. Enter it like 0.25.');
+    expect([byField('cue').value, byField('trim-end').value]).toEqual(['0.4', '1.5']);
+    expect(await loadLibrarySound(ws, 'garbled')).toMatchObject({ cue: 0.4, trim: { start: 0.1, end: 1.5 } });
+  });
+
   it('names an invalid cue in step 2 and keeps what was set', async () => {
     await hold('scratch');
     await soundWizard.showSoundWizard('scratch');
     byField('cue').value = '5';
+    await byField('cue').fire('input');
     await byAttr('data-next', 'cue').fire('click');
     expect(byAttr('data-error', 'cue').text()).toMatch(/cue/);
     expect(byField('cue').value).toBe('5');
