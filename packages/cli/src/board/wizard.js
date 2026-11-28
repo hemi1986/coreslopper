@@ -3,7 +3,8 @@
 // ends with the one command to type in Claude Code, where the grilling happens.
 //   #/new                 choose: Production and Library (UX guideline G10)
 //   #/new/video[/<slug>]  #/new/series[/<slug>]  #/new/episode[/<slug>]  #/new/meme[/<slug>]
-// A library item's wizard has its own module: #/new/character[/<id>] in character-wizard.js.
+// A library item's wizard has its own module: #/new/character[/<id>] in character-wizard.js, #/new/set[/<id>] in
+// set-wizard.js.
 import { addStrings, api, copyButton, el, go, pending, post, projectFile, setLang, showError, t, upload } from './lib.js';
 import { libraryPicker } from './characters.js';
 import { setsPicker } from './sets.js';
@@ -33,7 +34,8 @@ addStrings({
     memeChars: 'Figuren aus der Bibliothek (optional)', memeNoChars: 'Noch keine Figuren in der Bibliothek – Claude erfindet sie aus deiner Idee.',
     memeNext: 'Meme angelegt. In Claude Code das Skript grillen lassen:',
     groupProduction: 'Produktion', groupLibrary: 'Bibliothek',
-    newCharacter: 'Figur', newCharacterSub: 'Eine Figur für die Bibliothek: Name, Sheet, Bilder, Stimme – oder die Figuren eines Projekts oder einer Serie übernehmen.'
+    newCharacter: 'Figur', newCharacterSub: 'Eine Figur für die Bibliothek: Name, Sheet, Bilder, Stimme – oder die Figuren eines Projekts oder einer Serie übernehmen.',
+    newSet: 'Set', newSetSub: 'Ein Ort für die Bibliothek: Name, Beschreibung, Referenzen, Platten mit Kamerawinkel – oder die Sets eines Projekts oder einer Serie übernehmen.'
   },
   en: {
     newTitle: 'Create', newVideo: 'Music video', newVideoSub: 'For a finished song: project data, lyrics, song, references, characters.',
@@ -59,7 +61,8 @@ addStrings({
     memeChars: 'Characters from the library (optional)', memeNoChars: 'No characters in the library yet – Claude invents them from your idea.',
     memeNext: 'Meme created. Let Claude Code grill the script:',
     groupProduction: 'Production', groupLibrary: 'Library',
-    newCharacter: 'Character', newCharacterSub: 'A character for the library: name, sheet, images, voice – or take in the characters of a project or series.'
+    newCharacter: 'Character', newCharacterSub: 'A character for the library: name, sheet, images, voice – or take in the characters of a project or series.',
+    newSet: 'Set', newSetSub: 'A place for the library: name, description, references, plates with their angles – or take in the sets of a project or series.'
   }
 });
 
@@ -97,7 +100,7 @@ function loadOptions() { return api('/api/new/options').then(function (o) { opti
 /** The chooser's groups: [group string, [[kind, title string, sub string], …]]. */
 const CHOOSER = [
   ['groupProduction', [['video', 'newVideo', 'newVideoSub'], ['series', 'newSeries', 'newSeriesSub'], ['episode', 'newEpisode', 'newEpisodeSub'], ['meme', 'newMeme', 'newMemeSub']]],
-  ['groupLibrary', [['character', 'newCharacter', 'newCharacterSub']]]
+  ['groupLibrary', [['character', 'newCharacter', 'newCharacterSub'], ['set', 'newSet', 'newSetSub']]]
 ];
 
 function choose() {
