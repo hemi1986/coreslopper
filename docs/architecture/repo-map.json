@@ -138,16 +138,9 @@
       "path": "packages/cli",
       "score": 0.61,
       "reasons": [
-        "391 changed files in recent history",
+        "388 changed files in recent history",
         "shared library",
         "shared infrastructure – not a domain slice"
-      ]
-    },
-    {
-      "path": "scripts/audio-analysis",
-      "score": 0.16,
-      "reasons": [
-        "5 changed files in recent history"
       ]
     },
     {
@@ -155,6 +148,13 @@
       "score": 0.16,
       "reasons": [
         "6 changed files in recent history"
+      ]
+    },
+    {
+      "path": "scripts/audio-analysis",
+      "score": 0.15,
+      "reasons": [
+        "2 changed files in recent history"
       ]
     },
     {
@@ -170,7 +170,7 @@
       "path": "packages/core",
       "score": 0.03,
       "reasons": [
-        "103 changed files in recent history",
+        "101 changed files in recent history",
         "shared library",
         "layer package – hosts many concepts, not a domain slice"
       ]
@@ -597,6 +597,7 @@
         "characterization",
         "feedback",
         "http",
+        "look",
         "nav",
         "production",
         "project",
@@ -614,6 +615,7 @@
         "packages/cli/src/board-review.ts",
         "packages/cli/src/board-wizard.ts",
         "tests/board-feedback.test.ts",
+        "tests/board-look.test.ts",
         "tests/board-nav.test.ts",
         "tests/board-production.test.ts",
         "tests/board-projects.test.ts",
@@ -636,7 +638,7 @@
       "reasons": [
         "2 layers: cli, tests",
         "2 packages",
-        "14 files"
+        "15 files"
       ],
       "adopted": true,
       "adoptedAt": "2026-11-22"
