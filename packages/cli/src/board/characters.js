@@ -1,13 +1,15 @@
 // The character library: every character of the workspace's videos and
 // series, to take into a new music video or series canon with one click.
-//   #/characters        the gallery, a new character, import from a project
+//   #/characters        the list (a table: search, tag/unused/origin filters, sort, all in the hash),
+//                       a new character, import from a project
 //   #/characters/<id>   one character: files, states, where it is used, use it
 import { addStrings, api, el, go, pending, post, setLang, showError, t, upload } from './lib.js';
+import { allTags, anyLibraryFilter, defaultDir, libraryListHash, matchesLibraryItem, parseLibraryListState, queryOf, sortLibraryItems, toggleValue, writeListHash } from './list-state.js';
 
 addStrings({
   de: {
     libTitle: 'Figuren', libHelp: 'Alle Figuren aus deinen Videos und Serien. Eine Figur kommt automatisch hinein, sobald style-character eines Projekts fertig ist; eigene kannst du hier anlegen. Beim Übernehmen landen ihre Dateien im Projekt unter characters/<id>/.',
-    libEmpty: 'Noch keine Figuren in der Bibliothek.', libNew: 'Neue Figur anlegen', libImport: 'Aus Projekt oder Serie übernehmen', libImportHelp: 'Holt alle Figuren mit Bildern aus einem bestehenden Projekt oder einer Serie in die Bibliothek; bekannte Figuren bekommen nur ihre neuen Bilder und Zustände.',
+    libEmpty: 'Noch keine Figuren', libNew: 'Neue Figur anlegen', libImport: 'Aus Projekt oder Serie übernehmen', libImportHelp: 'Holt alle Figuren mit Bildern aus einem bestehenden Projekt oder einer Serie in die Bibliothek; bekannte Figuren bekommen nur ihre neuen Bilder und Zustände.',
     libImportButton: 'Importieren', libImported: function (n) { return n + ' Figur(en) übernommen'; }, libNothing: 'Keine Figur mit Bildern gefunden.',
     name: 'Name', description: 'Beschreibung (Aussehen, Alter, Haare, Outfit)', prompt: 'Prompt-Satz für Keyframes', tags: 'Schlagworte, mit Komma', face: 'Darstellung',
     faces: { full: 'voll sichtbar', silhouette: 'nur Silhouette', 'screen-only': 'nur auf Bildschirmen', 'voice-only': 'nur Stimme' },
@@ -18,11 +20,16 @@ addStrings({
     edit: 'Bearbeiten', save: 'Speichern', cancel: 'Abbrechen', deleteChar: 'Aus der Bibliothek löschen', confirmDelete: 'Diese Figur und ihre Dateien aus der Bibliothek löschen? Projekte behalten ihre Kopien.',
     removeFile: 'Entfernen', confirmRemoveFile: function (n) { return n + ' aus der Bibliothek löschen?'; }, back: '← Alle Figuren', series: 'Serie', project: 'Video',
     pickHelp: 'Figuren aus der Bibliothek übernehmen: Ihre Bilder landen in characters/<id>/, der Agent baut beim Character-Bible darauf auf, statt sie neu zu erzeugen. Zustände nur, wenn angehakt.',
-    pickEmpty: 'Die Bibliothek ist leer; sie füllt sich mit jedem fertigen Projekt. Eigene Figuren unter Figuren anlegen.', openLibrary: 'Bibliothek öffnen'
+    pickEmpty: 'Die Bibliothek ist leer; sie füllt sich mit jedem fertigen Projekt. Eigene Figuren unter Figuren anlegen.', openLibrary: 'Bibliothek öffnen',
+    clSearch: 'Suche in Name, Beschreibung und Schlagworten …', clTags: 'Schlagworte', clUnused: 'unbenutzt', clOrigin: 'Herkunft', clAll: 'alle',
+    clNoMatch: 'Keine Figur passt zu diesen Filtern', clReset: 'Filter zurücksetzen', clYes: 'ja', clNo: 'nein', clManual: 'manuell', clFrom: 'aus',
+    clCols: { name: 'Name', face: 'Darstellung', tags: 'Schlagworte', images: 'Bilder', voice: 'Stimme', used: 'Verwendet in', origin: 'Herkunft' },
+    clImages: function (images, states) { return images + ' Bilder · ' + states + ' Zustände'; },
+    clCount: function (n, all) { return n + ' von ' + all; }
   },
   en: {
     libTitle: 'Characters', libHelp: 'Every character of your videos and series. A character comes in by itself once a project\'s style-character stage is done; add your own here. Using one copies its files into the project under characters/<id>/.',
-    libEmpty: 'No characters in the library yet.', libNew: 'New character', libImport: 'Take from a project or series', libImportHelp: 'Brings every character with images of an existing project or series into the library; known characters only gain their new images and states.',
+    libEmpty: 'No characters yet', libNew: 'New character', libImport: 'Take from a project or series', libImportHelp: 'Brings every character with images of an existing project or series into the library; known characters only gain their new images and states.',
     libImportButton: 'Import', libImported: function (n) { return n + ' character(s) taken in'; }, libNothing: 'No character with images found.',
     name: 'Name', description: 'Description (look, age, hair, outfit)', prompt: 'Prompt sentence for keyframes', tags: 'Tags, comma-separated', face: 'Display',
     faces: { full: 'fully visible', silhouette: 'silhouette only', 'screen-only': 'on screens only', 'voice-only': 'voice only' },
@@ -33,7 +40,12 @@ addStrings({
     edit: 'Edit', save: 'Save', cancel: 'Cancel', deleteChar: 'Delete from the library', confirmDelete: 'Delete this character and its files from the library? Projects keep their copies.',
     removeFile: 'Remove', confirmRemoveFile: function (n) { return 'Delete ' + n + ' from the library?'; }, back: '← All characters', series: 'Series', project: 'Video',
     pickHelp: 'Take characters from the library: their images land in characters/<id>/, and the character bible builds on them instead of generating them again. States only when ticked.',
-    pickEmpty: 'The library is empty; it fills with every finished project. Add your own under Characters.', openLibrary: 'Open the library'
+    pickEmpty: 'The library is empty; it fills with every finished project. Add your own under Characters.', openLibrary: 'Open the library',
+    clSearch: 'Search name, description and tags …', clTags: 'Tags', clUnused: 'unused', clOrigin: 'Origin', clAll: 'all',
+    clNoMatch: 'No character matches these filters', clReset: 'Reset filters', clYes: 'yes', clNo: 'no', clManual: 'manual', clFrom: 'from',
+    clCols: { name: 'Name', face: 'Display', tags: 'Tags', images: 'Images', voice: 'Voice', used: 'Used in', origin: 'Origin' },
+    clImages: function (images, states) { return images + ' images · ' + states + ' states'; },
+    clCount: function (n, all) { return n + ' of ' + all; }
   }
 });
 
@@ -46,6 +58,8 @@ function targetLabel(target) { return (target.scope === 'series' ? t('series') :
 function targetValue(target) { return target.scope + '/' + target.slug; }
 function isUsedIn(entry, scope, slug) { return entry.usedIn.some(function (use) { return use.scope === scope && use.slug === slug; }); }
 function originText(origin) { return origin === 'manual' ? t('manual') : t('fromOrigin') + ' ' + origin; }
+/** The origin as the list shows it: "manuell" or "aus <slug>" (an import records the workspace path, `projects/<slug>`). */
+function listOrigin(origin) { return origin === 'manual' ? t('clManual') : t('clFrom') + ' ' + String(origin).split('/').pop(); }
 
 function cover(entry, cls) {
   return entry.cover
@@ -119,34 +133,179 @@ function importForm(data, refresh) {
   ]);
 }
 
-function gallery() {
-  return load().then(function (data) {
-    const node = main();
-    node.appendChild(el('h2', { text: t('libTitle'), style: 'margin:0 0 6px;font-size:20px' }));
-    node.appendChild(el('p', { class: 'meta', text: t('libHelp') }));
-    const grid = el('div', { class: 'grid char-grid' });
-    const draw = function (list) {
-      grid.innerHTML = '';
-      if (!list.characters.length) grid.appendChild(el('p', { class: 'empty', text: t('libEmpty') }));
-      list.characters.forEach(function (entry) {
-        grid.appendChild(el('section', { class: 'card char-card', onclick: function () { go('#/characters/' + entry.id); } }, [
-          cover(entry, 'char-cover'),
-          el('h3', { text: entry.name }),
-          el('p', { class: 'meta clamp', text: entry.description }),
-          el('div', {}, [
-            el('span', { class: 'chip', text: entry.refs.length + (entry.sheet ? 1 : 0) + ' ' + t('refs') }), ' ',
-            entry.states.length ? el('span', { class: 'chip', text: entry.states.length + ' ' + t('states') }) : null, ' ',
-            entry.voice ? el('span', { class: 'chip', text: t('roles').voice }) : null, ' ',
-            el('span', { class: 'chip', text: t('usedIn') + ' ' + entry.usedIn.length })
-          ].concat(entry.tags.map(function (tag) { return el('span', { class: 'chip', text: '#' + tag }); })))
-        ]));
-      });
-      list.errors.forEach(function (error) { grid.appendChild(el('p', { class: 'error', text: error.id + ': ' + error.error })); });
+// --------------------------------------------------------------------- list
+
+/** The list's route; its query may hold any character, a decoded line break too. */
+export const CHARACTERS_ROUTE = /^#\/characters\/?(?:\?[\s\S]*)?$/;
+
+const LIST = { sorts: ['name', 'images', 'used', 'origin'], ascending: ['name', 'origin'] };
+
+function imageCount(entry) { return entry.refs.length + (entry.sheet && entry.refs.indexOf(entry.sheet) < 0 ? 1 : 0); }
+
+/** One item per library character of `/api/library`, and one per entry that does not load (`error`), by name. */
+export function characterItems(data) {
+  const items = data.characters.map(function (entry) {
+    return {
+      id: entry.id, name: entry.name, entry: entry, search: [entry.name, entry.description].concat(entry.tags), tags: entry.tags,
+      images: imageCount(entry), states: entry.states.length, used: entry.usedIn.length, origin: entry.origin, href: '#/characters/' + entry.id
     };
-    draw(data);
-    node.appendChild(grid);
-    node.appendChild(importForm(data, draw));
-    node.appendChild(newCharacterForm(function (id) { go('#/characters/' + id); }));
+  });
+  const errors = (data.errors || []).map(function (error) { return { id: error.id, name: error.id, error: error.error, search: [error.id], tags: [], used: 0, origin: '' }; });
+  return { items: items, errors: errors };
+}
+
+/** The list options for a library: its tags and origins are the values the address may name. */
+export function characterListOptions(list) {
+  const origins = [];
+  list.items.forEach(function (item) { if (origins.indexOf(item.origin) < 0) origins.push(item.origin); });
+  return Object.assign({ tags: allTags(list.items), origins: origins }, LIST);
+}
+
+/** The list's state from the query of `#/characters?…`; unknown values are ignored. */
+export function parseCharacterState(query, list) { return parseLibraryListState(query, characterListOptions(list)); }
+
+/** The address of a list state; defaults are left out. */
+export function characterHash(state) { return libraryListHash('#/characters', state, LIST); }
+
+/**
+ * The rows to show, sorted by the state's column: the characters that match, then the entries that do not load.
+ * An unreadable entry has no tags, uses or origin, so it shows only while no filter is set and the search, if any,
+ * finds its id.
+ */
+export function characterRows(list, state) {
+  const keys = {
+    images: function (item) { return item.images; },
+    used: function (item) { return item.used; },
+    origin: function (item) { return listOrigin(item.origin); }
+  };
+  const rows = sortLibraryItems(list.items.filter(function (item) { return matchesLibraryItem(item, state); }), state, keys);
+  const filtered = state.tag.length || state.unused || state.origin;
+  return filtered ? rows : rows.concat(list.errors.filter(function (item) { return matchesLibraryItem(item, state); }));
+}
+
+let view = null; // { data, list, state, results, reset }
+let listAddress = '#/characters'; // the list's last address, for the detail page's back link
+
+function setState(state, full) {
+  view.state = state;
+  listAddress = characterHash(state);
+  writeListHash(listAddress);
+  if (full) drawList(); else drawResults();
+}
+
+function quiet(event) { if (event && event.stopPropagation) event.stopPropagation(); }
+
+function resetButton(className) {
+  return el('button', { class: className + ' cl-reset', onclick: function () { setState(parseCharacterState('', view.list), true); } }, [t('clReset')]);
+}
+
+function filterBar() {
+  const state = view.state;
+  view.reset = el('span', { class: 'pl-reset' });
+  const search = el('input', { type: 'search', class: 'pl-search', placeholder: t('clSearch'), 'aria-label': t('clSearch'), value: state.q, oninput: function (event) {
+    // The search is in the address, so a refresh need not keep the view for it (app.js marks other input as edited).
+    quiet(event);
+    setState(Object.assign({}, view.state, { q: event.target.value }), false);
+  } });
+  search.value = state.q;
+  const options = characterListOptions(view.list);
+  const tags = options.tags.length ? el('div', { class: 'pl-filter', role: 'group', 'aria-label': t('clTags') }, [el('span', { class: 'pl-label', text: t('clTags') })].concat(options.tags.map(function (tag) {
+    const on = state.tag.indexOf(tag) >= 0;
+    return el('button', { class: 'pl-chip' + (on ? ' on' : ''), 'aria-pressed': on ? 'true' : 'false', 'data-tag': tag, onclick: function () {
+      setState(Object.assign({}, view.state, { tag: toggleValue(view.state.tag, tag) }), true);
+    } }, ['#' + tag]);
+  }))) : null;
+  const unused = el('button', { class: 'pl-chip cl-unused' + (state.unused ? ' on' : ''), 'aria-pressed': state.unused ? 'true' : 'false', onclick: function () {
+    setState(Object.assign({}, view.state, { unused: !view.state.unused }), true);
+  } }, [t('clUnused')]);
+  const origin = el('select', { class: 'pl-select cl-origin', 'aria-label': t('clOrigin'), oninput: quiet, onchange: function (event) {
+    setState(Object.assign({}, view.state, { origin: event.target.value }), true);
+  } }, [el('option', { value: '', text: t('clAll') })].concat(options.origins.map(function (value) {
+    return el('option', { value: value, selected: value === state.origin, text: listOrigin(value) });
+  })));
+  origin.value = state.origin;
+  return el('div', { class: 'pl-filters' }, [
+    search, tags, el('div', { class: 'pl-filter' }, [unused]),
+    el('label', { class: 'pl-filter' }, [el('span', { class: 'pl-label', text: t('clOrigin') }), origin]),
+    view.reset
+  ]);
+}
+
+function header() {
+  const cols = t('clCols');
+  const th = function (col, sortable) {
+    if (!sortable) return el('th', { text: col ? cols[col] : '' });
+    const on = view.state.sort === col;
+    return el('th', { class: 'pl-sort' + (on ? ' on' : ''), 'data-sort': col, 'aria-sort': on ? (view.state.dir === 'asc' ? 'ascending' : 'descending') : null, onclick: function () {
+      const next = Object.assign({}, view.state);
+      if (on) next.dir = view.state.dir === 'asc' ? 'desc' : 'asc';
+      else { next.sort = col; next.dir = defaultDir(col, LIST); }
+      setState(next, false);
+    } }, [cols[col] + (on ? (view.state.dir === 'asc' ? ' ▲' : ' ▼') : '')]);
+  };
+  return el('thead', {}, [el('tr', {}, [th(''), th('name', true), th('face'), th('tags'), th('images', true), th('voice'), th('used', true), th('origin', true)])]);
+}
+
+function row(item) {
+  if (item.error) return el('tr', { class: 'pl-error', 'data-id': item.id }, [
+    el('td', {}, [el('div', { class: 'lib-cover placeholder', text: '!' })]), el('td', {}, [el('b', { text: item.id })]),
+    el('td', { colspan: '6', class: 'error', text: item.error })
+  ]);
+  const entry = item.entry;
+  return el('tr', { class: 'link-row', 'data-id': item.id, onclick: function () { go(item.href); } }, [
+    el('td', {}, [cover(entry, 'lib-cover')]),
+    el('td', {}, [el('b', { text: entry.name }), el('span', { class: 'sub', text: entry.id })]),
+    el('td', { text: t('faces')[entry.face] || entry.face }),
+    el('td', { class: 'cl-tags', text: entry.tags.map(function (tag) { return '#' + tag; }).join(' ') }),
+    el('td', { class: 'num', text: t('clImages')(item.images, item.states) }),
+    el('td', { text: entry.voice ? t('clYes') : t('clNo') }),
+    el('td', { class: 'num', text: String(item.used) }),
+    el('td', { text: listOrigin(entry.origin) })
+  ]);
+}
+
+function drawResults() {
+  const results = view.results;
+  results.innerHTML = '';
+  // The search redraws only the results, so the reset button of the bar is drawn here too.
+  view.reset.innerHTML = '';
+  if (anyLibraryFilter(view.state)) view.reset.appendChild(resetButton('small'));
+  const rows = characterRows(view.list, view.state);
+  if (!rows.length) {
+    results.appendChild(el('div', { class: 'empty cl-nomatch' }, [el('p', { text: t('clNoMatch') }), resetButton('primary')]));
+    return;
+  }
+  results.appendChild(el('p', { class: 'sub pl-count', text: t('clCount')(rows.length, view.list.items.length + view.list.errors.length) }));
+  results.appendChild(el('table', { class: 'list pl-table cl-table' }, [header(), el('tbody', {}, rows.map(row))]));
+}
+
+function drawList() {
+  const node = main();
+  node.appendChild(el('h2', { text: t('libTitle'), style: 'margin:0 0 6px;font-size:20px' }));
+  node.appendChild(el('p', { class: 'meta', text: t('libHelp') }));
+  if (!view.list.items.length && !view.list.errors.length) node.appendChild(el('div', { class: 'empty cl-empty' }, [el('p', { text: t('libEmpty') })]));
+  else {
+    node.appendChild(filterBar());
+    view.results = el('div', { class: 'pl-results' });
+    node.appendChild(view.results);
+    drawResults();
+  }
+  node.appendChild(importForm(view.data, function (data) { useData(data, view.state); drawList(); }));
+  node.appendChild(newCharacterForm(function (id) { go('#/characters/' + id); }));
+}
+
+function useData(data, state) {
+  const list = characterItems(data);
+  view = { data: data, list: list, state: state, results: null, reset: null };
+}
+
+function gallery() {
+  const query = queryOf(location.hash);
+  return load().then(function (data) {
+    const list = characterItems(data);
+    useData(data, parseCharacterState(query, list));
+    listAddress = characterHash(view.state);
+    drawList();
   }).catch(showError);
 }
 
@@ -189,7 +348,7 @@ function detail(id) {
     const entry = data.characters.filter(function (c) { return c.id === id; })[0];
     const node = main();
     const refresh = function () { detail(id); };
-    node.appendChild(el('p', {}, [el('a', { class: 'back-link', href: '#/characters', text: t('back') })]));
+    node.appendChild(el('p', {}, [el('a', { class: 'back-link', href: listAddress, text: t('back') })]));
     if (!entry) { node.appendChild(el('p', { class: 'error', text: id + ': ?' })); return; }
     node.appendChild(el('header', { class: 'project' }, [el('h2', { text: entry.name }), el('span', { class: 'chip', text: entry.id }), el('span', { class: 'chip', text: originText(entry.origin) })]));
 

@@ -102,7 +102,7 @@ When a project is done, the **Release** tab holds everything for publishing it.
 
 ![The character library](assets/board/en/characters.webp)
 
-**Characters** is your character library. A project's characters come in by themselves once its character bible is done. **Take from a project or series** imports existing ones, and **New character** adds your own. On a character's own view, **Use in** copies it into a music video or a series canon.
+**Characters** is your character library, a table with one row per character: its cover, tags, images and states, voice, how many productions use it, and where it came from. Search by name, description, or tag, filter by tag, **unused**, or **Origin**, and click a column header to sort; the address keeps all of it, so Back and a refresh return to the same list. Click a row to open the character. A project's characters come in by themselves once its character bible is done. **Take from a project or series** imports existing ones, and **New character** adds your own. On a character's own view, **Use in** copies it into a music video or a series canon.
 
 ## Series
 
