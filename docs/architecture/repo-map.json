@@ -138,7 +138,7 @@
       "path": "packages/cli",
       "score": 0.61,
       "reasons": [
-        "363 changed files in recent history",
+        "366 changed files in recent history",
         "shared library",
         "shared infrastructure – not a domain slice"
       ]
@@ -170,7 +170,7 @@
       "path": "packages/core",
       "score": 0.03,
       "reasons": [
-        "96 changed files in recent history",
+        "92 changed files in recent history",
         "shared library",
         "layer package – hosts many concepts, not a domain slice"
       ]
@@ -563,6 +563,36 @@
       "adoptedAt": "2026-11-22"
     },
     {
+      "name": "state",
+      "terms": [
+        "characterization",
+        "state"
+      ],
+      "tables": [],
+      "files": [
+        "packages/cli/src/board/list-state.js",
+        "packages/core/src/state.ts",
+        "tests/state-characterization.test.ts",
+        "tests/state.test.ts"
+      ],
+      "packages": [
+        "?",
+        "packages/cli",
+        "packages/core"
+      ],
+      "layers": [
+        "cli",
+        "core",
+        "tests"
+      ],
+      "score": 16,
+      "reasons": [
+        "3 layers: cli, core, tests",
+        "3 packages",
+        "4 files"
+      ]
+    },
+    {
       "name": "short",
       "terms": [
         "form",
@@ -595,6 +625,7 @@
       "name": "board",
       "terms": [
         "board",
+        "character",
         "characterization",
         "contact",
         "feedback",
@@ -605,6 +636,7 @@
         "project",
         "release",
         "review",
+        "set",
         "sheet",
         "shell",
         "sound",
@@ -618,6 +650,8 @@
         "packages/cli/src/board-production.ts",
         "packages/cli/src/board-review.ts",
         "packages/cli/src/board-wizard.ts",
+        "tests/board-character-wizard.test.ts",
+        "tests/board-characters.test.ts",
         "tests/board-contact-sheet.test.ts",
         "tests/board-feedback.test.ts",
         "tests/board-look.test.ts",
@@ -626,7 +660,11 @@
         "tests/board-projects.test.ts",
         "tests/board-release.test.ts",
         "tests/board-review.test.ts",
+        "tests/board-set-wizard.test.ts",
+        "tests/board-sets.test.ts",
         "tests/board-shell-characterization.test.ts",
+        "tests/board-sound-list.test.ts",
+        "tests/board-sound-wizard.test.ts",
         "tests/board-sounds.test.ts",
         "tests/board-watch.test.ts",
         "tests/board-wizard.test.ts"
@@ -643,7 +681,7 @@
       "reasons": [
         "2 layers: cli, tests",
         "2 packages",
-        "17 files"
+        "23 files"
       ],
       "adopted": true,
       "adoptedAt": "2026-11-22"
@@ -693,6 +731,38 @@
       "adoptedAt": "2026-11-22"
     },
     {
+      "name": "character",
+      "terms": [
+        "character",
+        "characterization",
+        "wizard"
+      ],
+      "tables": [],
+      "files": [
+        "packages/cli/src/board/character-wizard.js",
+        "packages/cli/src/board/characters.js",
+        "packages/cli/src/character-library.ts",
+        "tests/character-characterization.test.ts",
+        "tests/character-library.test.ts"
+      ],
+      "packages": [
+        "?",
+        "packages/cli"
+      ],
+      "layers": [
+        "cli",
+        "tests"
+      ],
+      "score": 13,
+      "reasons": [
+        "2 layers: cli, tests",
+        "2 packages",
+        "5 files"
+      ],
+      "adopted": true,
+      "adoptedAt": "2026-11-22"
+    },
+    {
       "name": "sery",
       "terms": [
         "budget",
@@ -724,17 +794,19 @@
       ]
     },
     {
-      "name": "character",
+      "name": "sound",
       "terms": [
-        "character",
-        "characterization"
+        "cue",
+        "sound",
+        "wizard"
       ],
       "tables": [],
       "files": [
-        "packages/cli/src/board/characters.js",
-        "packages/cli/src/character-library.ts",
-        "tests/character-characterization.test.ts",
-        "tests/character-library.test.ts"
+        "packages/cli/src/board/sound-wizard.js",
+        "packages/cli/src/board/sounds.js",
+        "packages/cli/src/sound-library.ts",
+        "tests/sound-cues.test.ts",
+        "tests/sound-library.test.ts"
       ],
       "packages": [
         "?",
@@ -744,14 +816,12 @@
         "cli",
         "tests"
       ],
-      "score": 12,
+      "score": 13,
       "reasons": [
         "2 layers: cli, tests",
         "2 packages",
-        "4 files"
-      ],
-      "adopted": true,
-      "adoptedAt": "2026-11-22"
+        "5 files"
+      ]
     },
     {
       "name": "clip",
@@ -796,34 +866,6 @@
         "tests/lipsync-audio.test.ts",
         "tests/lipsync-default.test.ts",
         "tests/lipsync-routing.test.ts"
-      ],
-      "packages": [
-        "?",
-        "packages/cli"
-      ],
-      "layers": [
-        "cli",
-        "tests"
-      ],
-      "score": 12,
-      "reasons": [
-        "2 layers: cli, tests",
-        "2 packages",
-        "4 files"
-      ]
-    },
-    {
-      "name": "sound",
-      "terms": [
-        "cue",
-        "sound"
-      ],
-      "tables": [],
-      "files": [
-        "packages/cli/src/board/sounds.js",
-        "packages/cli/src/sound-library.ts",
-        "tests/sound-cues.test.ts",
-        "tests/sound-library.test.ts"
       ],
       "packages": [
         "?",
@@ -890,33 +932,6 @@
       "score": 11,
       "reasons": [
         "2 layers: cli, tests",
-        "2 packages",
-        "3 files"
-      ]
-    },
-    {
-      "name": "production",
-      "terms": [
-        "production",
-        "watch"
-      ],
-      "tables": [],
-      "files": [
-        "packages/cli/src/board/production.js",
-        "packages/cli/src/production-watch.ts",
-        "packages/core/src/production.ts"
-      ],
-      "packages": [
-        "packages/cli",
-        "packages/core"
-      ],
-      "layers": [
-        "cli",
-        "core"
-      ],
-      "score": 11,
-      "reasons": [
-        "2 layers: cli, core",
         "2 packages",
         "3 files"
       ]

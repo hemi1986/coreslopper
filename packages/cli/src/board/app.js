@@ -6,9 +6,12 @@
 //   #/p/<slug>/contact-sheet                 the contact sheet
 //   #/p/<slug>/doc/<path>                    a project document (brief, treatment, …)
 //   #/s/<slug>       a series                #/new[/video|series|episode|meme[/<slug>]]  the wizard
-//   #/characters[/<id>]                     the character library
-//   #/sets[/<id>]                           the set library
-//   #/sounds[/<id>]                         the sound library
+//   #/new/character[/<id>]                   the wizard for a library character
+//   #/new/set[/<id>]                         the wizard for a library set
+//   #/new/sound[/<id>]                       the wizard for a library sound
+//   #/characters[?…]  the character list     #/characters/<id>  one library character
+//   #/sets[?…]        the set list           #/sets/<id>        one library set
+//   #/sounds[?…]      the sound list         #/sounds/<id>      one library sound
 //   #/guide[/<doc>]                          the board guide, or another page of docs/
 import { api, decodedHash, go, loading } from './lib.js';
 import { renderNav, viewBusy } from './nav.js';
@@ -18,9 +21,12 @@ import { onReleaseChange, showCalendar, showRelease } from './release.js';
 import { showReview } from './review.js';
 import { showContactSheet } from './contact-sheet.js';
 import { showWizard } from './wizard.js';
-import { showCharacters } from './characters.js';
-import { showSets } from './sets.js';
-import { showSounds } from './sounds.js';
+import { showCharacterWizard } from './character-wizard.js';
+import { showSetWizard } from './set-wizard.js';
+import { showSoundWizard } from './sound-wizard.js';
+import { CHARACTERS_ROUTE, showCharacters } from './characters.js';
+import { SETS_ROUTE, showSets } from './sets.js';
+import { SOUNDS_ROUTE, showSounds } from './sounds.js';
 import { showGuide } from './guide.js';
 
 let active = 'overview';
@@ -36,13 +42,19 @@ function route() {
   kept = false;
   const hash = decodedHash(location.hash || '#/');
   let match, view;
-  if ((match = /^#\/new(?:\/(video|series|episode|meme)(?:\/([a-z0-9-]+))?)?\/?$/.exec(hash))) { active = 'new'; view = showWizard(match[1], match[2]); }
+  if ((match = /^#\/new\/character(?:\/([a-z0-9][a-z0-9_-]*))?\/?$/.exec(hash))) { active = 'new'; view = showCharacterWizard(match[1]); }
+  else if ((match = /^#\/new\/set(?:\/([a-z0-9][a-z0-9_-]*))?\/?$/.exec(hash))) { active = 'new'; view = showSetWizard(match[1]); }
+  else if ((match = /^#\/new\/sound(?:\/([a-z0-9][a-z0-9_-]*))?\/?$/.exec(hash))) { active = 'new'; view = showSoundWizard(match[1]); }
+  else if ((match = /^#\/new(?:\/(video|series|episode|meme)(?:\/([a-z0-9-]+))?)?\/?$/.exec(hash))) { active = 'new'; view = showWizard(match[1], match[2]); }
   else if (PROJECTS_ROUTE.test(hash)) { active = 'projects'; view = showProjects(); }
   else if (hash === '#/calendar') { active = 'calendar'; view = showCalendar(); }
   else if ((match = /^#\/guide(?:\/([a-z][a-z0-9-]*(?:\.de)?))?\/?$/.exec(hash))) { active = 'guide'; view = showGuide(match[1]); }
-  else if ((match = /^#\/characters(?:\/([a-z0-9][a-z0-9_-]*))?\/?$/.exec(hash))) { active = 'characters'; view = showCharacters(match[1]); }
-  else if ((match = /^#\/sets(?:\/([a-z0-9][a-z0-9_-]*))?\/?$/.exec(hash))) { active = 'sets'; view = showSets(match[1]); }
-  else if ((match = /^#\/sounds(?:\/([a-z0-9][a-z0-9_-]*))?\/?$/.exec(hash))) { active = 'sounds'; view = showSounds(match[1]); }
+  else if (CHARACTERS_ROUTE.test(hash)) { active = 'characters'; view = showCharacters(); }
+  else if ((match = /^#\/characters\/([a-z0-9][a-z0-9_-]*)\/?$/.exec(hash))) { active = 'characters'; view = showCharacters(match[1]); }
+  else if (SETS_ROUTE.test(hash)) { active = 'sets'; view = showSets(); }
+  else if ((match = /^#\/sets\/([a-z0-9][a-z0-9_-]*)\/?$/.exec(hash))) { active = 'sets'; view = showSets(match[1]); }
+  else if (SOUNDS_ROUTE.test(hash)) { active = 'sounds'; view = showSounds(); }
+  else if ((match = /^#\/sounds\/([a-z0-9][a-z0-9_-]*)\/?$/.exec(hash))) { active = 'sounds'; view = showSounds(match[1]); }
   else if ((match = /^#\/p\/([a-z0-9-]+)\/release(?:\/([a-z]+))?(?:\/(.+))?$/.exec(hash))) { active = 'release:' + match[1]; view = showRelease(match[1], match[2], match[3]); }
   else if ((match = /^#\/p\/([a-z0-9-]+)\/doc\/(.+)$/.exec(hash))) { active = 'project:' + match[1]; view = showDocument(match[1], match[2]); }
   else if ((match = /^#\/p\/([a-z0-9-]+)\/contact-sheet\/?$/.exec(hash))) { active = 'project:' + match[1]; view = showContactSheet(match[1]); }

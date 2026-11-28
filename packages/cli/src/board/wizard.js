@@ -1,9 +1,10 @@
 // The wizard for a new music video, series, episode, or meme. It collects what a
 // form can hold (project data, lyrics, song, a meme's pitch, references) and
 // ends with the one command to type in Claude Code, where the grilling happens.
-//   #/new                 choose            #/new/video[/<slug>]
-//   #/new/series[/<slug>]                   #/new/episode[/<slug>]
-//   #/new/meme[/<slug>]
+//   #/new                 choose: Production and Library (UX guideline G10)
+//   #/new/video[/<slug>]  #/new/series[/<slug>]  #/new/episode[/<slug>]  #/new/meme[/<slug>]
+// A library item's wizard has its own module: #/new/character[/<id>] in character-wizard.js, #/new/set[/<id>] in
+// set-wizard.js, #/new/sound[/<id>] in sound-wizard.js.
 import { addStrings, api, copyButton, el, go, pending, post, projectFile, setLang, showError, t, upload } from './lib.js';
 import { libraryPicker } from './characters.js';
 import { setsPicker } from './sets.js';
@@ -31,7 +32,11 @@ addStrings({
     newMeme: 'Meme', newMemeSub: 'Ein kurzes, witziges Hochkant-Video (~15 s) für TikTok, Shorts und Reels.',
     idea: 'Idee', ideaHelp: 'Worum geht es? In deinen Worten – das Grilling startet hier, nichts ist schon entschieden.', setting: 'Setting (optional)', settingHelp: 'Wo spielt es?',
     memeChars: 'Figuren aus der Bibliothek (optional)', memeNoChars: 'Noch keine Figuren in der Bibliothek – Claude erfindet sie aus deiner Idee.',
-    memeNext: 'Meme angelegt. In Claude Code das Skript grillen lassen:'
+    memeNext: 'Meme angelegt. In Claude Code das Skript grillen lassen:',
+    groupProduction: 'Produktion', groupLibrary: 'Bibliothek',
+    newCharacter: 'Figur', newCharacterSub: 'Eine Figur für die Bibliothek: Name, Sheet, Bilder, Stimme – oder die Figuren eines Projekts oder einer Serie übernehmen.',
+    newSet: 'Set', newSetSub: 'Ein Ort für die Bibliothek: Name, Beschreibung, Referenzen, Platten mit Kamerawinkel – oder die Sets eines Projekts oder einer Serie übernehmen.',
+    newSound: 'Sound', newSoundSub: 'Ein wiederkehrender Ton für Memes: Datei, Titel, wofür er gedacht ist, Cue und Trim beim Abspielen, Lizenz.'
   },
   en: {
     newTitle: 'Create', newVideo: 'Music video', newVideoSub: 'For a finished song: project data, lyrics, song, references, characters.',
@@ -55,7 +60,11 @@ addStrings({
     newMeme: 'Meme', newMemeSub: 'A short, funny vertical video (~15 s) for TikTok, Shorts, and Reels.',
     idea: 'Idea', ideaHelp: 'What is it about? In your words – the grilling starts here, nothing is decided yet.', setting: 'Setting (optional)', settingHelp: 'Where does it happen?',
     memeChars: 'Characters from the library (optional)', memeNoChars: 'No characters in the library yet – Claude invents them from your idea.',
-    memeNext: 'Meme created. Let Claude Code grill the script:'
+    memeNext: 'Meme created. Let Claude Code grill the script:',
+    groupProduction: 'Production', groupLibrary: 'Library',
+    newCharacter: 'Character', newCharacterSub: 'A character for the library: name, sheet, images, voice – or take in the characters of a project or series.',
+    newSet: 'Set', newSetSub: 'A place for the library: name, description, references, plates with their angles – or take in the sets of a project or series.',
+    newSound: 'Sound', newSoundSub: 'A recurring sound for memes: file, title, what it is for, cue and trim while it plays, licence.'
   }
 });
 
@@ -84,19 +93,29 @@ function commandBox(text, command, link) {
 }
 function projectLink(slug) { return el('a', { href: '#/p/' + slug, text: t('toProject') }); }
 function seriesLink(slug) { return el('a', { href: '#/s/' + slug, text: t('toSeries') }); }
-function step(n, title, done, children) {
+/** A wizard step: its number (a tick once done), its title, and its body. */
+export function step(n, title, done, children) {
   return el('section', { class: 'card step' + (done ? ' done-step' : '') }, [el('h3', { class: 'step-title' }, [el('span', { class: 'step-n', text: done ? '✓' : String(n) }), title])].concat(children));
 }
 function loadOptions() { return api('/api/new/options').then(function (o) { options = o; return o; }); }
 
+/** The chooser's groups: [group string, [[kind, title string, sub string], …]]. */
+const CHOOSER = [
+  ['groupProduction', [['video', 'newVideo', 'newVideoSub'], ['series', 'newSeries', 'newSeriesSub'], ['episode', 'newEpisode', 'newEpisodeSub'], ['meme', 'newMeme', 'newMemeSub']]],
+  ['groupLibrary', [['character', 'newCharacter', 'newCharacterSub'], ['set', 'newSet', 'newSetSub'], ['sound', 'newSound', 'newSoundSub']]]
+];
+
 function choose() {
   const node = main();
   node.appendChild(el('h2', { text: t('newTitle'), style: 'margin:0 0 16px;font-size:20px' }));
-  node.appendChild(el('div', { class: 'grid' }, [
-    ['video', t('newVideo'), t('newVideoSub')], ['series', t('newSeries'), t('newSeriesSub')], ['episode', t('newEpisode'), t('newEpisodeSub')], ['meme', t('newMeme'), t('newMemeSub')]
-  ].map(function (c) {
-    return el('section', { class: 'card', onclick: function () { go('#/new/' + c[0]); } }, [el('h3', { text: c[1], style: 'margin:0 0 6px' }), el('p', { class: 'meta', text: c[2] })]);
-  })));
+  CHOOSER.forEach(function (group) {
+    node.appendChild(el('section', { class: 'new-group', 'data-group': group[0] }, [
+      el('h3', { class: 'section-title', text: t(group[0]) }),
+      el('div', { class: 'grid' }, group[1].map(function (c) {
+        return el('section', { class: 'card', 'data-kind': c[0], onclick: function () { go('#/new/' + c[0]); } }, [el('h3', { text: t(c[1]), style: 'margin:0 0 6px' }), el('p', { class: 'meta', text: t(c[2]) })]);
+      }))
+    ]));
+  });
 }
 
 // --------------------------------------------------------------- references

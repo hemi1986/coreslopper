@@ -9,7 +9,7 @@ risk: null
 depends_on: [ST-064]
 labels: [feature:asset-library]
 feature: asset-library
-status: ready
+status: done
 ---
 
 ## Context
@@ -36,10 +36,10 @@ Feature `asset-library`, decided by the user on 2026-11-28. Flow `FLOW-LibraryMa
 - `docs/board.md` and both board guides describe it.
 
 ## Acceptance Criteria
-- [ ] The chooser's Library group has a Set card that opens `#/new/set` (test)
-- [ ] Step 1 with a name creates the library set and the address becomes `#/new/set/<id>` (test with a fixture
+- [x] The chooser's Library group has a Set card that opens `#/new/set` (test)
+- [x] Step 1 with a name creates the library set and the address becomes `#/new/set/<id>` (test with a fixture
       workspace)
-- [ ] A reference and a plate uploaded in step 2 appear in the set (test)
-- [ ] The import path takes the sets of a fixture project into the library and lists them with links (test)
-- [ ] A refused name is shown with its reason and the fields keep their text
-- [ ] The Sets view has no inline creation or import form, and its **+ Neu** opens `#/new/set`
+- [x] A reference and a plate uploaded in step 2 appear in the set (test)
+- [x] The import path takes the sets of a fixture project into the library and lists them with links (test)
+- [x] A refused name is shown with its reason and the fields keep their text
+- [x] The Sets view has no inline creation or import form, and its **+ Neu** opens `#/new/set`

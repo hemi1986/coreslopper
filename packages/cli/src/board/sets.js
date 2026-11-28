@@ -1,15 +1,16 @@
 // The set library: every reusable place of the workspace's videos and series,
 // to take into a new music video or series canon with one click.
-//   #/sets        the gallery, a new set, import from a project or series
+//   #/sets        the list (a table: search, tag/unused/origin filters, sort, all in the hash);
+//                 its + New opens the set wizard (#/new/set, set-wizard.js)
 //   #/sets/<id>   one set: references, plates, where it is used, use it
 import { addStrings, api, el, go, pending, post, setLang, showError, t, upload } from './lib.js';
+import { allTags, anyLibraryFilter, defaultDir, libraryListHash, matchesLibraryItem, parseLibraryListState, queryOf, sortLibraryItems, toggleValue, writeListHash } from './list-state.js';
 
 addStrings({
   de: {
-    setTitle: 'Sets', setHelp: 'Alle Sets aus deinen Videos und Serien: jeder Ort mit seinen Referenzen und Kamerawinkeln. Ein Set kommt automatisch in die Bibliothek, sobald das Set-Bible eines Videos fertig ist; eigene legst du hier an.',
-    setEmpty: 'Die Bibliothek hat noch keine Sets; sie füllt sich mit jedem fertigen Musikvideo und jeder Serie. Eigene Sets legst du hier an.',
-    setNew: 'Neues Set anlegen', setImport: 'Aus Projekt oder Serie übernehmen', setImportHelp: 'Holt alle Sets mit Bildern aus einem bestehenden Musikvideo oder einer Serie in die Bibliothek; bekannte Sets bekommen nur ihre neuen Bilder und Kamerawinkel.',
-    setImportButton: 'Importieren', setImported: function (n) { return n + ' Set(s) übernommen'; }, setNothing: 'Kein Set mit Bildern gefunden.', setSkipped: 'ohne Bilder',
+    setTitle: 'Sets', setHelp: 'Alle Sets aus deinen Videos und Serien: jeder Ort mit seinen Referenzen und Kamerawinkeln. Ein Set kommt automatisch in die Bibliothek, sobald das Set-Bible eines Videos fertig ist; eigene legst du mit + Neu an oder übernimmst sie aus einem Projekt.',
+    setEmpty: 'Die Bibliothek hat noch keine Sets; sie füllt sich mit jedem fertigen Musikvideo und jeder Serie. Eigene Sets legst du mit + Neu an.',
+    slNew: '+ Neu',
     setName: 'Name', setDescription: 'Beschreibung (Ort, Licht, Material)', setPrompt: 'Prompt-Satz für Keyframes', setTags: 'Schlagworte, mit Komma',
     setCreate: 'Anlegen', setUploading: 'lädt hoch …',
     setRefsChip: 'Referenzen', setPlateCount: function (n) { return n + (n === 1 ? ' Platte' : ' Platten'); }, setUsedIn: 'Verwendet in', setUsedNowhere: 'noch nirgends',
@@ -21,13 +22,16 @@ addStrings({
     setDelete: 'Aus der Bibliothek löschen', setConfirmDelete: function (where) { return 'Dieses Set und seine Dateien aus der Bibliothek löschen? ' + (where.length ? 'Verwendet in: ' + where.join(', ') + '.' : 'Es wird nirgends verwendet.') + ' Projekte behalten ihre Kopien.'; },
     setRemoveFile: 'Entfernen', setConfirmRemoveFile: function (n) { return n + ' aus der Bibliothek löschen?'; }, setBack: '← Alle Sets', setSeries: 'Serie', setProject: 'Video',
     setPickHelp: 'Sets aus der Bibliothek übernehmen: Alle Referenzen und alle Kamerawinkel landen in sets/<id>/, der Agent baut beim Set-Bible darauf auf, statt sie neu zu erzeugen.',
-    setOpenLibrary: 'Sets öffnen'
+    setOpenLibrary: 'Sets öffnen',
+    slEmpty: 'Noch keine Sets', slSearch: 'Suche in Name, Beschreibung und Schlagworten …', slTags: 'Schlagworte', slUnused: 'unbenutzt', slOrigin: 'Herkunft', slAll: 'alle',
+    slNoMatch: 'Kein Set passt zu diesen Filtern', slReset: 'Filter zurücksetzen', slManual: 'manuell', slFrom: 'aus',
+    slCols: { name: 'Name', tags: 'Schlagworte', refs: 'Referenzen', plates: 'Platten', used: 'Verwendet in', origin: 'Herkunft' },
+    slCount: function (n, all) { return n + ' von ' + all; }
   },
   en: {
-    setTitle: 'Sets', setHelp: 'Every set of your videos and series: each place with its references and camera angles. A set comes in by itself once a video\'s set bible is done; add your own here.',
-    setEmpty: 'The library has no sets yet; it fills with every finished music video and series. Add your own here.',
-    setNew: 'New set', setImport: 'Take from a project or series', setImportHelp: 'Brings every set with images of an existing music video or series into the library; known sets only gain their new images and camera angles.',
-    setImportButton: 'Import', setImported: function (n) { return n + ' set(s) taken in'; }, setNothing: 'No set with images found.', setSkipped: 'no images',
+    setTitle: 'Sets', setHelp: 'Every set of your videos and series: each place with its references and camera angles. A set comes in by itself once a video\'s set bible is done; add your own or take them from a project with + New.',
+    setEmpty: 'The library has no sets yet; it fills with every finished music video and series. Add your own with + New.',
+    slNew: '+ New',
     setName: 'Name', setDescription: 'Description (place, light, material)', setPrompt: 'Prompt sentence for keyframes', setTags: 'Tags, comma-separated',
     setCreate: 'Create', setUploading: 'uploading …',
     setRefsChip: 'references', setPlateCount: function (n) { return n + (n === 1 ? ' plate' : ' plates'); }, setUsedIn: 'Used in', setUsedNowhere: 'nowhere yet',
@@ -39,7 +43,11 @@ addStrings({
     setDelete: 'Delete from the library', setConfirmDelete: function (where) { return 'Delete this set and its files from the library? ' + (where.length ? 'Used in: ' + where.join(', ') + '.' : 'It is not used anywhere.') + ' Projects keep their copies.'; },
     setRemoveFile: 'Remove', setConfirmRemoveFile: function (n) { return 'Delete ' + n + ' from the library?'; }, setBack: '← All sets', setSeries: 'Series', setProject: 'Video',
     setPickHelp: 'Take sets from the library: every reference and every camera angle lands in sets/<id>/, and the set bible builds on them instead of generating them again.',
-    setOpenLibrary: 'Open the Sets'
+    setOpenLibrary: 'Open the Sets',
+    slEmpty: 'No sets yet', slSearch: 'Search name, description and tags …', slTags: 'Tags', slUnused: 'unused', slOrigin: 'Origin', slAll: 'all',
+    slNoMatch: 'No set matches these filters', slReset: 'Reset filters', slManual: 'manual', slFrom: 'from',
+    slCols: { name: 'Name', tags: 'Tags', refs: 'References', plates: 'Plates', used: 'Used in', origin: 'Origin' },
+    slCount: function (n, all) { return n + ' of ' + all; }
   }
 });
 
@@ -51,6 +59,8 @@ function field(label, control) { return el('label', { class: 'form-field' }, [el
 function targetLabel(target) { return (target.scope === 'series' ? t('setSeries') : t('setProject')) + ': ' + target.title; }
 function targetValue(target) { return target.scope + '/' + target.slug; }
 function isUsedIn(entry, scope, slug) { return entry.usedIn.some(function (use) { return use.scope === scope && use.slug === slug; }); }
+/** The origin as the list shows it: "manuell" or "aus <slug>" (an import records the workspace path, `projects/<slug>`). */
+function listOrigin(origin) { return origin === 'manual' ? t('slManual') : t('slFrom') + ' ' + String(origin).split('/').pop(); }
 function originText(origin) { return origin === 'manual' ? t('setManual') : t('setFromOrigin') + ' ' + origin; }
 
 function cover(entry, cls) {
@@ -59,74 +69,179 @@ function cover(entry, cls) {
     : el('div', { class: cls + ' placeholder', text: entry.name.slice(0, 1).toUpperCase() });
 }
 
-// ------------------------------------------------------------------ gallery
+// --------------------------------------------------------------------- list
 
-function newSetForm(onCreated) {
-  const name = input({ required: true }), description = el('textarea', { class: 'note-input', rows: 3 }), prompt = el('textarea', { class: 'note-input', rows: 2 }), tags = input({});
-  const error = el('p', { class: 'error' });
-  const form = el('form', { class: 'card form' }, [
-    el('h3', { text: t('setNew'), style: 'margin:0 0 10px' }),
-    el('div', { class: 'form-row' }, [field(t('setName'), name), field(t('setTags'), tags)]),
-    el('div', { class: 'form-row' }, [field(t('setDescription'), description)]),
-    el('div', { class: 'form-row' }, [field(t('setPrompt'), prompt)]),
-    error, el('button', { class: 'primary', type: 'submit', text: t('setCreate') })
-  ]);
-  form.onsubmit = pending(function () {
-    error.textContent = '';
-    return post('/api/sets/new', { name: name.value, description: description.value, prompt: prompt.value, tags: tags.value })
-      .then(function (created) { onCreated(created.id); })
-      // A refused write names its reason and leaves the typed fields as they are.
-      .catch(function (e) { error.textContent = e.message; });
+/** The list's route; its query may hold any character, a decoded line break too. */
+export const SETS_ROUTE = /^#\/sets\/?(?:\?[\s\S]*)?$/;
+
+const LIST = { sorts: ['name', 'refs', 'plates', 'used', 'origin'], ascending: ['name', 'origin'] };
+
+/** One item per library set of `/api/sets`, and one per entry that does not load (`error`). */
+export function setItems(data) {
+  const items = data.sets.map(function (entry) {
+    return {
+      id: entry.id, name: entry.name, entry: entry, search: [entry.name, entry.description].concat(entry.tags), tags: entry.tags,
+      refs: entry.refs.length, plates: entry.plates.length, used: entry.usedIn.length, origin: entry.origin, href: '#/sets/' + entry.id
+    };
   });
-  return form;
+  const errors = (data.errors || []).map(function (error) { return { id: error.id, name: error.id, error: error.error, search: [error.id], tags: [], used: 0, origin: '' }; });
+  return { items: items, errors: errors };
 }
 
-function importForm(data, refresh) {
-  const target = el('select', { class: 'text' }, data.targets.map(function (x) { return el('option', { value: targetValue(x), text: targetLabel(x) }); }));
-  const result = el('p', { class: 'meta' });
-  const button = el('button', { class: 'small', text: t('setImportButton'), onclick: pending(function () {
-    const parts = target.value.split('/');
-    return post('/api/sets/import', { scope: parts[0], slug: parts[1] }).then(function (r) {
-      result.className = 'meta';
-      result.textContent = r.results.length
-        ? t('setImported')(r.results.filter(function (x) { return x.id; }).length) + ': ' + r.results.map(function (x) { return x.set + ' → ' + (x.id || t('setSkipped')); }).join(', ')
-        : t('setNothing');
-      refresh(r);
-    }).catch(function (e) { result.textContent = e.message; result.className = 'error'; });
-  }) });
-  return el('section', { class: 'card' }, [
-    el('h3', { text: t('setImport'), style: 'margin:0 0 6px' }), el('p', { class: 'meta', text: t('setImportHelp') }),
-    data.targets.length ? el('div', { class: 'form-row' }, [target, button]) : null, result
+/** The list options for a library: its tags and origins are the values the address may name. */
+export function setListOptions(list) {
+  const origins = [];
+  list.items.forEach(function (item) { if (origins.indexOf(item.origin) < 0) origins.push(item.origin); });
+  return Object.assign({ tags: allTags(list.items), origins: origins }, LIST);
+}
+
+/** The list's state from the query of `#/sets?…`; unknown values are ignored. */
+export function parseSetState(query, list) { return parseLibraryListState(query, setListOptions(list)); }
+
+/** The address of a list state; defaults are left out. */
+export function setHash(state) { return libraryListHash('#/sets', state, LIST); }
+
+/**
+ * The rows to show, sorted by the state's column: the sets that match, then the entries that do not load. An
+ * unreadable entry has no tags, uses or origin, so it shows only while no filter is set and the search, if any,
+ * finds its id.
+ */
+export function setRows(list, state) {
+  const keys = {
+    refs: function (item) { return item.refs; },
+    plates: function (item) { return item.plates; },
+    used: function (item) { return item.used; },
+    origin: function (item) { return listOrigin(item.origin); }
+  };
+  const rows = sortLibraryItems(list.items.filter(function (item) { return matchesLibraryItem(item, state); }), state, keys);
+  const filtered = state.tag.length || state.unused || state.origin;
+  return filtered ? rows : rows.concat(list.errors.filter(function (item) { return matchesLibraryItem(item, state); }));
+}
+
+let view = null; // { data, list, state, results, reset }
+let listAddress = '#/sets'; // the list's last address, for the detail page's back link
+
+function setState(state, full) {
+  view.state = state;
+  listAddress = setHash(state);
+  writeListHash(listAddress);
+  if (full) drawList(); else drawResults();
+}
+
+function quiet(event) { if (event && event.stopPropagation) event.stopPropagation(); }
+
+function resetButton(className) {
+  return el('button', { class: className + ' sl-reset', onclick: function () { setState(parseSetState('', view.list), true); } }, [t('slReset')]);
+}
+
+function filterBar() {
+  const state = view.state;
+  view.reset = el('span', { class: 'pl-reset' });
+  const search = el('input', { type: 'search', class: 'pl-search', placeholder: t('slSearch'), 'aria-label': t('slSearch'), value: state.q, oninput: function (event) {
+    // The search is in the address, so a refresh need not keep the view for it (app.js marks other input as edited).
+    quiet(event);
+    setState(Object.assign({}, view.state, { q: event.target.value }), false);
+  } });
+  search.value = state.q;
+  const options = setListOptions(view.list);
+  const tags = options.tags.length ? el('div', { class: 'pl-filter', role: 'group', 'aria-label': t('slTags') }, [el('span', { class: 'pl-label', text: t('slTags') })].concat(options.tags.map(function (tag) {
+    const on = state.tag.indexOf(tag) >= 0;
+    return el('button', { class: 'pl-chip' + (on ? ' on' : ''), 'aria-pressed': on ? 'true' : 'false', 'data-tag': tag, onclick: function () {
+      setState(Object.assign({}, view.state, { tag: toggleValue(view.state.tag, tag) }), true);
+    } }, ['#' + tag]);
+  }))) : null;
+  const unused = el('button', { class: 'pl-chip sl-unused' + (state.unused ? ' on' : ''), 'aria-pressed': state.unused ? 'true' : 'false', onclick: function () {
+    setState(Object.assign({}, view.state, { unused: !view.state.unused }), true);
+  } }, [t('slUnused')]);
+  const origin = el('select', { class: 'pl-select sl-origin', 'aria-label': t('slOrigin'), oninput: quiet, onchange: function (event) {
+    setState(Object.assign({}, view.state, { origin: event.target.value }), true);
+  } }, [el('option', { value: '', text: t('slAll') })].concat(options.origins.map(function (value) {
+    return el('option', { value: value, selected: value === state.origin, text: listOrigin(value) });
+  })));
+  origin.value = state.origin;
+  return el('div', { class: 'pl-filters' }, [
+    search, tags, el('div', { class: 'pl-filter' }, [unused]),
+    el('label', { class: 'pl-filter' }, [el('span', { class: 'pl-label', text: t('slOrigin') }), origin]),
+    view.reset
   ]);
+}
+
+function header() {
+  const cols = t('slCols');
+  const th = function (col, sortable) {
+    if (!sortable) return el('th', { text: col ? cols[col] : '' });
+    const on = view.state.sort === col;
+    return el('th', { class: 'pl-sort' + (on ? ' on' : ''), 'data-sort': col, 'aria-sort': on ? (view.state.dir === 'asc' ? 'ascending' : 'descending') : null, onclick: function () {
+      const next = Object.assign({}, view.state);
+      if (on) next.dir = view.state.dir === 'asc' ? 'desc' : 'asc';
+      else { next.sort = col; next.dir = defaultDir(col, LIST); }
+      setState(next, false);
+    } }, [cols[col] + (on ? (view.state.dir === 'asc' ? ' ▲' : ' ▼') : '')]);
+  };
+  return el('thead', {}, [el('tr', {}, [th(''), th('name', true), th('tags'), th('refs', true), th('plates', true), th('used', true), th('origin', true)])]);
+}
+
+function row(item) {
+  if (item.error) return el('tr', { class: 'pl-error', 'data-id': item.id }, [
+    el('td', {}, [el('div', { class: 'lib-cover placeholder', text: '!' })]), el('td', {}, [el('b', { text: item.id })]),
+    el('td', { colspan: '5', class: 'error', text: item.error })
+  ]);
+  const entry = item.entry;
+  return el('tr', { class: 'link-row', 'data-id': item.id, onclick: function () { go(item.href); } }, [
+    el('td', {}, [cover(entry, 'lib-cover')]),
+    el('td', {}, [el('b', { text: entry.name }), el('span', { class: 'sub', text: entry.id })]),
+    el('td', { class: 'cl-tags', text: entry.tags.map(function (tag) { return '#' + tag; }).join(' ') }),
+    el('td', { class: 'num', text: String(item.refs) }),
+    el('td', { class: 'num', text: String(item.plates) }),
+    el('td', { class: 'num', text: String(item.used) }),
+    el('td', { text: listOrigin(entry.origin) })
+  ]);
+}
+
+function drawResults() {
+  const results = view.results;
+  results.innerHTML = '';
+  // The search redraws only the results, so the reset button of the bar is drawn here too.
+  view.reset.innerHTML = '';
+  if (anyLibraryFilter(view.state)) view.reset.appendChild(resetButton('small'));
+  const rows = setRows(view.list, view.state);
+  if (!rows.length) {
+    results.appendChild(el('div', { class: 'empty sl-nomatch' }, [el('p', { text: t('slNoMatch') }), resetButton('primary')]));
+    return;
+  }
+  results.appendChild(el('p', { class: 'sub pl-count', text: t('slCount')(rows.length, view.list.items.length + view.list.errors.length) }));
+  results.appendChild(el('table', { class: 'list pl-table cl-table' }, [header(), el('tbody', {}, rows.map(row))]));
+}
+
+/** The set wizard: + New in the list's head and in its empty state (UX guidelines G6, G10). */
+export const NEW_SET = '#/new/set';
+
+function drawList() {
+  const node = main();
+  node.appendChild(el('div', { class: 'list-head' }, [
+    el('h2', { text: t('setTitle') }),
+    el('button', { class: 'primary sl-new', onclick: function () { go(NEW_SET); } }, [t('slNew')])
+  ]));
+  node.appendChild(el('p', { class: 'meta', text: t('setHelp') }));
+  if (!view.list.items.length && !view.list.errors.length) node.appendChild(el('div', { class: 'empty sl-empty' }, [el('p', { text: t('slEmpty') }), el('a', { href: NEW_SET, class: 'sl-empty-new', text: t('slNew') })]));
+  else {
+    node.appendChild(filterBar());
+    view.results = el('div', { class: 'pl-results' });
+    node.appendChild(view.results);
+    drawResults();
+  }
+}
+
+function useData(data, state) {
+  view = { data: data, list: setItems(data), state: state, results: null, reset: null };
 }
 
 function gallery() {
+  const query = queryOf(location.hash);
   return load().then(function (data) {
-    const node = main();
-    node.appendChild(el('h2', { text: t('setTitle'), style: 'margin:0 0 6px;font-size:20px' }));
-    node.appendChild(el('p', { class: 'meta', text: t('setHelp') }));
-    const grid = el('div', { class: 'grid set-grid' });
-    const draw = function (list) {
-      grid.innerHTML = '';
-      if (!list.sets.length) grid.appendChild(el('p', { class: 'empty', text: t('setEmpty') }));
-      list.sets.forEach(function (entry) {
-        grid.appendChild(el('section', { class: 'card set-card', onclick: function () { go('#/sets/' + entry.id); } }, [
-          cover(entry, 'set-cover'),
-          el('h3', { text: entry.name }),
-          el('p', { class: 'meta clamp', text: entry.description }),
-          el('div', {}, [
-            el('span', { class: 'chip', text: entry.refs.length + ' ' + t('setRefsChip') }), ' ',
-            el('span', { class: 'chip', text: t('setPlateCount')(entry.plates.length) }), ' ',
-            el('span', { class: 'chip', text: t('setUsedIn') + ' ' + entry.usedIn.length })
-          ].concat(entry.tags.map(function (tag) { return el('span', { class: 'chip', text: '#' + tag }); })))
-        ]));
-      });
-      list.errors.forEach(function (error) { grid.appendChild(el('p', { class: 'error', text: error.id + ': ' + error.error })); });
-    };
-    draw(data);
-    node.appendChild(grid);
-    node.appendChild(importForm(data, draw));
-    node.appendChild(newSetForm(function (id) { go('#/sets/' + id); }));
+    useData(data, parseSetState(query, setItems(data)));
+    listAddress = setHash(view.state);
+    drawList();
   }).catch(showError);
 }
 
@@ -170,7 +285,7 @@ function detail(id) {
     const entry = data.sets.filter(function (s) { return s.id === id; })[0];
     const node = main();
     const refresh = function () { detail(id); };
-    node.appendChild(el('p', {}, [el('a', { class: 'back-link', href: '#/sets', text: t('setBack') })]));
+    node.appendChild(el('p', {}, [el('a', { class: 'back-link', href: listAddress, text: t('setBack') })]));
     if (!entry) { node.appendChild(el('p', { class: 'error', text: id + ': ?' })); return; }
     node.appendChild(el('header', { class: 'project' }, [el('h2', { text: entry.name }), el('span', { class: 'chip', text: entry.id }), el('span', { class: 'chip', text: originText(entry.origin) })]));
 

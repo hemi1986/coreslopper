@@ -9,7 +9,7 @@ risk: null
 depends_on: []
 labels: [feature:asset-library]
 feature: asset-library
-status: ready
+status: done
 ---
 
 ## Context
@@ -42,11 +42,11 @@ library lists are tables with a cover thumbnail), G5, G6, G10. Pattern: the proj
 - `docs/board.md` and both board guides describe the list.
 
 ## Acceptance Criteria
-- [ ] The list shows every library character sorted by name, with cover, tags, image/state count, used-in count and
+- [x] The list shows every library character sorted by name, with cover, tags, image/state count, used-in count and
       origin (test with a fixture workspace)
-- [ ] Searching "MIRA" finds a character named "Mira" and one whose tags contain "mira" (test)
-- [ ] Filter **unused** shows exactly the characters no production names in `library` (test)
-- [ ] Filter tag `held` and origin `manual` together show only manual characters tagged `held` (test)
-- [ ] `#/characters?unused=1&sort=name&dir=desc` restores filter and sort after a reload
-- [ ] A filter with no match shows the no-match text, and **Reset filters** clears search and filters
-- [ ] An empty library shows "No characters yet"
+- [x] Searching "MIRA" finds a character named "Mira" and one whose tags contain "mira" (test)
+- [x] Filter **unused** shows exactly the characters no production names in `library` (test)
+- [x] Filter tag `held` and origin `manual` together show only manual characters tagged `held` (test)
+- [x] `#/characters?unused=1&sort=name&dir=desc` restores filter and sort after a reload
+- [x] A filter with no match shows the no-match text, and **Reset filters** clears search and filters
+- [x] An empty library shows "No characters yet"

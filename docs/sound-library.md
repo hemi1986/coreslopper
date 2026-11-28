@@ -8,7 +8,10 @@ when it writes a script ([ADR 0051](adr/0051-memes-and-the-sound-library.md)). `
 `coreslopper update` never touch it.
 
 This page is the reference for maintaining the library by hand. The board's [Sounds view](board.md#sounds) does the
-same through the same commands.
+same through the same commands; its list plays each sound in its row and filters by tag, **unused**, and licence, so
+`licence=unknown` shows what the release check will flag. A new sound starts in the board's sound wizard (**+ New** →
+**Sound**, `#/new/sound`): the file, title, use when, and tags (`sound add`), then the cue and trim set while the sound
+plays, then the licence, source, and credit (`sound edit`).
 
 ## Where the library lives
 
@@ -65,8 +68,9 @@ One or two sentences about the moment it punctuates are enough; the tags help na
 ### Finding the cue
 
 The cue is the moment the sound lands – the hit – in seconds from the **trimmed start**, not from the file's start.
-Play the sound, stop on the hit, and read the position; **Cue from playback** in the board's Sounds view does exactly
-that.
+Play the sound, stop on the hit, and read the position; **Cue from playback** on a sound's page in the board, and
+**Set cue here** in the sound wizard's second step, do exactly that. The wizard's **Trim start here** and **Trim end
+here** set the trim from the playback position the same way.
 
 With `trim: { start: 0.20, end: 1.40 }` and the hit 0.55 s into the file, the cue is `0.35`. The cue must lie inside
 the trimmed sound (here at most `1.20`). Only a meme's shot anchored on the line's `cue` uses it: the shot lands on
@@ -222,6 +226,6 @@ A sound the library no longer holds is never proposed to a new meme.
 
 ## See also
 
-- [The board: Sounds](board.md#sounds) – the library in the browser, with upload, playback, and editing
+- [The board: Sounds](board.md#sounds) – the library in the browser, with the sound wizard, playback, and editing
 - [ADR 0051](adr/0051-memes-and-the-sound-library.md) – the decision behind the library
 - `sound --help` – every command and option
