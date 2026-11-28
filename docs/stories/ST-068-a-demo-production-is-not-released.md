@@ -13,7 +13,7 @@ events: [EVT-ReleaseDayFixed, EVT-ReleaseCalendarPlanned, EVT-ReleaseApproved, E
 depends_on: [ST-067]
 labels: [feature:demo-projects]
 feature: demo-projects
-status: ready
+status: in-progress
 ---
 
 ## Story
