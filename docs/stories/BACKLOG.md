@@ -4,15 +4,9 @@
 
 **Progress: 31 of 31 domain stories done** · scenarios 108 of 108
 
-**59 stories** · In Progress: 0 · Ready: 1 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 58 · Superseded: 0
+**59 stories** · In Progress: 0 · Ready: 0 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 59 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
-
-## Ready
-
-| ID | Title | Type | Context | Priority | Size | Risk | Depends on |
-|---|---|---|---|---|---|---|---|
-| [ST-058](ST-058-the-contact-sheet-shows-the-keyframes.md) | The board's contact sheet shows each shot's keyframe | chore | – | should | – | – | – |
 
 ## Done
 
@@ -72,6 +66,7 @@ Within each section: by priority, then by story ID, with dependencies pulled in 
 | [ST-042](ST-042-an-internal-project-cannot-be-approved.md) | An internal project cannot be approved | domain | Release | should | – | – | ST-036 |
 | [ST-052](ST-052-the-board-shows-the-release-shape.md) | The release board names the release shape and shows only its platforms | task | – | should | – | – | ST-047, ST-048 |
 | [ST-053](ST-053-a-short-episode-joins-the-series-playlist.md) | A short episode's YouTube post asks for the series playlist | task | – | should | – | – | ST-048 |
+| [ST-058](ST-058-the-contact-sheet-shows-the-keyframes.md) | The board's contact sheet shows each shot's keyframe | chore | – | should | – | – | – |
 | [ST-059](ST-059-the-boards-werkstatt-look.md) | The board's "Werkstatt" look | chore | – | should | – | – | ST-056 |
 | [ST-018](ST-018-the-boards-sounds-view.md) | The board's Sounds view | task | – | could | – | – | ST-001, ST-002, ST-003, ST-006 |
 | [ST-019](ST-019-spike-tiktok-trending-audio.md) | Spike: can a meme use TikTok's trending audio? | spike | – | could | – | – | – |

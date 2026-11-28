@@ -45,16 +45,16 @@ Files that share a concept stem or a table across layers. These are suggestions 
 | review | cli, core, tests | 5 | – | 3 layers: cli, core, tests; 3 packages; 5 files | yes |
 | media | cli, remotion, tests | 4 | – | 3 layers: cli, remotion, tests; 3 packages; 4 files | yes |
 | short | cli, core, tests | 3 | – | 3 layers: cli, core, tests; 3 packages; 3 files | – |
-| board | cli, tests | 15 | – | 2 layers: cli, tests; 2 packages; 15 files | yes |
+| board | cli, tests | 17 | – | 2 layers: cli, tests; 2 packages; 17 files | yes |
 | publish | cli, tests | 11 | – | 2 layers: cli, tests; 2 packages; 11 files | yes |
 | sery | cli, tests | 5 | – | 2 layers: cli, tests; 2 packages; 5 files | – |
 | character | cli, tests | 4 | – | 2 layers: cli, tests; 2 packages; 4 files | yes |
 | clip | cli, tests | 4 | – | 2 layers: cli, tests; 2 packages; 4 files | – |
 | lipsync | cli, tests | 4 | – | 2 layers: cli, tests; 2 packages; 4 files | – |
 | sound | cli, tests | 4 | – | 2 layers: cli, tests; 2 packages; 4 files | – |
+| contact | cli, tests | 3 | – | 2 layers: cli, tests; 2 packages; 3 files | – |
 | init | cli, tests | 3 | – | 2 layers: cli, tests; 2 packages; 3 files | – |
 | production | cli, core | 3 | – | 2 layers: cli, core; 2 packages; 3 files | – |
-| project | cli, core | 3 | – | 2 layers: cli, core; 2 packages; 3 files | – |
 | render | cli, tests | 3 | – | 2 layers: cli, tests; 2 packages; 3 files | yes |
 | pipeline | – | 0 | – | marked adopted manually | yes |
 | verdict | – | 0 | – | marked adopted manually | yes |
@@ -81,12 +81,12 @@ node .claude/skills/adopt/scripts/repo-map.ts --adopt-slice <name>
 
 | # | Package | Score | Why |
 |---|---|---|---|
-| 1 | `packages/cli` (@coreslopper/cli) | 0.61 | 379 changed files in recent history; shared library; shared infrastructure – not a domain slice |
+| 1 | `packages/cli` (@coreslopper/cli) | 0.61 | 363 changed files in recent history; shared library; shared infrastructure – not a domain slice |
 | 2 | `scripts/pose` (coreslopper-pose) | 0.16 | 6 changed files in recent history |
 | 3 | `scripts/audio-analysis` (coreslopper-audio-analysis) | 0.15 | 2 changed files in recent history |
-| 4 | `packages/remotion` (@coreslopper/remotion) | 0.07 | 5 changed files in recent history; shared library; shared infrastructure – not a domain slice |
-| 5 | `packages/core` (@coreslopper/core) | 0.03 | 100 changed files in recent history; shared library; layer package – hosts many concepts, not a domain slice |
-| 6 | `packages/providers` (@coreslopper/providers) | 0.01 | 13 changed files in recent history; shared library; layer package – hosts many concepts, not a domain slice |
+| 4 | `packages/remotion` (@coreslopper/remotion) | 0.07 | 4 changed files in recent history; shared library; shared infrastructure – not a domain slice |
+| 5 | `packages/core` (@coreslopper/core) | 0.03 | 96 changed files in recent history; shared library; layer package – hosts many concepts, not a domain slice |
+| 6 | `packages/providers` (@coreslopper/providers) | 0.01 | 12 changed files in recent history; shared library; layer package – hosts many concepts, not a domain slice |
 
 ## Suggested first slice
 

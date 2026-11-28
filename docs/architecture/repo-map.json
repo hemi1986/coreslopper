@@ -138,7 +138,7 @@
       "path": "packages/cli",
       "score": 0.61,
       "reasons": [
-        "379 changed files in recent history",
+        "363 changed files in recent history",
         "shared library",
         "shared infrastructure – not a domain slice"
       ]
@@ -161,7 +161,7 @@
       "path": "packages/remotion",
       "score": 0.07,
       "reasons": [
-        "5 changed files in recent history",
+        "4 changed files in recent history",
         "shared library",
         "shared infrastructure – not a domain slice"
       ]
@@ -170,7 +170,7 @@
       "path": "packages/core",
       "score": 0.03,
       "reasons": [
-        "100 changed files in recent history",
+        "96 changed files in recent history",
         "shared library",
         "layer package – hosts many concepts, not a domain slice"
       ]
@@ -179,7 +179,7 @@
       "path": "packages/providers",
       "score": 0.01,
       "reasons": [
-        "13 changed files in recent history",
+        "12 changed files in recent history",
         "shared library",
         "layer package – hosts many concepts, not a domain slice"
       ]
@@ -596,6 +596,7 @@
       "terms": [
         "board",
         "characterization",
+        "contact",
         "feedback",
         "http",
         "look",
@@ -604,6 +605,7 @@
         "project",
         "release",
         "review",
+        "sheet",
         "shell",
         "sound",
         "watch",
@@ -611,10 +613,12 @@
       ],
       "tables": [],
       "files": [
+        "packages/cli/src/board-contact-sheet.ts",
         "packages/cli/src/board-http.ts",
         "packages/cli/src/board-production.ts",
         "packages/cli/src/board-review.ts",
         "packages/cli/src/board-wizard.ts",
+        "tests/board-contact-sheet.test.ts",
         "tests/board-feedback.test.ts",
         "tests/board-look.test.ts",
         "tests/board-nav.test.ts",
@@ -639,7 +643,7 @@
       "reasons": [
         "2 layers: cli, tests",
         "2 packages",
-        "15 files"
+        "17 files"
       ],
       "adopted": true,
       "adoptedAt": "2026-11-22"
@@ -837,6 +841,33 @@
       ]
     },
     {
+      "name": "contact",
+      "terms": [
+        "contact",
+        "sheet"
+      ],
+      "tables": [],
+      "files": [
+        "packages/cli/src/board/contact-sheet.js",
+        "packages/cli/src/contact-sheet.ts",
+        "tests/contact-sheet.test.ts"
+      ],
+      "packages": [
+        "?",
+        "packages/cli"
+      ],
+      "layers": [
+        "cli",
+        "tests"
+      ],
+      "score": 11,
+      "reasons": [
+        "2 layers: cli, tests",
+        "2 packages",
+        "3 files"
+      ]
+    },
+    {
       "name": "init",
       "terms": [
         "command",
@@ -874,32 +905,6 @@
         "packages/cli/src/board/production.js",
         "packages/cli/src/production-watch.ts",
         "packages/core/src/production.ts"
-      ],
-      "packages": [
-        "packages/cli",
-        "packages/core"
-      ],
-      "layers": [
-        "cli",
-        "core"
-      ],
-      "score": 11,
-      "reasons": [
-        "2 layers: cli, core",
-        "2 packages",
-        "3 files"
-      ]
-    },
-    {
-      "name": "project",
-      "terms": [
-        "project"
-      ],
-      "tables": [],
-      "files": [
-        "packages/cli/src/board/projects.js",
-        "packages/cli/src/new-project.ts",
-        "packages/core/src/project.ts"
       ],
       "packages": [
         "packages/cli",

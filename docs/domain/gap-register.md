@@ -599,3 +599,34 @@ Decisions (by recommendation, not reviewed by the user):
   - the old release-board links, which still lead to the release view.
 
   ADR 0049 (proposed) records the rest.
+
+## Gaps left open by marathon 2026-11-28
+
+Candidates only – no stories until the user asks. The rows come from the open questions of the run's stories
+(ST-049, ST-051, ST-053, ST-055, ST-057). Priority is a suggestion. The user asked the orchestrator to decide the
+open questions by its best judgement; the decisions below are recommendations, not reviewed by the user.
+
+| # | Class | Gap | Evidence | Source | Priority |
+|---|---|---|---|---|---|
+| G-219 | Missing | Whether a horizontal episode posts its vertical version as its one Short is derived from the episode's current length on every run and recorded nowhere: a later cut across 3 minutes in a started release adds or drops Shorts already posted, the release-shape guard of ST-051 does not see it, and cut Shorts in `renders/shorts/` stay behind | `packages/core/src/short-form.ts`; `packages/cli/src/release.ts` | ST-049 | medium |
+| G-220 | Missing | `calendar <project>` plans a release without the release-shape guard that `release` applies once a release has started | `packages/cli/src/release-calendar.ts` | ST-051 | low |
+| G-221 | Exists but contradicts | Edges of the release-shape guard: an unreadable `release-status.json`, the board's refresh after a refused shape, and a started release whose manifest is missing | `packages/cli/src/release.ts`; `packages/cli/src/release-board.ts` | ST-051 | low |
+| G-222 | Exists but contradicts | README TODO lines of a release are English also for a German release (the playlist TODO and the older ones) | `packages/cli/src/release-texts.ts` | ST-053 | low |
+| G-223 | Missing | No test renders the project list in German | `tests/board-*.test.ts` | ST-057 | low |
+
+Decisions (by recommendation, not reviewed by the user):
+
+- G-219: the Shorts source is recorded in the release manifest when the release starts and frozen like the release
+  shape (ST-051), not made a release shape of its own: the shape names the kind of release, the Shorts source is a
+  fact of one release. Until a story does it, it stays a known gap.
+- A horizontal episode without a 9:16 derivative format gets a TODO and no Short (ST-049): intended – there is no
+  vertical version to post, and a TODO never fails a release.
+- The 3-minute bound is inclusive everywhere, with the 0.05 s tolerance, through `isShortForm` in
+  `packages/core/src/short-form.ts` only (ST-055).
+- A Short named `Main` (another case) needs no refusal of its own (ST-055): the reserved name is the file stem
+  `main`, which the schema already guards; no case variant was seen in a real release.
+- An unknown `series=` slug in the address is dropped silently and the list shows unfiltered (ST-057): intended – a
+  stale link still opens the board, and the filter control shows that no series is selected.
+- A series without episodes sorts last in the project list (ST-057): intended – it has no activity yet.
+- The list's Released rule uses the browser's date (ST-057): the user opens the board on the computer it runs on,
+  so browser and server share one clock.
