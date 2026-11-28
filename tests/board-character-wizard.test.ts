@@ -174,7 +174,7 @@ describe('the + New chooser', () => {
     expect(groups.map((g) => g.children[0]!.text())).toEqual(['Production', 'Library']);
     const cards = (group: FakeElement) => group.all().filter((e) => e.getAttribute('data-kind')).map((e) => e.getAttribute('data-kind'));
     expect(cards(groups[0]!)).toEqual(['video', 'series', 'episode', 'meme']);
-    expect(cards(groups[1]!)).toEqual(['character', 'set']);
+    expect(cards(groups[1]!)).toEqual(['character', 'set', 'sound']);
     const card = one((e) => e.getAttribute('data-kind') === 'character');
     expect(card.text()).toContain('Character');
     await card.fire('click');

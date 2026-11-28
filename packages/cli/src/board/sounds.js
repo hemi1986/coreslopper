@@ -1,19 +1,18 @@
 // The sound library: the workspace's recurring meme sounds (library/sounds/<id>/,
 // ADR 0051), each described so the meme skill picks well.
 //   #/sounds        the list (a table: a play button per row, search, tag/unused/licence filters, sort, all in the
-//                   hash), an upload
+//                   hash); its + New opens the sound wizard (#/new/sound, sound-wizard.js)
 //   #/sounds/<id>   one sound: play it, set its cue from the playback, edit, remove
-import { addStrings, api, el, go, pending, post, setLang, showError, t, upload } from './lib.js';
+import { addStrings, api, el, go, pending, post, setLang, showError, t } from './lib.js';
 import { allTags, anyLibraryFilter, defaultDir, libraryListHash, matchesLibraryItem, parseLibraryListState, queryOf, sortLibraryItems, toggleValue, writeListHash } from './list-state.js';
 
 addStrings({
   de: {
-    soundTitle: 'Sounds', soundHelp: 'Die Sound-Bibliothek deiner Memes: jeder wiederkehrende Ton mit dem, wofür er gedacht ist. Die Beschreibungen entscheiden, welchen Sound das Meme-Skill wählt; ein Upload misst Länge und Lautheit, die Lizenz bleibt deine Angabe.',
+    soundTitle: 'Sounds', soundHelp: 'Die Sound-Bibliothek deiner Memes: jeder wiederkehrende Ton mit dem, wofür er gedacht ist. Die Beschreibungen entscheiden, welchen Sound das Meme-Skill wählt; einen neuen lädst du mit + Neu hoch; Länge und Lautheit werden gemessen, die Lizenz bleibt deine Angabe.',
     soundEmpty: 'Die Bibliothek hat noch keine Sounds. Lade einen wiederkehrenden Ton hoch – ein Boom, ein Record Scratch, ein Sting – und beschreibe, wofür er gedacht ist: danach wählt das Meme-Skill.',
-    soundUpload: 'Sound hochladen', soundNeedsFile: 'Wähle eine Audiodatei zum Hochladen.',
+    sdNew: '+ Neu',
     soundFile: 'Audiodatei', soundTitleField: 'Titel', soundUseWhen: 'Wofür (das Skill wählt danach)', soundTags: 'Schlagworte, mit Komma',
     soundCue: 'Cue in Sekunden', soundTrim: 'Trim von-bis, z. B. 0.1-1.2', soundLicence: 'Lizenz', soundSource: 'Quelle (URL oder Worte)', soundCredit: 'Credit (wenn die Lizenz ihn verlangt)',
-    soundCreate: 'Hochladen', soundUploading: 'lädt hoch …',
     soundUsedIn: 'Verwendet in', soundUsedNowhere: 'noch nirgends', soundLength: 'Länge', soundLoudness: 'Lautheit',
     soundCueLabel: 'Cue', soundTrimLabel: 'Trim', soundLicenceLabel: 'Lizenz', soundTagsLabel: 'Schlagworte', soundNoTags: 'keine',
     soundBack: '← Alle Sounds', soundPlayHint: 'Abspielen, dann den Cue aus der Abspielposition setzen; ein neuer Trim behält den Moment, wenn du den Cue nicht anfasst.',
@@ -26,12 +25,11 @@ addStrings({
     sdCount: function (n, all) { return n + ' von ' + all; }
   },
   en: {
-    soundTitle: 'Sounds', soundHelp: 'The sound library of your memes: every recurring sound with what it is for. The descriptions decide which sound the meme skill picks; an upload measures length and loudness, the licence stays yours to state.',
+    soundTitle: 'Sounds', soundHelp: 'The sound library of your memes: every recurring sound with what it is for. The descriptions decide which sound the meme skill picks; upload a new one with + New; its length and loudness are measured, the licence stays yours to state.',
     soundEmpty: 'The library has no sounds yet. Upload a recurring sound – a boom, a record scratch, a sting – and describe what it is for: the meme skill picks by that.',
-    soundUpload: 'Upload a sound', soundNeedsFile: 'Choose an audio file to upload.',
+    sdNew: '+ New',
     soundFile: 'Audio file', soundTitleField: 'Title', soundUseWhen: 'Use when (the skill picks by it)', soundTags: 'Tags, comma-separated',
     soundCue: 'Cue in seconds', soundTrim: 'Trim start-end, e.g. 0.1-1.2', soundLicence: 'Licence', soundSource: 'Source (URL or words)', soundCredit: 'Credit (when the licence asks for it)',
-    soundCreate: 'Upload', soundUploading: 'uploading …',
     soundUsedIn: 'Used in', soundUsedNowhere: 'nowhere yet', soundLength: 'Length', soundLoudness: 'Loudness',
     soundCueLabel: 'Cue', soundTrimLabel: 'Trim', soundLicenceLabel: 'Licence', soundTagsLabel: 'Tags', soundNoTags: 'none',
     soundBack: '← All sounds', soundPlayHint: 'Play, then set the cue from the playback position; a new trim keeps the moment when you leave the cue untouched.',
@@ -52,44 +50,6 @@ function input(attrs) { return el('input', Object.assign({ class: 'text' }, attr
 function field(label, control) { return el('label', { class: 'form-field' }, [el('span', { text: label }), control]); }
 function trimmed(entry) { return entry.trim ? entry.trim.end - entry.trim.start : entry.length; }
 function clock(entry) { return Math.round(trimmed(entry) * 1000) / 1000 + ' s'; }
-function param(name, value) { return value === undefined || value === null || value === '' ? '' : '&' + name + '=' + encodeURIComponent(value); }
-
-// ------------------------------------------------------------------ upload
-
-function uploadForm(onCreated) {
-  const file = el('input', { type: 'file', accept: 'audio/*,.wav,.mp3,.flac,.aif,.aiff,.m4a,.ogg,.opus' });
-  const title = input({ required: true });
-  const useWhen = el('textarea', { class: 'note-input', rows: 2, required: true });
-  const tags = input({});
-  const cue = input({ type: 'number', min: '0', step: '0.001' });
-  const trim = input({ placeholder: '0.1-1.2' });
-  const licence = input({ placeholder: 'unknown' });
-  const source = input({});
-  const credit = input({});
-  const error = el('p', { class: 'error' });
-  const progress = el('p', { class: 'meta' });
-  const form = el('form', { class: 'card form' }, [
-    el('h3', { text: t('soundUpload'), style: 'margin:0 0 10px' }),
-    el('div', { class: 'form-row' }, [field(t('soundFile'), file), field(t('soundTitleField'), title), field(t('soundTags'), tags)]),
-    el('div', { class: 'form-row' }, [field(t('soundUseWhen'), useWhen)]),
-    el('div', { class: 'form-row' }, [field(t('soundCue'), cue), field(t('soundTrim'), trim), field(t('soundLicence'), licence)]),
-    el('div', { class: 'form-row' }, [field(t('soundSource'), source), field(t('soundCredit'), credit)]),
-    error, progress, el('button', { class: 'primary', type: 'submit', text: t('soundCreate') })
-  ]);
-  form.onsubmit = pending(function () {
-    error.textContent = '';
-    progress.textContent = '';
-    if (!file.files[0]) { error.textContent = t('soundNeedsFile'); return; }
-    const query = '?name=' + encodeURIComponent(file.files[0].name) + param('title', title.value) + param('use-when', useWhen.value)
-      + param('tags', tags.value) + param('cue', cue.value) + param('trim', trim.value)
-      + param('licence', licence.value) + param('source', source.value) + param('credit', credit.value);
-    return upload('/api/upload/sounds' + query, file.files[0], function (share) { progress.textContent = t('soundUploading') + ' ' + Math.round(share * 100) + '%'; })
-      .then(function (result) { onCreated(result.sound.id); })
-      // A refused upload names its reason and leaves what was typed in the form.
-      .catch(function (e) { error.textContent = e.message; progress.textContent = ''; });
-  });
-  return form;
-}
 
 // --------------------------------------------------------------------- list
 
@@ -299,20 +259,25 @@ function drawResults() {
   results.appendChild(el('table', { class: 'list pl-table cl-table sd-table' }, [header(), el('tbody', {}, rows.map(row))]));
 }
 
+/** The sound wizard: + New in the list's head and in its empty state (UX guidelines G6, G10). */
+export const NEW_SOUND = '#/new/sound';
+
 function drawList() {
   const node = main();
-  node.appendChild(el('h2', { text: t('soundTitle'), style: 'margin:0 0 6px;font-size:20px' }));
+  node.appendChild(el('div', { class: 'list-head' }, [
+    el('h2', { text: t('soundTitle') }),
+    el('button', { class: 'primary sd-new', onclick: function () { go(NEW_SOUND); } }, [t('sdNew')])
+  ]));
   node.appendChild(el('p', { class: 'meta', text: t('soundHelp') }));
   // The same audio element goes back into the page at once, so a full redraw does not stop a playing sound.
   node.appendChild(view.audio);
-  if (!view.list.items.length && !view.list.errors.length) node.appendChild(el('div', { class: 'empty sd-empty' }, [el('p', { text: t('sdEmpty') })]));
+  if (!view.list.items.length && !view.list.errors.length) node.appendChild(el('div', { class: 'empty sd-empty' }, [el('p', { text: t('sdEmpty') }), el('a', { href: NEW_SOUND, class: 'sd-empty-new', text: t('sdNew') })]));
   else {
     node.appendChild(filterBar());
     view.results = el('div', { class: 'pl-results' });
     node.appendChild(view.results);
     drawResults();
   }
-  node.appendChild(uploadForm(function (id) { go('#/sounds/' + id); }));
 }
 
 function gallery() {

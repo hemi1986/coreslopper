@@ -9,7 +9,7 @@ risk: null
 depends_on: [ST-064]
 labels: [feature:asset-library]
 feature: asset-library
-status: ready
+status: in-progress
 ---
 
 ## Context
@@ -37,10 +37,10 @@ commands `CMD-AddLibrarySound` and `CMD-UpdateLibrarySound` (existing routes `/a
 - `docs/board.md`, both board guides and `docs/sound-library.md` (both languages) describe it.
 
 ## Acceptance Criteria
-- [ ] The chooser's Library group has a Sound card that opens `#/new/sound` (test)
-- [ ] Step 1 with a file, title and use-when creates the library sound and the address becomes `#/new/sound/<id>`
+- [x] The chooser's Library group has a Sound card that opens `#/new/sound` (test)
+- [x] Step 1 with a file, title and use-when creates the library sound and the address becomes `#/new/sound/<id>`
       (test with a fixture workspace)
-- [ ] A cue and trim set in step 2 are stored on the sound (test)
-- [ ] Step 3 without a licence leaves it `unknown` and shows the release-check note
-- [ ] A step 1 without a file is refused with its reason and the typed fields keep their text
-- [ ] The Sounds view has no inline upload form, and its **+ Neu** opens `#/new/sound`
+- [x] A cue and trim set in step 2 are stored on the sound (test)
+- [x] Step 3 without a licence leaves it `unknown` and shows the release-check note
+- [x] A step 1 without a file is refused with its reason and the typed fields keep their text
+- [x] The Sounds view has no inline upload form, and its **+ Neu** opens `#/new/sound`

@@ -44,7 +44,7 @@ The navigation lists no project: **Projects** opens the list of every project an
 
 ## Start a music video
 
-Click **+ New** and choose **Music video**. The chooser has two groups: **Production** (Music video, Series, Episode, Meme) and **Library** (Character, Set).
+Click **+ New** and choose **Music video**. The chooser has two groups: **Production** (Music video, Series, Episode, Meme) and **Library** (Character, Set, Sound).
 
 ![Choosing what to create](assets/board/en/new.webp)
 
@@ -106,7 +106,7 @@ When a project is done, the **Release** tab holds everything for publishing it.
 
 **Sets** is your set library, the same kind of table: one row per set with its cover (the first plate, else the first reference), tags, the number of references and plates, how many productions use it, and where it came from. Search, the filters **unused** and **Origin**, the tag chips, and the column headers work as in Characters, and the address keeps them too. Click a row to open the set. **+ New** in the head of the list opens the set wizard, as **+ New** → **Set** does. It first asks: **Create new** or **Import from a project or series**. To create one, fill in the name, description, and prompt sentence (all three required) and tags and click **Create**; then upload references and plates, each plate with its camera angle (each image shows as it uploads). **To the set** opens its page, and a reload goes on where you were. To import, choose the project or series and click **Import**: the wizard lists the sets it took in, each linked to its page. A refused entry (an empty or taken name, a plate without its angle) shows its reason in the step and keeps what you typed.
 
-**Sounds** is the sound library of your memes, the same kind of table: one row per sound with a play button, its use when, its length after the trim, its licence, tags, and how many memes took it. ▶ plays the sound right in the row, a second click stops it, and another row's ▶ stops the first. Search by title, use when, or tag, filter by tag, **unused**, or **Licence** (`unknown` finds what the release check will flag), and sort by the column headers; the address keeps it all. A click elsewhere on the row opens the sound.
+**Sounds** is the sound library of your memes, the same kind of table: one row per sound with a play button, its use when, its length after the trim, its licence, tags, and how many memes took it. ▶ plays the sound right in the row, a second click stops it, and another row's ▶ stops the first. Search by title, use when, or tag, filter by tag, **unused**, or **Licence** (`unknown` finds what the release check will flag), and sort by the column headers; the address keeps it all. A click elsewhere on the row opens the sound. **+ New** in the head of the list opens the sound wizard, as **+ New** → **Sound** does. Choose the audio file, fill in the title and use when (all three required) and tags, and click **Upload**. In the next step the sound plays: pause where it hits and click **Set cue here**, and use **Trim start here** and **Trim end here** to cut it; **Next** keeps what is set, and skipping it is fine. Last, enter the licence, source, and credit if you know them and click **Save**; without a licence it stays `unknown`, which the release check flags. **To the sound** opens its page, and a reload goes on where you were. A refused entry (a missing file or title, a file that is not audio, a cue outside the sound) shows its reason in the step and keeps what you typed.
 
 ## Series
 

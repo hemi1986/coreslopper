@@ -8,6 +8,7 @@
 //   #/s/<slug>       a series                #/new[/video|series|episode|meme[/<slug>]]  the wizard
 //   #/new/character[/<id>]                   the wizard for a library character
 //   #/new/set[/<id>]                         the wizard for a library set
+//   #/new/sound[/<id>]                       the wizard for a library sound
 //   #/characters[?…]  the character list     #/characters/<id>  one library character
 //   #/sets[?…]        the set list           #/sets/<id>        one library set
 //   #/sounds[?…]      the sound list         #/sounds/<id>      one library sound
@@ -22,6 +23,7 @@ import { showContactSheet } from './contact-sheet.js';
 import { showWizard } from './wizard.js';
 import { showCharacterWizard } from './character-wizard.js';
 import { showSetWizard } from './set-wizard.js';
+import { showSoundWizard } from './sound-wizard.js';
 import { CHARACTERS_ROUTE, showCharacters } from './characters.js';
 import { SETS_ROUTE, showSets } from './sets.js';
 import { SOUNDS_ROUTE, showSounds } from './sounds.js';
@@ -42,6 +44,7 @@ function route() {
   let match, view;
   if ((match = /^#\/new\/character(?:\/([a-z0-9][a-z0-9_-]*))?\/?$/.exec(hash))) { active = 'new'; view = showCharacterWizard(match[1]); }
   else if ((match = /^#\/new\/set(?:\/([a-z0-9][a-z0-9_-]*))?\/?$/.exec(hash))) { active = 'new'; view = showSetWizard(match[1]); }
+  else if ((match = /^#\/new\/sound(?:\/([a-z0-9][a-z0-9_-]*))?\/?$/.exec(hash))) { active = 'new'; view = showSoundWizard(match[1]); }
   else if ((match = /^#\/new(?:\/(video|series|episode|meme)(?:\/([a-z0-9-]+))?)?\/?$/.exec(hash))) { active = 'new'; view = showWizard(match[1], match[2]); }
   else if (PROJECTS_ROUTE.test(hash)) { active = 'projects'; view = showProjects(); }
   else if (hash === '#/calendar') { active = 'calendar'; view = showCalendar(); }
