@@ -9,7 +9,7 @@ risk: null
 depends_on: [ST-067]
 labels: [feature:demo-projects]
 feature: demo-projects
-status: in-progress
+status: done
 ---
 
 ## Context
