@@ -179,7 +179,9 @@ state in memory), one core transition (`setStageRunning`, `setStageDone`, `setSt
 
 Pure functions over loaded files: `stageViews`, `productionPhase`, `projectNextAction`, `seriesNextAction`
 (`packages/core/src/production.ts`); `status` (`packages/cli/src/status.ts`); the board's production view
-(`packages/cli/src/board-production.ts`), which reads files and never writes. The page does not poll:
+(`packages/cli/src/board-production.ts`), which reads files and never writes; the contact sheet tab's `contactSheet`
+(`packages/cli/src/board-contact-sheet.ts`), built on every read from `validateProject(…, { write: false })` and the
+keyframes in `assets/keyframes/`, so a filed keyframe shows after a refresh (ST-058). The page does not poll:
 the user refreshes with the button in the navigation, which keeps a view with a playing video or an edited field
 (ADR 0049, `viewBusy` in `nav.js`).
 The release board's view is `boardProject` (`packages/cli/src/release-board-data.ts`), a pure read of the release
@@ -187,9 +189,9 @@ folder's manifest, `upload.yaml`, the calendar and the status; whether an approv
 (`packages/core/src/autopilot.ts`) wherever it is read (G-159).
 
 The resolved storyboard (shots in seconds and frames) is made on demand and never stored; render passes it to
-Remotion unchanged as props, apart from public asset paths (`render.ts:98-111`). Derived documents of the
-storyboard (`storyboard.md`, `review/contact-sheet.svg`) are written once and go stale when the YAML changes
-(G-70, G-81). Lists that core and Remotion both need (motion components) are kept twice today (G-75).
+Remotion unchanged as props, apart from public asset paths (`render.ts:98-111`). `storyboard.md`, a derived
+document of the storyboard, is written once and goes stale when the YAML changes (G-81); `review/contact-sheet.svg`
+is only the storyboard stage's output, and no view reads it. Lists that core and Remotion both need (motion components) are kept twice today (G-75).
 
 Timing lookups (`sectionAt`, `energyAt`, `beatIndexAt`) and anchor resolution (`resolveAnchor`) are pure
 functions over the effective timing in `packages/core/src/timing.ts`; Remotion has its own copies today (G-59).
