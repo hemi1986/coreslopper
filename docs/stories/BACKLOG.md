@@ -4,16 +4,21 @@
 
 **Progress: 31 of 31 domain stories done** · scenarios 108 of 108
 
-**59 stories** · In Progress: 0 · Ready: 2 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 57 · Superseded: 0
+**59 stories** · In Progress: 1 · Ready: 1 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 57 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
+
+## In Progress
+
+| ID | Title | Type | Context | Priority | Size | Risk | Depends on |
+|---|---|---|---|---|---|---|---|
+| [ST-054](ST-054-the-microsite-data-names-the-aspect.md) | The microsite data names the video's aspect | task | – | could | – | – | ST-048 |
 
 ## Ready
 
 | ID | Title | Type | Context | Priority | Size | Risk | Depends on |
 |---|---|---|---|---|---|---|---|
 | [ST-058](ST-058-the-contact-sheet-shows-the-keyframes.md) | The board's contact sheet shows each shot's keyframe | chore | – | should | – | – | – |
-| [ST-054](ST-054-the-microsite-data-names-the-aspect.md) | The microsite data names the video's aspect | task | – | could | – | – | ST-048 |
 
 ## Done
 
