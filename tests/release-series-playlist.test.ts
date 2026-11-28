@@ -39,6 +39,23 @@ describe("a series' YouTube playlist", () => {
     expect(SeriesSchema.parse({ ...series, youtube_playlist: {} }).youtube_playlist).toEqual({});
     expect(SeriesSchema.safeParse({ ...series, youtube_playlist: { url: 'not a url' } }).success).toBe(false);
     expect(SeriesSchema.safeParse({ ...series, youtube_playlist: { title: '' } }).success).toBe(false);
+    expect(SeriesSchema.parse({ ...series, youtube_playlist: { url: 'HTTPS://www.youtube.com/playlist?list=PL-x' } }).youtube_playlist?.url).toBe('HTTPS://www.youtube.com/playlist?list=PL-x');
+  });
+
+  it('rejects a playlist URL that is not http or https', () => {
+    const series = { version: 1, slug: 'night-desk', title: 'Night Desk', formats: { master: { aspect: '9:16', width: 1080, height: 1920, fps: 30 } }, providers: { image: 'mock', video: 'mock', audio: 'mock' } };
+    expect(SeriesSchema.safeParse(series).success).toBe(true);
+    for (const url of ['javascript:alert(1)', 'JAVASCRIPT:alert(1)', 'data:text/html,x', 'ftp://example.com/list']) {
+      expect(SeriesSchema.safeParse({ ...series, youtube_playlist: { url } }).success, url).toBe(false);
+    }
+  });
+
+  it('trims the playlist title and rejects a blank or multi-line one', () => {
+    const series = { version: 1, slug: 'night-desk', title: 'Night Desk', formats: { master: { aspect: '9:16', width: 1080, height: 1920, fps: 30 } }, providers: { image: 'mock', video: 'mock', audio: 'mock' } };
+    expect(SeriesSchema.parse({ ...series, youtube_playlist: { title: '  Night Desk – all  ' } }).youtube_playlist?.title).toBe('Night Desk – all');
+    for (const title of ['   ', 'Night Desk\n- [x] posted', 'Night\rDesk']) {
+      expect(SeriesSchema.safeParse({ ...series, youtube_playlist: { title } }).success, JSON.stringify(title)).toBe(false);
+    }
   });
 
   it("gives a short episode's YouTube post the checklist line with the playlist title and its link", async () => {

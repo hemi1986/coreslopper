@@ -181,11 +181,12 @@
       "properties": {
         "title": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "pattern": "^[^\\r\\n]+$"
         },
         "url": {
           "type": "string",
-          "format": "uri"
+          "pattern": "^https?:\\/\\/"
         }
       }
     },

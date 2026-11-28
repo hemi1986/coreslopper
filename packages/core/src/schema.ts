@@ -633,8 +633,19 @@ export const SeriesSchema = z.object({
    */
   youtube_playlist: z
     .object({
-      title: z.string().min(1).optional(),
-      url: z.string().url().optional(),
+      /** One line, trimmed. */
+      title: z
+        .string()
+        .trim()
+        .min(1)
+        .regex(/^[^\r\n]+$/, { message: 'must be one line' })
+        .optional(),
+      /** An http(s) link to the playlist. */
+      url: z
+        .string()
+        .url()
+        .regex(/^https?:\/\//i, { message: 'must be an http or https URL' })
+        .optional(),
     })
     .optional(),
   /** Optional creative limits. Without an entry nothing is checked. */
