@@ -9,7 +9,7 @@ risk: null
 depends_on: []
 labels: [bug, feature:board-redesign]
 feature: board-redesign
-status: ready
+status: in-progress
 ---
 
 ## Context
