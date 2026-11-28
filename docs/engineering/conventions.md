@@ -166,6 +166,10 @@ state in memory), one core transition (`setStageRunning`, `setStageDone`, `setSt
   `serveMedia` from a whitelist. A `ValidationError` becomes a 400. New view routes go into a `<view>Route`
   function in the view's module, as the wizard and the library do (HS-251, G-214). The page is static ES
   modules in `packages/cli/src/board/` without a build step; each view registers its strings with `addStrings`.
+  The board navigation (`nav.js`, ADR 0058) is a bar across the top with fixed entries only – no project and no
+  series; `app.js` maps each route to a view key and `activeEntry` marks its entry (a project's tabs and a series
+  mark Projects). `main` uses the full window width; running text (`.markdown`, the wizard's `.step`) is capped at
+  about 80 characters, and no view may scroll sideways down to a 1280 px window (`tests/board-nav.test.ts`).
 - User-owned files (`timing.overrides.json`, `lyrics.txt`, imported stems, `project.yaml`) are never replaced by
   a tool; a command that would do so is a hard stop. The one exception: fixing a proposed release day writes
   `release.release_date` into `project.yaml`, keeping every comment (`setReleaseDate`,
@@ -177,7 +181,7 @@ Pure functions over loaded files: `stageViews`, `productionPhase`, `projectNextA
 (`packages/core/src/production.ts`); `status` (`packages/cli/src/status.ts`); the board's production view
 (`packages/cli/src/board-production.ts`), which reads files and never writes. The page does not poll:
 the user refreshes with the button in the navigation, which keeps a view with a playing video or an edited field
-(ADR 0049).
+(ADR 0049, `viewBusy` in `nav.js`).
 The release board's view is `boardProject` (`packages/cli/src/release-board-data.ts`), a pure read of the release
 folder's manifest, `upload.yaml`, the calendar and the status; whether an approval holds is `approvalHolds`
 (`packages/core/src/autopilot.ts`) wherever it is read (G-159).

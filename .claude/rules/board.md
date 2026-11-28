@@ -49,7 +49,8 @@ release view only. "Page", "screen" and "sidebar" are not terms; "tab" is only t
   the wizard. `releaseProjectDirs` (a release folder or a calendar, in `release-facts.ts`) serves the release routes
   and `/media`, and the autopilot reads it too.
 - The page (`packages/cli/src/board/`) is static ES modules with no build step:
-  - `app.js` holds the hash routes, the navigation and the user's refresh (no poll, ADR 0049);
+  - `app.js` holds the hash routes and the user's refresh (no poll, ADR 0049); `nav.js` the board navigation, a
+    bar across the top with fixed entries only (ADR 0058), and `viewBusy`; `projects.js` the project list;
   - `markdown.js` renders the markdown subset of the docs and the project documents as DOM nodes, never as HTML;
     `guide.js` shows a page of the workspace's `docs/` with it, and `production.js` a project document
     (`#/p/<slug>/doc/<path>`);

@@ -175,7 +175,7 @@ describe('production view', () => {
     const page = await request(handler, '/');
     expect(page.status).toBe(200);
     expect(page.body).toContain('/board/app.js');
-    for (const file of ['app.js', 'lib.js', 'production.js', 'release.js', 'board.css']) {
+    for (const file of ['app.js', 'lib.js', 'nav.js', 'projects.js', 'production.js', 'release.js', 'board.css']) {
       expect((await request(handler, `/board/${file}`)).status).toBe(200);
     }
     expect((await request(handler, '/board/..%2Frelease-board.ts')).status).toBe(404);
