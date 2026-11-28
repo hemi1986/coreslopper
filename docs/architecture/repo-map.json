@@ -138,7 +138,7 @@
       "path": "packages/cli",
       "score": 0.61,
       "reasons": [
-        "359 changed files in recent history",
+        "360 changed files in recent history",
         "shared library",
         "shared infrastructure – not a domain slice"
       ]
@@ -170,7 +170,7 @@
       "path": "packages/core",
       "score": 0.03,
       "reasons": [
-        "94 changed files in recent history",
+        "93 changed files in recent history",
         "shared library",
         "layer package – hosts many concepts, not a domain slice"
       ]
@@ -650,6 +650,7 @@
         "packages/cli/src/board-production.ts",
         "packages/cli/src/board-review.ts",
         "packages/cli/src/board-wizard.ts",
+        "tests/board-character-wizard.test.ts",
         "tests/board-characters.test.ts",
         "tests/board-contact-sheet.test.ts",
         "tests/board-feedback.test.ts",
@@ -678,7 +679,7 @@
       "reasons": [
         "2 layers: cli, tests",
         "2 packages",
-        "20 files"
+        "21 files"
       ],
       "adopted": true,
       "adoptedAt": "2026-11-22"
@@ -728,6 +729,38 @@
       "adoptedAt": "2026-11-22"
     },
     {
+      "name": "character",
+      "terms": [
+        "character",
+        "characterization",
+        "wizard"
+      ],
+      "tables": [],
+      "files": [
+        "packages/cli/src/board/character-wizard.js",
+        "packages/cli/src/board/characters.js",
+        "packages/cli/src/character-library.ts",
+        "tests/character-characterization.test.ts",
+        "tests/character-library.test.ts"
+      ],
+      "packages": [
+        "?",
+        "packages/cli"
+      ],
+      "layers": [
+        "cli",
+        "tests"
+      ],
+      "score": 13,
+      "reasons": [
+        "2 layers: cli, tests",
+        "2 packages",
+        "5 files"
+      ],
+      "adopted": true,
+      "adoptedAt": "2026-11-22"
+    },
+    {
       "name": "sery",
       "terms": [
         "budget",
@@ -757,36 +790,6 @@
         "2 packages",
         "5 files"
       ]
-    },
-    {
-      "name": "character",
-      "terms": [
-        "character",
-        "characterization"
-      ],
-      "tables": [],
-      "files": [
-        "packages/cli/src/board/characters.js",
-        "packages/cli/src/character-library.ts",
-        "tests/character-characterization.test.ts",
-        "tests/character-library.test.ts"
-      ],
-      "packages": [
-        "?",
-        "packages/cli"
-      ],
-      "layers": [
-        "cli",
-        "tests"
-      ],
-      "score": 12,
-      "reasons": [
-        "2 layers: cli, tests",
-        "2 packages",
-        "4 files"
-      ],
-      "adopted": true,
-      "adoptedAt": "2026-11-22"
     },
     {
       "name": "clip",
