@@ -9,7 +9,7 @@ risk: null
 depends_on: []
 labels: [feature:asset-library]
 feature: asset-library
-status: ready
+status: in-progress
 ---
 
 ## Context
