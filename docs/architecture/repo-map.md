@@ -45,7 +45,7 @@ Files that share a concept stem or a table across layers. These are suggestions 
 | review | cli, core, tests | 5 | – | 3 layers: cli, core, tests; 3 packages; 5 files | yes |
 | media | cli, remotion, tests | 4 | – | 3 layers: cli, remotion, tests; 3 packages; 4 files | yes |
 | short | cli, core, tests | 3 | – | 3 layers: cli, core, tests; 3 packages; 3 files | – |
-| board | cli, tests | 13 | – | 2 layers: cli, tests; 2 packages; 13 files | yes |
+| board | cli, tests | 14 | – | 2 layers: cli, tests; 2 packages; 14 files | yes |
 | publish | cli, tests | 11 | – | 2 layers: cli, tests; 2 packages; 11 files | yes |
 | sery | cli, tests | 5 | – | 2 layers: cli, tests; 2 packages; 5 files | – |
 | character | cli, tests | 4 | – | 2 layers: cli, tests; 2 packages; 4 files | yes |
@@ -81,11 +81,11 @@ node .claude/skills/adopt/scripts/repo-map.ts --adopt-slice <name>
 
 | # | Package | Score | Why |
 |---|---|---|---|
-| 1 | `packages/cli` (@coreslopper/cli) | 0.61 | 395 changed files in recent history; shared library; shared infrastructure – not a domain slice |
+| 1 | `packages/cli` (@coreslopper/cli) | 0.61 | 378 changed files in recent history; shared library; shared infrastructure – not a domain slice |
 | 2 | `scripts/audio-analysis` (coreslopper-audio-analysis) | 0.16 | 5 changed files in recent history |
 | 3 | `scripts/pose` (coreslopper-pose) | 0.16 | 6 changed files in recent history |
 | 4 | `packages/remotion` (@coreslopper/remotion) | 0.07 | 5 changed files in recent history; shared library; shared infrastructure – not a domain slice |
-| 5 | `packages/core` (@coreslopper/core) | 0.03 | 104 changed files in recent history; shared library; layer package – hosts many concepts, not a domain slice |
+| 5 | `packages/core` (@coreslopper/core) | 0.03 | 101 changed files in recent history; shared library; layer package – hosts many concepts, not a domain slice |
 | 6 | `packages/providers` (@coreslopper/providers) | 0.01 | 15 changed files in recent history; shared library; layer package – hosts many concepts, not a domain slice |
 
 ## Suggested first slice

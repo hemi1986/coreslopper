@@ -4,15 +4,9 @@
 
 **Progress: 31 of 31 domain stories done** · scenarios 108 of 108
 
-**59 stories** · In Progress: 1 · Ready: 5 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 53 · Superseded: 0
+**59 stories** · In Progress: 0 · Ready: 5 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 54 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
-
-## In Progress
-
-| ID | Title | Type | Context | Priority | Size | Risk | Depends on |
-|---|---|---|---|---|---|---|---|
-| [ST-057](ST-057-the-boards-project-list.md) | The board's project list with search, filters and series grouping | task | – | must | – | – | ST-056 |
 
 ## Ready
 
@@ -60,6 +54,7 @@ Within each section: by priority, then by story ID, with dependencies pulled in 
 | [ST-049](ST-049-a-short-horizontal-episode-posts-its-vertical-version.md) | A horizontal episode of up to 3 minutes posts its vertical version as its one Short | domain | Release | should | – | – | ST-047 |
 | [ST-055](ST-055-skills-and-docs-for-platform-formats.md) | The release skill and the platform docs follow the release shapes | task | – | must | – | – | ST-044, ST-045, ST-046, ST-048, ST-049 |
 | [ST-056](ST-056-the-board-has-a-top-navigation-and-full-width.md) | The board has a top navigation and uses the full width | task | – | must | – | – | – |
+| [ST-057](ST-057-the-boards-project-list.md) | The board's project list with search, filters and series grouping | task | – | must | – | – | ST-056 |
 | [ST-012](ST-012-a-shot-lands-on-the-sound-cue.md) | A shot lands on a sound's cue | domain | Storyboard | should | – | – | ST-011 |
 | [ST-014](ST-014-burned-in-subtitles-for-a-meme.md) | A meme's render carries German subtitles | domain | Render | should | – | – | ST-007 |
 | [ST-020](ST-020-episode-announcement-says-new-episode.md) | An episode's announcement images say "new episode", not "new song" | chore | – | should | – | – | – |
