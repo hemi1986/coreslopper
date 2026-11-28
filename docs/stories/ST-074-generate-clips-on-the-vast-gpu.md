@@ -28,9 +28,9 @@ Feature `vast-gpu`, decided by the user on 2026-11-28 (ADR 0059 proposed, CMD-Ru
   stays the `comfyui` provider for stills, audio, the restore pass and every local workflow. A project that does not
   name `vast` never talks to vast.ai.
 - **Operations.** Text-, image-, first/last-frame- and reference-to-video on plain MiniMax H3 (no Pika LoRA), with the
-  tagged workflows in `comfyui/vast/` (ST-076) as the roles' `alternatives.vast` models. Lip-sync stays on
-  `providers.lipsync` (default the local `comfyui`) until ST-070 answers HS-269; a lip-sync story for `vast` follows
-  only then.
+  tagged workflows in `comfyui/vast/` (ST-076) as the roles' `alternatives.vast` models. Lip-sync on `vast`
+  (ST-070 showed plain H3 lip-syncs, F15) ships with its workflow in ST-076; this story keeps `providers.lipsync` as
+  it is.
 - **Prompt.** A plain-text prompt; a Flex prompt is rejected before any call.
 - **Access.** Every request carries the rental's access token; the server URL and token come from the GPU rental,
   never from `COMFYUI_URL`.
@@ -66,7 +66,7 @@ Scenario: Stills of a vast project stay on the local ComfyUI
   Then the keyframe is generated on the local ComfyUI server
 
 ## Out of Scope
-- Lip-sync on `vast` (after ST-070, HS-269)
+- Lip-sync on `vast` (ST-076)
 - Video or audio references for MiniMax H3 (the adapter does not wire them yet)
 - Other vast.ai templates or models
 

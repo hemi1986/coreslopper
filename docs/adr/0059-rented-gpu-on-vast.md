@@ -27,9 +27,10 @@ whose boot, URL discovery and workflows are not yet documented (HS-270, HS-271).
   template id `6c54167e40e8ceed220393d585126a1c` on the model page) on one rented GPU, by default an RTX PRO 6000 S.
   Plain MiniMax H3: no Pika LoRA, and nothing is installed by us at boot. The user's local `comfyui` keeps every
   existing workflow; the two servers coexist. A project chooses it with `providers.video: vast`.
-- **Operations.** Text-, image-, first/last-frame- and reference-to-video. Lip-sync only if the spike HS-269 shows
-  that plain H3 with `MiniMaxH3AddGuide` lip-syncs well enough; until then `providers.lipsync` stays elsewhere, by
-  default the local `comfyui`.
+- **Operations.** Text-, image-, first/last-frame- and reference-to-video, and lip-sync: the spike ST-070 showed that
+  plain H3 with the vocal anchored by `MiniMaxH3AddGuide` at frame 0 lip-syncs speech, shouting and singing well
+  enough (HS-269, F15 in the research). A project puts lip-sync on the rental with `providers.lipsync: vast`; the
+  default stays the local `comfyui` (ADR 0053).
 - **Workflows shipped, not fetched.** vast's H3 workflow templates are exported once (Export API) from a rental,
   tagged with `cs:` tags as in ADR 0014, and shipped in the workspace payload under `comfyui/vast/`. Prompts are
   plain text; a Flex prompt is rejected on `vast`.
@@ -70,9 +71,9 @@ whose boot, URL discovery and workflows are not yet documented (HS-270, HS-271).
   automatic restart.
 - Spend on the GPU is outside the project budget and its batch cap; the workspace's rental records and the board
   show it instead. The price cap, the idle and the max-runtime limits are the only guards on it.
-- Open spikes before the first story can be ready: HS-270 (how a client finds the authenticated ComfyUI URL through
-  the API, and whether the H3 template puts ComfyUI behind the portal's token check), HS-271 (the template's
-  `template_hash_id`, workflows, model files and boot time) and HS-269 (lip-sync on plain H3).
+- The spike ST-070 answered HS-269, HS-270 and HS-271 (F10–F16 in `docs/research/vast-gpu-rental.md`): ComfyUI is
+  behind the portal's token check, its tunnel URL comes from the portal's `/get-all-quick-tunnels`, and the template
+  downloads its models at boot (about 11.5 minutes to ready).
 - vast.ai's rate limits answer HTTP 429 without `Retry-After` and publish no numbers (F7): the adapter backs off on its
   own, and status reads stay infrequent.
 - A shipped workflow in `comfyui/vast/` goes stale when vast changes its template; the export is redone by hand.

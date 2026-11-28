@@ -4,7 +4,7 @@
 
 **Progress: 32 of 37 domain stories done** · scenarios 112 of 128
 
-**78 stories** · In Progress: 0 · Ready: 9 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 69 · Superseded: 0
+**78 stories** · In Progress: 0 · Ready: 8 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 70 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
 
@@ -12,7 +12,6 @@ Within each section: by priority, then by story ID, with dependencies pulled in 
 
 | ID | Title | Type | Context | Priority | Size | Risk | Depends on |
 |---|---|---|---|---|---|---|---|
-| [ST-070](ST-070-spike-minimax-h3-on-vast.md) | Spike: MiniMax H3 on a rented vast.ai GPU – access, workflows, lip-sync | spike | – | must | – | – | – |
 | [ST-071](ST-071-rent-a-gpu-on-vast.md) | Rent a GPU on vast.ai for MiniMax H3 | domain | Generation | must | – | – | ST-070 |
 | [ST-072](ST-072-shut-down-the-gpu.md) | Shut down the rented GPU and record its cost | domain | Generation | must | – | – | ST-071 |
 | [ST-073](ST-073-shut-down-an-idle-gpu.md) | The watchdog shuts down an idle or overdue GPU rental | domain | Generation | must | – | – | ST-072 |
@@ -65,6 +64,7 @@ Within each section: by priority, then by story ID, with dependencies pulled in 
 | [ST-064](ST-064-the-new-character-wizard.md) | The New chooser offers the library, and a wizard creates or imports characters | task | – | must | – | – | – |
 | [ST-065](ST-065-the-new-set-wizard.md) | A wizard creates or imports library sets | task | – | must | – | – | ST-064 |
 | [ST-066](ST-066-the-new-sound-wizard.md) | A wizard adds a library sound and sets its cue while it plays | task | – | must | – | – | ST-064 |
+| [ST-070](ST-070-spike-minimax-h3-on-vast.md) | Spike: MiniMax H3 on a rented vast.ai GPU – access, workflows, lip-sync | spike | – | must | – | – | – |
 | [ST-012](ST-012-a-shot-lands-on-the-sound-cue.md) | A shot lands on a sound's cue | domain | Storyboard | should | – | – | ST-011 |
 | [ST-014](ST-014-burned-in-subtitles-for-a-meme.md) | A meme's render carries German subtitles | domain | Render | should | – | – | ST-007 |
 | [ST-020](ST-020-episode-announcement-says-new-episode.md) | An episode's announcement images say "new episode", not "new song" | chore | – | should | – | – | – |

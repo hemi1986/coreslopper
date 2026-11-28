@@ -4277,15 +4277,18 @@ hotspots:
   - id: HS-269
     question: "Does plain MiniMax H3 (no Pika LoRA) lip-sync a vocal anchored with MiniMaxH3AddGuide at frame 0 well enough to run lipSync on the vast provider?"
     refs: [CMD-RunGenerationBatch, AGG-GpuRental]
-    status: open
+    status: resolved
+    resolution: "Yes. The ST-070 spike ran three daily-um-9 shots (spoken, shouted, sung) on plain H3 with the vocal anchored at frame 0; the user judged them usable, so lip-sync runs on vast with providers.lipsync: vast (ST-076; user, 2026-11-28)"
   - id: HS-270
     question: "How does a client find the authenticated ComfyUI URL of a new rental through the API – Cloudflare tunnel URL or the mapped port – and does the MiniMax H3 template put ComfyUI behind the portal's token check?"
     refs: [CMD-RentGpu, AGG-GpuRental]
-    status: open
+    status: resolved
+    resolution: "ComfyUI sits behind the portal's Caddy token check (401 without, 200 with WEB_PASSWORD as bearer). The client reads public_ipaddr and ports from GET /instances/{id}/ and asks the portal (ports 1111/tcp) GET /get-all-quick-tunnels for the HTTPS tunnel URL of localhost:8188 (ST-070, research F11-F12, 2026-11-28)"
   - id: HS-271
     question: "Which template_hash_id, workflow templates, model files and boot time does vast's MiniMax H3 ComfyUI template have?"
     refs: [CMD-RentGpu, EXT-VastAi]
-    status: open
+    status: resolved
+    resolution: "template_hash_id 6c54167e40e8ceed220393d585126a1c, image vastai/comfy:v0.44.0-cuda-13.2-py312, disk >= 65 GB; three workflows (t2v, i2v with optional last frame, r2v); five model files downloaded at boot; ComfyUI ready after about 11.5 min (ST-070, research F10, F13-F14, 2026-11-28)"
 
 flows:
   - id: FLOW-AutonomousStage
