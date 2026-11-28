@@ -50,6 +50,7 @@ import {
   type ReleaseManifest,
   type ReleaseCalendar,
   type ReleasePlan,
+  type ReleaseShape,
   type UploadData,
   type UsedSound,
 } from '@coreslopper/core';
@@ -67,7 +68,7 @@ import {
   type FfmpegRunner,
   type Prober,
 } from './release-media.js';
-import { readmeText, releaseLabels, releaseTexts, calendarEventLabel, type ReleaseTextInput } from './release-texts.js';
+import { readmeText, releaseLabels, releaseTexts, calendarEventLabel, type ReleaseTextInput, type SeriesPlaylist } from './release-texts.js';
 import { calendarInput, planCalendar } from './release-calendar.js';
 import { loadStatus, withReleaseLock } from './release-records.js';
 import { micrositeSong } from './release-microsite.js';
@@ -281,6 +282,23 @@ export async function songJson(project: LoadedProject): Promise<Record<string, u
 export function projectFormats(project: Pick<LoadedProject, 'config'>): { id: string; width: number; height: number; fps: number }[] {
   const { master, derivatives } = project.config.formats;
   return [master, ...derivatives].map((format) => ({ id: formatId(format.aspect), width: format.width, height: format.height, fps: master.fps }));
+}
+
+/**
+ * The series playlist of a short episode; undefined for any other shape or an
+ * episode without a series. A missing URL is the release TODO of
+ * `seriesPlaylistTodo`, never a failure.
+ */
+export function seriesPlaylist(project: Pick<LoadedProject, 'series'>, shape: ReleaseShape | undefined): SeriesPlaylist | undefined {
+  if (shape !== 'short-episode' || !project.series) return undefined;
+  const playlist = project.series.youtube_playlist;
+  return { title: playlist?.title ?? project.series.title, ...(playlist?.url ? { url: playlist.url } : {}) };
+}
+
+/** The TODO of a short episode whose series playlist has no URL yet; undefined when nothing is missing. */
+export function seriesPlaylistTodo(project: Pick<LoadedProject, 'series'>, shape: ReleaseShape | undefined): string | undefined {
+  const playlist = seriesPlaylist(project, shape);
+  return playlist && !playlist.url ? `YouTube playlist of the series: set youtube_playlist.url in projects/${project.series?.slug}/series.yaml` : undefined;
 }
 
 /**
@@ -572,7 +590,10 @@ export async function buildRelease(options: ReleaseOptions): Promise<ReleaseResu
     credits,
     files,
     durationSeconds: timing?.audio.duration,
+    playlist: seriesPlaylist(project, shape),
   };
+  const playlistTodo = seriesPlaylistTodo(project, shape);
+  if (playlistTodo) todos.push(playlistTodo);
   // The calendar: the next free slots under config/release-schedule.yaml; kept times stay.
   const schedule = await loadReleaseSchedule(root);
   // A meme and a short episode are Shorts, never a Premiere.

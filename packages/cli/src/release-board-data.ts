@@ -18,7 +18,7 @@ import {
 } from '@coreslopper/core';
 import { checklistKey, loadAutopilotLog } from './release-records.js';
 import { micrositeSong, type MicrositeSong } from './release-microsite.js';
-import { calendarEventLabel, distributorRows, mediaFile } from './release-texts.js';
+import { calendarEventLabel, distributorRows, mediaFile, type SeriesPlaylist } from './release-texts.js';
 import { autopilotReadiness, lastRun } from './autopilot-state.js';
 import { loadReleaseFacts, type ReleaseFacts } from './release-facts.js';
 
@@ -48,6 +48,8 @@ export interface BoardChecklistItem {
   /** The release-record key of the line: the post and the line's name, never its position (G-163). */
   key: string;
   label: string;
+  /** Where the line points, e.g. the series playlist; the board links it. */
+  href?: string;
 }
 
 export interface BoardPost {
@@ -339,6 +341,8 @@ const kindOf = (path: string): BoardFile['kind'] =>
 const file = (label: string, path: string | undefined): BoardFile[] => (path ? [{ label, path, kind: kindOf(path) }] : []);
 const field = (label: string, value: string | undefined, extra: Partial<BoardField> = {}): BoardField[] => (value?.trim() ? [{ label, value, ...extra }] : []);
 const checklist = (id: string, lines: string[]): BoardChecklistItem[] => lines.map((label) => ({ key: checklistKey(id, label), label }));
+/** The YouTube post's line for a short episode's series playlist, linked when the series names its URL. */
+const playlistLine = (playlist: SeriesPlaylist, label: string): BoardChecklistItem => ({ key: checklistKey('youtube', label), label, ...(playlist.url ? { href: playlist.url } : {}) });
 
 /** A length as m:ss. */
 const minutes = (seconds: number): string => {
@@ -414,7 +418,11 @@ export async function boardProject(projectRoot: string, root: string, options: {
       ...field(b.tags, planValue('youtube', 'tags'), limitOf('youtube', 'tags')),
       ...field(b.pinned, oneVideo ? undefined : planValue('youtube', 'pinned')),
     ],
-    checklist: checklist('youtube', oneVideo ? [b.publish, b.synthetic, b.kids] : [input.premiere ? b.premiere : b.publish, b.synthetic, b.kids, b.category, b.endscreen]),
+    checklist: [
+      ...checklist('youtube', oneVideo ? [b.publish, b.synthetic, b.kids] : [input.premiere ? b.premiere : b.publish, b.synthetic, b.kids, b.category, b.endscreen]),
+      // A short episode joins its series' playlist; the line's key stays when the URL is added later.
+      ...(input.playlist ? [playlistLine(input.playlist, l.meme.playlist(input.playlist.title))] : []),
+    ],
     url: true,
   });
   if (!oneVideo && planValue('youtube', 'community')) youtube.push({ id: 'community', heading: heading('community', l.community), at: at('community'), files: file(b.upload, files.thumbnails[0]), fields: field(b.text, planValue('youtube', 'community')), checklist: [], url: true });

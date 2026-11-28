@@ -51,7 +51,7 @@ The release board assigns each file of the release folder to its posts:
 | Scheduling | Yes; no Premiere | 9080341 |
 | Playlists and shows | A Short fits any playlist; a playlist of only Shorts (vertical or square, ≤ 180 s) can become a show ("Shorts series") in Studio, with a 16:9 banner and backdrop; a video belongs to one series playlist | [57792](https://support.google.com/youtube/answer/57792), [F13](research/platform-video-formats.md) |
 
-The related video is the only clickable pointer from a Short to the main video. A short episode's checklist names the series' playlist: adding the Short to it, or the show, stays a step in Studio.
+The related video is the only clickable pointer from a Short to the main video. A short episode's YouTube checklist asks to add the Short to the series' playlist: `youtube_playlist: { title, url }` in `series.yaml`, named after the series without a title and linked once it has its URL. A missing URL is a TODO in `README.md` and the release checks ("YouTube playlist of the series"). Adding the Short stays a step in Studio; the series stays a plain playlist, not a show.
 
 ## TikTok
 
