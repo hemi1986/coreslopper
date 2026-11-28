@@ -472,6 +472,11 @@ export function boardHandler(options: BoardOptions = {}) {
           events: await loadEvents(root, 50),
         });
       }
+      const sheetMatch = /^\/api\/production\/projects\/([^/]+)\/contact-sheet$/.exec(path);
+      if (req.method === 'GET' && sheetMatch) {
+        const { contactSheet } = await import('./board-contact-sheet.js');
+        return json(res, await contactSheet(await workspaceDir(projectDirs, sheetMatch[1]!, 'project')));
+      }
       const productionMatch = /^\/api\/production\/(projects|series)\/([^/]+)$/.exec(path);
       if (req.method === 'GET' && productionMatch) {
         if (productionMatch[1] === 'series') {
