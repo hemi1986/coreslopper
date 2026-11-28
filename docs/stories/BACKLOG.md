@@ -4,15 +4,20 @@
 
 **Progress: 31 of 31 domain stories done** · scenarios 108 of 108
 
-**66 stories** · In Progress: 0 · Ready: 5 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 61 · Superseded: 0
+**66 stories** · In Progress: 1 · Ready: 4 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 61 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
+
+## In Progress
+
+| ID | Title | Type | Context | Priority | Size | Risk | Depends on |
+|---|---|---|---|---|---|---|---|
+| [ST-062](ST-062-the-boards-sound-list.md) | The board's Sounds view is a searchable, filterable table with playback | task | – | must | – | – | – |
 
 ## Ready
 
 | ID | Title | Type | Context | Priority | Size | Risk | Depends on |
 |---|---|---|---|---|---|---|---|
-| [ST-062](ST-062-the-boards-sound-list.md) | The board's Sounds view is a searchable, filterable table with playback | task | – | must | – | – | – |
 | [ST-064](ST-064-the-new-character-wizard.md) | The New chooser offers the library, and a wizard creates or imports characters | task | – | must | – | – | – |
 | [ST-065](ST-065-the-new-set-wizard.md) | A wizard creates or imports library sets | task | – | must | – | – | ST-064 |
 | [ST-066](ST-066-the-new-sound-wizard.md) | A wizard adds a library sound and sets its cue while it plays | task | – | must | – | – | ST-064 |
