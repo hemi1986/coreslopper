@@ -41,11 +41,11 @@ G6, G10. Same pattern as the Characters list (ST-060). A sound has no origin; th
 - `docs/board.md`, both board guides and `docs/sound-library.md` (both languages) describe the list.
 
 ## Acceptance Criteria
-- [ ] The list shows every library sound sorted by title, with length, licence, tags and used-in count (test with a
+- [x] The list shows every library sound sorted by title, with length, licence, tags and used-in count (test with a
       fixture workspace)
-- [ ] Searching "applaus" finds a sound whose use-when mentions "Applaus" (test)
-- [ ] Filter licence `unknown` shows exactly the sounds of unknown licence (test)
-- [ ] Filter **unused** shows exactly the sounds no meme took (test)
-- [ ] The play button plays the sound in the row; starting another row stops the first
-- [ ] `#/sounds?licence=unknown&sort=length&dir=desc` restores filter and sort after a reload
-- [ ] A filter with no match shows the no-match text and **Reset filters**; an empty library shows "No sounds yet"
+- [x] Searching "applaus" finds a sound whose use-when mentions "Applaus" (test)
+- [x] Filter licence `unknown` shows exactly the sounds of unknown licence (test)
+- [x] Filter **unused** shows exactly the sounds no meme took (test)
+- [x] The play button plays the sound in the row; starting another row stops the first
+- [x] `#/sounds?licence=unknown&sort=length&dir=desc` restores filter and sort after a reload
+- [x] A filter with no match shows the no-match text and **Reset filters**; an empty library shows "No sounds yet"

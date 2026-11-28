@@ -106,6 +106,8 @@ Wenn ein Projekt fertig ist, enthält der Tab **Release** alles für die Veröff
 
 **Sets** ist deine Set-Bibliothek, die gleiche Art Tabelle: eine Zeile pro Set mit Vorschaubild (die erste Platte, sonst die erste Referenz), Schlagworten, der Zahl der Referenzen und Platten, in wie vielen Produktionen es steckt und woher es kommt. Suche, die Filter **unbenutzt** und **Herkunft**, die Schlagwort-Chips und die Spaltenköpfe funktionieren wie bei den Figuren, und die Adresse behält auch sie. Ein Klick auf eine Zeile öffnet das Set.
 
+**Sounds** ist die Sound-Bibliothek deiner Memes, die gleiche Art Tabelle: eine Zeile pro Sound mit Abspielknopf, wofür er gedacht ist, seiner Länge nach dem Trim, seiner Lizenz, Schlagworten und wie viele Memes ihn übernommen haben. ▶ spielt den Sound direkt in der Zeile, ein zweiter Klick stoppt ihn, und das ▶ einer anderen Zeile stoppt den ersten. Suche nach Titel, Wofür oder Schlagwort, filtere nach Schlagwort, **unbenutzt** oder **Lizenz** (`unknown` findet, was der Release-Check anmerken wird) und sortiere per Klick auf einen Spaltenkopf; die Adresse behält alles. Ein Klick an eine andere Stelle der Zeile öffnet den Sound.
+
 ## Serien
 
 ![Eine Serie mit Lücken im Canon und ihren Episoden](assets/board/de/series.webp)

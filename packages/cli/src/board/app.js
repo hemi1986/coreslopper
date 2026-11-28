@@ -8,7 +8,7 @@
 //   #/s/<slug>       a series                #/new[/video|series|episode|meme[/<slug>]]  the wizard
 //   #/characters[?…]  the character list     #/characters/<id>  one library character
 //   #/sets[?…]        the set list           #/sets/<id>        one library set
-//   #/sounds[/<id>]                         the sound library
+//   #/sounds[?…]      the sound list         #/sounds/<id>      one library sound
 //   #/guide[/<doc>]                          the board guide, or another page of docs/
 import { api, decodedHash, go, loading } from './lib.js';
 import { renderNav, viewBusy } from './nav.js';
@@ -20,7 +20,7 @@ import { showContactSheet } from './contact-sheet.js';
 import { showWizard } from './wizard.js';
 import { CHARACTERS_ROUTE, showCharacters } from './characters.js';
 import { SETS_ROUTE, showSets } from './sets.js';
-import { showSounds } from './sounds.js';
+import { SOUNDS_ROUTE, showSounds } from './sounds.js';
 import { showGuide } from './guide.js';
 
 let active = 'overview';
@@ -44,7 +44,8 @@ function route() {
   else if ((match = /^#\/characters\/([a-z0-9][a-z0-9_-]*)\/?$/.exec(hash))) { active = 'characters'; view = showCharacters(match[1]); }
   else if (SETS_ROUTE.test(hash)) { active = 'sets'; view = showSets(); }
   else if ((match = /^#\/sets\/([a-z0-9][a-z0-9_-]*)\/?$/.exec(hash))) { active = 'sets'; view = showSets(match[1]); }
-  else if ((match = /^#\/sounds(?:\/([a-z0-9][a-z0-9_-]*))?\/?$/.exec(hash))) { active = 'sounds'; view = showSounds(match[1]); }
+  else if (SOUNDS_ROUTE.test(hash)) { active = 'sounds'; view = showSounds(); }
+  else if ((match = /^#\/sounds\/([a-z0-9][a-z0-9_-]*)\/?$/.exec(hash))) { active = 'sounds'; view = showSounds(match[1]); }
   else if ((match = /^#\/p\/([a-z0-9-]+)\/release(?:\/([a-z]+))?(?:\/(.+))?$/.exec(hash))) { active = 'release:' + match[1]; view = showRelease(match[1], match[2], match[3]); }
   else if ((match = /^#\/p\/([a-z0-9-]+)\/doc\/(.+)$/.exec(hash))) { active = 'project:' + match[1]; view = showDocument(match[1], match[2]); }
   else if ((match = /^#\/p\/([a-z0-9-]+)\/contact-sheet\/?$/.exec(hash))) { active = 'project:' + match[1]; view = showContactSheet(match[1]); }
