@@ -11,7 +11,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { buildRelease, runRelease } from '../packages/cli/src/release.ts';
 import { calendarInput, planCalendar, runCalendar } from '../packages/cli/src/release-calendar.ts';
-import { cleanupFixtures, fakeDeps, fixture, setDistribution, siblingCalendar } from './helpers/release-fixture.ts';
+import { cleanupFixtures, fakeDeps, fixture, setDemo, setDistribution, siblingCalendar } from './helpers/release-fixture.ts';
 
 afterEach(cleanupFixtures);
 
@@ -104,5 +104,27 @@ describe('planning around an internal project', () => {
     const calendar = await planNeon(dir);
 
     expect(calendar.release_date).toBe('2026-12-11');
+  });
+});
+
+describe('planning around a demo production', () => {
+  it("ST-068: A demo's release day is free for another release", async () => {
+    const dir = await fixture();
+    await siblingCalendar(dir, 'demo', { release_date: '2026-12-04', demo: true });
+
+    const calendar = await planNeon(dir);
+
+    expect(calendar.release_date).toBe('2026-12-04');
+  });
+
+  it("plans a demo's own calendar and builds its release package", async () => {
+    const dir = await fixture();
+    await setDemo(dir, true);
+
+    await runRelease({ projectDir: dir, deps: fakeDeps() });
+
+    expect(existsSync(join(dir, 'renders', 'release', 'manifest.json'))).toBe(true);
+    expect(existsSync(join(dir, 'review', 'calendar.yaml'))).toBe(true);
+    await expect(runCalendar({ projectDir: dir, root: join(dir, '..', '..'), log: () => undefined })).resolves.toBeDefined();
   });
 });

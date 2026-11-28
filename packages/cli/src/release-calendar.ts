@@ -45,8 +45,8 @@ export async function siblingProjects(projectRoot: string): Promise<string[]> {
 
 /**
  * The calendars of every other publicly released project in the workspace, read for the plan of one project. A
- * project with distribution internal is no other release: its calendar books no release day and no slot for another
- * project's plan, even when it stays on disk (CMD-PlanReleaseCalendar). An unreadable calendar is skipped; a project
+ * project with distribution internal or a demo production is no other release: its calendar books no release day and
+ * no slot for another project's plan, even when it stays on disk (CMD-PlanReleaseCalendar; ST-040, ST-068). An unreadable calendar is skipped; a project
  * whose `project.yaml` cannot be read counts as public, so a broken file keeps its booking rather than silently
  * freeing a day or a slot.
  */
