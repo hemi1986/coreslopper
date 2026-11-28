@@ -138,7 +138,7 @@
       "path": "packages/cli",
       "score": 0.61,
       "reasons": [
-        "365 changed files in recent history",
+        "360 changed files in recent history",
         "shared library",
         "shared infrastructure – not a domain slice"
       ]
@@ -636,6 +636,7 @@
         "project",
         "release",
         "review",
+        "set",
         "sheet",
         "shell",
         "sound",
@@ -658,6 +659,7 @@
         "tests/board-projects.test.ts",
         "tests/board-release.test.ts",
         "tests/board-review.test.ts",
+        "tests/board-sets.test.ts",
         "tests/board-shell-characterization.test.ts",
         "tests/board-sounds.test.ts",
         "tests/board-watch.test.ts",
@@ -675,7 +677,7 @@
       "reasons": [
         "2 layers: cli, tests",
         "2 packages",
-        "18 files"
+        "19 files"
       ],
       "adopted": true,
       "adoptedAt": "2026-11-22"

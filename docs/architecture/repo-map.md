@@ -46,7 +46,7 @@ Files that share a concept stem or a table across layers. These are suggestions 
 | media | cli, remotion, tests | 4 | – | 3 layers: cli, remotion, tests; 3 packages; 4 files | yes |
 | state | cli, core, tests | 4 | – | 3 layers: cli, core, tests; 3 packages; 4 files | – |
 | short | cli, core, tests | 3 | – | 3 layers: cli, core, tests; 3 packages; 3 files | – |
-| board | cli, tests | 18 | – | 2 layers: cli, tests; 2 packages; 18 files | yes |
+| board | cli, tests | 19 | – | 2 layers: cli, tests; 2 packages; 19 files | yes |
 | publish | cli, tests | 11 | – | 2 layers: cli, tests; 2 packages; 11 files | yes |
 | sery | cli, tests | 5 | – | 2 layers: cli, tests; 2 packages; 5 files | – |
 | character | cli, tests | 4 | – | 2 layers: cli, tests; 2 packages; 4 files | yes |
@@ -81,7 +81,7 @@ node .claude/skills/adopt/scripts/repo-map.ts --adopt-slice <name>
 
 | # | Package | Score | Why |
 |---|---|---|---|
-| 1 | `packages/cli` (@coreslopper/cli) | 0.61 | 365 changed files in recent history; shared library; shared infrastructure – not a domain slice |
+| 1 | `packages/cli` (@coreslopper/cli) | 0.61 | 360 changed files in recent history; shared library; shared infrastructure – not a domain slice |
 | 2 | `scripts/pose` (coreslopper-pose) | 0.16 | 6 changed files in recent history |
 | 3 | `scripts/audio-analysis` (coreslopper-audio-analysis) | 0.15 | 2 changed files in recent history |
 | 4 | `packages/remotion` (@coreslopper/remotion) | 0.07 | 4 changed files in recent history; shared library; shared infrastructure – not a domain slice |
