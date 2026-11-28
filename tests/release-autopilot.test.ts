@@ -601,6 +601,21 @@ describe('a demo production and the release', () => {
     expect(await readFile(join(dir, 'review', 'release-status.json'), 'utf8').catch(() => undefined)).toBe(status);
     expect((await loadStatus(dir)).approval).toBeUndefined();
   });
+
+  it('ST-068: A public project is still approved and posted', async () => {
+    const dir = await fixture();
+    const root = join(dir, '..', '..');
+    await setReleaseDay(dir, undefined);
+    // A demo beside it does not change the public project's approval.
+    await siblingCalendar(dir, 'demo', { release_date: '2026-12-11', demo: true });
+    await buildRelease({ projectDir: dir, root, deps: fakeDeps({ now: () => new Date('2026-11-13T09:00:00Z') }) });
+    expect(await loadCalendar(dir)).toMatchObject({ release_date: '2026-12-04', proposed: true });
+
+    const status = await approveRelease(dir, { root, now: new Date('2026-11-13T10:00:00Z') });
+
+    expect(status.approval?.release_date).toBe('2026-12-04');
+    expect(await releaseDay(dir)).toBe('2026-12-04');
+  });
 });
 
 /** `release.release_date` of a project's project.yaml, or undefined when it has none. */
