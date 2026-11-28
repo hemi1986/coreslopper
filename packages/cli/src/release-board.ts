@@ -13,6 +13,7 @@ import {
   LIBRARY_FILE_LIMITS,
   libraryTarget,
   libraryTargets,
+  onlyDemoProductions,
   safeName,
   type LibraryImportOptions,
   type LibraryImportOutcome,
@@ -222,7 +223,8 @@ export function boardHandler(options: BoardOptions = {}) {
       };
       const listing = async () => {
         const { entries, errors } = await library.list(root);
-        return { [library.kind]: entries, errors, targets: await libraryTargets(root) };
+        // `onlyDemos`: the workspace has no other production, so the board shows the demos' uses without its switch.
+        return { [library.kind]: entries, errors, targets: await libraryTargets(root), onlyDemos: await onlyDemoProductions(root) };
       };
       const fileMatch = filePattern.exec(path);
       if (req.method === 'GET' && fileMatch) {

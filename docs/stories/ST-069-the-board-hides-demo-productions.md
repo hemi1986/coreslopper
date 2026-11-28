@@ -42,14 +42,14 @@ finished projects and `demo-episode` among the open ones.
 - `docs/board.md` and both board guides describe it; `docs/board.md` says the demos can be deleted.
 
 ## Acceptance Criteria
-- [ ] With one real project and the three demos, the production view and the project list show only the real
+- [x] With one real project and the three demos, the production view and the project list show only the real
       project, and the switch **Show demos** (test with a fixture workspace)
-- [ ] Turning the switch on shows the demos in a group **Demos** after the other groups and keeps that after a
+- [x] Turning the switch on shows the demos in a group **Demos** after the other groups and keeps that after a
       reload (stored value) (test)
-- [ ] A workspace with only the demos shows them in the group **Demos** without the switch (test)
-- [ ] A library character used only by `demo` counts 0 in **Used in** and matches **unused** while demos are hidden,
+- [x] A workspace with only the demos shows them in the group **Demos** without the switch (test)
+- [x] A library character used only by `demo` counts 0 in **Used in** and matches **unused** while demos are hidden,
       and 1 when they are shown; its page lists "Neon Rain (Demo)" (test)
-- [ ] The board's calendar and `/calendar.ics` list no event of a demo with a calendar (test)
+- [x] The board's calendar and `/calendar.ics` list no event of a demo with a calendar (test)
 
 ## Out of Scope
 - The sound library: no shipped demo is a meme

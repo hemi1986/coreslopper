@@ -4,6 +4,7 @@
 //                       its + New opens the character wizard (#/new/character, character-wizard.js)
 //   #/characters/<id>   one character: files, states, where it is used, use it
 import { addStrings, api, el, go, pending, post, setLang, showError, t, upload } from './lib.js';
+import { countedUses, demosShown, useLabel } from './demos.js';
 import { librarySelection } from './library-selection.js';
 import { allTags, anyLibraryFilter, defaultDir, libraryListHash, matchesLibraryItem, parseLibraryListState, queryOf, sortLibraryItems, toggleValue, writeListHash } from './list-state.js';
 
@@ -90,10 +91,12 @@ function imageCount(entry) { return entry.refs.length + (entry.sheet && entry.re
 
 /** One item per library character of `/api/library`, and one per entry that does not load (`error`), by name. */
 export function characterItems(data) {
+  // A use in a demo production counts only while the board shows the demos (demos.js).
+  const shown = demosShown(data.onlyDemos);
   const items = data.characters.map(function (entry) {
     return {
       id: entry.id, name: entry.name, entry: entry, search: [entry.name, entry.description].concat(entry.tags), tags: entry.tags,
-      images: imageCount(entry), states: entry.states.length, used: entry.usedIn.length, origin: entry.origin, href: '#/characters/' + entry.id
+      images: imageCount(entry), states: entry.states.length, used: countedUses(entry.usedIn, shown).length, origin: entry.origin, href: '#/characters/' + entry.id
     };
   });
   const errors = (data.errors || []).map(function (error) { return { id: error.id, name: error.id, error: error.error, search: [error.id], tags: [], used: 0, origin: '' }; });
@@ -252,10 +255,7 @@ function drawList() {
 /** Where a character is used, as the delete confirmation names it: the production's title, else its slug. */
 function usesOf(item) {
   const targets = view.data.targets || [];
-  return item.entry.usedIn.map(function (use) {
-    const target = targets.filter(function (x) { return x.scope === use.scope && x.slug === use.slug; })[0];
-    return target ? target.title : use.slug;
-  });
+  return item.entry.usedIn.map(function (use) { return useLabel(use, targets); });
 }
 
 /** Load the list again with its state and selection, after a delete of selected rows. */
@@ -352,7 +352,7 @@ function detail(id) {
       }) })]) : null,
       checks.node ? el('p', { class: 'meta', text: t('statesHelp') }) : null, checks.node, useResult,
       el('p', { class: 'meta' }, [el('b', { text: t('usedIn') + ': ' })].concat(entry.usedIn.length ? entry.usedIn.map(function (use, index) {
-        return el('span', {}, [index ? ', ' : '', el('a', { href: (use.scope === 'series' ? '#/s/' : '#/p/') + use.slug, text: use.slug })]);
+        return el('span', {}, [index ? ', ' : '', el('a', { href: (use.scope === 'series' ? '#/s/' : '#/p/') + use.slug, text: useLabel(use, data.targets) })]);
       }) : [t('usedNowhere')]))
     ]));
 

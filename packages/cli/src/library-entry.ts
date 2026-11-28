@@ -68,10 +68,37 @@ export async function libraryTargetKind(dir: string): Promise<LibraryTargetKind 
   return existsSync(join(dir, 'series.yaml')) ? 'series' : undefined;
 }
 
-/** Where a library entry is used: a project or series canon whose bible names it in `library`. */
-export type LibraryUseLink<Name extends string = string> = { scope: 'project' | 'series'; slug: string } & {
+/**
+ * Where a library entry is used: a project or series canon whose bible names it in `library`. `demo` is there, and
+ * true, only when the production is a demo production (`demo: true` in its own project.yaml or series.yaml).
+ */
+export type LibraryUseLink<Name extends string = string> = { scope: 'project' | 'series'; slug: string; demo?: true } & {
   [K in Name]: string;
 };
+
+/**
+ * Whether a project or series folder is a demo production: `demo: true` in its own project.yaml or series.yaml. An
+ * unreadable file is no demo, so the board shows it with the real productions.
+ */
+export async function isDemoProduction(dir: string): Promise<boolean> {
+  for (const name of ['project.yaml', 'series.yaml']) {
+    const file = join(dir, name);
+    if (!existsSync(file)) continue;
+    const data = await readFile(file, 'utf8')
+      .then((content) => parseYaml(content) as { demo?: unknown } | null)
+      .catch(() => null);
+    return data?.demo === true;
+  }
+  return false;
+}
+
+/** Whether the workspace has no project or series other than demo productions (an internal one counts as real). */
+export async function onlyDemoProductions(root: string): Promise<boolean> {
+  for (const dir of [...(await projectDirs(root)), ...(await seriesDirs(root))]) {
+    if (!(await isDemoProduction(dir))) return false;
+  }
+  return true;
+}
 
 /** The fields every bible entry shares, across characters and sets. */
 export interface LibraryEntryBase {
@@ -342,10 +369,11 @@ export function defineLibraryKind<
           .then((content) => parseYaml(content) as { [key: string]: { id?: unknown; library?: unknown }[] | undefined } | null)
           // An unreadable bible shows up in the production view; here it uses nothing.
           .catch(() => null);
+        const demo = (raw?.[config.kind] ?? []).length ? await isDemoProduction(dir) : false;
         for (const row of raw?.[config.kind] ?? []) {
           if (typeof row?.library !== 'string') continue;
           const list = found.get(row.library) ?? [];
-          list.push({ scope, slug: basename(dir), [config.useName]: String(row.id) } as LibraryUseLink<UseName>);
+          list.push({ scope, slug: basename(dir), ...(demo ? { demo: true } : {}), [config.useName]: String(row.id) } as LibraryUseLink<UseName>);
           found.set(row.library, list);
         }
       }
