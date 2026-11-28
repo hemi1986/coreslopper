@@ -32,6 +32,16 @@ The board does not refresh by itself. Press **↻ Refresh** at the right of the 
 
 The navigation lists no project: **Projects** opens the list of every project and series, released ones included.
 
+## Projects: find a project
+
+**Projects** is a table of every music video, meme, episode, and series, the newest activity first. Each row shows the kind, the state, the current stage, the next step, the release day with how many release events are done, and when something last changed. Click a row to open it.
+
+- Type in the search field to find a project by its title or slug.
+- Click **Kind**, **Status**, or pick a **Series** to narrow the list. **Released** shows the projects that are out.
+- Click a column header to sort by title, release day, or last activity; click it again to reverse the order.
+- Switch on **Group by series** to see every episode under its series, with the planned episodes that have no project yet.
+- **Reset filters** clears everything. The address keeps your search and filters, so **↻ Refresh**, Back, and a bookmark bring the same list back.
+
 ## Start a music video
 
 Click **+ New** and choose **Music video**.

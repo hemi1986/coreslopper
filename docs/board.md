@@ -4,6 +4,17 @@ The board is the workspace's local page: the production of every project and ser
 
 The navigation is a bar across the top ([ADR 0058](adr/0058-navigation-without-projects.md)): **Work** (Production, Projects, Release calendar) and **Library** (Characters, Sets, Sounds), then **+ New**, and **Guide** and **Refresh** set apart. The entry of the current view is marked; a project's tabs and a series mark **Projects**. The navigation lists no project and no series: **Projects** (`#/projects`) lists every one, released ones included, an unreadable one with its error. The board is laid out for a desktop browser: the main area uses the full window width, running text stays at about 80 characters a line, and nothing scrolls sideways down to a 1280 px window.
 
+## The project list
+
+**Projects** (`#/projects`) is a table with one row per music video, meme, episode and series, newest activity first. A row shows the title and slug, the kind (an episode with its number and series), the state, the production phase or current stage, the next step, the release day with its done marks, and the last activity. A click opens the project (`#/p/<slug>`) or the series (`#/s/<slug>`); Back returns to the list as you left it. The list only reads `/api/production` and `/api/projects`.
+
+- **Sort**: click **Title**, **Release day** or **Last activity**; a second click reverses the order.
+- **Search** finds a project by title or slug, case-insensitively, while you type.
+- **Filters**: **Kind** (Music video, Episode, Meme, Series), **Status** (Your turn, Running, Done, Released) and **Series**. Choices within a filter combine with "or", the filters with "and". **Released** is a finished project whose release events are all ticked off or whose release day has passed, or a finished internal one. **Series** shows only that series' episodes.
+- **Group by series** (off by default) puts every episode under its series row, followed by the planned episodes that have no project yet, while no search and no state filter is active.
+- The search, the filters, the sort and the grouping live in the address, e.g. `#/projects?q=nacht&kind=episode&status=yours&series=drift&group=series&sort=title&dir=asc`: a refresh, Back and a pasted link restore them, and unknown values are ignored.
+- With no project yet, the list says so and links **+ New**; with no match, **Reset filters** clears the search, the filters and the grouping. An unreadable project or series is a row with its error.
+
 New to the board? Start with the [board guide](board-guide.md), a tour with screenshots ([Deutsch](board-guide.de.md)). The board shows it too: **Guide** in the navigation opens it in your browser's language, read from the workspace's `docs/`.
 
 ## Start it
