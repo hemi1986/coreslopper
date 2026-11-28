@@ -175,6 +175,7 @@ aggregates:
       - No writer loses another writer's change to the project state, and no recorded spend is lost (confirmed 2026-11-21; not enforced, state.json has no write lock – gap register)
       - The project's error history only grows; the current error of a stage is its last error (the code does this, state.ts:293)
       - The recorded spend equals the cost sum of the project's manifest – the planned cost of every new generation (the QA checker checks it, packages/cli/src/qa.ts:230-262; decided 2026-11-21, HS-92 – the spend command and a paid call that returns no file break it, gap register)
+      - "A project is a demo production only when its own project.yaml says demo: true; an episode does not inherit it from its series, and only a hand edit writes it (user, 2026-11-28, feature demo-projects)"
   - id: AGG-ProjectReview
     name: Project review
     context: BC-Review
@@ -298,6 +299,7 @@ aggregates:
       - An episode number belongs to one episode of the series (decided 2026-11-22, HS-108; series-status only reports a duplicate – gap register)
       - An episode copies formats, providers and brand from series.yaml once, when it is created; nothing is inherited later (the code does this, new-project.ts:101-134; ADR 0016)
       - An episode may add files to the canon but never overwrites an existing one (decided 2026-11-22, HS-117; generate lets an episode's out path reach any canon file – gap register; the canon files themselves belong to the character slice)
+      - "A series is a demo production only when its own series.yaml says demo: true; only a hand edit writes it (user, 2026-11-28, feature demo-projects)"
   - id: AGG-Script
     name: Script
     context: BC-ScriptedAudio
@@ -2129,6 +2131,7 @@ commands:
       - The calendar of a project with distribution internal is no other release – it books no release day and no slot for any other project's plan (user, 2026-11-22, ST-040)
       - A replan never moves a proposed release day the distributor may already have – it stays until the user moves it (decided 2026-11-22, HS-165; --replan proposes again – gap register)
       - A short episode's calendar plans YouTube Shorts, TikTok, the Reel, X and the microsite on the release day, the announcement when there is one, and no story, community post or LinkedIn (user, 2026-11-27, HS-266)
+      - The calendar of a demo production is planned for its own release package but, like an internal project's, books no release day and no slot for any other project's plan (user, 2026-11-28, feature demo-projects)
   - id: CMD-MarkCalendarEventDone
     name: Mark a calendar event done
     actor: ACT-User
@@ -2151,6 +2154,7 @@ commands:
       - A proposed release day is written into project.yaml first and the calendar planned again – the one place a tool writes the user's project.yaml (the code does this, release-autopilot.ts:86,102-109; HS-177)
       - The day in the request must be the calendar's (the code does this, release-autopilot.ts:81-84)
       - A project with distribution internal is never approved – the approval is refused before anything is written, also with a calendar from before it became internal (user, 2026-11-22, ST-042)
+      - A demo production is never approved – the approval is refused before anything is written (user, 2026-11-28, feature demo-projects)
   - id: CMD-WithdrawApproval
     name: Withdraw the approval
     actor: ACT-User
@@ -2198,6 +2202,7 @@ commands:
       - A round leaves a project with distribution internal alone – it posts nothing of it, also with an approval from before it became internal, and its plan lists no event of it (user, 2026-11-22, ST-041)
       - The pending YouTube uploads are read first, so the posts that link to the main video follow in the same round; then the due events, earliest first (the code does this, release-autopilot.ts:256-302)
       - An error in the autopilot does not stop the production scan of the same watchdog round (the code does this, packages/cli/src/production-watch.ts:99-126)
+      - "A round leaves a demo production alone as it leaves an internal project: it posts nothing of it and its plan lists no event of it (user, 2026-11-28, feature demo-projects)"
   - id: CMD-PostCalendarEvent
     name: Post a calendar event
     actor: ACT-Watchdog
@@ -2609,7 +2614,7 @@ read_models:
     fed_by: [EVT-StageStarted, EVT-StageCompleted, EVT-StageFailed, EVT-StageSkipped, EVT-StageReset]
     used_by: [ACT-User]
     fields: [Where, Command, Reason, Stage]
-    description: "Precedence: a running stage (wait), an open interactive stage (setup skill), open review rounds, an open autonomous stage (/video-next, resume when failed); all stages done without a release folder means reset qa-export, then /video-next – /video-next resets it itself, and the board says the release folder is missing (fixed 2026-11-22, G-5); then the release view"
+    description: "Precedence: a running stage (wait), an open interactive stage (setup skill), open review rounds, an open autonomous stage (/video-next, resume when failed); all stages done without a release folder means reset qa-export, then /video-next – /video-next resets it itself, and the board says the release folder is missing (fixed 2026-11-22, G-5); then the release view; a demo production has no next action: where none, reason demo, no command (user, 2026-11-28, feature demo-projects)"
   - id: RM-ProductionView
     name: Production view
     fed_by: [EVT-ProjectCreated, EVT-StageStarted, EVT-StageCompleted, EVT-StageFailed, EVT-StageSkipped, EVT-StageReset, EVT-SpendRecorded]
@@ -2713,13 +2718,13 @@ read_models:
     fed_by: [EVT-LibraryCharacterCreated, EVT-LibraryCharacterExtended, EVT-LibraryCharacterUpdated, EVT-LibraryFileAdded, EVT-LibraryFileRemoved, EVT-LibraryCharacterDeleted, EVT-LibraryCharacterUsed]
     used_by: [ACT-User, ACT-SetupSkill, ACT-StageRunner]
     fields: [Library character, Name, Cover, Character sheet, References, Reference voice, Character states, Tags, Origin, History, Used in, Targets]
-    description: "character list and the board's Characters view (packages/cli/src/character-library.ts:69-112,538-547; packages/cli/src/board/characters.js); used in lists the productions whose characters.yaml names the entry in library. The board's Characters view (#/characters) is a table like the project list: a cover per row, searchable by name, description and tags, filterable by tag, unused and origin, sortable by its column headers, name first by default; search, filters and sort live in the address (user, 2026-11-28, feature asset-library)"
+    description: "character list and the board's Characters view (packages/cli/src/character-library.ts:69-112,538-547; packages/cli/src/board/characters.js); used in lists the productions whose characters.yaml names the entry in library. The board's Characters view (#/characters) is a table like the project list: a cover per row, searchable by name, description and tags, filterable by tag, unused and origin, sortable by its column headers, name first by default; search, filters and sort live in the address (user, 2026-11-28, feature asset-library); on the board a use in a demo production counts for used in and the unused filter only while demos are shown; the entry's page marks it (Demo) (user, 2026-11-28, feature demo-projects)"
   - id: RM-SetLibrary
     name: Set library
     fed_by: [EVT-LibrarySetCreated, EVT-LibrarySetExtended, EVT-LibrarySetUpdated, EVT-LibrarySetFileAdded, EVT-LibrarySetFileRemoved, EVT-LibrarySetDeleted, EVT-LibrarySetUsed]
     used_by: [ACT-User, ACT-SetupSkill, ACT-StageRunner]
     fields: [Library set, Name, Cover, Description, Prompt, References, Plates, Tags, Origin, History, Used in, Targets]
-    description: "set list and the board's Sets view; the cover is the first plate, else the first reference; used in lists the productions whose sets.yaml names the entry in library. The board's Sets view (#/sets) is a table like the project list: a cover per row, searchable by name, description and tags, filterable by tag, unused and origin, sortable by its column headers, name first by default; search, filters and sort live in the address (user, 2026-11-28, feature asset-library)"
+    description: "set list and the board's Sets view; the cover is the first plate, else the first reference; used in lists the productions whose sets.yaml names the entry in library. The board's Sets view (#/sets) is a table like the project list: a cover per row, searchable by name, description and tags, filterable by tag, unused and origin, sortable by its column headers, name first by default; search, filters and sort live in the address (user, 2026-11-28, feature asset-library); on the board a use in a demo production counts for used in and the unused filter only while demos are shown; the entry's page marks it (Demo) (user, 2026-11-28, feature demo-projects)"
   - id: RM-UserReferences
     name: User references
     fed_by: [EVT-UserReferenceAdded, EVT-UserReferenceUpdated, EVT-UserReferenceRemoved]
@@ -2755,7 +2760,7 @@ read_models:
     fed_by: [EVT-ReleaseCalendarPlanned, EVT-CalendarEventMarkedDone]
     used_by: [ACT-User]
     fields: [Project, Event, Time, Platform, Step, Done]
-    description: "/api/calendar and /calendar.ics over every project, and per project texts/release-plan.md and calendar.ics in the release folder (release-board.ts:477-500; packages/core/src/calendar.ts:231-248)"
+    description: "/api/calendar and /calendar.ics over every project, and per project texts/release-plan.md and calendar.ics in the release folder (release-board.ts:477-500; packages/core/src/calendar.ts:231-248); a demo production's calendar is not on the board's calendar (user, 2026-11-28, feature demo-projects)"
   - id: RM-ReleaseChecks
     name: Release checks
     fed_by: [EVT-ReleasePackageBuilt, EVT-ReleaseChecked]
@@ -2786,7 +2791,7 @@ read_models:
     fed_by: [EVT-ReleaseCalendarPlanned, EVT-ReleaseApproved, EVT-PostClaimed, EVT-CalendarEventPosted, EVT-PostAttemptFailed]
     used_by: [ACT-User]
     fields: [Project, Event, Time, Platform, Action, Autopilot state, Due at]
-    description: "release-run --plan: every calendar event of every publicly released project with a calendar and its state; a project with distribution internal gets one skip line and none of its earlier calendar's events (release-autopilot.ts:534-555)"
+    description: "release-run --plan: every calendar event of every publicly released project with a calendar and its state; a project with distribution internal gets one skip line and none of its earlier calendar's events (release-autopilot.ts:534-555); a demo production gets one skip line and none of its calendar's events (user, 2026-11-28, feature demo-projects)"
   - id: RM-PublishPlan
     name: Publish plan
     fed_by: [EVT-PublishPlanned, EVT-VideoUploaded]
@@ -2840,13 +2845,13 @@ read_models:
     fed_by: [EVT-ProjectCreated, EVT-SeriesCreated, EVT-EpisodeCreated, EVT-StageStarted, EVT-StageCompleted, EVT-StageFailed, EVT-ReleaseCalendarPlanned, EVT-CalendarEventMarkedDone, EVT-BoardRefreshed]
     used_by: [ACT-User]
     fields: [Project, Kind, Series, Episode number, Planned episode, Production phase, Current stage, Next action, Release day, Done of total, Last activity, Error]
-    description: "The board's Projects view (#/projects): every music video, meme, episode and series as one row of a table, newest activity first; searchable by title and slug, filterable by kind, state and series, optionally grouped by series with the planned episodes; the search, the filters and the grouping live in the address (user, 2026-11-27, feature board-redesign)"
+    description: "The board's Projects view (#/projects): every music video, meme, episode and series as one row of a table, newest activity first; searchable by title and slug, filterable by kind, state and series, optionally grouped by series with the planned episodes; the search, the filters and the grouping live in the address (user, 2026-11-27, feature board-redesign); the board hides demo productions unless Show demos is on (kept in the browser) or the workspace has no other project or series, and then lists them in a group Demos (user, 2026-11-28, feature demo-projects)"
   - id: RM-BoardActivity
     name: Board activity
     fed_by: [EVT-StageStarted, EVT-StageCompleted, EVT-StageFailed]
     used_by: [ACT-User]
     fields: [Last round, Interval, Stalled projects, Event, Project, At]
-    description: "/api/activity: the watchdog's last round and interval, the stalled projects and the latest 50 events of the production scan from .cache/watch/ (release-board.ts:357-364; packages/cli/src/production-watch.ts); the production view shows it under Activity"
+    description: "/api/activity: the watchdog's last round and interval, the stalled projects and the latest 50 events of the production scan from .cache/watch/ (release-board.ts:357-364; packages/cli/src/production-watch.ts); the production view shows it under Activity; the production scan skips a demo production: no event, no stall warning, no push (user, 2026-11-28, feature demo-projects)"
   - id: RM-SoundLibrary
     name: Sound library
     fed_by: [EVT-LibrarySoundAdded, EVT-LibrarySoundUpdated, EVT-LibrarySoundRemeasured, EVT-LibrarySoundRemoved]
@@ -4275,3 +4280,6 @@ flows:
     name: From + New or a library list to a library character, set or sound, and back out again
     description: "The board's library wizards (#/new/character, #/new/set, #/new/sound) create the entry in their first step and add its files in the next ones; the character and set wizards can import from a production instead. The library lists find, filter and delete several entries at once; each deletion is the existing single delete, one after the other, after one confirmation that names where each entry is used (user, 2026-11-28, feature asset-library)"
     sequence: [ACT-User, CMD-OpenBoardView, EVT-BoardViewOpened, CMD-AddLibraryCharacter, EVT-LibraryCharacterCreated, CMD-AddLibraryFile, EVT-LibraryFileAdded, CMD-ImportCharacters, CMD-AddLibrarySet, EVT-LibrarySetCreated, CMD-AddLibrarySetFile, EVT-LibrarySetFileAdded, CMD-ImportSets, CMD-AddLibrarySound, EVT-LibrarySoundAdded, CMD-UpdateLibrarySound, EVT-LibrarySoundUpdated, RM-CharacterLibrary, RM-SetLibrary, RM-SoundLibrary, CMD-DeleteLibraryCharacter, EVT-LibraryCharacterDeleted, CMD-DeleteLibrarySet, EVT-LibrarySetDeleted, CMD-RemoveLibrarySound, EVT-LibrarySoundRemoved]
+  - id: FLOW-DemoProductions
+    name: A shipped demo stays out of the way
+    sequence: [ACT-User, RM-ProjectCatalogue, RM-NextAction, RM-BoardActivity, CMD-PlanReleaseCalendar, EVT-ReleaseCalendarPlanned, CMD-ApproveRelease, EVT-ApprovalRefused]
