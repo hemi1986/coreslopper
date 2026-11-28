@@ -158,7 +158,16 @@ table.list td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .docs a:hover { border-color: var(--accent); }
 .renders { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
 .renders video { width: 100%; max-height: 360px; background: var(--media-bg); border-radius: var(--radius); display: block; }
-.contact { max-width: 100%; border: var(--border); border-radius: var(--radius); background: var(--sheet-bg); }
+/* The contact sheet (ST-058): the full width, 4 to 6 cards a row at 1280 to 1440 px. */
+.sheet { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.sheet-card { margin: 0; background: var(--panel); border: var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; font-size: var(--fs-sm); min-width: 0; }
+.sheet-frame { display: block; aspect-ratio: 16 / 9; background: var(--sheet-bg); }
+.sheet-frame img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.sheet-frame.placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: var(--muted); }
+.sheet-card figcaption { padding: 8px 10px 10px; }
+.sheet-card figcaption p { margin: 6px 0 0; overflow-wrap: anywhere; }
+.sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+.sheet-text { font-weight: 600; }
 .shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
 .shots figure { margin: 0; font-size: var(--fs-xs); }
 .shots img { width: 100%; border-radius: var(--radius); display: block; background: var(--chip); }

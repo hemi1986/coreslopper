@@ -191,19 +191,20 @@ export function pending(run, options) {
   };
 }
 
-/** The tabs of a project page: production, review, and release once the project has a release package or calendar. */
+/** The tabs of a project page: production, the contact sheet, review, and release once the project has a release package or calendar. */
 export function viewTabs(slug, active, hasRelease) {
   const nav = el('nav', { class: 'tabs' });
   const tab = function (id, label, hash) {
     nav.appendChild(el('button', { class: 'tab' + (active === id ? ' active' : ''), onclick: function () { go(hash); } }, [label]));
   };
   tab('production', t('tabProduction'), '#/p/' + slug);
+  tab('contact-sheet', t('tabContactSheet'), '#/p/' + slug + '/contact-sheet');
   tab('review', t('tabReview'), '#/p/' + slug + '/review');
   if (hasRelease) tab('release', t('tabRelease'), '#/p/' + slug + '/release');
   return nav;
 }
 
 addStrings({
-  de: { tabProduction: 'Produktion', tabReview: 'Review', tabRelease: 'Release' },
-  en: { tabProduction: 'Production', tabReview: 'Review', tabRelease: 'Release' },
+  de: { tabProduction: 'Produktion', tabContactSheet: 'Contact Sheet', tabReview: 'Review', tabRelease: 'Release' },
+  en: { tabProduction: 'Production', tabContactSheet: 'Contact sheet', tabReview: 'Review', tabRelease: 'Release' },
 });

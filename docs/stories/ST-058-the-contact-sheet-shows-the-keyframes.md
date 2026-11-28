@@ -9,7 +9,7 @@ risk: null
 depends_on: []
 labels: [bug, feature:board-redesign]
 feature: board-redesign
-status: ready
+status: in-progress
 ---
 
 ## Context
@@ -38,8 +38,8 @@ Prototype: prototype/board-redesign – Wie sieht das Board auf dem Desktop aus:
 - The embedded SVG is removed from the production view.
 
 ## Acceptance Criteria
-- [ ] Regression: a project with a storyboard of 3 shots and a keyframe for shot-002 lists 3 cards, and only
+- [x] Regression: a project with a storyboard of 3 shots and a keyframe for shot-002 lists 3 cards, and only
       shot-002 shows an image (test)
-- [ ] A keyframe filed after the page loaded shows after **Refresh**, with no new `contact-sheet` run (test or by hand)
-- [ ] A project without `storyboard.yaml` shows no grid and no error (test)
-- [ ] An invalid storyboard shows its validation error in the tab (test)
+- [x] A keyframe filed after the page loaded shows after **Refresh**, with no new `contact-sheet` run (test or by hand)
+- [x] A project without `storyboard.yaml` shows no grid and no error (test)
+- [x] An invalid storyboard shows its validation error in the tab (test)

@@ -11,7 +11,7 @@ addStrings({
     kindVideo: 'Musikvideo', kindMeme: 'Meme', kindEpisode: function (s, n) { return 'Episode ' + n + ' · ' + s; },
     budget: 'Budget', spent: 'ausgegeben', reserved: 'reserviert', since: 'seit', stage: 'Stage', status: 'Status', attempts: 'Versuche', when: 'Zeit', error: 'Fehler',
     queue: 'Generierungs-Queue', queueStates: { pending: 'offen', generating: 'generiert', reviewing: 'im Review', passed: 'bestanden', 'needs-fix': 'braucht Fix', error: 'Fehler' },
-    reviews: 'Art-Director-Reviews', failedReviews: function (n) { return n + ' Review(s) nicht bestanden'; }, documents: 'Dokumente', noDocument: 'Dokument nicht gefunden', renders: 'Renders', contact: 'Contact Sheet',
+    reviews: 'Art-Director-Reviews', failedReviews: function (n) { return n + ' Review(s) nicht bestanden'; }, documents: 'Dokumente', noDocument: 'Dokument nicht gefunden', renders: 'Renders',
     noRenders: 'Noch kein Render.', interactiveNote: 'interaktiv',
     next: {
       interactive: function (s) { return 'In Claude Code weitermachen (' + s + '):'; },
@@ -46,7 +46,7 @@ addStrings({
     kindVideo: 'Music video', kindMeme: 'Meme', kindEpisode: function (s, n) { return 'Episode ' + n + ' · ' + s; },
     budget: 'Budget', spent: 'spent', reserved: 'reserved', since: 'for', stage: 'Stage', status: 'Status', attempts: 'Attempts', when: 'Time', error: 'Error',
     queue: 'Generation queue', queueStates: { pending: 'pending', generating: 'generating', reviewing: 'in review', passed: 'passed', 'needs-fix': 'needs a fix', error: 'error' },
-    reviews: 'Art-director reviews', failedReviews: function (n) { return n + ' review(s) failed'; }, documents: 'Documents', noDocument: 'Document not found', renders: 'Renders', contact: 'Contact sheet',
+    reviews: 'Art-director reviews', failedReviews: function (n) { return n + ' review(s) failed'; }, documents: 'Documents', noDocument: 'Document not found', renders: 'Renders',
     noRenders: 'No render yet.', interactiveNote: 'interactive',
     next: {
       interactive: function (s) { return 'Continue in Claude Code (' + s + '):'; },
@@ -256,8 +256,6 @@ function renderProject(p) {
       el('div', { class: 'meta' }, [el('b', { text: render.name }), ' · ' + bytes(render.bytes) + ' · ' + local(render.modified) + ' · ', el('a', { href: '#/p/' + p.slug + '/review/' + encodeURIComponent(render.name), text: t('tabReview') + ' →' })])
     ]);
   }))] : p.progress.length ? [] : [el('p', { class: 'empty', text: t('noRenders') })])));
-
-  if (p.contactSheet) main.appendChild(section(t('contact'), [el('a', { href: projectFile(p.slug, p.contactSheet), target: '_blank' }, [el('img', { class: 'contact', src: projectFile(p.slug, p.contactSheet), alt: t('contact') })])]));
 
   if (p.queueItems.length) main.appendChild(section(t('queue') + ' (' + queueLine(p.queue || {}) + ')', [el('table', { class: 'list' }, p.queueItems.map(function (item) {
     return el('tr', {}, [

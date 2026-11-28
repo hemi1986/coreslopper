@@ -443,8 +443,15 @@ export function boardHandler(options: BoardOptions = {}) {
 
   return async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     try {
-      const url = new URL(req.url ?? '/', 'http://localhost');
-      const path = decodeURIComponent(url.pathname);
+      let url: URL;
+      let path: string;
+      try {
+        url = new URL(req.url ?? '/', 'http://localhost');
+        path = decodeURIComponent(url.pathname);
+      } catch {
+        // An address that is no URL (`//[`) or holds a malformed percent sequence (`%E0`) is a bad address, not a server error.
+        return json(res, { error: 'malformed address' }, 400);
+      }
       if (req.method !== 'GET') {
         const refused = trustedWrite(req, path.startsWith('/api/upload/'));
         if (refused) return json(res, { error: refused }, 403);
@@ -471,6 +478,11 @@ export function boardHandler(options: BoardOptions = {}) {
           stalled: Object.entries(snapshot?.projects ?? {}).filter(([, pulse]) => pulse.stalled).map(([slug]) => slug),
           events: await loadEvents(root, 50),
         });
+      }
+      const sheetMatch = /^\/api\/production\/projects\/([^/]+)\/contact-sheet$/.exec(path);
+      if (req.method === 'GET' && sheetMatch) {
+        const { contactSheet } = await import('./board-contact-sheet.js');
+        return json(res, await contactSheet(await workspaceDir(projectDirs, sheetMatch[1]!, 'project')));
       }
       const productionMatch = /^\/api\/production\/(projects|series)\/([^/]+)$/.exec(path);
       if (req.method === 'GET' && productionMatch) {

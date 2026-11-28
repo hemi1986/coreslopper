@@ -3,6 +3,7 @@
 //   #/projects       the project list
 //   #/p/<slug>       a project's production   #/p/<slug>/release[/<platform>[/<event>]]
 //   #/p/<slug>/review[/<render>]             the review player
+//   #/p/<slug>/contact-sheet                 the contact sheet
 //   #/p/<slug>/doc/<path>                    a project document (brief, treatment, …)
 //   #/s/<slug>       a series                #/new[/video|series|episode|meme[/<slug>]]  the wizard
 //   #/characters[/<id>]                     the character library
@@ -15,6 +16,7 @@ import { PROJECTS_ROUTE, showProjects } from './projects.js';
 import { showDocument, showProduction } from './production.js';
 import { onReleaseChange, showCalendar, showRelease } from './release.js';
 import { showReview } from './review.js';
+import { showContactSheet } from './contact-sheet.js';
 import { showWizard } from './wizard.js';
 import { showCharacters } from './characters.js';
 import { showSets } from './sets.js';
@@ -43,6 +45,7 @@ function route() {
   else if ((match = /^#\/sounds(?:\/([a-z0-9][a-z0-9_-]*))?\/?$/.exec(hash))) { active = 'sounds'; view = showSounds(match[1]); }
   else if ((match = /^#\/p\/([a-z0-9-]+)\/release(?:\/([a-z]+))?(?:\/(.+))?$/.exec(hash))) { active = 'release:' + match[1]; view = showRelease(match[1], match[2], match[3]); }
   else if ((match = /^#\/p\/([a-z0-9-]+)\/doc\/(.+)$/.exec(hash))) { active = 'project:' + match[1]; view = showDocument(match[1], match[2]); }
+  else if ((match = /^#\/p\/([a-z0-9-]+)\/contact-sheet\/?$/.exec(hash))) { active = 'project:' + match[1]; view = showContactSheet(match[1]); }
   else if ((match = /^#\/p\/([a-z0-9-]+)\/review(?:\/(.+))?$/.exec(hash))) { active = 'review:' + match[1]; view = showReview(match[1], match[2]); }
   else if ((match = /^#\/p\/([a-z0-9-]+)\/([a-z]+)$/.exec(hash))) { go('#/p/' + match[1] + '/release/' + match[2]); return; } // the release board's old links
   else if ((match = /^#\/p\/([a-z0-9-]+)\/?$/.exec(hash))) { active = 'project:' + match[1]; view = showProduction(active); }
