@@ -57,8 +57,26 @@ rethrown unchanged. `npm test` (1129 passed) and `npm run typecheck` are green, 
 
 | # | Severity | Area | File:line | Finding | Source (ADR, rule, glossary, smell) | Suggested direction |
 |---|---|---|---|---|---|---|
-| 9 | blocker | merge-blocker: server-error | packages/cli/src/release-board.ts:446 | `new URL(req.url ?? '/', 'http://localhost')`, one line above the #1 fix, is still outside the new guard. It throws `TypeError [ERR_INVALID_URL]` on request targets Node's HTTP parser accepts, for example `GET //[ HTTP/1.1` or the absolute form `GET http://[ HTTP/1.1`. I reproduced this with a raw socket against a plain `http.createServer`. The outer catch answers 500 with "Invalid URL" for any non-`ValidationError` (`:546-548`). The line is older than this story, but it is the same shared address parsing as #1, and every route, including the new one, goes through it. | Merge blockers: 5xx on input a client can send | Put `new URL(...)` inside the same try as the decode, so both answer 400 `malformed address`. Add one request test with `//[` next to the `%E0` test. |
+| 9 | blocker | fixed in round 3 (was merge blocker server-error) | packages/cli/src/release-board.ts:446 | `new URL(req.url ?? '/', 'http://localhost')`, one line above the #1 fix, is still outside the new guard. It throws `TypeError [ERR_INVALID_URL]` on request targets Node's HTTP parser accepts, for example `GET //[ HTTP/1.1` or the absolute form `GET http://[ HTTP/1.1`. I reproduced this with a raw socket against a plain `http.createServer`. The outer catch answers 500 with "Invalid URL" for any non-`ValidationError` (`:546-548`). The line is older than this story, but it is the same shared address parsing as #1, and every route, including the new one, goes through it. | Merge blockers: 5xx on input a client can send | Put `new URL(...)` inside the same try as the decode, so both answer 400 `malformed address`. Add one request test with `//[` next to the `%E0` test. |
 | 10 | minor | Design / Primitive Obsession | packages/cli/src/board-contact-sheet.ts:51 | `scope` is partly inferred by reading the message text: `message.includes(storyboardPath)` catches storyboard.yaml read, YAML and schema failures from `readYamlFile`. This works today, because `loadProject` and `contactSheet` both build the path with `projectPaths`. It breaks silently if the message wording or the path form changes. The scope then turns to `project` without any failing test, because no test covers an unparsable storyboard. | Smell: Primitive Obsession (meaning in a string); codebase-design: locality | Either let the storyboard's load failure carry the same typed marker (`StoryboardValidationError`, or a `file` field on `ValidationError`), or add one test with a storyboard.yaml that does not parse, so the inference is pinned. |
 
 fix blockers first
-Most important: `new URL(req.url)` at `release-board.ts:446` still answers 500 on a request target such as `//[` (finding 9, tagged `merge-blocker: server-error`). It is the same one-line widening of the #1 guard.
+Most important: `new URL(req.url)` at `release-board.ts:446` still answers 500 on a request target such as `//[` (finding 9, fixed in round 3 (was merge blocker server-error)). It is the same one-line widening of the #1 guard.
+
+## Round 3
+Base: marathon/2026-11-28 · Commits: 11 (1 new: d6d9641) · Date: 2026-11-28
+
+Fix check. **#9 holds:** `new URL(req.url ?? '/', 'http://localhost')` now sits in the same inner try as the decode
+(`release-board.ts:446-453`), so an address that is no URL and a malformed percent sequence both answer 400
+`malformed address` before the write guard and every route. `url` is declared with `let` outside the try. The catch
+returns, so the type checker accepts the later reads. The new request test sends `//[` and pins status and body. Node
+throws `ERR_INVALID_URL` on that input, so on the parent commit the outer catch answered 500 "Invalid URL" and the test
+would have failed. Nothing in the handler runs before the inner try, so no other client-sent address can reach the
+500 path through parsing. `tests/board-contact-sheet.test.ts` (11 passed) and `npm run typecheck` are green, and
+`check-language.ts` is OK.
+
+No new findings. #5, #6, #7 and #10 (all minor) are still open, and the main session decides on them. No merge
+blocker is open.
+
+ready to merge
+Most important: #9 is fixed. `new URL` and the decode share one guard, so `//[` answers 400 and no longer 500.
