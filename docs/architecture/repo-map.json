@@ -138,7 +138,7 @@
       "path": "packages/cli",
       "score": 0.61,
       "reasons": [
-        "390 changed files in recent history",
+        "395 changed files in recent history",
         "shared library",
         "shared infrastructure – not a domain slice"
       ]
@@ -593,6 +593,7 @@
         "characterization",
         "feedback",
         "http",
+        "nav",
         "production",
         "release",
         "review",
@@ -608,6 +609,7 @@
         "packages/cli/src/board-review.ts",
         "packages/cli/src/board-wizard.ts",
         "tests/board-feedback.test.ts",
+        "tests/board-nav.test.ts",
         "tests/board-production.test.ts",
         "tests/board-release.test.ts",
         "tests/board-review.test.ts",
@@ -628,7 +630,7 @@
       "reasons": [
         "2 layers: cli, tests",
         "2 packages",
-        "12 files"
+        "13 files"
       ],
       "adopted": true,
       "adoptedAt": "2026-11-22"
@@ -880,28 +882,27 @@
       ]
     },
     {
-      "name": "queue",
+      "name": "project",
       "terms": [
-        "characterization",
-        "queue"
+        "project"
       ],
       "tables": [],
       "files": [
-        "packages/cli/src/queue.ts",
-        "tests/queue-characterization.test.ts",
-        "tests/queue.test.ts"
+        "packages/cli/src/board/projects.js",
+        "packages/cli/src/new-project.ts",
+        "packages/core/src/project.ts"
       ],
       "packages": [
-        "?",
-        "packages/cli"
+        "packages/cli",
+        "packages/core"
       ],
       "layers": [
         "cli",
-        "tests"
+        "core"
       ],
       "score": 11,
       "reasons": [
-        "2 layers: cli, tests",
+        "2 layers: cli, core",
         "2 packages",
         "3 files"
       ]
