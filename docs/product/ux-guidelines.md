@@ -57,6 +57,19 @@ Grouping is a switch that is off by default. A grouped series shows its planned 
 ## G9 – The board never refreshes by itself
 The user refreshes; the board does not poll or reload on its own. (2026-11-27 – already decided in ADR 0049; recorded so no screen adds auto-refresh)
 
+Amended 2026-11-28 (feature `vast-gpu`): an action the user started may show its own progress live as the answer to that click until it ends (e.g. renting a GPU: rented, booting, ready, or the error). This is not background polling; everything else on the page still changes only on Refresh. (2026-11-28 – renting takes minutes and the user must see that it works and when it is ready)
+
+## G11 – Workspace-wide machine state is a chip in the top bar
+State that concerns the whole workspace and costs money while it runs (the rented vast GPU) is a status chip at the right of the top bar next to Refresh, not a navigation entry (G3 stays). The chip reads `vast GPU: off`, `vast GPU: starting…`, `vast GPU: ready · $1.23/h · 0:42 · $0.86` (hourly price, running time, cost so far) or `vast GPU: stopping…`. A click opens a panel with the details (GPU, price, running time, cost so far, idle time left) and the one action, Rent GPU or Shut down. Shut down asks for confirmation when vast items are generating or pending. A page that needs the GPU (the production page of a project whose video provider is vast, when no GPU is ready) shows a notice with its own Rent GPU button. (2026-11-28 – a running cost must stay visible from every page without becoming navigation; feature `vast-gpu`)
+
+Rejection texts for Rent GPU (UI language English), worded exactly:
+- "VAST_API_KEY is missing in .env."
+- "No <GPU> under $<cap>/h. Cheapest now: $<price>/h. Raise VAST_MAX_PRICE_PER_HOUR or try later."
+- vast.ai's own message plus "Top up your vast.ai credit." when the credit is too low.
+- "The GPU did not become ready within 20 min and was shut down; cost so far $<x>."
+
+While a GPU rental is active, Rent GPU is not offered. (2026-11-28 – each rejection names its cause and the way out; feature `vast-gpu`)
+
 ## Look
 
 ## G8 – Visual direction "Werkstatt", light or dark by system

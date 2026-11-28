@@ -481,8 +481,13 @@ A named creative job in `config/models.yaml`, such as `image.keyframe` or `video
 _Avoid_: model (the slug or workflow a role names), preset
 
 **Provider**:
-What runs the generations of one kind for a project, set in `project.yaml` `providers` (`image`, `video`, `lipsync`, `audio`): a cloud provider (`fal`, `higgsfield`, `topview`), the local provider `comfyui`, or `mock`. Lip-sync runs on the video provider, except that a Topview project lip-syncs on fal.ai; reference-to-video always runs on ComfyUI.
+What runs the generations of one kind for a project, set in `project.yaml` `providers` (`image`, `video`, `lipsync`, `audio`): a cloud provider (`fal`, `higgsfield`, `topview`), the local provider `comfyui`, the rented provider `vast` (MiniMax H3 on a **GPU Rental**), or `mock`. Lip-sync runs on the video provider, except that a Topview project lip-syncs on fal.ai; reference-to-video always runs on ComfyUI.
 _Avoid_: backend, vendor, engine
+
+**GPU Rental**:
+One GPU the workspace rents on vast.ai, from renting to shutdown, running vast's MiniMax H3 ComfyUI template for the `vast` provider. A workspace has at most one; shutting it down destroys it. It costs its hourly price for its running time, which is the workspace's cost, not a project's budget; a clip made on it costs nothing on its own. The user's own ComfyUI server stays the `comfyui` provider.
+_Avoid_: cloud ComfyUI, remote server, instance (vast.ai's word for the machine)
+_UI (en)_: vast GPU
 
 **Generation Cache**:
 The results of earlier generations under `.cache/generations/<cache key>/`, shared by every project and series of a workspace. A generation with the same **Cache Key** reuses the result at no cost as long as its files exist.

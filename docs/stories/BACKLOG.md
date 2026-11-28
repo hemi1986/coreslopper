@@ -2,11 +2,25 @@
 
 > Generated from `docs/stories/ST-*.md` – **do not edit manually**. Change the story files instead.
 
-**Progress: 32 of 32 domain stories done** · scenarios 112 of 112
+**Progress: 32 of 37 domain stories done** · scenarios 112 of 128
 
-**69 stories** · In Progress: 0 · Ready: 0 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 69 · Superseded: 0
+**78 stories** · In Progress: 0 · Ready: 9 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 69 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
+
+## Ready
+
+| ID | Title | Type | Context | Priority | Size | Risk | Depends on |
+|---|---|---|---|---|---|---|---|
+| [ST-070](ST-070-spike-minimax-h3-on-vast.md) | Spike: MiniMax H3 on a rented vast.ai GPU – access, workflows, lip-sync | spike | – | must | – | – | – |
+| [ST-071](ST-071-rent-a-gpu-on-vast.md) | Rent a GPU on vast.ai for MiniMax H3 | domain | Generation | must | – | – | ST-070 |
+| [ST-072](ST-072-shut-down-the-gpu.md) | Shut down the rented GPU and record its cost | domain | Generation | must | – | – | ST-071 |
+| [ST-073](ST-073-shut-down-an-idle-gpu.md) | The watchdog shuts down an idle or overdue GPU rental | domain | Generation | must | – | – | ST-072 |
+| [ST-076](ST-076-vast-workflows-and-h3-prompting.md) | Ship the tagged MiniMax H3 workflows for vast and the H3 prompt guide | task | – | must | – | – | ST-070 |
+| [ST-074](ST-074-generate-clips-on-the-vast-gpu.md) | The vast provider generates MiniMax H3 clips on the rented GPU | domain | Generation | must | – | – | ST-071, ST-076 |
+| [ST-075](ST-075-the-queue-stops-without-the-vast-gpu.md) | The queue run stops when the vast GPU is gone | domain | Generation queue | must | – | – | ST-074 |
+| [ST-077](ST-077-the-gpu-chip-in-the-board.md) | The vast GPU chip and panel in the board | task | – | must | – | – | ST-071, ST-072 |
+| [ST-078](ST-078-choose-vast-for-a-new-production.md) | Choose MiniMax H3 on vast.ai when creating a production | task | – | should | – | – | ST-074 |
 
 ## Done
 

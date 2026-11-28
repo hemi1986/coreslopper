@@ -139,8 +139,9 @@ accept is final.
 
 ### BC-Generation – Generation
 Purpose: turns batch items into provider calls for a model role, budget-checked, cached and billed at the planned
-cost. Core terms: Model Role, Generation Cache, Manifest, Batch Cap. Owner role: the agent changes model roles at
-the user's request.
+cost. Core terms: Model Role, Generation Cache, Manifest, Batch Cap, GPU Rental. Owner role: the agent changes
+model roles at the user's request; the user rents the GPU rental (`AGG-GpuRental`, target), the user or the watchdog round
+shuts it down.
 
 ### BC-Render – Render
 Purpose: renders every format from one composition, cuts Shorts, composes images, keeps media in the media

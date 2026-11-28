@@ -52,6 +52,9 @@ external_systems:
   - id: EXT-ComfyUI
     name: ComfyUI server
     description: The local generation server; the queue run restarts it through COMFYUI_RESTART_COMMAND when a generation fails or hangs
+  - id: EXT-VastAi
+    name: vast.ai
+    description: The GPU marketplace the workspace rents a GPU from – searched, rented, observed and destroyed through its REST API with the user's VAST_API_KEY; the rented instance runs vast's own MiniMax H3 ComfyUI template (docs/research/vast-gpu-rental.md)
   - id: EXT-AudioModels
     name: Local audio models
     description: Demucs (vocal separation), WhisperX (speech recognition and word alignment), librosa (beats, onsets, energy) and the MelBand-Roformer karaoke model (lead stem), run locally by the song analysis (ADR 0008, 0026)
@@ -283,6 +286,17 @@ aggregates:
       - A paid provider runs a role only with a known price; a local or mock generation costs nothing (the code does this at resolution, models.ts:62-68, generate.ts:372-380,689 – not when the file is loaded)
       - A Pika workflow loads only the model files its family's lock allows (the code does this, packages/providers/src/comfyui.ts:374-405)
       - Only the agent changes the model roles and a project's model overrides, at the user's request (user, 2026-11-21, HS-88)
+  - id: AGG-GpuRental
+    name: GPU rental
+    context: BC-Generation
+    status: target
+    invariants:
+      - A workspace has at most one active GPU rental; vast.ai is asked for instances with the workspace's rental label, not only the local record, so a rental left behind by a crash is found (user, 2026-11-28, feature vast-gpu)
+      - A GPU is rented only from an on-demand, verified offer whose hourly price is at most VAST_MAX_PRICE_PER_HOUR (default 1.50) (user, 2026-11-28)
+      - Shutting a GPU rental down destroys the instance; a rental is never only stopped, because a stopped instance keeps costing storage (user, 2026-11-28; F6 in docs/research/vast-gpu-rental.md)
+      - A rental that is not ready within 20 minutes of being rented is shut down (user, 2026-11-28)
+      - The ComfyUI server of a rental is reached only with the rental's own access token, generated at rental time; it never runs on an unauthenticated port (user, 2026-11-28; F8 in docs/research/vast-gpu-rental.md)
+      - A rental's cost is its hourly price times its running time from rented to shut down; it is the workspace's cost, never billed to a project budget (user, 2026-11-28)
   - id: AGG-Series
     name: Series
     context: BC-Series
@@ -828,6 +842,31 @@ events:
     name: ComfyUI restarted
     context: BC-Generation
     data: [Server URL]
+  - id: EVT-GpuRented
+    name: GPU rented
+    aggregate: AGG-GpuRental
+    pivotal: true
+    data: [Instance ID, Rental label, GPU, Hourly price, Rented at]
+  - id: EVT-GpuRentalRefused
+    name: GPU rental refused
+    aggregate: AGG-GpuRental
+    data: [Reason, Cheapest hourly price]
+  - id: EVT-GpuReady
+    name: GPU ready
+    aggregate: AGG-GpuRental
+    data: [Instance ID, Server URL, Boot time]
+  - id: EVT-GpuRentalOverdue
+    name: GPU rental overdue
+    aggregate: AGG-GpuRental
+    origin: time
+    data: [Instance ID, Idle time, Running time]
+    description: "Noticed by the watchdog round: no vast generation ran or waited for VAST_IDLE_MINUTES, or the rental has run VAST_MAX_HOURS"
+  - id: EVT-GpuShutDown
+    name: GPU shut down
+    aggregate: AGG-GpuRental
+    pivotal: true
+    data: [Instance ID, Shutdown reason, Shut down at, Running time, Rental cost]
+    description: "Shutdown reason: user, idle, max runtime, boot timeout"
   - id: EVT-SeriesCreated
     name: Series created
     aggregate: AGG-Series
@@ -1568,6 +1607,7 @@ commands:
       - Generates ready items lowest order first through generate (budget, cache, manifest, spend)
       - A budget or config error puts the item back to pending and stops the run; a validation error marks it error; other failures are tried again with a ComfyUI restart in between
       - A killed run's generating items go back to pending on the next run
+      - A vast item whose GPU rental is not ready, or vanished, goes back to pending and stops the run with the hint to rent the GPU; there is no restart command for it (user, 2026-11-28, feature vast-gpu)
   - id: CMD-GiveVerdict
     name: Give a verdict
     actor: ACT-ArtDirector
@@ -1721,6 +1761,7 @@ commands:
       - Every generation – a new result, a reuse or a failure – adds one line to the project's or the series canon's manifest (runner.ts:97,158,191); a paid call that returns no file also leaves one (decided 2026-11-21, HS-92; today it leaves none – gap register)
       - A paid submission is never charged twice – a submission is retried only with an idempotency key the provider honours, or before the provider accepted it (decided 2026-11-21, HS-97; fal is retried without a key – gap register)
       - A final local clip gets the restore pass unless seedvr2 is off (generate.ts:556-569)
+      - The vast provider runs the video operations of plain MiniMax H3 on the GPU rental's ComfyUI server with the tagged workflows from comfyui/vast/ and a plain-text prompt (a Flex prompt is rejected); it costs nothing per clip, the rental carries the cost (user, 2026-11-28, feature vast-gpu)
   - id: CMD-EstimateGeneration
     name: Estimate a generation
     actor: ACT-StageRunner
@@ -1746,6 +1787,26 @@ commands:
       - "--if-stuck and the watchdog round restart only when every check of a 3-minute window (one every 30 s) is stuck: no answer from /queue within 10 s, or at least one pending prompt, none running, and the same prompt first in the queue; one healthy check ends the window without a restart (ST-039)"
       - A running prompt is never stuck for this check; a hung generation is the queue run's timeout (queue.ts)
       - The watchdog round records a restart as a production event (comfyui-restarted in .cache/watch/events.jsonl)
+  - id: CMD-RentGpu
+    name: Rent a GPU
+    actor: ACT-User
+    aggregate: AGG-GpuRental
+    produces: [EVT-GpuRented, EVT-GpuRentalRefused, EVT-GpuReady, EVT-GpuShutDown]
+    description: "gpu up, and Rent GPU in the board's GPU panel; the board streams the command's progress – rented, booting, ready – as the answer to the click (feature vast-gpu)"
+    rules:
+      - Requires VAST_API_KEY; VAST_GPU (default RTX PRO 6000 S, a comma list allowed), VAST_MAX_PRICE_PER_HOUR (1.50), VAST_DISK_GB (150), VAST_IDLE_MINUTES (30), VAST_MAX_HOURS (8) and VAST_TEMPLATE are read from .env; a missing key or an invalid value (not a number, not positive) is a configuration error before vast.ai is asked
+      - Picks the cheapest offer that fits; without one it rents nothing and names the cheapest offer of the wanted GPUs and its price
+      - Rents with the MiniMax H3 ComfyUI template and a fresh random access token
+      - Ready means the ComfyUI server answers with the token and refuses a request without it
+  - id: CMD-ShutDownGpu
+    name: Shut down the GPU
+    actor: ACT-User
+    aggregate: AGG-GpuRental
+    produces: [EVT-GpuShutDown]
+    description: "gpu down, Shut down in the board's GPU panel, and the watchdog round through POL-ShutDownIdleGpu (feature vast-gpu)"
+    rules:
+      - The board asks for confirmation when vast items are generating or pending in a queue
+      - A generation running on the rental fails as unreachable; the queue run puts it back to pending and stops (CMD-RunQueue)
   - id: CMD-RecordCanonSpend
     name: Record canon spend
     actor: ACT-SetupSkill
@@ -2535,6 +2596,11 @@ policies:
     name: A failed local generation restarts ComfyUI before the next try
     when: [EVT-GenerationFailed]
     then: [CMD-RestartComfyUI]
+  - id: POL-ShutDownIdleGpu
+    name: An idle or overdue GPU rental is shut down
+    when: [EVT-GpuRentalOverdue]
+    then: [CMD-ShutDownGpu]
+    description: "The watchdog round shuts the rental down when no vast generation ran or waited for VAST_IDLE_MINUTES (30), or when it has run VAST_MAX_HOURS (8) (user, 2026-11-28, feature vast-gpu)"
   - id: POL-ValidateEveryScriptEdit
     name: Every script edit is validated
     when: [EVT-ScriptWritten, EVT-ScriptRevised]
@@ -2620,6 +2686,12 @@ read_models:
     fed_by: [EVT-ProjectCreated, EVT-StageStarted, EVT-StageCompleted, EVT-StageFailed, EVT-StageSkipped, EVT-StageReset, EVT-SpendRecorded]
     used_by: [ACT-User]
     fields: [Project, Production phase, Stage status, Stage attempts, Spent total, Remaining budget, Next action]
+  - id: RM-GpuStatus
+    name: GPU status
+    fed_by: [EVT-GpuRented, EVT-GpuRentalRefused, EVT-GpuReady, EVT-GpuRentalOverdue, EVT-GpuShutDown]
+    used_by: [ACT-User, ACT-Watchdog]
+    fields: [Rental state, GPU, Hourly price, Running time, Rental cost so far, Idle time left]
+    description: "gpu status and the GPU chip in the board's top bar; the rental state is off, starting, ready or stopping, read from vast.ai by the rental label (feature vast-gpu)"
   - id: RM-ReviewView
     name: Review view
     fed_by: [EVT-ReviewNoteAdded, EVT-ReviewNoteChanged, EVT-ReviewNoteDeleted, EVT-ReviewRoundSent, EVT-ReviewRoundAnswered]
@@ -4202,6 +4274,18 @@ hotspots:
     refs: [CMD-BuildReleasePackage, AGG-ReleaseStatus]
     status: resolved
     resolution: "The shape is recorded in the manifest. Until the release status holds a done mark or a live URL it follows the project; after that, a run whose shape differs fails and changes nothing (user, 2026-11-27)"
+  - id: HS-269
+    question: "Does plain MiniMax H3 (no Pika LoRA) lip-sync a vocal anchored with MiniMaxH3AddGuide at frame 0 well enough to run lipSync on the vast provider?"
+    refs: [CMD-RunGenerationBatch, AGG-GpuRental]
+    status: open
+  - id: HS-270
+    question: "How does a client find the authenticated ComfyUI URL of a new rental through the API – Cloudflare tunnel URL or the mapped port – and does the MiniMax H3 template put ComfyUI behind the portal's token check?"
+    refs: [CMD-RentGpu, AGG-GpuRental]
+    status: open
+  - id: HS-271
+    question: "Which template_hash_id, workflow templates, model files and boot time does vast's MiniMax H3 ComfyUI template have?"
+    refs: [CMD-RentGpu, EXT-VastAi]
+    status: open
 
 flows:
   - id: FLOW-AutonomousStage
@@ -4283,3 +4367,7 @@ flows:
   - id: FLOW-DemoProductions
     name: A shipped demo stays out of the way
     sequence: [ACT-User, RM-ProjectCatalogue, RM-NextAction, RM-BoardActivity, CMD-PlanReleaseCalendar, EVT-ReleaseCalendarPlanned, CMD-ApproveRelease, EVT-ApprovalRefused]
+  - id: FLOW-GpuRental
+    name: From renting a GPU to its shutdown
+    description: "The user rents the GPU before a production whose video provider is vast, the queue runs its vast items on it, and the user or the watchdog round shuts it down (user, 2026-11-28, feature vast-gpu)"
+    sequence: [ACT-User, RM-GpuStatus, CMD-RentGpu, EVT-GpuRented, EVT-GpuReady, ACT-QueueRun, CMD-RunGenerationBatch, EVT-GenerationCompleted, ACT-Watchdog, EVT-GpuRentalOverdue, POL-ShutDownIdleGpu, CMD-ShutDownGpu, EVT-GpuShutDown]

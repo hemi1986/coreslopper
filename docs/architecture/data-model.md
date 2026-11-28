@@ -315,6 +315,38 @@ optional Lip-sync (defaults to Video, or to fal.ai when Video is `comfyui` or `t
 manifest's cost sum, HS-92) and Reserved, which is never written above 0 (HS-93, to be removed). The batch cap
 is `batch_cap_usd` in `project.yaml`, or 30 % of the remaining budget.
 
+### AGG-GpuRental – GPU rental (target)
+
+One GPU the workspace rents on vast.ai (`EXT-VastAi`) for the `vast` provider, from renting to shutdown (feature
+`vast-gpu`, ADR 0059, proposed). A workspace has at most one active GPU rental; vast.ai itself is asked for
+instances with the workspace's rental label, so the local record is never the only source. Written by
+`CMD-RentGpu` and `CMD-ShutDownGpu` (the user, or the watchdog round through `POL-ShutDownIdleGpu`). It references
+no other aggregate. Where the workspace keeps the record of past rentals and their cost is decided with the story.
+
+| Attribute | Type | Required | Source |
+|---|---|---|---|
+| Instance ID | vast.ai instance id | yes | EVT-GpuRented, EVT-GpuReady, EVT-GpuRentalOverdue, EVT-GpuShutDown |
+| Rental label | Text, the workspace's label on the instance; finds a rental a crashed session left behind | yes | EVT-GpuRented |
+| GPU | GPU model name (default RTX PRO 6000 S) | yes | EVT-GpuRented, RM-GpuStatus |
+| Hourly price | Money (USD per hour), at most VAST_MAX_PRICE_PER_HOUR; on-demand, verified offer | yes | EVT-GpuRented, RM-GpuStatus |
+| Rented at | Timestamp | yes | EVT-GpuRented |
+| Rental state | `off` \| `starting` \| `ready` \| `stopping`, read from vast.ai by the rental label | yes | RM-GpuStatus |
+| Server URL | URL of the rental's ComfyUI server (the authenticated HTTPS tunnel, HS-270) | once ready | EVT-GpuReady |
+| Boot time | Duration from rented to ready, at most 20 minutes | once ready | EVT-GpuReady |
+| Idle time | Duration since a vast generation last ran or waited; Idle time left = VAST_IDLE_MINUTES − Idle time | no | EVT-GpuRentalOverdue, RM-GpuStatus |
+| Running time | Duration from rented to now, or to shut down; at most VAST_MAX_HOURS | yes | EVT-GpuRentalOverdue, EVT-GpuShutDown, RM-GpuStatus |
+| Rental cost | Money (USD): Hourly price × Running time; "so far" while active, final at shutdown; the workspace's cost, never a project budget's | yes | EVT-GpuShutDown, RM-GpuStatus |
+| Shutdown reason | `user` \| `idle` \| `max runtime` \| `boot timeout` | once shut down | EVT-GpuShutDown |
+| Shut down at | Timestamp | once shut down | EVT-GpuShutDown |
+
+**Access token**: generated fresh per rental and passed at launch; the invariant requires it, but no event carries
+it in its `data`, deliberately, because it is a secret. It lives only as long as the rental.
+
+**Refused rental**: `EVT-GpuRentalRefused` (Reason, Cheapest hourly price) creates no rental; its data is the answer
+to `gpu up` and the board's click, not a stored attribute.
+
+**A vast clip** costs $0 in its manifest line and cache record (Provider `vast`); the rental carries the cost.
+
 ### AGG-Series – Series (as-is)
 
 One folder per series, `projects/<slug>/` with `series.yaml` (`SeriesSchema`) and `state.json`
@@ -874,6 +906,21 @@ stateDiagram-v2
 A refused add (id taken, same content, not audio, cue or trim outside) leaves nothing behind; a refused edit of
 `sound.yaml` leaves the entry as it was.
 
+### A GPU rental (vast.ai, target)
+
+```mermaid
+stateDiagram-v2
+  [*] --> rented: GPU rented (cheapest fitting offer)
+  rented --> ready: GPU ready (ComfyUI answers with the token, refuses without it)
+  rented --> shut_down: GPU shut down (boot timeout after 20 min, or the user)
+  ready --> ready: GPU rental overdue (the watchdog round notices idle or max runtime)
+  ready --> shut_down: GPU shut down (user, idle, max runtime)
+  shut_down --> [*]: destroyed, never only stopped
+```
+
+A refused rental (no fitting offer, or a configuration error before vast.ai is asked) creates no rental. In
+`RM-GpuStatus`, `rented` reads as `starting`, a shutdown in progress as `stopping`, and no active rental as `off`.
+
 ### A bench result (model bench)
 
 ```mermaid
@@ -1002,4 +1049,5 @@ erDiagram
   PROJECT ||--o| EPISODE_TRACK : "audio/episode.wav, timing.json"
   EPISODE_TRACK }o--|{ TAKE : "mixed from"
   WORKSPACE ||--o{ LIBRARY_SOUND : "library/sounds/"
+  WORKSPACE ||--o{ GPU_RENTAL : "at most one active, found by rental label"
 ```
