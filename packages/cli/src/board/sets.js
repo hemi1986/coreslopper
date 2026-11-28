@@ -1,17 +1,16 @@
 // The set library: every reusable place of the workspace's videos and series,
 // to take into a new music video or series canon with one click.
-//   #/sets        the list (a table: search, tag/unused/origin filters, sort, all in the hash),
-//                 a new set, import from a project or series
+//   #/sets        the list (a table: search, tag/unused/origin filters, sort, all in the hash);
+//                 its + New opens the set wizard (#/new/set, set-wizard.js)
 //   #/sets/<id>   one set: references, plates, where it is used, use it
 import { addStrings, api, el, go, pending, post, setLang, showError, t, upload } from './lib.js';
 import { allTags, anyLibraryFilter, defaultDir, libraryListHash, matchesLibraryItem, parseLibraryListState, queryOf, sortLibraryItems, toggleValue, writeListHash } from './list-state.js';
 
 addStrings({
   de: {
-    setTitle: 'Sets', setHelp: 'Alle Sets aus deinen Videos und Serien: jeder Ort mit seinen Referenzen und Kamerawinkeln. Ein Set kommt automatisch in die Bibliothek, sobald das Set-Bible eines Videos fertig ist; eigene legst du hier an.',
-    setEmpty: 'Die Bibliothek hat noch keine Sets; sie füllt sich mit jedem fertigen Musikvideo und jeder Serie. Eigene Sets legst du hier an.',
-    setNew: 'Neues Set anlegen', setImport: 'Aus Projekt oder Serie übernehmen', setImportHelp: 'Holt alle Sets mit Bildern aus einem bestehenden Musikvideo oder einer Serie in die Bibliothek; bekannte Sets bekommen nur ihre neuen Bilder und Kamerawinkel.',
-    setImportButton: 'Importieren', setImported: function (n) { return n + ' Set(s) übernommen'; }, setNothing: 'Kein Set mit Bildern gefunden.', setSkipped: 'ohne Bilder',
+    setTitle: 'Sets', setHelp: 'Alle Sets aus deinen Videos und Serien: jeder Ort mit seinen Referenzen und Kamerawinkeln. Ein Set kommt automatisch in die Bibliothek, sobald das Set-Bible eines Videos fertig ist; eigene legst du mit + Neu an oder übernimmst sie aus einem Projekt.',
+    setEmpty: 'Die Bibliothek hat noch keine Sets; sie füllt sich mit jedem fertigen Musikvideo und jeder Serie. Eigene Sets legst du mit + Neu an.',
+    slNew: '+ Neu',
     setName: 'Name', setDescription: 'Beschreibung (Ort, Licht, Material)', setPrompt: 'Prompt-Satz für Keyframes', setTags: 'Schlagworte, mit Komma',
     setCreate: 'Anlegen', setUploading: 'lädt hoch …',
     setRefsChip: 'Referenzen', setPlateCount: function (n) { return n + (n === 1 ? ' Platte' : ' Platten'); }, setUsedIn: 'Verwendet in', setUsedNowhere: 'noch nirgends',
@@ -30,10 +29,9 @@ addStrings({
     slCount: function (n, all) { return n + ' von ' + all; }
   },
   en: {
-    setTitle: 'Sets', setHelp: 'Every set of your videos and series: each place with its references and camera angles. A set comes in by itself once a video\'s set bible is done; add your own here.',
-    setEmpty: 'The library has no sets yet; it fills with every finished music video and series. Add your own here.',
-    setNew: 'New set', setImport: 'Take from a project or series', setImportHelp: 'Brings every set with images of an existing music video or series into the library; known sets only gain their new images and camera angles.',
-    setImportButton: 'Import', setImported: function (n) { return n + ' set(s) taken in'; }, setNothing: 'No set with images found.', setSkipped: 'no images',
+    setTitle: 'Sets', setHelp: 'Every set of your videos and series: each place with its references and camera angles. A set comes in by itself once a video\'s set bible is done; add your own or take them from a project with + New.',
+    setEmpty: 'The library has no sets yet; it fills with every finished music video and series. Add your own with + New.',
+    slNew: '+ New',
     setName: 'Name', setDescription: 'Description (place, light, material)', setPrompt: 'Prompt sentence for keyframes', setTags: 'Tags, comma-separated',
     setCreate: 'Create', setUploading: 'uploading …',
     setRefsChip: 'references', setPlateCount: function (n) { return n + (n === 1 ? ' plate' : ' plates'); }, setUsedIn: 'Used in', setUsedNowhere: 'nowhere yet',
@@ -69,47 +67,6 @@ function cover(entry, cls) {
   return entry.cover
     ? el('img', { class: cls, src: setFile(entry.id, entry.cover), loading: 'lazy', alt: entry.name })
     : el('div', { class: cls + ' placeholder', text: entry.name.slice(0, 1).toUpperCase() });
-}
-
-// ------------------------------------------------------------- the forms
-
-function newSetForm(onCreated) {
-  const name = input({ required: true }), description = el('textarea', { class: 'note-input', rows: 3 }), prompt = el('textarea', { class: 'note-input', rows: 2 }), tags = input({});
-  const error = el('p', { class: 'error' });
-  const form = el('form', { class: 'card form' }, [
-    el('h3', { text: t('setNew'), style: 'margin:0 0 10px' }),
-    el('div', { class: 'form-row' }, [field(t('setName'), name), field(t('setTags'), tags)]),
-    el('div', { class: 'form-row' }, [field(t('setDescription'), description)]),
-    el('div', { class: 'form-row' }, [field(t('setPrompt'), prompt)]),
-    error, el('button', { class: 'primary', type: 'submit', text: t('setCreate') })
-  ]);
-  form.onsubmit = pending(function () {
-    error.textContent = '';
-    return post('/api/sets/new', { name: name.value, description: description.value, prompt: prompt.value, tags: tags.value })
-      .then(function (created) { onCreated(created.id); })
-      // A refused write names its reason and leaves the typed fields as they are.
-      .catch(function (e) { error.textContent = e.message; });
-  });
-  return form;
-}
-
-function importForm(data, refresh) {
-  const target = el('select', { class: 'text' }, data.targets.map(function (x) { return el('option', { value: targetValue(x), text: targetLabel(x) }); }));
-  const result = el('p', { class: 'meta' });
-  const button = el('button', { class: 'small', text: t('setImportButton'), onclick: pending(function () {
-    const parts = target.value.split('/');
-    return post('/api/sets/import', { scope: parts[0], slug: parts[1] }).then(function (r) {
-      result.className = 'meta';
-      result.textContent = r.results.length
-        ? t('setImported')(r.results.filter(function (x) { return x.id; }).length) + ': ' + r.results.map(function (x) { return x.set + ' → ' + (x.id || t('setSkipped')); }).join(', ')
-        : t('setNothing');
-      refresh(r);
-    }).catch(function (e) { result.textContent = e.message; result.className = 'error'; });
-  }) });
-  return el('section', { class: 'card' }, [
-    el('h3', { text: t('setImport'), style: 'margin:0 0 6px' }), el('p', { class: 'meta', text: t('setImportHelp') }),
-    data.targets.length ? el('div', { class: 'form-row' }, [target, button]) : null, result
-  ]);
 }
 
 // --------------------------------------------------------------------- list
@@ -256,19 +213,23 @@ function drawResults() {
   results.appendChild(el('table', { class: 'list pl-table cl-table' }, [header(), el('tbody', {}, rows.map(row))]));
 }
 
+/** The set wizard: + New in the list's head and in its empty state (UX guidelines G6, G10). */
+export const NEW_SET = '#/new/set';
+
 function drawList() {
   const node = main();
-  node.appendChild(el('h2', { text: t('setTitle'), style: 'margin:0 0 6px;font-size:20px' }));
+  node.appendChild(el('div', { class: 'list-head' }, [
+    el('h2', { text: t('setTitle') }),
+    el('button', { class: 'primary sl-new', onclick: function () { go(NEW_SET); } }, [t('slNew')])
+  ]));
   node.appendChild(el('p', { class: 'meta', text: t('setHelp') }));
-  if (!view.list.items.length && !view.list.errors.length) node.appendChild(el('div', { class: 'empty sl-empty' }, [el('p', { text: t('slEmpty') })]));
+  if (!view.list.items.length && !view.list.errors.length) node.appendChild(el('div', { class: 'empty sl-empty' }, [el('p', { text: t('slEmpty') }), el('a', { href: NEW_SET, class: 'sl-empty-new', text: t('slNew') })]));
   else {
     node.appendChild(filterBar());
     view.results = el('div', { class: 'pl-results' });
     node.appendChild(view.results);
     drawResults();
   }
-  node.appendChild(importForm(view.data, function (data) { useData(data, view.state); drawList(); }));
-  node.appendChild(newSetForm(function (id) { go('#/sets/' + id); }));
 }
 
 function useData(data, state) {

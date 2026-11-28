@@ -245,9 +245,10 @@ describe('the Sets list', () => {
     expect(find((e) => e.has('pl-search'))[0]!.value).toBe('');
   });
 
-  it('shows "No sets yet" for an empty library', async () => {
+  it('shows "No sets yet" for an empty library, with + New to the set wizard', async () => {
     await open('#/sets', empty);
-    expect(find((e) => e.has('sl-empty'))[0]!.text()).toBe('No sets yet');
+    expect(find((e) => e.has('sl-empty'))[0]!.text()).toBe('No sets yet+ New');
+    expect(find((e) => e.has('sl-empty-new'))[0]!.getAttribute('href')).toBe('#/new/set');
     expect(find((e) => e.tagName === 'TABLE')).toEqual([]);
   });
 });

@@ -4,7 +4,8 @@
 //   #/new/character/<id>   the entry's steps: images, reference voice, the way to the character's page
 // Every write goes through the library's existing routes (`/api/library/new`, `/api/upload/library/<id>`,
 // `/api/library/import`), so the wizard creates exactly what `character new`, `add-file` and `import` create.
-import { addStrings, api, el, go, pending, post, setLang, showError, t, upload } from './lib.js';
+import { addStrings, api, el, go, pending, post, setLang, showError, t } from './lib.js';
+import { sendLibraryFiles } from './library-wizard.js';
 import { libraryFile } from './characters.js';
 import { step } from './wizard.js';
 
@@ -133,30 +134,16 @@ function voiceTile(box, entry) {
   if (entry.voice) box.appendChild(tile(entry, entry.voice.ref, t('roles').voice + ': ' + entry.voice.transcript));
 }
 
-/**
- * Upload the files one after the other into the entry; `show(entry)` draws the entry after each file, so every file
- * appears as it lands. `sent` holds the files that landed already: they are left out, and each file joins it once its
- * upload succeeds, so a retry sends only what failed or was not sent yet. A refusal stops the chain and names its
- * reason in `status`; the inputs keep their files, so the button retries. After a full success `done()` clears them.
- */
+/** Upload into the character `id`; `show(entry)` draws the entry after each file (`sendLibraryFiles`). */
 function sendFiles(id, chosen, sent, status, show, done) {
-  const items = chosen.filter(function (item) { return !sent.has(item.file); });
-  if (!items.length) return;
-  let chain = Promise.resolve();
-  status.className = 'sub cw-status';
-  items.forEach(function (item, index) {
-    chain = chain.then(function () {
-      const query = '?name=' + encodeURIComponent(item.file.name) + '&role=' + item.role + (item.role === 'voice' ? '&transcript=' + encodeURIComponent(item.transcript) : '');
-      return upload('/api/upload/library/' + encodeURIComponent(id) + query, item.file, function (share) {
-        status.textContent = t('uploading') + ' ' + (index + 1) + '/' + items.length + ' · ' + Math.round(share * 100) + '%';
-      }).then(function (listing) {
-        sent.add(item.file);
-        const entry = (listing.characters || []).filter(function (c) { return c.id === id; })[0];
-        if (entry) show(entry);
-      });
-    });
+  const items = chosen.map(function (item) {
+    return { file: item.file, query: 'role=' + item.role + (item.role === 'voice' ? '&transcript=' + encodeURIComponent(item.transcript) : '') };
   });
-  return chain.then(function () { status.textContent = ''; done(); }).catch(function (e) { status.textContent = e.message; status.className = 'error cw-status'; });
+  // The items are new objects, so `sent` keys by the file itself.
+  return sendLibraryFiles('/api/upload/library/', id, items, sent, status, 'cw-status', function (listing) {
+    const entry = (listing.characters || []).filter(function (c) { return c.id === id; })[0];
+    if (entry) show(entry);
+  }, done);
 }
 
 function entrySteps(id) {
