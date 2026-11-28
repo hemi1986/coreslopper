@@ -38,11 +38,11 @@ G6, G10. Same pattern as the Characters list (ST-060) and the project list (ST-0
 - `docs/board.md` and both board guides describe the list.
 
 ## Acceptance Criteria
-- [ ] The list shows every library set sorted by name, with cover, tags, reference/plate counts, used-in count and
+- [x] The list shows every library set sorted by name, with cover, tags, reference/plate counts, used-in count and
       origin (test with a fixture workspace)
-- [ ] Searching "wald" finds a set whose description mentions "Wald" (test)
-- [ ] Filter **unused** shows exactly the sets no production names in `library` (test)
-- [ ] Filter origin `<slug>` shows only the sets imported from that production (test)
-- [ ] `#/sets?tag=nacht&sort=plates&dir=desc` restores filter and sort after a reload
-- [ ] A filter with no match shows the no-match text, and **Reset filters** clears search and filters
-- [ ] An empty library shows "No sets yet"
+- [x] Searching "wald" finds a set whose description mentions "Wald" (test)
+- [x] Filter **unused** shows exactly the sets no production names in `library` (test)
+- [x] Filter origin `<slug>` shows only the sets imported from that production (test)
+- [x] `#/sets?tag=nacht&sort=plates&dir=desc` restores filter and sort after a reload
+- [x] A filter with no match shows the no-match text, and **Reset filters** clears search and filters
+- [x] An empty library shows "No sets yet"
