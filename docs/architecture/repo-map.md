@@ -81,11 +81,11 @@ node .claude/skills/adopt/scripts/repo-map.ts --adopt-slice <name>
 
 | # | Package | Score | Why |
 |---|---|---|---|
-| 1 | `packages/cli` (@coreslopper/cli) | 0.61 | 361 changed files in recent history; shared library; shared infrastructure – not a domain slice |
+| 1 | `packages/cli` (@coreslopper/cli) | 0.61 | 366 changed files in recent history; shared library; shared infrastructure – not a domain slice |
 | 2 | `scripts/pose` (coreslopper-pose) | 0.16 | 6 changed files in recent history |
 | 3 | `scripts/audio-analysis` (coreslopper-audio-analysis) | 0.15 | no churn or consumers recorded |
 | 4 | `packages/remotion` (@coreslopper/remotion) | 0.07 | 4 changed files in recent history; shared library; shared infrastructure – not a domain slice |
-| 5 | `packages/core` (@coreslopper/core) | 0.03 | 86 changed files in recent history; shared library; layer package – hosts many concepts, not a domain slice |
+| 5 | `packages/core` (@coreslopper/core) | 0.03 | 85 changed files in recent history; shared library; layer package – hosts many concepts, not a domain slice |
 | 6 | `packages/providers` (@coreslopper/providers) | 0.01 | 12 changed files in recent history; shared library; layer package – hosts many concepts, not a domain slice |
 
 ## Suggested first slice
