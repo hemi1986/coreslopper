@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.14.0](https://github.com/hemi1986/coreslopper/compare/v0.13.0...v0.14.0) (2026-11-28)
+
+
+### Features
+
+* **asset-library:** a wizard adds a library sound and sets its cue while it plays (ST-066) ([b1eb2ed](https://github.com/hemi1986/coreslopper/commit/b1eb2ed77d2058e50443945682ac3781ca22fc4f))
+* **asset-library:** a wizard creates or imports library sets (ST-065) ([31aec48](https://github.com/hemi1986/coreslopper/commit/31aec48c6e3345bf01ab40d51362948d4263689f))
+* **asset-library:** select several library entries in a list and delete them at once (ST-063) ([19e6259](https://github.com/hemi1986/coreslopper/commit/19e625917a71049d07c53b5ce06aaf75eda39b24))
+* **asset-library:** select several library entries in a list and delete them at once (ST-063) ([e62a8e8](https://github.com/hemi1986/coreslopper/commit/e62a8e8f2603982f16096ba7c4cc731c0db4867c))
+* **asset-library:** the board's Characters view is a searchable, filterable table (ST-060) ([78e040e](https://github.com/hemi1986/coreslopper/commit/78e040edd8f2f7dec4a7d5800dc6ea0d3a30eca5))
+* **asset-library:** the board's Sets view is a searchable, filterable table (ST-061) ([ab94f2d](https://github.com/hemi1986/coreslopper/commit/ab94f2dbaaadafe691bdc2b759664175ef1f47e5))
+* **asset-library:** the board's Sounds view is a searchable, filterable table with playback (ST-062) ([ec51013](https://github.com/hemi1986/coreslopper/commit/ec5101309a81f358ef5ff63e74ac9def4af93d7e))
+* **asset-library:** the New chooser offers the library, and a wizard creates or imports characters (ST-064) ([71deae5](https://github.com/hemi1986/coreslopper/commit/71deae56e2c6ce1c6f1dd00185f9c63edf8d6c17))
+* **demo-projects:** a demo cannot be approved (ST-068) ([21cd8cf](https://github.com/hemi1986/coreslopper/commit/21cd8cff5437cfaebd16ddca6776aea8caefbf87))
+* **demo-projects:** a demo's release day is free for another release (ST-068) ([176e3b5](https://github.com/hemi1986/coreslopper/commit/176e3b51856ede508a43da83d027d0ad38b5f7ca))
+* **demo-projects:** a public project is still approved and posted (ST-068) ([39b82ab](https://github.com/hemi1986/coreslopper/commit/39b82abe1ecb54e4fb190d2552bb05bd39945586))
+* **demo-projects:** demo productions are marked and make no work (ST-067) ([a28f319](https://github.com/hemi1986/coreslopper/commit/a28f319217d51867abef94ffd80659e66c98b825))
+* **demo-projects:** the autopilot leaves a demo alone (ST-068) ([1fb9490](https://github.com/hemi1986/coreslopper/commit/1fb949067f8f13589036a1809088cce2fd33e22d))
+* **demo-projects:** the board hides demo productions unless Show demos is on (ST-069) ([7567eb2](https://github.com/hemi1986/coreslopper/commit/7567eb28ab3644ee001db2a7ee21e943de74b268))
+
+
+### Bug Fixes
+
+* **asset-library:** a retried upload sends only the files that did not land (ST-064) ([8e6c6c1](https://github.com/hemi1986/coreslopper/commit/8e6c6c10f7bd7883beba6fdee9cac0e4703fe902))
+* **asset-library:** mark name and description as required in the character wizard (ST-064) ([ccbcfd4](https://github.com/hemi1986/coreslopper/commit/ccbcfd452213224e56457cb2f674d3d82d3cb943))
+* **asset-library:** store the cue and trim the user set, refuse a non-number in the sound wizard (ST-066) ([2ecc7b2](https://github.com/hemi1986/coreslopper/commit/2ecc7b241584d3880e345fde9b355447e2cd9253))
+
+
+### Documentation
+
+* **asset-library:** specify the asset library stories (ST-060–ST-066) ([54fc88e](https://github.com/hemi1986/coreslopper/commit/54fc88e49c54687ba7cc07a18fc985e0b1c0c876))
+* **demo-projects:** a demo production is not released (ST-068) ([102d39c](https://github.com/hemi1986/coreslopper/commit/102d39c9464063b0237e2a0ebe0ee26a65fe250a))
+* **demo-projects:** specify demo productions (ST-067–ST-069) ([c32d505](https://github.com/hemi1986/coreslopper/commit/c32d5058e20807bb67957bc553b1b503edd2dba8))
+
 ## [0.13.0](https://github.com/hemi1986/coreslopper/compare/v0.12.0...v0.13.0) (2026-11-28)
 
 
