@@ -138,7 +138,7 @@
       "path": "packages/cli",
       "score": 0.61,
       "reasons": [
-        "388 changed files in recent history",
+        "379 changed files in recent history",
         "shared library",
         "shared infrastructure – not a domain slice"
       ]
@@ -170,7 +170,7 @@
       "path": "packages/core",
       "score": 0.03,
       "reasons": [
-        "101 changed files in recent history",
+        "100 changed files in recent history",
         "shared library",
         "layer package – hosts many concepts, not a domain slice"
       ]
@@ -179,7 +179,7 @@
       "path": "packages/providers",
       "score": 0.01,
       "reasons": [
-        "15 changed files in recent history",
+        "13 changed files in recent history",
         "shared library",
         "layer package – hosts many concepts, not a domain slice"
       ]
@@ -353,6 +353,7 @@
         "tests/release-folder.test.ts",
         "tests/release-images.test.ts",
         "tests/release-internal.test.ts",
+        "tests/release-microsite.test.ts",
         "tests/release-plan.test.ts",
         "tests/release-records.test.ts",
         "tests/release-reel.test.ts",
@@ -380,7 +381,7 @@
       "reasons": [
         "3 layers: cli, core, tests",
         "3 packages",
-        "41 files"
+        "42 files"
       ],
       "adopted": true,
       "adoptedAt": "2026-11-22"
