@@ -1,0 +1,3 @@
+{"version":1,"target":"ST-063","entries":[
+{"key":"claude-code|66e7d4ca-03af-4014-a5f1-af5d06972e03|main|ST-063|kontext|2026-11-28T12:45:33.927Z|claude-code|66e7d4ca-03af-4014-a5f1-af5d06972e03|main|anthropic/claude-opus-5-5","target":"ST-063","phase":"kontext","harness":"claude-code","run":"66e7d4ca-03af-4014-a5f1-af5d06972e03","session":"66e7d4ca-03af-4014-a5f1-af5d06972e03","agent":"main","agentType":"main","model":"claude-opus-5-5","provider":"anthropic","start":"2026-11-28T12:45:33.927Z","end":"2026-11-28T12:45:40.508Z","messages":1,"tokens":{"input":2,"output":441,"reasoning":128,"cacheRead":144747,"cacheWrite":6965,"cacheWrite1h":6965},"harnessCostUsd":null,"agentMs":6581,"userWaitMs":0,"recorded":"2026-11-28T12:45:40.611Z"}
+]}

@@ -9,7 +9,7 @@ risk: null
 depends_on: [ST-060, ST-061, ST-062]
 labels: [feature:asset-library]
 feature: asset-library
-status: ready
+status: in-progress
 ---
 
 ## Context
