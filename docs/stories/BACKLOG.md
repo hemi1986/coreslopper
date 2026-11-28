@@ -4,15 +4,20 @@
 
 **Progress: 31 of 31 domain stories done** · scenarios 108 of 108
 
-**59 stories** · In Progress: 0 · Ready: 7 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 52 · Superseded: 0
+**59 stories** · In Progress: 1 · Ready: 6 · Ready for Human Review: 0 · In Review: 0 · Draft: 0 · Done: 52 · Superseded: 0
 
 Within each section: by priority, then by story ID, with dependencies pulled in front. Open questions: [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md)
+
+## In Progress
+
+| ID | Title | Type | Context | Priority | Size | Risk | Depends on |
+|---|---|---|---|---|---|---|---|
+| [ST-056](ST-056-the-board-has-a-top-navigation-and-full-width.md) | The board has a top navigation and uses the full width | task | – | must | – | – | – |
 
 ## Ready
 
 | ID | Title | Type | Context | Priority | Size | Risk | Depends on |
 |---|---|---|---|---|---|---|---|
-| [ST-056](ST-056-the-board-has-a-top-navigation-and-full-width.md) | The board has a top navigation and uses the full width | task | – | must | – | – | – |
 | [ST-057](ST-057-the-boards-project-list.md) | The board's project list with search, filters and series grouping | task | – | must | – | – | ST-056 |
 | [ST-052](ST-052-the-board-shows-the-release-shape.md) | The release board names the release shape and shows only its platforms | task | – | should | – | – | ST-047, ST-048 |
 | [ST-053](ST-053-a-short-episode-joins-the-series-playlist.md) | A short episode's YouTube post asks for the series playlist | task | – | should | – | – | ST-048 |

@@ -9,7 +9,7 @@ risk: null
 depends_on: []
 labels: [feature:board-redesign]
 feature: board-redesign
-status: ready
+status: in-progress
 ---
 
 ## Context
@@ -37,10 +37,10 @@ The screen's one job is to get the user to a view. The navigation is the board's
   `docs/engineering/conventions.md` (board shell) follow.
 
 ## Acceptance Criteria
-- [ ] The navigation shows the entries of both groups, + New, Guide and Refresh in this order, and no project or
+- [x] The navigation shows the entries of both groups, + New, Guide and Refresh in this order, and no project or
       series (test of the page script or a DOM check)
-- [ ] The active entry is marked for every route, Projects for `#/p/<slug>` and its tabs
-- [ ] At 1280 px and 1440 px window width no view scrolls horizontally (checked by hand with the sandbox workspace)
-- [ ] A formatted document and the guide keep a line length of about 80 characters at 1440 px
-- [ ] Refresh with a playing render keeps the review view and reloads the navigation (existing behaviour, still green)
-- [ ] `docs/board.md` and both board guides describe the new navigation
+- [x] The active entry is marked for every route, Projects for `#/p/<slug>` and its tabs
+- [x] At 1280 px and 1440 px window width no view scrolls horizontally (checked by hand with the sandbox workspace)
+- [x] A formatted document and the guide keep a line length of about 80 characters at 1440 px
+- [x] Refresh with a playing render keeps the review view and reloads the navigation (existing behaviour, still green)
+- [x] `docs/board.md` and both board guides describe the new navigation

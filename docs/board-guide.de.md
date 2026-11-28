@@ -16,11 +16,13 @@ npm run cli -- board          # http://127.0.0.1:4848
 
 Oder im Board-Container, der auch den Watchdog ausführt: `docker compose up -d` (siehe [board.md](board.md#start-it)). Öffne http://127.0.0.1:4848 im Browser.
 
-Das Board aktualisiert sich nicht von selbst. Klicke oben in der Navigation auf **↻ Aktualisieren**, nachdem Claude Code gearbeitet hat. Ein laufendes Video oder eine Notiz, die du gerade schreibst, bleiben erhalten.
+Die Navigation ist die Leiste oben. **Arbeit** enthält Produktion, Projekte und Release-Kalender; **Bibliothek** enthält Figuren, Sets und Sounds. **+ Neu** legt etwas Neues an, **Anleitung** und **↻ Aktualisieren** stehen abgesetzt rechts. Der Eintrag der Ansicht, auf der du bist, ist markiert; die Tabs eines Projekts und eine Serie markieren **Projekte**.
+
+Das Board aktualisiert sich nicht von selbst. Klicke rechts in der Navigation auf **↻ Aktualisieren**, nachdem Claude Code gearbeitet hat. Ein laufendes Video oder eine Notiz, die du gerade schreibst, bleiben erhalten.
 
 ## Produktion: wo du dran bist
 
-![Die Produktionsansicht mit drei Projekten und einer Serie](assets/board/de/production.webp)
+![Die Produktionsansicht mit drei Projekten und einer Serie, unter der Navigationsleiste](assets/board/de/production.webp)
 
 **Produktion** ist die Startansicht. Jede Karte ist ein Projekt oder eine Serie:
 
@@ -28,7 +30,7 @@ Das Board aktualisiert sich nicht von selbst. Klicke oben in der Navigation auf 
 - **Läuft**: Claude Code oder ein Render arbeitet daran.
 - Der farbige Streifen zeigt die Stages. Darunter stehen die aktuelle Stage und das Budget.
 
-Die Navigation links listet alle Projekte und Serien. Ein fertiges Projekt klappt am Ende in **Fertig** ein: ein veröffentlichtes, und ein internes Projekt (**Fertig – nicht öffentlich**), sobald alle Stages fertig sind.
+Die Navigation listet kein Projekt: **Projekte** öffnet die Liste aller Projekte und Serien, die veröffentlichten eingeschlossen.
 
 ## Ein Musikvideo anlegen
 
@@ -48,7 +50,7 @@ Danach lädst du den Song (den Mix) hoch und, falls vorhanden, den Vocal-Stem. M
 
 ## Ein Projekt verfolgen
 
-Klicke in der Navigation auf ein Projekt.
+Klicke auf **Produktion** auf die Karte eines Projekts, oder öffne **Projekte** und klicke auf seine Zeile.
 
 ![Der Produktions-Tab eines fertigen Projekts](assets/board/de/project.webp)
 
